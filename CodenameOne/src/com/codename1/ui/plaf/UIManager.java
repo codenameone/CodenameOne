@@ -1065,6 +1065,14 @@ public class UIManager {
             themeProps.put("PickerButtonTablet.press#derive", "Button");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("Picker")) {
+            themeProps.put("Picker.derive", "TextField");
+            themeProps.put("Picker.sel#derive", "TextField");
+            themeProps.put("Picker.press#derive", "TextField");
+            themeProps.put("Picker.dis#derive", "TextField");
+            themeProps.put("Picker.sel#border", Border.createLineBorder(1, 0x206afb));
+        }
+        
         
     }
 

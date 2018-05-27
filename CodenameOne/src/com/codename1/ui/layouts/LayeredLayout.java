@@ -36,6 +36,8 @@ import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -3206,4 +3208,39 @@ public class LayeredLayout extends Layout {
 
     }
 
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+        return true;
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        java.util.List<Component> cmps = new ArrayList<Component>();
+        for (Component cmp : parent) {
+            cmps.add(cmp);
+        }
+        
+        Collections.sort(cmps, new Comparator<Component>() {
+
+            @Override
+            public int compare(Component o1, Component o2) {
+                if (o1.getY() < o2.getY()) {
+                    return -1;
+                } else if (o1.getY() > o2.getY()) {
+                    return 1;
+                } else {
+                    if (o1.getX() < o2.getX()) {
+                        return -1;
+                    } else if (o1.getX() > o2.getX()) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+            }
+            
+        });
+        Component[] cmpArr = cmps.toArray(new Component[cmps.size()]);
+        return cmpArr;
+    } 
 }

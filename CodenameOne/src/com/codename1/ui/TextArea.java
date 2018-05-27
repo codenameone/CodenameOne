@@ -358,6 +358,7 @@ public class TextArea extends Component {
      */
     private TextArea(String text, int maxSize, int rows, int columns, int constraint){
         setUIID("TextArea");
+        setPreferredTabIndex(0);
         this.maxSize = maxSize;
         setText(text);
         setConstraint(constraint);
@@ -479,6 +480,16 @@ public class TextArea extends Component {
         return editable;
     }
 
+    @Override
+    public int getPreferredTabIndex() {
+        if (isEditable()) {
+            return super.getPreferredTabIndex();
+        }
+        return -1;
+    }
+
+    
+    
     /**
      * Sets this text area to be editable or readonly
      * 
@@ -1855,7 +1866,6 @@ public class TextArea extends Component {
      * Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
      */
     public void startEditing() {
-        System.out.println("Editing starting");
         if(!Display.getInstance().isTextEditing(this)) {
             final TextArea cmp = this;
             //registerAsInputDevice();
@@ -1866,6 +1876,7 @@ public class TextArea extends Component {
     /**
      * Launches the text field editing in a callserially call
      */
+    @Override
     public void startEditingAsync() {
         if(!Display.getInstance().isTextEditing(this)) {
             if (Display.impl.usesInvokeAndBlockForEditString()) {
@@ -1903,6 +1914,7 @@ public class TextArea extends Component {
      * Indicates whether we are currently editing this text area
      * @return true if Display.getInstance().isTextEditing(this)
      */
+    @Override
     public boolean isEditing() {
         return Display.getInstance().isTextEditing(this);
     }
@@ -1920,6 +1932,7 @@ public class TextArea extends Component {
      * Stops text editing of this field if it is being edited
      * @param onFinish invoked when editing stopped
      */
+    @Override
     public void stopEditing(Runnable onFinish) {
         if(isEditing()) {
             Display.getInstance().stopEditing(this, onFinish);

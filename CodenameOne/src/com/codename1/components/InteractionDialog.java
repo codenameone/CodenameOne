@@ -407,6 +407,14 @@ public class InteractionDialog extends Container {
     }
     
     /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     * @param onFinish Callback called when dispose animation is complete.
+     */
+    public void disposeToTheBottom(Runnable onFinish) {
+        disposeTo(Component.BOTTOM, onFinish);
+    }
+    
+    /**
      * Removes the interaction dialog from view with an animation to the top
      */
     public void disposeToTheTop() {
@@ -422,6 +430,10 @@ public class InteractionDialog extends Container {
     
     
     private void disposeTo(int direction) {
+        disposeTo(direction, null);
+    }
+    
+    private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
         final Container p = getParent();
         if(p != null) {
@@ -454,6 +466,9 @@ public class InteractionDialog extends Container {
                                 pp.revalidate();
                                 cleanupLayer(f);
                             } 
+                            if (onFinish != null) {
+                                onFinish.run();
+                            }
                         }
                     });
                 } else {
@@ -463,9 +478,15 @@ public class InteractionDialog extends Container {
                     p.remove();
                     pp.removeAll();
                     pp.revalidate();
+                    if (onFinish != null) {
+                        onFinish.run();
+                    }
                 }
             } else {
                 remove();
+                if (onFinish != null) {
+                    onFinish.run();
+                }
             }
         }
     }

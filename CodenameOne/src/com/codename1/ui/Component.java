@@ -59,6 +59,12 @@ import java.util.HashMap;
  */
 public class Component implements Animation, StyleListener {
     
+    private int tabIndex;
+    // -1 = the element should be focusable, but should not be reachable via sequential keyboard navigation. Mostly useful to create accessible widgets 
+    // 0 =  the element should be focusable in sequential keyboard navigation, but its order is defined by the container's source order.
+    
+    private int preferredTabIndex=-1;
+    
     /**
      * Indicates whether the component displays the material design ripple effect
      */
@@ -2866,6 +2872,110 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Sets the tab index of the component.  This method is for internal use only.  To set the
+     * preferred tab index, use {@link #setPreferredTabIndex(int) }
+     * @param index The tab index.
+     * @deprecated This method is called internally by the layout manager each time the traversal order of the form is queried.  Use {@link #setPreferredTabIndex(int) } instead.
+     * @see #getPreferredTabIndex() 
+     * @see #setPreferredTabIndex(int) 
+     * @see #getTabIndex() 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
+     */
+    public void setTabIndex(int index) {
+        tabIndex = index;
+    }
+    
+    /**
+     * Gets the tab index of the component. This value is only useful immediately
+     * after calling {@link Form#getTabIterator(com.codename1.ui.Component) } on the 
+     * form or {@link Container#updateTabIndices(int) } in the parent component.
+     * @return The tab index of the component.
+     * @see #getPreferredTabIndex() 
+     * @see #setTabIndex(int) 
+     * @see #setPreferredTabIndex(int) 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
+     * @see Container#updateTabIndices(int) 
+     * @deprecated This method is used internally when querying the traversal order of the form.  Use {@link #getPreferredTabIndex() } to get the preferred tab index.
+     * 
+     */
+    public int getTabIndex() {
+        return tabIndex;
+    }
+    
+    /**
+     * Sets the preferred tab index of the component.
+     * @param index The preferred tab index
+     * @see #getPreferredTabIndex() 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
+     * @see Container#updateTabIndices(int) 
+     */
+    public void setPreferredTabIndex(int index) {
+        preferredTabIndex = index;
+    }
+    
+    /**
+     * Gets the preferred tab index of this component.  Tab indices are used to specify the traversal order
+     * when tabbing from component to component in a form.  
+     * 
+     * <p>Tab index meanings work similar to the HTML {@literal tabIndex}
+     * attribute. A tab Index of {@literal -1} (the default value) results in the field not being traversable
+     * using the keyboard (or using the next/prev buttons in devices' virtual keyboards).  A tab index of {@literal 0}
+     * results in the component's traversal order being dictated by the natural traversal order of the form.</p>
+     * 
+     * <p>Use {@link Form#getTabIterator(com.codename1.ui.Component) } to obtain the complete traversal order for
+     * all components in the form.</p>
+     * 
+     * <p>Best practice is to only explicitly set preferred tabIndex values of {@literal 0} if you want the component
+     * to be traversable, or {@literal -1} if you don't want the component to be traversable.  Explicitly setting 
+     * a positive preferred tab index may result in unexpected results.</p>
+     * 
+     * <h3>How the Preferred Tab Index is Used</h3>
+     * 
+     * <p>When the user tries to "tab" to the next field (or presses the "Next" button on the virtual keyboard), this 
+     * triggers a call to {@link Form#getTabIterator(com.codename1.ui.Component) }, crawls the component hierarchy and
+     * returns a {@link java.util.ListIterator} of all of the traversable fields in the form in the order they should 
+     * be traversed. This order is determined by the layout managers on the form.  The core layout managers define 
+     * sensible traversal orders by default.  If you have a custom layout manager, you can override its traversal
+     * order by implementing the {@link com.codename1.ui.layouts.Layout#overridesTabIndices(com.codename1.ui.Container) } and
+     * {@link com.codename1.ui.layouts.Layout#getChildrenInTraversalOrder(com.codename1.ui.Container) } methods.</p>
+     * @return 
+     */
+    public int getPreferredTabIndex() {
+        if (isEnabled() && isVisible() && isFocusable()) {
+            return preferredTabIndex;
+        }
+        return -1;
+    }
+    
+    /**
+     * Sets whether this component is traversable using the keyboard using tab, next, previous keys.  This is 
+     * just a wrapper around {@link #setPreferredTabIndex(int) } that sets the tab index to 0 if the component
+     * should be traversable, and -1 if it shouldn't be.
+     * 
+     * <p>Note:  This method is marked final because this is just a convenience wrapper around {@link #setPreferredTabIndex(int) }</p>
+     * 
+     * @param traversable True to make the component traversable.
+     */
+    public final void setTraversable(boolean traversable) {
+        if (traversable && getPreferredTabIndex() < 0) {
+            setPreferredTabIndex(0);
+        } else if (!traversable && getPreferredTabIndex() >= 0) {
+            setPreferredTabIndex(-1);
+        }
+    }
+    
+    /**
+     * Checks if this component should be traversable using the keyboard using tab, next, previous keys.
+     * 
+     * <p>Note: This method is marked final because it is just a convenience wrapper around {@link #getPreferredTabIndex() }</p>
+     * @return 
+     */
+    public final boolean isTraversable() {
+        return getPreferredTabIndex() >= 0;
+    }
+    
+    
+    /**
      * Indicates the values within the component have changed and preferred 
      * size should be recalculated
      * 
@@ -5454,6 +5564,51 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * If the component {@link #isEditable() }, then this will start the editing
+     * process.  For TextFields, this results in showing the keyboard and allowing
+     * the user to edit the input.  For the Picker, this will display the popup.
+     * 
+     * @see #stopEditing(java.lang.Runnable) 
+     * @see #isEditing() 
+     * @see #isEditable() 
+     */
+    public void startEditingAsync() {
+        // Empty implementation overridden by subclass
+    }
+    
+    /**
+     * Stops the editing process.
+     * @param onFinish Callback called when the editing is complete.
+     * @see #startEditingAsync() 
+     * @see #isEditing() 
+     * @see #isEditable() 
+     */
+    public void stopEditing(Runnable onFinish) {
+        
+    }
+    
+    /**
+     * Checks if the component is currently being edited.
+     * 
+     * @return True if the component is currently being edited.
+     * @see #startEditingAsync() 
+     * @see #stopEditing(java.lang.Runnable) 
+     * @see #isEditable() 
+     */
+    public boolean isEditing() {
+        return false;
+    }
+    
+    /**
+     * Checks to see if the component is editable.   This is used for next/previous
+     * focus traversal on forms.
+     * @return 
+     */
+    public boolean isEditable() {
+        return false;
+    }
+    
+    /**
      * This is a callback method to inform the Component when it's been laidout
      * on the parent Container
      */
@@ -5555,7 +5710,7 @@ public class Component implements Animation, StyleListener {
     public Component getNextFocusDown() {
         return nextFocusDown;
     }
-
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
