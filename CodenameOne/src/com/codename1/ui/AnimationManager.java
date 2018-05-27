@@ -27,6 +27,7 @@ import com.codename1.io.Util;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.events.ScrollListener;
 import java.util.ArrayList;
+import java.util.TreeMap;
 
 /**
  * Animation manager concentrates all of the animations for a given form into a single place that allows us
@@ -37,10 +38,11 @@ import java.util.ArrayList;
  */
 public final class AnimationManager {
     private final Form parentForm;
-    private ArrayList<ArrayList<ComponentAnimation>> anims_queues = new ArrayList<ArrayList<ComponentAnimation>>(); //animations queues. Animations of a same queue would be run in serie while queues run in parrallel
-    private ArrayList<ArrayList<Runnable>> postAnimations_queues = new ArrayList<ArrayList<Runnable>>(); //runnables that would run when all animations of a specific queue have finished 
+    private TreeMap<Integer, ArrayList<ComponentAnimation>> anims_queues = new TreeMap<Integer, ArrayList<ComponentAnimation>>(); //animations queues. Animations of a same queue would be run in serie while queues run in parrallel
+    private TreeMap<Integer, ArrayList<Runnable>> postAnimations_queues = new TreeMap<Integer, ArrayList<Runnable>>(); //runnables that would run when all animations of a specific queue have finished 
     private ArrayList<Runnable> postAllAnimations =  new ArrayList<Runnable>(); //runnables that would run when all animations, of all queues, have finished 
-        
+       
+    
     AnimationManager(Form parentForm) {
         this.parentForm = parentForm;
     }
@@ -51,26 +53,24 @@ public final class AnimationManager {
      * @return true if an animation is currently in progress in this queue
      */
     public boolean isAnimating(int qIndex) {
-    	if (qIndex >= 0 && qIndex < anims_queues.size()) {
-    		ArrayList<ComponentAnimation> anims = anims_queues.get(qIndex);
-    		if (anims != null) {
-    			int size = anims.size();
-    			if(size == 0) {
-    				return false;
-    			}
-    			if(size > 1) {
-    				return true;
-    			}
-    			// special case where an animation finished but wasn't removed from the queue just yet...
-    			return anims.get(0).isInProgress();
+    	ArrayList<ComponentAnimation> anims = anims_queues.get(qIndex);
+    	if (anims != null) {
+    		int size = anims.size();
+    		if(size == 0) {
+    			return false;
     		}
+    		if(size > 1) {
+    			return true;
+    		}
+    		// special case where an animation finished but wasn't removed from the queue just yet...
+    		return anims.get(0).isInProgress();
     	}
     	return false;
     }
     
     
     public boolean isAnimating() {
-    	for (int i=0; i<anims_queues.size(); i++) {
+    	for (int i: anims_queues.keySet()) {
     		if (isAnimating(i)) {
     			return true;
     		}
@@ -81,30 +81,28 @@ public final class AnimationManager {
     
     void updateAnimations() {
     	boolean animated = false;
-    	for (int i=0; i<anims_queues.size(); i++) {
+    	for (int i: anims_queues.keySet()) {
     		ArrayList<ComponentAnimation> anims = anims_queues.get(i);
-    		if (anims != null) {
-	    	    if(anims.size() > 0) {
-		            ComponentAnimation c = anims.get(0);
-		            if(c.isInProgress()) {
-		                c.updateAnimationState();
-		            } else {
-		                c.updateAnimationState();
-		                anims.remove(c);
-		            }
-		            animated = true;
-		        } else {  ////execute postAnimations that should be run when this queue has finished animating
-		        	if (i >= 0 && i < postAnimations_queues.size()) { //a queue might not have any associated postAnimations so must ensure that postAnimations_queues.get(i) would not throw an outofbounds exception
-		        		ArrayList<Runnable> postAnimations = postAnimations_queues.get(i);
-		        		if (postAnimations != null) {
-		        			while(postAnimations.size() > 0) {
-		        				postAnimations.get(0).run();
-		        				postAnimations.remove(0);
-		        			}
-		        		}
-		        	}
-		        }
+    		//if (anims != null) {
+    		if(anims.size() > 0) {
+    			ComponentAnimation c = anims.get(0);
+    			if(c.isInProgress()) {
+    				c.updateAnimationState();
+    			} else {
+    				c.updateAnimationState();
+    				anims.remove(c);
+    			}
+    			animated = true;
+    		} else {  ////execute postAnimations that should be run when this queue has finished animating
+    			ArrayList<Runnable> postAnimations = postAnimations_queues.get(i);
+    			if (postAnimations != null) {
+    				while(postAnimations.size() > 0) {
+    					postAnimations.get(0).run();
+    					postAnimations.remove(0);
+    				}
+    			}
     		}
+    		//}
     	}
     	if (!animated) { //execute postAnimations that should be run when all queues have finished animating
     		while(postAllAnimations.size() > 0) {
@@ -115,14 +113,14 @@ public final class AnimationManager {
     }
 
     void flush() {
-    	for (int i=0; i<anims_queues.size(); i++) {
+    	for (int i: anims_queues.keySet()) {
     		ArrayList<ComponentAnimation> anims = anims_queues.get(i);
-    		if (anims != null) {
-    			while(anims.size() > 0) {
-    				anims.get(0).flush();
-    				anims.remove(0);
-    			}
+    		//if (anims != null) {
+    		while(anims.size() > 0) {
+    			anims.get(0).flush();
+    			anims.remove(0);
     		}
+    		//}
     	}
     }
     
@@ -135,23 +133,15 @@ public final class AnimationManager {
      * @param qIndex: the index of the queue
      */
     public void addAnimation(ComponentAnimation an, int qIndex) {
-    	if (qIndex >= 0) {
-    		ArrayList<ComponentAnimation> anims = null;
-    		if (qIndex < anims_queues.size()) {
-    			anims = anims_queues.get(qIndex);
-    			if (anims == null) {
-        			anims = new ArrayList<ComponentAnimation>();
-        			anims_queues.set(qIndex, anims);
-        		}
-    		}
-    		else {
-    			anims = new ArrayList<ComponentAnimation>();
-    			anims_queues.add(qIndex, anims);
-    		}
-    		anims.add(an);
-    		Display.getInstance().notifyDisplay();
+    	ArrayList<ComponentAnimation> anims = anims_queues.get(qIndex);
+    	if (anims == null) {
+    		anims = new ArrayList<ComponentAnimation>();
+    		anims_queues.put(qIndex, anims);
     	}
+    	anims.add(an);
+    	Display.getInstance().notifyDisplay();
     }
+    
     
     /**
      * Adds the animation to the end of a specific animation queue and blocks the current thread until the animation
@@ -267,24 +257,30 @@ public final class AnimationManager {
     }
     
     
+    private int lastqind = 0; //a cache for the last automatically attributed qIndex
     /**
      * @return the index of the first empty queue
      */
     private int firstEmptyQueue() {
-    	for (int i=0; i<anims_queues.size(); i++) {
+    	for (int i: anims_queues.keySet()) {
     		ArrayList<ComponentAnimation> aq = anims_queues.get(i);
     		if (aq == null || aq.isEmpty()) {
     			//ensure that there is no postAnimation queue pending associated to that queue
-    			ArrayList<Runnable> postAnimations = null;
-    			if (i >= 0 && i < postAnimations_queues.size()) { 
-    				postAnimations = postAnimations_queues.get(i);
-    			}
+    			ArrayList<Runnable> postAnimations = postAnimations_queues.get(i);
     			if (postAnimations == null || postAnimations.isEmpty()) {
 					return i;
 				}
     		}
     	}
-    	return anims_queues.size();
+    	/*
+    	while (anims_queues.containsKey(lastqind)) { //ensure user did not manually declare a queue with this ID
+    		lastqind++;
+    	}
+    	*/
+    	if (!anims_queues.isEmpty() && lastqind <= anims_queues.lastKey()) { //since this is a treemap, lastkey contains the maximum current qIndex
+    		lastqind = anims_queues.lastKey()+1;
+    	}
+    	return lastqind;
     }
     
     
@@ -342,39 +338,25 @@ public final class AnimationManager {
      * @param qIndex: the index of the queue 
      */
     public void flushAnimation(Runnable r, int qIndex) {
-    	if(isAnimating(qIndex)) { //qIndex necessarily >= 0
-    		ArrayList<Runnable> postAnimations = null;
-    		if (qIndex < postAnimations_queues.size()) {
-    			postAnimations = postAnimations_queues.get(qIndex);
-    			if (postAnimations == null) {
-    				postAnimations = new ArrayList<Runnable>();
-    				postAnimations_queues.set(qIndex, postAnimations);
-    			}
-    		}
-    		else {
+    	if(isAnimating(qIndex)) { 
+    		ArrayList<Runnable> postAnimations = postAnimations_queues.get(qIndex);
+    		if (postAnimations == null) {
     			postAnimations = new ArrayList<Runnable>();
-    			postAnimations_queues.add(qIndex, postAnimations);
+    			postAnimations_queues.put(qIndex, postAnimations);
     		}
     		postAnimations.add(r);
     	} else {
     		r.run();
     	}
     }
-    
-    /**
-     * Invokes the runnable when all animations of the main queue (i.e queue with index 0) have completed
-     * @param r the runnable that will be invoked after the animations of the main queue
-     */
-    public void flushAnimation(Runnable r) {
-    	flushAnimation(r, 0);
-    }
+        
     
     
     /**
      * Invokes the runnable when all animations (of all queues) have completed
      * @param r: the runnable that will be invoked after the animations of the queue
      */
-    public void flushAnimationAll(Runnable r) {
+    public void flushAnimation(Runnable r) {
         if(isAnimating()) {
         	postAllAnimations.add(r);
         } else {
