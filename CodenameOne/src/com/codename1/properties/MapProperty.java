@@ -23,13 +23,9 @@
 
 package com.codename1.properties;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -47,6 +43,19 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      */
     public MapProperty(String name) {
         super(name);
+    }
+    
+
+    /**
+     * Constructs a property with the given name 
+     * @param name the name of the property
+     * @param genericTypeKey the generic type of the key
+     * @param genericTypeValue the generic type of the value
+     */
+    public MapProperty(String name, Class genericTypeKey, Class genericTypeValue) {
+        super(name);
+        validateCollectionType(genericTypeKey);
+        validateCollectionType(genericTypeValue);
     }
     
     /**

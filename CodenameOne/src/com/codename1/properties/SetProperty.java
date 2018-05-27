@@ -60,9 +60,6 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
         for(T t : values) {
             value.add(t);
         }
-        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
-            throw new IllegalArgumentException(
-                    "the element type class needs to be a subclass of PropertyBusinessObject");
     }
     
     /**

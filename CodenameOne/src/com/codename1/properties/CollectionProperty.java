@@ -39,7 +39,8 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
       
     
     public CollectionProperty(String name, Class genericType) {
-    	 super(name, genericType);
+        super(name, genericType);
+        validateCollectionType(genericType);
     }
     
     
@@ -114,6 +115,5 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
      * @return true if the given element is contained in the collection property  
      */
     public abstract boolean contains(T element);
-
 
 }

@@ -204,4 +204,21 @@ public class PropertyBase<T, K> {
         }
         return l;
     }
+
+    /**
+     * Validates that the collection type is valid and throws an exception otherwise
+     * @param elementType the generic type of the collection
+     */
+    protected final void validateCollectionType(Class elementType) {
+        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) {
+            if(elementType == String.class || elementType == Integer.class ||
+                elementType == Long.class  || elementType == Double.class ||
+                elementType == Byte.class  || elementType == Float.class ||
+                elementType == Boolean.class  || elementType == Character.class) {
+                return;
+            }
+            throw new IllegalArgumentException(
+                    "the element type class needs to be a subclass of PropertyBusinessObject");
+        }
+    }
 }
