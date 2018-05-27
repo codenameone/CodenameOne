@@ -422,6 +422,7 @@ public class MediaPlayer extends Container {
         if(seekBar) {
             buttonsBar = new Container(new BorderLayout());
             progress = new Slider();
+            progress.setEditable(true);
             buttonsBar.addComponent(BorderLayout.CENTER, 
                 FlowLayout.encloseCenterMiddle(progress));
             progress.addActionListener(new ActionListener() {
