@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -132,6 +133,37 @@ public class CN1CSSCLI extends Application {
 
                 @Override
                 public void run() {
+                    
+                    // When run in watch mode, a parent process can provide a port
+                    // number that the cli compiler can connect to in order to detect
+                    // if the parent process is "dead".  If this socket disconnects 
+                    // for any reason, we know the parent process is dead and we can
+                    // exit.
+                    final String parentPort = System.getProperty("parent.port", null);
+                    if (parentPort != null) {
+                        Thread pulseThread = new Thread(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                try {
+                                    Socket sock = new Socket("127.0.0.1", Integer.parseInt(parentPort));
+                                    sock.setKeepAlive(true);
+                                    InputStream is = sock.getInputStream();
+                                    while (is.read() >= 0) {
+                                        // Still alive
+                                    }
+                                    
+                                } catch (IOException ex) {
+                                    Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                                System.exit(0);
+                            }
+                            
+                        });
+                        pulseThread.setDaemon(true);
+                        pulseThread.start();
+                    }
+                    
                     final Path path = inputFile.getParentFile().toPath();
                     
                     try (final WatchService watchService = FileSystems.getDefault().newWatchService()) {
@@ -196,6 +228,8 @@ public class CN1CSSCLI extends Application {
     }
     
     
+    
+    
     private static void compile(File inputFile, File outputFile) throws IOException {
         File baseDir = inputFile.getParentFile().getParentFile();
         File checksumsFile = getChecksumsFile(baseDir);
@@ -215,7 +249,9 @@ public class CN1CSSCLI extends Application {
                 String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
                 String previousChecksum = checksums.get(inputFile.getName());
                 if (previousChecksum == null || !previousChecksum.equals(outputFileChecksum)) {
-                    File bak = new File(inputFile.getParentFile(), outputFile.getName()+"."+System.currentTimeMillis()+".bak");
+                    File backups = new File(inputFile.getParentFile(), ".backups");
+                    backups.mkdirs();
+                    File bak = new File(backups, outputFile.getName()+"."+System.currentTimeMillis()+".bak");
                     Files.copy(outputFile.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING);
                     System.out.println(outputFile+" has been modified since it was last compiled.  Making copy at "+bak);
                     outputFile.delete();

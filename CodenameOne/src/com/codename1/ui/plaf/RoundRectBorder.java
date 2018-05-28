@@ -357,7 +357,8 @@ public class RoundRectBorder extends Border {
             // draw a gradient of sort for the shadow
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
-                fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
+                int iterOpacity = Math.max(0, Math.min(255, (int)(shadowOpacity * (shadowSpreadL - iter)/(float)shadowSpreadL)));
+                drawShape(tg, 0, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
                 tg.translate(-iter, -iter);
             }
             
@@ -555,6 +556,19 @@ public class RoundRectBorder extends Border {
             g.setColor(strokeColor);
             g.drawShape(gp, this.stroke);
         }            
+    }
+    
+    private Stroke stroke1;
+    
+    private void drawShape(Graphics g, int color, int opacity, int width, int height) {
+        g.setColor(color);
+        g.setAlpha(opacity);
+        GeneralPath gp = createShape(width, height);
+        if (stroke1 == null) {
+            stroke1 = new Stroke(1f, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1f);
+        }
+        g.drawShape(gp, stroke1);
+                   
     }
     
     @Override

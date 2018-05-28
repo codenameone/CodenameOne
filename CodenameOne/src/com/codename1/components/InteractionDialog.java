@@ -25,6 +25,10 @@ package com.codename1.components;
 
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import static com.codename1.ui.Component.BOTTOM;
+import static com.codename1.ui.Component.LEFT;
+import static com.codename1.ui.Component.RIGHT;
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -254,7 +258,31 @@ public class InteractionDialog extends Container {
         }
     }
     
-    
+    public void resize(final int top, final int bottom, final int left, final int right) {
+        if (!disposed) {
+            final Form f = Display.getInstance().getCurrent();
+            
+            Style unselectedStyle = getUnselectedStyle();
+
+            unselectedStyle.setMargin(TOP, Math.max(0, top));
+            unselectedStyle.setMargin(BOTTOM, Math.max(0, bottom));
+            unselectedStyle.setMargin(LEFT, Math.max(0, left));
+            unselectedStyle.setMargin(RIGHT, Math.max(0, right));
+            unselectedStyle.setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+
+            getParent().setX(getX());
+            getParent().setY(getY());
+            setX(0);
+            setY(0);
+            getParent().setWidth(getWidth());
+            getParent().setHeight(getHeight());
+            
+            getLayeredPane(f).animateLayout(400);
+            
+
+            
+        }
+    }
     
     /**
      * This method shows the form as a modal alert allowing us to produce a behavior
@@ -273,14 +301,21 @@ public class InteractionDialog extends Container {
     public void show(int top, int bottom, int left, int right) {
         disposed = false;
         Form f = Display.getInstance().getCurrent();
-        getUnselectedStyle().setMargin(TOP, top);
-        getUnselectedStyle().setMargin(BOTTOM, bottom);
-        getUnselectedStyle().setMargin(LEFT, left);
-        getUnselectedStyle().setMargin(RIGHT, right);
-        getUnselectedStyle().setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        Style unselectedStyle = getUnselectedStyle();
+        
+        unselectedStyle.setMargin(TOP, top);
+        unselectedStyle.setMargin(BOTTOM, bottom);
+        unselectedStyle.setMargin(LEFT, left);
+        unselectedStyle.setMargin(RIGHT, right);
+        unselectedStyle.setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
         
         // might occur when showing the dialog twice...
         remove();
+        
+        // We issue a revalidate in case this is the first time the layered pane 
+        // appears in the form.  Without this, the "show" animation won't work 
+        // the first time.
+        getLayeredPane(f).revalidate();
         
         getLayeredPane(f).addComponent(BorderLayout.center(this));
         if(animateShow) {
@@ -361,12 +396,65 @@ public class InteractionDialog extends Container {
      * Removes the interaction dialog from view with an animation to the left
      */
     public void disposeToTheLeft() {
+        disposeTo(Component.LEFT);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     */
+    public void disposeToTheBottom() {
+        disposeTo(Component.BOTTOM);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     * @param onFinish Callback called when dispose animation is complete.
+     */
+    public void disposeToTheBottom(Runnable onFinish) {
+        disposeTo(Component.BOTTOM, onFinish);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the top
+     */
+    public void disposeToTheTop() {
+        disposeTo(Component.TOP);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the right
+     */
+    public void disposeToTheRight() {
+        disposeTo(Component.RIGHT);
+    }
+    
+    
+    private void disposeTo(int direction) {
+        disposeTo(direction, null);
+    }
+    
+    private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
         final Container p = getParent();
         if(p != null) {
             final Form f = p.getComponentForm();
             if(f != null) {
-                setX(-getWidth());
+                switch (direction) {
+                    case Component.LEFT:
+                        setX(-getWidth());
+                        break;
+                    case Component.TOP:
+                        setY(-getHeight());
+                        break;
+                    case Component.RIGHT:
+                        setX(Display.getInstance().getDisplayWidth());
+                        break;
+                    case Component.BOTTOM:
+                        setY(Display.getInstance().getDisplayHeight());
+                        break;
+                        
+                }
+                
                 if(animateShow) {
                     p.animateUnlayout(400, 255, new Runnable() {
                         public void run() {
@@ -378,6 +466,9 @@ public class InteractionDialog extends Container {
                                 pp.revalidate();
                                 cleanupLayer(f);
                             } 
+                            if (onFinish != null) {
+                                onFinish.run();
+                            }
                         }
                     });
                 } else {
@@ -387,9 +478,15 @@ public class InteractionDialog extends Container {
                     p.remove();
                     pp.removeAll();
                     pp.revalidate();
+                    if (onFinish != null) {
+                        onFinish.run();
+                    }
                 }
             } else {
                 remove();
+                if (onFinish != null) {
+                    onFinish.run();
+                }
             }
         }
     }

@@ -212,6 +212,23 @@ public class Label extends Component {
     }
     
     /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     */
+    public void setMaterialIcon(char c) {
+        FontImage.setMaterialIcon(this, c);
+    }
+    
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     * @param size the size of the icon in millimeters
+     */
+    public void setMaterialIcon(char c, float size) {
+        FontImage.setMaterialIcon(this, c, size);
+    }
+    
+    /**
      * {@inheritDoc}
      */
     public int getBaselineResizeBehavior() {

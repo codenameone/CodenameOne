@@ -36,7 +36,7 @@ public class Rectangle implements Shape {
 
     private int x;
     private int y;
-    private Dimension size;
+    private final Dimension size;
     private GeneralPath path;
     
     private static final int MAX_POOL_SIZE = 20;

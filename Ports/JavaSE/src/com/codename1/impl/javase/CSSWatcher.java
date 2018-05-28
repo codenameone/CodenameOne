@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,7 +29,8 @@ import java.util.logging.Logger;
  * @author shannah
  */
 public class CSSWatcher implements Runnable {
-    private Thread watchThread;
+    private Thread watchThread, pulseThread;
+    private ServerSocket pulseSocket;
     private Process childProcess;
     private boolean closing;
     private static final int MIN_DESIGNER_VERSION=6;
@@ -96,6 +99,29 @@ public class CSSWatcher implements Runnable {
     }
     
     private void watch() throws IOException {
+        if (pulseSocket == null || pulseSocket.isClosed()) {
+            // If the the Simulator is killed then the shutdown hook doesn't run
+            // so we need an alternative way for the ResourceEditorApp to know that
+            // the parent is dead so that it will close itself.
+            // So we create a ServerSocket to serve as a "pulse".  
+            // We pass the port to the ResourceEditorApp so that it can connect.
+            // When the socket is disconnected for any reason, the ResourceEditor app will exit.
+            pulseSocket = new ServerSocket(0);
+            pulseThread = new Thread(new Runnable() {
+                public void run() {
+                    while (true) {
+                        try {
+                            Socket clientSocket = pulseSocket.accept();
+                            
+                        } catch (IOException ex) {
+                            Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                }
+            });
+            pulseThread.setDaemon(true);
+            
+        }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
         final File srcFile = new File("css", "theme.css");
         if (!srcFile.exists()) {
@@ -104,21 +130,24 @@ public class CSSWatcher implements Runnable {
         } else {
             System.out.println("Found theme.css file.  Watching for changes...");
         }
-        final File destFile = new File("src", "theme.css.res");
+        final File destFile = new File("src", "theme.res");
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
         
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", designerJar.getAbsolutePath(),
+                "-jar", "-Dcli=true", "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
                 "-css",
                 srcFile.getAbsolutePath(),
+                destFile.getAbsolutePath(),
                 "-watch",
                 "-Dprism.order=sw"
                 
         );
+        
         Process p = pb.start();
+        
         if (childProcess != null) {
             try {
                 childProcess.destroyForcibly();
@@ -211,11 +240,10 @@ public class CSSWatcher implements Runnable {
     public void start() {
         if (watchThread == null) {
             watchThread = new Thread(this);
-            watchThread.start();
+            watchThread.setDaemon(true);
+            watchThread.start(); 
         }
     }
-
-    
     
     
     

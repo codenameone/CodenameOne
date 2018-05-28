@@ -100,6 +100,18 @@ public class AutoCompleteTextField extends TextField {
         popup.setScrollable(false);
         popup.setUIID("AutoCompletePopup");
         setConstraint(TextArea.NON_PREDICTIVE);
+        addCloseListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                if (popup.isVisible()) {
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    Form f = getComponentForm();
+                    if (f != null) {
+                        f.repaint();
+                    }
+                }
+            }
+        });
         
     }
 

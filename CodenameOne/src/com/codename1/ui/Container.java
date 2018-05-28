@@ -1649,7 +1649,7 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param c the component that will be scrolling for visibility
      */
-    public void scrollComponentToVisible(Component c) {
+    public void scrollComponentToVisible(final Component c) {
         if (isScrollable()) {
             if (c != null) {
                 Rectangle r = c.getVisibleBounds();
@@ -1669,8 +1669,9 @@ public class Container extends Component implements Iterable<Component>{
                     }
                 }
                 boolean moveToVisible = true;
-                boolean large = c.getVisibleBounds().getSize().getHeight() > getHeight() || 
-                        c.getVisibleBounds().getSize().getWidth() > getWidth();
+                Dimension size = r.getSize();
+                boolean large = size.getHeight() > getHeight() || 
+                        size.getWidth() > getWidth();
                 if (large) {
                     int x = getScrollX();
                     int y = getScrollY();
@@ -1696,7 +1697,7 @@ public class Container extends Component implements Iterable<Component>{
             }
         }
     }
-
+    
     /**
      * This method scrolls the Container if Scrollable towards the given 
      * Component based on the given direction.
@@ -2572,6 +2573,37 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void animateLayout(final int duration) {
         animateLayout(duration, false, 255, true);
+    }
+    
+    /**
+     * Updates the tab indices in this container recursively. This method is used internally by 
+     * layout managers when calculating the traversal order of components in a form.
+     * @param offset The starting tab index.
+     * @return The ending tab index (+1)
+     * @deprecated For internal use only.
+     */
+    public int updateTabIndices(int offset) {
+        Container parent = this;
+        Layout l = parent.getActualLayout();
+        if (l.overridesTabIndices(parent)) {
+            return l.updateTabIndices(parent, offset);
+        }
+        
+        int len = parent.getComponentCount();
+        int idx = offset;
+        for (int i=0; i<len; i++) {
+            Component c = parent.getComponentAt(i);
+            int prefIdx = c.getPreferredTabIndex();
+            if (prefIdx == 0) {
+                c.setTabIndex(idx++);
+            } else {
+                c.setTabIndex(prefIdx);
+            }
+            if (c instanceof Container) {
+                idx = ((Container)c).updateTabIndices(idx);
+            }
+        }
+        return idx;
     }
 
     /**
