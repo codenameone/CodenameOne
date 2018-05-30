@@ -261,6 +261,8 @@ public class Form extends Container {
         return currentInputDevice;
     }
     
+    
+    
     /**
      * Allows subclasses to disable the global toolbar for a specific form by overriding this method
      */
@@ -2355,43 +2357,227 @@ public class Form extends Container {
         return false;
     }
     
+    /**
+     * Gets the next component in focus traversal order.  This will return the {@link Component#getNextFocusRight() }
+     * if it is set.  If not, it will return {@link Component#getNextFocusDown() } if it is set.  If not, it will 
+     * return the next component according to the traversal order.
+     * @param current The current component.
+     * @return The next component in the focus traversal order.
+     */
     public Component getNextComponent(Component current) {
-        Component next = current.getNextFocusRight();
-        if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
-            return next;
-        }
-        next = current.getNextFocusDown();
-        if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
-            return current.getNextFocusDown();
-        }
-        ListIterator<Component> it = getTabIterator(current);
-        if (it.hasNext()) {
-            return it.next();
-        }
-        return null;
+        return getTabIterator(current).getNext();
     }
     
     /**
-     * Gets the previous component in the traversal order.  This will return the {@link Component#getNextFocusLeft() }
+     * Gets the previous component in focus traversal order.  This will return the {@link Component#getNextFocusLeft() }
      * if it is set.  If not, it will return {@link Component#getNextFocusUp() } if it is set.  If not, it will 
      * return the previous component according to the traversal order defined by {@link Form#getTabIterator(com.codename1.ui.Component) }.
      * @param current The current component.
      * @return The previous component in the traversal order.
      */
     public Component getPreviousComponent(Component current) {
-        Component prev = current.getNextFocusLeft();
-        if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+        return getTabIterator(current).getPrevious();
+    }
+    
+    /**
+     * Iterates through the components on this form in traversal order.  
+     * @see #getTabIterator(com.codename1.ui.Component) 
+     */
+    public class TabIterator implements ListIterator<Component> {
+        private java.util.List<Component> components;
+        private int currPos;
+        private Component current;
+        
+        private TabIterator(java.util.List<Component> components, Component current) {
+            this.components = components;
+            setCurrent(current);
+        }
+        
+        /**
+         * Gets the current component in this iterator.
+         * @return 
+         */
+        public Component getCurrent() {
+            return current;
+        }
+        
+        /**
+         * Gets the next component in this iterator.  If the current component explicitly specifies
+         * a nextFocusRight or nextFocusDown component, then that component will be returned.
+         * Otherwise it will follow the tab index order.
+         * @return The next component to be traversed after {@link #getCurrent() }
+         */
+        public Component getNext() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+            
+            Component next = current != null ? current.getNextFocusRight() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            next = current != null ? current.getNextFocusDown() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                return components.get(0);
+            }
+            if (currPos < components.size()-1) {
+                return components.get(currPos+1);
+            }
+            return null;
+        }
+        
+        /**
+         * Gets the previous component that should be traversed when going "back" in through the
+         * form components.  If the current component has a nextFocusLeft or nextFocusUp field
+         * explicitly specified, then it will return that.  Otherwise it just follows the traversal 
+         * order using the tab index.
+         * @return The previous component according to traversal order.
+         */
+        public Component getPrevious() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+            Component prev = current != null ? current.getNextFocusLeft() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            prev = current != null ? current.getNextFocusUp() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                // Negative current position means that we pick the last 
+                // component on the form.
+                return components.get(components.size()-1);
+            }
+            if (currPos > 0 && currPos <= components.size()) {
+                return components.get(currPos-1);
+            }
+            return null;
+        }
+        
+        /**
+         * Sets the current component in the iterator.  This reposition the iterator
+         * to the given component.
+         * @param cmp The component to set as the current component.
+         */
+        public void setCurrent(Component cmp) {
+            current = cmp;
+            
+            currPos = cmp != null ? components.indexOf(cmp) : -1;
+        }
+        
+        /**
+         * Checks to see if there is a "next" component to traverse focus to in this iterator.
+         * @return True if there is a "next" component in this iterator.
+         */
+        public boolean hasNext() {
+            return getNext() != null;
+        }
+
+        /**
+         * Returns the next component in this iterator, and repositions the iterator at this component.
+         * 
+         * @return The "next" component in the iterator.
+         */
+        @Override
+        public Component next() {
+            Component next = getNext();
+            setCurrent(next);
+            return next;
+        }
+
+        /**
+         * Checks if this iterator has a "previous" component.
+         * @return 
+         */
+        @Override
+        public boolean hasPrevious() {
+            return getPrevious() != null;
+        }
+
+        /**
+         * Returns the previous component in this iterator, and repositions the iterator at this component.
+         * @return 
+         */
+        @Override
+        public Component previous() {
+            Component prev = getPrevious();
+            setCurrent(prev);
             return prev;
         }
-        prev = current.getNextFocusUp();
-        if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
-            return prev;
+
+        /**
+         * Gets the index within the iterator of the next component.
+         * @return 
+         */
+        @Override
+        public int nextIndex() {
+            Component next = getNext();
+            if (next == null) {
+                return -1;
+            }
+            return components.indexOf(next);
         }
-        ListIterator<Component> it = getTabIterator(current);
-        if (it.hasPrevious()) {
-            return it.previous();
+
+        /**
+         * Gets the index within the iterator of the previous component.
+         * @return 
+         */
+        @Override
+        public int previousIndex() {
+            Component prev = getPrevious();
+            if (prev == null) {
+                return -1;
+            }
+            return components.indexOf(prev);
         }
-        return null;
+
+        /**
+         * Removes the current component from the iterator, and repositions the iterator to the previous 
+         * component, or the next component (if previous doesn't exist).
+         */
+        @Override
+        public void remove() {
+            Component newCurr = getPrevious();
+            if (newCurr == null) {
+                newCurr = getNext();
+            }
+            if (current != null) {
+                components.remove(current);
+                setCurrent(newCurr);
+            }
+            
+        }
+
+        /**
+         * Replaces the current component, in the iterator, with the provided component.
+         * This will not actually replace the component in the form's hierarchy.  Just within
+         * the iterator.
+         * @param e The component to set as the current component.
+         */
+        @Override
+        public void set(Component e) {
+            if (currPos >= 0 && currPos < components.size()-1) {
+                components.set(currPos, e);
+                setCurrent(e);
+            }
+        }
+
+        /**
+         * Adds a component to the end of the iterator.
+         * @param e The component to add to the iterator.
+         */
+        @Override
+        public void add(Component e) {
+            components.add(e);
+        }
+        
     }
     
     /**
@@ -2407,7 +2593,7 @@ public class Form extends Container {
      * @see Component#getPreferredTabIndex() 
      * @see Component#setPreferredTabIndex(int) 
      */
-    public ListIterator<Component> getTabIterator(Component start) {
+    public TabIterator getTabIterator(Component start) {
         updateTabIndices(0);
         java.util.List<Component> out = new ArrayList<Component>();
         out.addAll(ComponentSelector.select("*", this).filter(new Filter() {
@@ -2429,21 +2615,7 @@ public class Form extends Container {
             
         });
         
-        
-        if (out.isEmpty()) {
-            return out.listIterator();
-        }
-        int startIndex = out.indexOf(start);
-        
-        if (startIndex == -1) {
-            startIndex = 0;
-        } else {
-            out.remove(startIndex);
-        }
-        
-        ListIterator<Component> it = out.listIterator(startIndex);
-        return it;
-
+        return new TabIterator(out, start);
     }
     
     

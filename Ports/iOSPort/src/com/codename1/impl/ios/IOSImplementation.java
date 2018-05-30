@@ -739,6 +739,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            
+            if (current != null) {
+                Component nextComponent = current.getNextComponent(cmp);
+                TextEditUtil.setNextEditComponent(nextComponent);
+            }
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
