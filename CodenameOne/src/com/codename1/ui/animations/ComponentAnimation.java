@@ -35,6 +35,7 @@ public abstract class ComponentAnimation {
     private Runnable onCompletion;
     private int step = -1;
     private ArrayList<Runnable> post;
+    private boolean completed = false;
 
     /**
      * Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming 
@@ -94,19 +95,25 @@ public abstract class ComponentAnimation {
     public final void updateAnimationState() {
         updateState();
         if(!isInProgress()) {
-            if(notifyLock != null) {
-                synchronized(notifyLock) {
-                    notifyLock.notify();
-                }
-            }
-            if(onCompletion != null) {
-                onCompletion.run();
-            }
-            if(post != null) {
-                for(Runnable p : post) {
-                    p.run();
-                }
-            }
+        	if (!completed) {
+        		completed = true;
+        		if(notifyLock != null) {
+        			synchronized(notifyLock) {
+        				notifyLock.notify();
+        			}
+        		}
+        		if(onCompletion != null) {
+        			onCompletion.run();
+        		}
+        		if(post != null) {
+        			for(Runnable p : post) {
+        				p.run();
+        			}
+        		}
+        	}
+        }
+        else { //ensure completed would be set to false if animation has been restarted
+        	 completed = false; 
         }
     }
     

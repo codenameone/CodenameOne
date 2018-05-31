@@ -38,10 +38,12 @@ import com.codename1.ui.list.DefaultListModel;
  */
 public class TextEditUtil {
 
+    
     /**
      * The currently edited TextArea
      */
     public static Component curEditedComponent;
+    public static Component nextEditedComponent;
 
     /**
      * Sets currently edited textarea.
@@ -50,6 +52,10 @@ public class TextEditUtil {
      */
     public static void setCurrentEditComponent(Component current) {
         curEditedComponent = current;
+    }
+    
+    public static void setNextEditComponent(Component cmp) {
+        nextEditedComponent = cmp;
     }
 
     /**
@@ -68,14 +74,14 @@ public class TextEditUtil {
         Runnable task = new Runnable() {
 
             public void run() {
+                
                 Component next = getNextEditComponent();
                 if (next != null) {
-                    if (next instanceof TextArea) {
-                        TextArea text = (TextArea) next;
-                        text.requestFocus();
-                        Display.getInstance().editString(next,
-                                text.getMaxSize(), text.getConstraint(), text.getText(), 0);
+                    if (!(next instanceof TextArea)) {
+                        IOSImplementation.foldKeyboard();
                     }
+                    next.requestFocus();
+                    next.startEditingAsync();
                 } else {
                     IOSImplementation.foldKeyboard();
                 }
@@ -89,23 +95,7 @@ public class TextEditUtil {
      * @return the next editable TextArea after the currently edited component.
      */
     private static Component getNextEditComponent() {
-        Component nextTextArea = null;
-        if (curEditedComponent != null) {
-            Component next = curEditedComponent.getNextFocusDown();
-            if (next == null) {
-                Form parent = curEditedComponent.getComponentForm();
-                
-                // could happen in the case of a table that gets recreated on edit
-                if(parent != null) {
-                    next = parent.findNextFocusVertical(true);
-                }
-            }
-
-            if (next != null && next instanceof TextArea && ((TextArea) next).isEditable() && ((TextArea) next).isEnabled()) {
-                nextTextArea = (TextArea) next;
-            }
-        }
-        return nextTextArea;
+        return nextEditedComponent;
     }
 
 }
