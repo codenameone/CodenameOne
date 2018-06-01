@@ -100,6 +100,7 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.FileProvider;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -6105,7 +6106,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
-
+        
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
@@ -6218,8 +6219,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 
         File newFile = getOutputMediaFile(false);
-        Uri imageUri = Uri.fromFile(newFile);
-
+        newFile.getParentFile().mkdirs();
+        newFile.getParentFile().setWritable(true, false);
+        //Uri imageUri = Uri.fromFile(newFile);
+        Uri imageUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
 
         String lastImageID = getLastImageId();
@@ -6255,7 +6258,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
 
         File newFile = getOutputMediaFile(true);
-        Uri videoUri = Uri.fromFile(newFile);
+        Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
 
         Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());
 
@@ -6455,16 +6458,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public static File getOutputMediaFile(boolean isVideo, Context activity, CharSequence title) {
 
 
-            File mediaStorageDir = null;
-            if(android.os.Build.VERSION.SDK_INT >= 8) {
-                mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                        Environment.DIRECTORY_PICTURES), "" + title);
-            } else {
-                mediaStorageDir = new File(Environment.getExternalStorageDirectory(), "" + title);
-            }
-
-            // This location works best if you want the created images to be shared
-            // between applications and persist after your app has been uninstalled.
+            File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), ""+title);
 
             // Create the storage directory if it does not exist
             if (!mediaStorageDir.exists()) {
