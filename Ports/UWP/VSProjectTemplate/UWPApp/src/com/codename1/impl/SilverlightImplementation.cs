@@ -1317,9 +1317,42 @@ namespace com.codename1.impl
                         commitEditing();
                     }
                 }
+            } else if (e.Key == Windows.System.VirtualKey.Tab)
+            {
+                if (currentlyEditing != null && currentlyEditing is TextField)
+                {
+                    TextField tf = (TextField)currentlyEditing;
+                    commitEditing();
+                    Display.getInstance().callSerially(new EditNext(tf));
+                    
+                }
             }
 
             
+        }
+
+
+        public class EditNext : java.lang.Runnable
+        {
+            TextField tf;
+            public EditNext(TextField tf)
+            {
+                this.tf = tf;
+            }
+
+            public void run()
+            {
+                Form f = tf.getComponentForm();
+                if (f != null)
+                {
+                    Component next = f.getNextComponent(tf);
+                    if (next != null)
+                    {
+                        next.requestFocus();
+                        next.startEditingAsync();
+                    }
+                }
+            }
         }
 
         public class DoneEditing : java.lang.Runnable
@@ -1425,7 +1458,9 @@ namespace com.codename1.impl
                            }
                        }
                    }
+
                    cl.Children.Add(textInputInstance);
+  
                    Canvas.SetZIndex(textInputInstance, 50000);
                    textInputInstance.IsEnabled = true;
                    Font fnt = currentlyEditing.getStyle().getFont();
