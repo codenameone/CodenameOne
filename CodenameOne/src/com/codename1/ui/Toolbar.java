@@ -325,11 +325,19 @@ public class Toolbar extends Container {
             showOnTopRightSidemenu(-1, false);
         }
     }
-
+    
     /**
-     * Closes the current left side menu
+     * Closes the current side menu
      */
     public void closeSideMenu() {
+        closeLeftSideMenu();
+        closeRightSideMenu();
+    }
+
+    /**
+     * Closes the left side menu
+     */
+    public void closeLeftSideMenu() {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
                 sidemenuDialog.disposeToTheLeft();
@@ -344,7 +352,7 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Closes the current right side menu
+     * Closes the right side menu
      */
     public void closeRightSideMenu() {
         if (onTopSideMenu) {
