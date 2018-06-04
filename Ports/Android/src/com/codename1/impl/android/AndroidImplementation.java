@@ -7421,7 +7421,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if(type == Display.PICKER_TYPE_DATE) {
             final java.util.Calendar cl = java.util.Calendar.getInstance();
-            cl.setTime((Date)currentValue);
+            if(currentValue != null) {
+                cl.setTime((Date)currentValue);
+            }
             class DatePick implements DatePickerDialog.OnDateSetListener,DatePickerDialog.OnCancelListener, Runnable {
                 Date result = (Date)currentValue;
 
