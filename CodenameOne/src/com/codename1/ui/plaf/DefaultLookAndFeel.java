@@ -570,6 +570,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());
         int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());
         int topPadding = ta.getStyle().getPaddingTop();
+        switch (ta.getVerticalAlignment()) {
+            case Component.CENTER :
+                topPadding += Math.max(0, (ta.getHeight() - (ta.getRowsGap() + fontHeight) * line)/2);
+                break;
+            case Component.BOTTOM :
+                topPadding += Math.max(0, (ta.getHeight() - (ta.getRowsGap() + fontHeight) * line));
+        }
         boolean shouldBreak = false;
         
         for (int i = 0; i < line; i++) {
