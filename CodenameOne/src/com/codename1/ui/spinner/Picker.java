@@ -1338,15 +1338,5 @@ public class Picker extends Button {
         }
         return super.getStyle(); 
     }
-
-    @Override
-    protected void focusGained() {
-        super.focusGained();
-        if (!isEditing()) {
-            startEditingAsync();
-        }
-    }
-    
-    
-    
+ 
 }
