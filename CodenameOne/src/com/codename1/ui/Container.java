@@ -1282,7 +1282,7 @@ public class Container extends Component implements Iterable<Component>{
         
         // prevents concurrent modification exception
         Component[] arr;
-        boolean includeQueued = false; // Setting this true because when would you ever want removeAll() to NOT remove queued components
+        boolean includeQueued = true; // Setting this true because when would you ever want removeAll() to NOT remove queued components
         if (includeQueued) {
             java.util.List<Component> l = getChildrenAsList(includeQueued);
             arr = new Component[l.size()];
