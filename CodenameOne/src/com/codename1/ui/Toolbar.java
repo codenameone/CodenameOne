@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
+import com.codename1.l10n.L10NManager;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -161,6 +162,9 @@ public class Toolbar extends Container {
 
     private InteractionDialog sidemenuDialog;
     private InteractionDialog rightSidemenuDialog;
+    private boolean isPointerReleasedListenerAdded = false;
+    private boolean isPointerPressedListenerAdded = false;
+    private boolean isPointerDraggedListenerAdded = false;
 
     private Container permanentSideMenuContainer;
     private Container permanentRightSideMenuContainer;
@@ -662,6 +666,23 @@ public class Toolbar extends Container {
     public Iterable<Command> getOverflowCommands() {
         return overflowCommands;
     }
+    
+    /**
+     * Adds a Command to the left or right side navigation menu according to the
+     * state of RTL.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+        if (!isRTL()) {
+            return addCommandToLeftSideMenu(name, icon, ev);
+        } else {
+            return addCommandToRightSideMenu(name, icon, ev);
+        }
+    }
 
     /**
      * Adds a Command to the left side navigation menu
@@ -671,9 +692,9 @@ public class Toolbar extends Container {
      * @param ev the even handler
      * @return a newly created Command instance
      */
-    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+    public Command addCommandToLeftSideMenu(String name, Image icon, final ActionListener ev) {
         Command cmd = Command.create(name, icon, ev);
-        addCommandToSideMenu(cmd);
+        addCommandToLeftSideMenu(cmd);
         return cmd;
     }
 
@@ -691,6 +712,49 @@ public class Toolbar extends Container {
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
+    
+    /**
+     * Adds a Component to the left or right side navigation menu, according to
+     * the state of RTL.
+     *
+     * @param cmp c Component to be added to the menu
+     */
+    public void addComponentToSideMenu(Component cmp) {
+        if (!isRTL()) {
+            addComponentToLeftSideMenu(cmp);
+        } else {
+            addComponentToRightSideMenu(cmp);
+        }
+    }
+    
+    /**
+     * This method is responsible to add a Component to the left or right side
+     * navigation panel according to the state of RTL.
+     *
+     * @param menu the Menu Container that was created in the
+     * constructSideNavigationComponent() method
+     *
+     * @param cmp the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp) {
+        sideMenu.addComponentToSideMenuImpl(menu, cmp);
+    }
+    
+    /**
+     * Adds a Component to the left or right side navigation menu, according to
+     * the state of RTL. The Component is added to the navigation menu and the
+     * command gets the events once the Component is being pressed.
+     *
+     * @param cmp c Component to be added to the menu
+     * @param cmd a Command to handle the events
+     */
+    public void addComponentToSideMenu(Component cmp, Command cmd) {
+        if (!isRTL()) {
+            addComponentToLeftSideMenu(cmp, cmd);
+        } else {
+            addComponentToRightSideMenu(cmp, cmd);
+        }
+    }
 
     /**
      * Adds a Command to the left side navigation menu with a material design
@@ -701,10 +765,10 @@ public class Toolbar extends Container {
      * @param ev the even handler
      * @return a newly created Command instance
      */
-    public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
+    public Command addMaterialCommandToLeftSideMenu(String name, char icon, final ActionListener ev) {
         Command cmd = Command.create(name, null, ev);
         setCommandMaterialIcon(cmd, icon, "SideCommand");
-        addCommandToSideMenu(cmd);
+        addCommandToLeftSideMenu(cmd);
         return cmd;
     }
 
@@ -724,6 +788,43 @@ public class Toolbar extends Container {
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
+    
+    /**
+     * Adds a Command to the left or right side navigation menu (according to
+     * the state of RTL) with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
+        if (!isRTL()) {
+            return addMaterialCommandToLeftSideMenu(name, icon, size, ev);
+        } else {
+            return addMaterialCommandToRightSideMenu(name, icon, size, ev);
+        }
+    }
+    
+    /**
+     * Adds a Command to the left or right side navigation menu (according to
+     * the state of RTL) with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
+        if (!isRTL()) {
+            return addMaterialCommandToLeftSideMenu(name, icon, ev);
+        } else {
+            return addMaterialCommandToRightSideMenu(name, icon, ev);
+        }
+    }
 
     /**
      * Adds a Command to the left side navigation menu with a material design
@@ -735,7 +836,7 @@ public class Toolbar extends Container {
      * @param ev the even handler
      * @return a newly created Command instance
      */
-    public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
+    public Command addMaterialCommandToLeftSideMenu(String name, char icon, float size, final ActionListener ev) {
         Command cmd = Command.create(name, null, ev);
         setCommandMaterialIcon(cmd, icon, size, "SideCommand");
         addCommandToSideMenu(cmd);
@@ -891,56 +992,28 @@ public class Toolbar extends Container {
         }
         return false;
     }
+    
+    /**
+     * Adds a Command to the left or right side navigation menu according to the
+     * state of RTL.
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToSideMenu(Command cmd) {
+        if (!isRTL()) {
+            addCommandToLeftSideMenu(cmd);
+        } else {
+            addCommandToRightSideMenu(cmd);
+        }
+    }
 
     /**
      * Adds a Command to the left side navigation menu
      *
      * @param cmd a Command
      */
-    public void addCommandToSideMenu(Command cmd) {
-        checkIfInitialized();
-        if (permanentSideMenu) {
-            constructPermanentSideMenu();
-
-            Button b = new Button(cmd);
-            b.setEndsWith3Points(false);
-            Integer gap = (Integer) cmd.getClientProperty("iconGap");
-            if (gap != null) {
-                b.setGap(gap.intValue());
-            }
-            b.setTextPosition(Label.RIGHT);
-            String uiid = (String) cmd.getClientProperty("uiid");
-            if (uiid != null) {
-                String luiid = (String) cmd.getClientProperty("luiid");
-                b.setUIID(uiid, luiid);
-            } else {
-                b.setUIID("SideCommand");
-            }
-            addComponentToSideMenu(permanentSideMenuContainer, b);
-        } else {
-            if (onTopSideMenu) {
-                constructOnTopSideMenu();
-
-                Button b = new Button(sideMenu.wrapCommand(cmd));
-                b.setEndsWith3Points(false);
-                Integer gap = (Integer) cmd.getClientProperty("iconGap");
-                if (gap != null) {
-                    b.setGap(gap.intValue());
-                }
-                b.setTextPosition(Label.RIGHT);
-                String uiid = (String) cmd.getClientProperty("uiid");
-                if (uiid != null) {
-                    String luiid = (String) cmd.getClientProperty("luiid");
-                    b.setUIID(uiid, luiid);
-                } else {
-                    b.setUIID("SideCommand");
-                }
-                addComponentToSideMenu(permanentSideMenuContainer, b);
-            } else {
-                sideMenu.addCommand(cmd);
-                sideMenu.installMenuBar();
-            }
-        }
+    public void addCommandToLeftSideMenu(Command cmd) {
+        addCommandToSideMenu(cmd, true);
     }
 
     /**
@@ -950,9 +1023,17 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToRightSideMenu(Command cmd) {
+        addCommandToSideMenu(cmd, false);
+    }
+    
+    private void addCommandToSideMenu(Command cmd, boolean isLeft) {
         checkIfInitialized();
         if (permanentSideMenu) {
-            constructPermanentRightSideMenu();
+            if (isLeft) {
+                constructPermanentSideMenu();
+            } else {
+                constructPermanentRightSideMenu();
+            }
 
             Button b = new Button(cmd);
             b.setEndsWith3Points(false);
@@ -960,7 +1041,11 @@ public class Toolbar extends Container {
             if (gap != null) {
                 b.setGap(gap.intValue());
             }
-            b.setTextPosition(Label.LEFT);
+            if (isLeft) {
+                b.setTextPosition(Label.RIGHT);
+            } else {
+                b.setTextPosition(Label.LEFT);
+            }
             String uiid = (String) cmd.getClientProperty("uiid");
             if (uiid != null) {
                 String luiid = (String) cmd.getClientProperty("luiid");
@@ -968,10 +1053,18 @@ public class Toolbar extends Container {
             } else {
                 b.setUIID("SideCommand");
             }
-            addComponentToRightSideMenu(permanentRightSideMenuContainer, FlowLayout.encloseRight(b));
+            if (isLeft) {
+                addComponentToLeftSideMenu(permanentSideMenuContainer, b);
+            } else {
+                addComponentToRightSideMenu(permanentRightSideMenuContainer, FlowLayout.encloseRight(b));
+            }
         } else {
             if (onTopSideMenu) {
-                constructOnTopRightSideMenu();
+                if (isLeft) {
+                    constructOnTopSideMenu();
+                } else {
+                    constructOnTopRightSideMenu();
+                }
 
                 Button b = new Button(sideMenu.wrapCommand(cmd));
                 b.setEndsWith3Points(false);
@@ -979,7 +1072,11 @@ public class Toolbar extends Container {
                 if (gap != null) {
                     b.setGap(gap.intValue());
                 }
-                b.setTextPosition(Label.LEFT);
+                if (isLeft) {
+                    b.setTextPosition(Label.RIGHT);
+                } else {
+                    b.setTextPosition(Label.LEFT);
+                }
                 String uiid = (String) cmd.getClientProperty("uiid");
                 if (uiid != null) {
                     String luiid = (String) cmd.getClientProperty("luiid");
@@ -987,10 +1084,19 @@ public class Toolbar extends Container {
                 } else {
                     b.setUIID("SideCommand");
                 }
-                b.getAllStyles().setAlignment(Font.RIGHT);
-                addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
+                if (isLeft) {
+                    addComponentToSideMenu(permanentSideMenuContainer, b);
+                } else {
+                    b.getAllStyles().setAlignment(Font.RIGHT);
+                    addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
+                }
             } else {
-                // not implemented
+                if (isLeft) {
+                    sideMenu.addCommand(cmd);
+                    sideMenu.installMenuBar();
+                } else {
+                    throw new IllegalStateException("Right sidemenu bar only works in on-top mode or permanent mode");
+                }
             }
         }
     }
@@ -1023,264 +1129,270 @@ public class Toolbar extends Container {
         }
     }
 
-    private void constructOnTopSideMenu() {
-        if (sidemenuDialog == null) {
-            permanentSideMenuContainer = constructSideNavigationComponent();
+    private void constructOnTopSideMenu(boolean isLeft) {
+        if ((isLeft && sidemenuDialog == null) || (!isLeft && rightSidemenuDialog == null)) {
+            if (isLeft) {
+                permanentSideMenuContainer = constructSideNavigationComponent();
+            } else {
+                permanentRightSideMenuContainer = constructSideNavigationComponent();
+            }
 
             final Form parent = getComponentForm();
-            parent.addPointerPressedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    if (sidemenuDialog.isShowing()) {
-                        if (evt.getX() > sidemenuDialog.getWidth()) {
-                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                            closeSideMenu();
-                            evt.consume();
-                        } else {
-                            if (evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
-                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+            if (!isPointerPressedListenerAdded) {
+                parent.addPointerPressedListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                            return;
+                        }
+                        if (sidemenuDialog != null) {
+                            if (sidemenuDialog.isShowing()) {
+                                if (evt.getX() > sidemenuDialog.getWidth()) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    closeSideMenu();
+                                    evt.consume();
+                                } else {
+                                    if (evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
+                                        parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                                    } else {
+                                        parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    }
+                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        evt.consume();
+                                    }
+                                }
                             } else {
-                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
+                                if (evt.getX() < sensitiveSection) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                                    evt.consume();
+                                } else {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
+                                }
                             }
-                            if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                evt.consume();
+                        }
+                        if (rightSidemenuDialog != null) {
+                            if (rightSidemenuDialog.isShowing()) {
+                                if (evt.getX() < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    closeRightSideMenu();
+                                    evt.consume();
+                                } else {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
+                                        parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
+                                    } else {
+                                        parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    }
+                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        evt.consume();
+                                    }
+                                }
+                            } else {
+                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
+                                if (evt.getX() > displayWidth - sensitiveSection) {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
+                                    evt.consume();
+                                } else {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
+                                }
                             }
                         }
-                    } else {
-                        int displayWidth = Display.getInstance().getDisplayWidth();
-                        final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
-                        if (evt.getX() < sensitiveSection) {
-                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
-                            evt.consume();
-                        } else {
-                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                            permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
-                        }
                     }
-                }
-            });
-            parent.addPointerDraggedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuCharged");
-                    if (b != null && b.booleanValue()) {
-                        parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
-                        showOnTopSidemenu(evt.getX(), false);
-                        evt.consume();
-                    } else {
-                        if (sidemenuDialog.isShowing()) {
-                            permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
-                            evt.consume();
-                        }
-                    }
-                }
-            });
-            parent.addPointerReleasedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
-                    if (b != null && b.booleanValue()) {
-                        parent.putClientProperty("cn1$sidemenuActivated", null);
-                        if (evt.getX() < parent.getWidth() / 4) {
-                            closeSideMenu();
-                        } else {
-                            showOnTopSidemenu(-1, true);
-                        }
-                        evt.consume();
-                    } else {
-                        if (sidemenuDialog.isShowing()) {
-                            if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                evt.consume();
-                            }
-                            permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
-                        }
-                    }
-                }
-            });
-
-            sidemenuDialog = new InteractionDialog(new BorderLayout());
-
-            sidemenuDialog.setFormMode(true);
-            sidemenuDialog.setUIID("Container");
-            sidemenuDialog.setDialogUIID("Container");
-            sidemenuDialog.getTitleComponent().remove();
-            sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
-            if (sidemenuSouthComponent != null) {
-                sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
+                });
             }
-            float size = 4.5f;
-            try {
-                size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-
-            if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
-                Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
-                if (i != null) {
-                    Command cmd = addCommandToLeftBar("", i, new ActionListener() {
-                        public void actionPerformed(ActionEvent evt) {
-                            if (sidemenuDialog.isShowing()) {
-                                closeSideMenu();
-                                return;
-                            }
-                            showOnTopSidemenu(-1, false);
+            isPointerPressedListenerAdded = true;
+            if (!isPointerDraggedListenerAdded) {
+                parent.addPointerDraggedListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                            return;
                         }
-                    });
-                    Image p = (Image) parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
-                    if (p != null) {
-                        findCommandComponent(cmd).setPressedIcon(p);
+                        if (sidemenuDialog != null) {
+                            Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuCharged");
+                            if (b != null && b.booleanValue()) {
+                                parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
+                                showOnTopSidemenu(evt.getX(), false);
+                                // evt.consume();
+                            } else {
+                                if (sidemenuDialog.isShowing()) {
+                                    permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
+                                    // evt.consume();
+                                }
+                            }
+                        }
+                        if (rightSidemenuDialog != null) {
+                            // TO DO
+                            Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuCharged");
+                            if (b != null && b.booleanValue()) {
+                                parent.putClientProperty("cn1$rightSidemenuActivated", Boolean.TRUE);
+                                // showOnTopRightSidemenu(evt.getX(), false);
+                                showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
+                                // evt.consume();
+                            } else {
+                                if (rightSidemenuDialog.isShowing()) {
+                                    permanentRightSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
+                                    // evt.consume();
+                                }
+                            }
+                        }
                     }
-                } else {
-                    addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
-                        public void actionPerformed(ActionEvent evt) {
-                            if (sidemenuDialog.isShowing()) {
-                                closeSideMenu();
-                                return;
-                            }
-                            showOnTopSidemenu(-1, false);
+                });
+            }
+  
+            if (!isPointerReleasedListenerAdded) {
+                parent.addPointerReleasedListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                            return;
                         }
-                    });
+                        if (sidemenuDialog != null) {
+                            Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
+                            if (b != null && b.booleanValue()) {
+                                parent.putClientProperty("cn1$sidemenuActivated", null);
+                                if (evt.getX() < parent.getWidth() / 4) {
+                                    closeSideMenu();
+                                } else {
+                                    showOnTopSidemenu(-1, true);
+                                }
+                                // evt.consume();
+                            } else {
+                                if (sidemenuDialog.isShowing()) {
+                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        // evt.consume();
+                                    }
+                                    permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
+                                }
+                            }
+                        }
+                        if (rightSidemenuDialog != null) {
+                            Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuActivated");
+                            if (b != null && b.booleanValue()) {
+                                parent.putClientProperty("cn1$rightSidemenuActivated", null);
+                                if (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4)) {
+                                    closeRightSideMenu();
+                                } else {
+                                    showOnTopRightSidemenu(-1, true);
+                                }
+                                // evt.consume();
+                            } else {
+                                if (rightSidemenuDialog.isShowing()) {
+                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        // evt.consume();
+                                    }
+                                    permanentRightSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            isPointerReleasedListenerAdded = true;
+
+            if (isLeft) {
+                sidemenuDialog = new InteractionDialog(new BorderLayout());
+
+                sidemenuDialog.setFormMode(true);
+                sidemenuDialog.setUIID("Container");
+                sidemenuDialog.setDialogUIID("Container");
+                sidemenuDialog.getTitleComponent().remove();
+                sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
+                if (sidemenuSouthComponent != null) {
+                    sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
+                }
+                float size = 4.5f;
+                try {
+                    size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+
+                if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
+                    Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
+                    if (i != null) {
+                        Command cmd = addCommandToLeftBar("", i, new ActionListener() {
+                            public void actionPerformed(ActionEvent evt) {
+                                if (sidemenuDialog.isShowing()) {
+                                    closeSideMenu();
+                                    return;
+                                }
+                                showOnTopSidemenu(-1, false);
+                            }
+                        });
+                        Image p = (Image) parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
+                        if (p != null) {
+                            findCommandComponent(cmd).setPressedIcon(p);
+                        }
+                    } else {
+                        addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                            public void actionPerformed(ActionEvent evt) {
+                                if (sidemenuDialog.isShowing()) {
+                                    closeSideMenu();
+                                    return;
+                                }
+                                showOnTopSidemenu(-1, false);
+                            }
+                        });
+                    }
+                }
+            } else {
+                rightSidemenuDialog = new InteractionDialog(new BorderLayout());
+
+                rightSidemenuDialog.setFormMode(true);
+                rightSidemenuDialog.setUIID("Container");
+                rightSidemenuDialog.setDialogUIID("Container");
+                rightSidemenuDialog.getTitleComponent().remove();
+                rightSidemenuDialog.add(BorderLayout.CENTER, permanentRightSideMenuContainer);
+                if (rightSidemenuSouthComponent != null) {
+                    rightSidemenuDialog.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);
+                }
+                float size = 4.5f;
+                try {
+                    size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+
+                if (!parent.getUIManager().isThemeConstant("hideRightSideMenuBool", false)) {
+                    Image i = (Image) parent.getUIManager().getThemeImageConstant("rightSideMenuImage");
+                    if (i != null) {
+                        Command cmd = addCommandToRightBar("", i, new ActionListener() {
+                            public void actionPerformed(ActionEvent evt) {
+                                if (rightSidemenuDialog.isShowing()) {
+                                    closeRightSideMenu();
+                                    return;
+                                }
+                                showOnTopRightSidemenu(-1, false);
+                            }
+                        });
+                        Image p = (Image) parent.getUIManager().getThemeImageConstant("rightSideMenuPressImage");
+                        if (p != null) {
+                            findCommandComponent(cmd).setPressedIcon(p);
+                        }
+                    } else {
+                        addMaterialCommandToRightBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                            public void actionPerformed(ActionEvent evt) {
+                                if (rightSidemenuDialog.isShowing()) {
+                                    closeRightSideMenu();
+                                    return;
+                                }
+                                showOnTopRightSidemenu(-1, false);
+                            }
+                        });
+                    }
                 }
             }
         }
     }
+    
+    private void constructOnTopSideMenu() {
+        constructOnTopSideMenu(true);
+    }
 
     private void constructOnTopRightSideMenu() {
-        if (rightSidemenuDialog == null) {
-            permanentRightSideMenuContainer = constructSideNavigationComponent();
-
-            final Form parent = getComponentForm();
-            parent.addPointerPressedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    if (rightSidemenuDialog.isShowing()) {
-                        if (evt.getX() < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
-                            parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
-                            closeRightSideMenu();
-                            evt.consume();
-                        } else {
-                            if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
-                                parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                            } else {
-                                parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
-                            }
-                            if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                evt.consume();
-                            }
-                        }
-                    } else {
-                        int displayWidth = Display.getInstance().getDisplayWidth();
-                        final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
-                        if (evt.getX() > displayWidth - sensitiveSection) {
-                            parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                            evt.consume();
-                        } else {
-                            parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
-                            permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
-                        }
-                    }
-                }
-            });
-            /* COMMENTED BECAUSE IT WORKS CORRECTLY ONLY FOR THE LEFT SIDEMENU
-            parent.addPointerDraggedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuCharged");
-                    if (b != null && b.booleanValue()) {
-                        parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                        showOnTopRightSidemenu(evt.getX(), false);
-                        evt.consume();
-                    } else {
-                        if (rightSidemenuDialog.isShowing()) {
-                            permanentRightSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
-                            evt.consume();
-                        }
-                    }
-                }
-            });
-            */
-            parent.addPointerReleasedListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
-                        return;
-                    }
-                    Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuActivated");
-                    if (b != null && b.booleanValue()) {
-                        parent.putClientProperty("cn1$rightSidemenuActivated", null);
-                        if (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4)) {
-                            closeRightSideMenu();
-                        } else {
-                            showOnTopRightSidemenu(-1, true);
-                        }
-                        evt.consume();
-                    } else {
-                        if (rightSidemenuDialog.isShowing()) {
-                            if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                evt.consume();
-                            }
-                            permanentRightSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
-                        }
-                    }
-                }
-            });
-
-            rightSidemenuDialog = new InteractionDialog(new BorderLayout());
-
-            rightSidemenuDialog.setFormMode(true);
-            rightSidemenuDialog.setUIID("Container");
-            rightSidemenuDialog.setDialogUIID("Container");
-            rightSidemenuDialog.getTitleComponent().remove();
-            rightSidemenuDialog.add(BorderLayout.CENTER, permanentRightSideMenuContainer);
-            if (rightSidemenuSouthComponent != null) {
-                rightSidemenuDialog.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);
-            }
-            float size = 4.5f;
-            try {
-                size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-
-            if (!parent.getUIManager().isThemeConstant("hideRightSideMenuBool", false)) {
-                Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
-                if (i != null) {
-                    Command cmd = addCommandToRightBar("", i, new ActionListener() {
-                        public void actionPerformed(ActionEvent evt) {
-                            if (rightSidemenuDialog.isShowing()) {
-                                closeRightSideMenu();
-                                return;
-                            }
-                            showOnTopRightSidemenu(-1, false);
-                        }
-                    });
-                    Image p = (Image) parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
-                    if (p != null) {
-                        findCommandComponent(cmd).setPressedIcon(p);
-                    }
-                } else {
-                    addMaterialCommandToRightBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
-                        public void actionPerformed(ActionEvent evt) {
-                            if (rightSidemenuDialog.isShowing()) {
-                                closeRightSideMenu();
-                                return;
-                            }
-                            showOnTopRightSidemenu(-1, false);
-                        }
-                    });
-                }
-            }
-        }
+        constructOnTopSideMenu(false);
     }
 
     void showOnTopSidemenu(int draggedX, boolean fromCurrent) {
@@ -1435,7 +1547,7 @@ public class Toolbar extends Container {
         
         rightSidemenuDialog.show(0, 0, dw - actualV, 0);
         if (draggedX > 0) {
-            rightSidemenuDialog.setX(Math.min(0, draggedX - actualV));
+            rightSidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));
         }
     }
 
@@ -1500,14 +1612,14 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Adds a Component to the side navigation menu. The Component is added to
-     * the navigation menu and the command gets the events once the Component is
-     * being pressed.
+     * Adds a Component to the left side navigation menu. The Component is added
+     * to the navigation menu and the command gets the events once the Component
+     * is being pressed.
      *
      * @param cmp c Component to be added to the menu
      * @param cmd a Command to handle the events
      */
-    public void addComponentToSideMenu(Component cmp, Command cmd) {
+    public void addComponentToLeftSideMenu(Component cmp, Command cmd) {
         checkIfInitialized();
         if (permanentSideMenu) {
             constructPermanentSideMenu();
@@ -1564,7 +1676,7 @@ public class Toolbar extends Container {
                 cnt.setLeadComponent(btn);
                 addComponentToRightSideMenu(permanentRightSideMenuContainer, cnt);
             } else {
-                // not implemented
+                throw new IllegalStateException("Right sidemenu bar only works in on-top mode or permanent mode");
             }
         }
     }
@@ -1574,15 +1686,15 @@ public class Toolbar extends Container {
      *
      * @param cmp c Component to be added to the menu
      */
-    public void addComponentToSideMenu(Component cmp) {
+    public void addComponentToLeftSideMenu(Component cmp) {
         checkIfInitialized();
         if (permanentSideMenu) {
             constructPermanentSideMenu();
-            addComponentToSideMenu(permanentSideMenuContainer, cmp);
+            addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);
         } else {
             if (onTopSideMenu) {
                 constructOnTopSideMenu();
-                addComponentToSideMenu(permanentSideMenuContainer, cmp);
+                addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);
             } else {
                 Command cmd = new Command("");
                 cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
@@ -1609,7 +1721,7 @@ public class Toolbar extends Container {
                 constructOnTopRightSideMenu();
                 addComponentToRightSideMenu(permanentRightSideMenuContainer, cmp);
             } else {
-                // not implemented
+                throw new IllegalStateException("Right sidemenu bar only works in on-top mode or permanent mode");
             }
         }
     }
@@ -1624,6 +1736,12 @@ public class Toolbar extends Container {
         if (permanentSideMenu || onTopSideMenu) {
             if (permanentSideMenuContainer != null) {
                 Button b = findCommandComponent(c, permanentSideMenuContainer);
+                if (b != null) {
+                    return b;
+                }
+            }
+            if (permanentRightSideMenuContainer != null) {
+                Button b = findCommandComponent(c, permanentRightSideMenuContainer);
                 if (b != null) {
                     return b;
                 }
@@ -1677,12 +1795,18 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
+        if (isRTL()) {
+            if (cmd.getClientProperty("changedMethod") == null) {
+                cmd.putClientProperty("changedMethod", Boolean.TRUE);
+                addCommandToLeftBar(cmd);
+                return;
+            }
+        }
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
-        if (isRTL()) {
-            cmd.putClientProperty("Left", null);
-        }
+        cmd.putClientProperty("Left", null);
         sideMenu.addCommand(cmd, 0);
+
     }
 
     /**
@@ -1705,12 +1829,18 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToLeftBar(Command cmd) {
+        if (isRTL()) {
+            if (cmd.getClientProperty("changedMethod") == null) {
+                cmd.putClientProperty("changedMethod", Boolean.TRUE);
+                addCommandToRightBar(cmd);
+                return;
+            }
+        }
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
-        if (!isRTL()) {
-            cmd.putClientProperty("Left", Boolean.TRUE);
-        }
+        cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
+
     }
 
     /**
@@ -2026,14 +2156,14 @@ public class Toolbar extends Container {
     }
 
     /**
-     * This method responsible to add a Component to the side navigation panel.
+     * This method responsible to add a Component to the left side navigation panel.
      *
      * @param menu the Menu Container that was created in the
      * constructSideNavigationComponent() method
      *
      * @param cmp the Component to add to the side menu
      */
-    protected void addComponentToSideMenu(Container menu, Component cmp) {
+    protected void addComponentToLeftSideMenu(Container menu, Component cmp) {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
     }
 
