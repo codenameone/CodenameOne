@@ -2093,6 +2093,12 @@ public class Form extends Container {
             contentStyle.setMarginUnit(null);
             initDialogBgPainter(p, previousForm);
             revalidate();
+        } else {
+            // If the keyboard was opened the top/bottom/left/right calculations
+            // may be zeroes right now, but this will change when the keyboard
+            // finishes closing, so we still need to add a BgPainter.
+            // Fixes issue described at https://github.com/codenameone/CodenameOne/issues/1751#issuecomment-394707781
+            initDialogBgPainter(p, previousForm);
         }
 
         initFocused();
