@@ -1132,24 +1132,34 @@ public class Form extends Container {
     public Container getLayeredPane(Class c, boolean top) {
         Container layeredPaneImpl = getLayeredPaneImpl();
         if(c == null) {
-             for(Component cmp : layeredPaneImpl) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
              } 
         }
         String n = c.getName();
-        for(Component cmp : layeredPaneImpl) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        for(Component cmp : children) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
         } 
+        
         Container cnt = new Container();
         int zIndex = 0;
-        int componentCount = layeredPaneImpl.getComponentCount();
+        int componentCount =  children.size();
         if(top) {
             if (componentCount > 0) {
-                Integer z = (Integer)layeredPaneImpl.getComponentAt(componentCount-1).getClientProperty(Z_INDEX_PROP);
+                Integer z = (Integer)children.get(componentCount-1).getClientProperty(Z_INDEX_PROP);
                 if (z != null) {
                     zIndex = z.intValue();
                 }
@@ -1158,7 +1168,7 @@ public class Form extends Container {
         } else {
             if (componentCount > 0) {
                 if (componentCount > 0) {
-                    Integer z = (Integer)layeredPaneImpl.getComponentAt(0).getClientProperty(Z_INDEX_PROP);
+                    Integer z = (Integer)children.get(0).getClientProperty(Z_INDEX_PROP);
                     if (z != null) {
                         zIndex = z.intValue();
                     }
@@ -1182,26 +1192,37 @@ public class Form extends Container {
      */
     public Container getLayeredPane(Class c, int zIndex) {
         Container layeredPaneImpl = getLayeredPaneImpl();
+        
         if(c == null) {
-             for(Component cmp : layeredPaneImpl) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
              } 
         }
         String n = c.getName();
-        for(Component cmp : layeredPaneImpl) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        for(Component cmp : children) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
         } 
+        
         Container cnt = new Container();
         cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        int len = layeredPaneImpl.getComponentCount();
+        int len = children.size();
         int insertIndex = -1;
         
         for (int i=0; i<len; i++) {
-            Component cmp = layeredPaneImpl.getComponentAt(i);
+            Component cmp = children.get(i);
             Integer cmpZIndex = (Integer)cmp.getClientProperty(Z_INDEX_PROP);
             int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
             if (cmpZ >= zIndex) {
@@ -1250,11 +1271,16 @@ public class Form extends Container {
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
         }
         if(c == null) {
-             for(Component cmp : formLayeredPane) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
-             } 
+             }
+             
              Container cnt = new Container();
              cnt.setWidth(getWidth());
              cnt.setHeight(getHeight());
@@ -1264,7 +1290,11 @@ public class Form extends Container {
              return cnt;
         }
         String n = c.getName();
-        for(Component cmp : formLayeredPane) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }

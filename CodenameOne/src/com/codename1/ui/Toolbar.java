@@ -1283,7 +1283,21 @@ public class Toolbar extends Container {
         }
     }
 
-    void showOnTopSidemenu(int draggedX, boolean fromCurrent) {
+    void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
+        AnimationManager a = getAnimationManager();
+        if (a != null) {
+            a.flushAnimation(new Runnable() {
+
+                @Override
+                public void run() {
+                    showOnTopSidemenuImpl(draggedX, fromCurrent);
+                }
+
+            });
+        }
+    }
+        
+    void showOnTopSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
         int dw = Display.getInstance().getDisplayWidth();
         if (Display.getInstance().isPortrait()) {
@@ -1361,7 +1375,22 @@ public class Toolbar extends Container {
         }
     }
 
-    void showOnTopRightSidemenu(int draggedX, boolean fromCurrent) {
+    void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
+        AnimationManager a = getAnimationManager();
+        if (a != null) {
+            a.flushAnimation(new Runnable() {
+
+                @Override
+                public void run() {
+                    showOnTopRightSidemenuImpl(draggedX, fromCurrent);
+                }
+
+            });
+        }
+        
+    }
+    
+    void showOnTopRightSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
         int dw = Display.getInstance().getDisplayWidth();
         if (Display.getInstance().isPortrait()) {
