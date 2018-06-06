@@ -82,6 +82,17 @@ public class InfiniteProgress extends Component {
     public InfiniteProgress() {
         setUIID("InfiniteProgress");
     }
+
+    /**
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
+     * on the returned <code>Dialog</code>.
+     *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
+     * @deprecated typo in method name please use {@link #showInfiniteBlocking()} instead
+     */
+    public Dialog showInifiniteBlocking() {
+        return showInfiniteBlocking();
+    }
     
     /**
      * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
@@ -89,7 +100,7 @@ public class InfiniteProgress extends Component {
      *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
      */
-    public Dialog showInifiniteBlocking() {
+    public Dialog showInfiniteBlocking() {
         Form f = Display.getInstance().getCurrent();
         if(f == null) {
             f = new Form();
