@@ -89,6 +89,8 @@ public class Label extends Component {
     private boolean autoSizeMode;
     private Font originalFont;
     private int widthAtLastCheck = -1;
+    private char materialIcon;
+    private float materialIconSize = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -217,6 +219,8 @@ public class Label extends Component {
      */
     public void setMaterialIcon(char c) {
         FontImage.setMaterialIcon(this, c);
+        materialIconSize = -1;
+        materialIcon = c;
     }
     
     /**
@@ -226,6 +230,25 @@ public class Label extends Component {
      */
     public void setMaterialIcon(char c, float size) {
         FontImage.setMaterialIcon(this, c, size);
+        materialIconSize = size;
+        materialIcon = c;
+    }
+    
+    /**
+     * Returns the material icon assigned to this component or 0 if not applicable
+     * @return the material icon
+     */
+    public char getMaterialIcon() {
+        return materialIcon;
+    }
+    
+    /**
+     * Returns the material icon size assigned to this component or 0/-1 if 
+     * not applicable
+     * @return the material icon size
+     */
+    public float getMaterialIconSize() {
+        return materialIconSize;
     }
     
     /**
@@ -252,10 +275,28 @@ public class Label extends Component {
         return s.getPaddingTop()+(innerHeight-f.getHeight())/2+f.getAscent();
     }
     
-    
-    
-    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        if(materialIcon != 0) {
+            FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
+        }
+    }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void refreshTheme(boolean merge) {
+        super.refreshTheme(merge);
+        if(materialIcon != 0) {
+            FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
+        }
+    }
+    
     /**
      * Sets the Label text
      * 
