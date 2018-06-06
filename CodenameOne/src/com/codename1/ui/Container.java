@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.layouts.FlowLayout;
@@ -38,7 +37,6 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Vector;
 
@@ -79,6 +77,16 @@ public class Container extends Component implements Iterable<Component>{
     private Component leadComponent;
     private Layout layout;
     private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
+    
+    /**
+     * A queue that keeps track of changes to the children while an animation is in progress.
+     * @see #getChildrenAsList(boolean) 
+     * @see #iterator(boolean) 
+     * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component) 
+     * @see #removeComponentImpl(com.codename1.ui.Component) 
+     */
+    private java.util.ArrayList<QueuedChange> changeQueue= new java.util.ArrayList<QueuedChange>();
+    
     private boolean shouldLayout = true;
     boolean scrollableX;
     boolean scrollableY;
@@ -87,6 +95,81 @@ public class Container extends Component implements Iterable<Component>{
     private boolean blockFocus = false;
     private boolean dontRecurseContainer;
     private UIManager uiManager;
+    
+    /**
+     * Encapsulates a change to the container's children.  Used to keep track of 
+     * queued inserts and removes that occur while an animation is in progress.
+     */
+    private static class QueuedChange {
+        /**
+         * The component that was inserted or removed.
+         */
+        private final Component component;
+        
+        /**
+         * The type of change.  Either {@link #TYPE_INSERT} or {@link #TYPE_REMOVE}
+         */
+        private final int type;
+        
+        /**
+         * For {@link #type} to indicate an insertion.
+         */
+        static final int TYPE_INSERT=0;
+        
+        /**
+         * For {@link #type} to indicate a removal.
+         */
+        static final int TYPE_REMOVE=1;
+        
+        /**
+         * Creates a new queued change.
+         * @param type Either {@link #TYPE_INSERT} or {@link #TYPE_REMOVE}
+         * @param cmp The component that was inserted or removed.
+         */
+        QueuedChange(int type, Component cmp) {
+            this.type = type;
+            this.component = cmp;
+        }
+    }
+    
+    /**
+     * Encapsulates a child component insertion that occurs during an animation.
+     */
+    private static class QueuedInsertion extends QueuedChange {
+        /**
+         * The component constraint of the component that was inserted.
+         */
+        private Object constraint;
+        
+        /**
+         * The index where the component should be inserted.
+         */
+        private int index;
+        
+        /**
+         * Creates a new queued insertion.
+         * @param index The index where the component is inserted.
+         * @param constraint The constraint.
+         * @param cmp The component that was inserted.
+         */
+        QueuedInsertion(int index, Object constraint, Component cmp) {
+            super(TYPE_INSERT, cmp);
+            this.index = index;
+            this.constraint = constraint;
+        }
+    }
+    
+    /**
+     * Encapsulates the removal of a component from the children while an animation
+     * is in progress.
+     */
+    private static class QueuedRemoval extends QueuedChange {
+        QueuedRemoval(Component cmp) {
+            super(TYPE_REMOVE, cmp);
+        }
+    }
+    
+    
 
     /**
      * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
@@ -680,13 +763,16 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     void insertComponentAt(final int index, final Object constraint, final Component cmp) {
-        AnimationManager a = getAnimationManager();
+        final AnimationManager a = getAnimationManager();
         if(a != null && a.isAnimating()) {
             // pretend like the component was already added
             if(cmp.getParent() != null) {
                 throw new IllegalArgumentException("Component is already contained in Container: " + cmp.getParent());
             }
             cmp.setParent(this);
+            
+            final QueuedInsertion insertion = new QueuedInsertion(index, constraint, cmp);
+            changeQueue.add(insertion);
             a.addAnimation(new ComponentAnimation() {
                 private boolean alreadyAdded;
                 
@@ -698,12 +784,16 @@ public class Container extends Component implements Iterable<Component>{
                 @Override
                 protected void updateState() {
                     if(!alreadyAdded) {
-                        alreadyAdded = true;
-                        cmp.setParent(null);
-                        if(constraint != null) {
-                            layout.addLayoutComponent(constraint, cmp, Container.this);
+                        try {
+                            alreadyAdded = true;
+                            cmp.setParent(null);
+                            if(constraint != null) {
+                                layout.addLayoutComponent(constraint, cmp, Container.this);
+                            }
+                            insertComponentAtImpl(index, cmp);
+                        } finally {
+                            changeQueue.remove(insertion);
                         }
-                        insertComponentAtImpl(index, cmp);
                         revalidate();
                     }
                 }
@@ -1063,11 +1153,13 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     void removeComponentImpl(final Component cmp) {
-        AnimationManager a = getAnimationManager();
+        final AnimationManager a = getAnimationManager();
         if(a != null && a.isAnimating()) {
             // pretend like the component was already removed
             layout.removeLayoutComponent(cmp);
             cmp.setParent(null);
+            final QueuedRemoval removed = new QueuedRemoval(cmp);
+            changeQueue.add(removed);
             a.addAnimation(new ComponentAnimation() {
                 private boolean alreadyRemoved;
                 @Override
@@ -1078,8 +1170,12 @@ public class Container extends Component implements Iterable<Component>{
                 @Override
                 protected void updateState() {
                     if(!alreadyRemoved) {
-                        alreadyRemoved = true;
-                        removeComponentImplNoAnimationSafety(cmp);
+                        try {
+                            alreadyRemoved = true;
+                            removeComponentImplNoAnimationSafety(cmp);
+                        } finally {
+                            changeQueue.remove(removed);
+                        }
                         revalidate();
                     }
                 }
@@ -1100,7 +1196,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param cmp the removed component
      */
     void removeComponentImplNoAnimationSafety(Component cmp) {
-        Form parentForm = cmp.getComponentForm();
+        Form parentForm = getComponentForm();
         layout.removeLayoutComponent(cmp);
         
         // the deinitizlize contract expects the component to be in a container but if this is a part of an animation 
@@ -1175,7 +1271,7 @@ public class Container extends Component implements Iterable<Component>{
      * a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
      * such an issue.
      */
-    public void removeAll() {
+   public void removeAll() {
         Form parentForm = getComponentForm();
         if (parentForm != null) {
             Component focus = parentForm.getFocused();
@@ -1185,8 +1281,16 @@ public class Container extends Component implements Iterable<Component>{
         }
         
         // prevents concurrent modification exception
-        Component[] arr = new Component[components.size()];
-        components.toArray(arr);
+        Component[] arr;
+        boolean includeQueued = true; // Setting this true because when would you ever want removeAll() to NOT remove queued components
+        if (includeQueued) {
+            java.util.List<Component> l = getChildrenAsList(includeQueued);
+            arr = new Component[l.size()];
+            l.toArray(arr);
+        } else {
+            arr = new Component[components.size()];
+            components.toArray(arr);
+        }
 
         int componentCount = arr.length;
         for(int iter = 0 ; iter < componentCount ; iter++) {
@@ -2989,6 +3093,84 @@ public class Container extends Component implements Iterable<Component>{
         }        
     }
 
+    /**
+     * Gets the child components of this Container as a List.  Using {@literal true} as the 
+     * argument provides a way to obtain all of the children, including children whose full
+     * addition is pending while an animation is in progress.
+     * 
+     * <p><strong>Animation Discussion</strong>: If children are added or removed from a Container
+     * while its containing Form has an animation in progress, the insertion/deletion isn't complete
+     * until after the animation is finished.  Most methods to interact with a container's children
+     * won't see these pending changes until that time.  E.g.:</p>
+     * 
+     * <p>{@code 
+     * // Assume an animation is in progress on the form containing cnt.
+     * Label lbl = new Label("Test");
+     * int len = cnt.getComponentCount(); // 0
+     * cnt.addComponent(lbl);
+     * int lenAfter = cnt.getComponentCount(); // 0
+     * cnt.contains(lbl);  // true
+     * cnt.getChildrenAsList(true).size(); // 1
+     * cnt.getChildrenAsList(false).size(); // 0
+     * 
+     * Button btn = new Button("Press me");
+     * cnt.addComponent(btn);
+     * cnt.getComponentCount(); // 0
+     * cnt.getChildrenAsList(true).size(); // 2
+     * cnt.removeComponent(btn);
+     * cnt.getComponentCount(); // 0
+     * cnt.getChildrenAsList(true).size(); // 1
+     * 
+     * }</p>
+     * @param includeQueued True to reflect queued inserts and removals while an animation is in progress.
+     * @return A list including all of the children of this container.
+     * @see #iterator(boolean) 
+     */
+    public java.util.List<Component> getChildrenAsList(boolean includeQueued) {
+        if (includeQueued) {
+            java.util.ArrayList<Component> out = new java.util.ArrayList<Component>();
+            out.addAll(components);
+            if (changeQueue != null) {
+                for (QueuedChange change : changeQueue) {
+                    switch (change.type) {
+                        case QueuedChange.TYPE_INSERT:
+                            QueuedInsertion insert = (QueuedInsertion)change;
+                            int index = insert.index;
+                            if(insert.index == Integer.MAX_VALUE) {
+                                index = out.size();
+                            }
+                            out.add(index, change.component);
+                            break;
+                        case QueuedChange.TYPE_REMOVE:
+                            out.remove(change.component);
+                            break;
+                    }
+                }
+            };
+            return out;
+        } else {
+            java.util.ArrayList<Component> out = new java.util.ArrayList<Component>();
+            out.addAll(components);
+            return out;
+        }
+    }
+    
+    /**
+     * Obtains an iterator that iterates over the children of this container.  If argument is true,
+     * then the iteratator will include queued insertions/deletions while an animation is in progress.
+     * @param includeQueued True to include queued component insertions and removals while animation is in progress.
+     * @return An iterator that iterates over the children of this component.
+     * @see #iterator() 
+     * @see #getChildrenAsList(boolean) 
+     */
+    public Iterator<Component> iterator(boolean includeQueued) {
+        if (includeQueued) {
+            return getChildrenAsList(includeQueued).iterator();
+        } else {
+            return iterator();
+        }
+    }
+    
     /**
      * Part of the Iterable interface allowing us to do a for-each loop on Container
      * @return the iterator of the components
