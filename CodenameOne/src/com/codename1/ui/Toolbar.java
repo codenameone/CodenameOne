@@ -85,7 +85,7 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png" alt="Toolbar animation stages" />
  * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png" alt="Toolbar animation stages" />
  *
- * @author Chen
+ * @author Chen, Francesco Galgani
  */
 public class Toolbar extends Container {
 
@@ -344,7 +344,11 @@ public class Toolbar extends Container {
     public void closeLeftSideMenu() {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
-                sidemenuDialog.disposeToTheLeft();
+                if (!isRTL()) {
+                    sidemenuDialog.disposeToTheLeft();
+                } else {
+                    sidemenuDialog.disposeToTheRight();
+                }
                 Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
                 Style s = cnt.getUnselectedStyle();
                 s.setBgTransparency(0);
@@ -361,7 +365,11 @@ public class Toolbar extends Container {
     public void closeRightSideMenu() {
         if (onTopSideMenu) {
             if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
-                rightSidemenuDialog.disposeToTheRight();
+                if (!isRTL()) {
+                    rightSidemenuDialog.disposeToTheRight();
+                } else {
+                    rightSidemenuDialog.disposeToTheLeft();
+                }
                 Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
                 Style s = cnt.getUnselectedStyle();
                 s.setBgTransparency(0);
@@ -677,11 +685,7 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
-        if (!isRTL()) {
-            return addCommandToLeftSideMenu(name, icon, ev);
-        } else {
-            return addCommandToRightSideMenu(name, icon, ev);
-        }
+        return addCommandToLeftSideMenu(name, icon, ev);
     }
 
     /**
@@ -720,11 +724,7 @@ public class Toolbar extends Container {
      * @param cmp c Component to be added to the menu
      */
     public void addComponentToSideMenu(Component cmp) {
-        if (!isRTL()) {
-            addComponentToLeftSideMenu(cmp);
-        } else {
-            addComponentToRightSideMenu(cmp);
-        }
+        addComponentToLeftSideMenu(cmp);
     }
     
     /**
@@ -749,11 +749,7 @@ public class Toolbar extends Container {
      * @param cmd a Command to handle the events
      */
     public void addComponentToSideMenu(Component cmp, Command cmd) {
-        if (!isRTL()) {
-            addComponentToLeftSideMenu(cmp, cmd);
-        } else {
-            addComponentToRightSideMenu(cmp, cmd);
-        }
+        addComponentToLeftSideMenu(cmp, cmd);
     }
 
     /**
@@ -801,11 +797,7 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
-        if (!isRTL()) {
-            return addMaterialCommandToLeftSideMenu(name, icon, size, ev);
-        } else {
-            return addMaterialCommandToRightSideMenu(name, icon, size, ev);
-        }
+        return addMaterialCommandToLeftSideMenu(name, icon, size, ev);
     }
     
     /**
@@ -819,11 +811,7 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
-        if (!isRTL()) {
-            return addMaterialCommandToLeftSideMenu(name, icon, ev);
-        } else {
-            return addMaterialCommandToRightSideMenu(name, icon, ev);
-        }
+        return addMaterialCommandToLeftSideMenu(name, icon, ev);
     }
 
     /**
@@ -1000,11 +988,7 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToSideMenu(Command cmd) {
-        if (!isRTL()) {
-            addCommandToLeftSideMenu(cmd);
-        } else {
-            addCommandToRightSideMenu(cmd);
-        }
+        addCommandToLeftSideMenu(cmd);
     }
 
     /**
@@ -1144,7 +1128,7 @@ public class Toolbar extends Container {
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
                         }
-                        if (sidemenuDialog != null) {
+                        if (sidemenuDialog != null && !isRTL()) {
                             if (sidemenuDialog.isShowing()) {
                                 if (evt.getX() > sidemenuDialog.getWidth()) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
@@ -1172,7 +1156,35 @@ public class Toolbar extends Container {
                                 }
                             }
                         }
-                        if (rightSidemenuDialog != null) {
+                        if (sidemenuDialog != null && isRTL()) {
+                            if (sidemenuDialog.isShowing()) {
+                                if (evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    closeSideMenu();
+                                    evt.consume();
+                                } else {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
+                                        parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                                    } else {
+                                        parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    }
+                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        evt.consume();
+                                    }
+                                }
+                            } else {
+                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
+                                if (evt.getX() > displayWidth - sensitiveSection) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                                    evt.consume();
+                                } else {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
+                                }
+                            }
+                        }
+                        if (rightSidemenuDialog != null && !isRTL()) {
                             if (rightSidemenuDialog.isShowing()) {
                                 if (evt.getX() < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
@@ -1200,6 +1212,34 @@ public class Toolbar extends Container {
                                 }
                             }
                         }
+                        if (rightSidemenuDialog != null && isRTL()) {
+                            if (rightSidemenuDialog.isShowing()) {
+                                if (evt.getX() > rightSidemenuDialog.getWidth()) {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    closeRightSideMenu();
+                                    evt.consume();
+                                } else {
+                                    if (evt.getX() + Display.getInstance().convertToPixels(8) > rightSidemenuDialog.getWidth()) {
+                                        parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
+                                    } else {
+                                        parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    }
+                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                        evt.consume();
+                                    }
+                                }
+                            } else {
+                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
+                                if (evt.getX() < sensitiveSection) {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
+                                    evt.consume();
+                                } else {
+                                    parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
+                                    permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
+                                }
+                            }
+                        }
                     }
                 });
             }
@@ -1214,27 +1254,29 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuCharged");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
-                                showOnTopSidemenu(evt.getX(), false);
-                                // evt.consume();
+                                if (!isRTL()) {
+                                    showOnTopSidemenu(evt.getX(), false);
+                                } else {
+                                    showOnTopSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
+                                }
                             } else {
                                 if (sidemenuDialog.isShowing()) {
                                     permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
-                                    // evt.consume();
                                 }
                             }
                         }
                         if (rightSidemenuDialog != null) {
-                            // TO DO
                             Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuCharged");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", Boolean.TRUE);
-                                // showOnTopRightSidemenu(evt.getX(), false);
-                                showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
-                                // evt.consume();
+                                if (!isRTL()) {
+                                    showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
+                                } else {
+                                    showOnTopRightSidemenu(evt.getX(), false);
+                                }
                             } else {
                                 if (rightSidemenuDialog.isShowing()) {
                                     permanentRightSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
-                                    // evt.consume();
                                 }
                             }
                         }
@@ -1252,7 +1294,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
-                                if (evt.getX() < parent.getWidth() / 4) {
+                                if ((evt.getX() < parent.getWidth() / 4 && !isRTL()) || (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && isRTL())) {
                                     closeSideMenu();
                                 } else {
                                     showOnTopSidemenu(-1, true);
@@ -1271,7 +1313,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", null);
-                                if (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4)) {
+                                if ((evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && !isRTL()) || (evt.getX() < parent.getWidth() / 4 && isRTL())) {
                                     closeRightSideMenu();
                                 } else {
                                     showOnTopRightSidemenu(-1, true);
@@ -1458,8 +1500,13 @@ public class Toolbar extends Container {
         if (sidemenuDialog.getClientProperty("cn1$firstShow") == null) {
             sidemenuDialog.setAnimateShow(false);
             sidemenuDialog.setVisible(false);
-            sidemenuDialog.show(0, 0, 0, dw - v);
-            sidemenuDialog.disposeToTheLeft();
+            if (!isRTL()) {
+                sidemenuDialog.show(0, 0, 0, dw - v);
+                sidemenuDialog.disposeToTheLeft();
+            } else {
+                sidemenuDialog.show(0, 0, dw - v, 0);
+                sidemenuDialog.disposeToTheRight();
+            }
             sidemenuDialog.setVisible(true);
             sidemenuDialog.putClientProperty("cn1$firstShow", Boolean.TRUE);
             sidemenuDialog.setAnimateShow(draggedX < 1);
@@ -1467,7 +1514,11 @@ public class Toolbar extends Container {
         sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
         sidemenuDialog.setWidth(v);
         if (!fromCurrent) {
-            sidemenuDialog.setX(-v);
+            if (!isRTL()) {
+                sidemenuDialog.setX(-v);
+            } else {
+                sidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
+            }
         }
         sidemenuDialog.setRepositionAnimation(false);
         sidemenuDialog.layoutContainer();
@@ -1482,8 +1533,14 @@ public class Toolbar extends Container {
         s.setBgColor(0);
 
         sidemenuDialog.show(0, 0, 0, dw - actualV);
-        if (draggedX > 0) {
-            sidemenuDialog.setX(Math.min(0, draggedX - actualV));
+        if (!isRTL()) {
+            if (draggedX > 0) {
+                sidemenuDialog.setX(Math.min(0, draggedX - actualV));
+            }
+        } else {
+            if (draggedX > 0) {
+                sidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));
+            }
         }
     }
 
@@ -1551,8 +1608,13 @@ public class Toolbar extends Container {
         if (rightSidemenuDialog.getClientProperty("cn1$firstRightShow") == null) {
             rightSidemenuDialog.setAnimateShow(false);
             rightSidemenuDialog.setVisible(false);
-            rightSidemenuDialog.show(0, 0, dw - v, 0);
-            rightSidemenuDialog.disposeToTheRight();
+            if (!isRTL()) {
+                rightSidemenuDialog.show(0, 0, dw - v, 0);
+                rightSidemenuDialog.disposeToTheRight();
+            } else {
+                rightSidemenuDialog.show(0, 0, 0, dw - v);
+                rightSidemenuDialog.disposeToTheLeft();
+            }
             rightSidemenuDialog.setVisible(true);
             rightSidemenuDialog.putClientProperty("cn1$firstRightShow", Boolean.TRUE);
             rightSidemenuDialog.setAnimateShow(draggedX < 1);
@@ -1560,7 +1622,11 @@ public class Toolbar extends Container {
         rightSidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
         rightSidemenuDialog.setWidth(v);
         if (!fromCurrent) {
-            rightSidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
+            if (!isRTL()) {
+                rightSidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
+            } else {
+                rightSidemenuDialog.setX(-v);
+            }
         }
         rightSidemenuDialog.setRepositionAnimation(false);
         rightSidemenuDialog.layoutContainer();
@@ -1573,10 +1639,16 @@ public class Toolbar extends Container {
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int) f);
         s.setBgColor(0);
-        
+
         rightSidemenuDialog.show(0, 0, dw - actualV, 0);
-        if (draggedX > 0) {
-            rightSidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));
+        if (!isRTL()) {
+            if (draggedX > 0) {
+                rightSidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));
+            }
+        } else {
+            if (draggedX > 0) {
+                rightSidemenuDialog.setX(Math.min(0, draggedX - actualV));
+            }
         }
     }
 
@@ -1824,18 +1896,10 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
-        if (isRTL()) {
-            if (cmd.getClientProperty("changedMethod") == null) {
-                cmd.putClientProperty("changedMethod", Boolean.TRUE);
-                addCommandToLeftBar(cmd);
-                return;
-            }
-        }
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", null);
         sideMenu.addCommand(cmd, 0);
-
     }
 
     /**
@@ -1858,18 +1922,10 @@ public class Toolbar extends Container {
      * @param cmd a Command
      */
     public void addCommandToLeftBar(Command cmd) {
-        if (isRTL()) {
-            if (cmd.getClientProperty("changedMethod") == null) {
-                cmd.putClientProperty("changedMethod", Boolean.TRUE);
-                addCommandToRightBar(cmd);
-                return;
-            }
-        }
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
-
     }
 
     /**
