@@ -1211,4 +1211,23 @@ public class TableLayout extends Layout {
         tl.setGrowHorizontally(growHorizontally);
         return Container.encloseIn(tl, cmps);
     }
+
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+        return true;
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        int len = tablePositions.length;
+        Component[] out = new Component[len];
+        for (int i=0; i<len; i++) {
+            Constraint con = tablePositions[i];
+            if (con != null) {
+                out[i] = tablePositions[i].parent;
+            }
+        }
+        return out;
+    }
+    
 }

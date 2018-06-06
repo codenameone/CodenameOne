@@ -100,7 +100,8 @@ public class BorderLayout extends Layout {
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
     /**
-     * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
+     * The center component takes up the entire screens and the sides are 
+     * automatically placed on top (or below based on z-order) thus creating
      * a layered effect
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
@@ -880,4 +881,15 @@ public class BorderLayout extends Layout {
     public static Container west(Component west) {
         return Container.encloseIn(new BorderLayout(), west, BorderLayout.WEST);
     }
+
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+        return true;
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        return new Component[]{portraitNorth, portraitWest, portraitCenter, portraitEast, portraitSouth};
+    }
+    
 }

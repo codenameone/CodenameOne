@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.io.Log;
+import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Rectangle;
@@ -40,8 +41,12 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.ListIterator;
 
 /**
  *<p> Top level component that serves as the root for the UI, this {@link Container}
@@ -75,6 +80,8 @@ public class Form extends Container {
     static int rippleY;
     
     ArrayList<Component> buttonsAwatingRelease;
+    
+    private VirtualInputDevice currentInputDevice;
     
     private AnimationManager animMananger = new AnimationManager(this);
     
@@ -228,6 +235,33 @@ public class Form extends Container {
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
     }
+    
+    /**
+     * Sets the current virtual input device for the form.  This will execute the {@link VirtualInputDevice#close() }
+     * method of the current input device, and then set {@literal device} as the new current input device.
+     * 
+     * <p>Some examples of virtual input devices are the Picker widget and the virtual keyboard.</p>
+     * @param device
+     * @throws Exception 
+     */
+    public void setCurrentInputDevice(VirtualInputDevice device) throws Exception {
+        if (currentInputDevice != null) {
+            currentInputDevice.close();
+        }
+        currentInputDevice = device;
+    }
+    
+    /**
+     * Returns the current virtual input device in the form.
+     * 
+     * @return The current input device in the form.
+     * @see #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
+     */
+    public VirtualInputDevice getCurrentInputDevice() {
+        return currentInputDevice;
+    }
+    
+    
     
     /**
      * Allows subclasses to disable the global toolbar for a specific form by overriding this method
@@ -1098,24 +1132,34 @@ public class Form extends Container {
     public Container getLayeredPane(Class c, boolean top) {
         Container layeredPaneImpl = getLayeredPaneImpl();
         if(c == null) {
-             for(Component cmp : layeredPaneImpl) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
              } 
         }
         String n = c.getName();
-        for(Component cmp : layeredPaneImpl) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        for(Component cmp : children) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
         } 
+        
         Container cnt = new Container();
         int zIndex = 0;
-        int componentCount = layeredPaneImpl.getComponentCount();
+        int componentCount =  children.size();
         if(top) {
             if (componentCount > 0) {
-                Integer z = (Integer)layeredPaneImpl.getComponentAt(componentCount-1).getClientProperty(Z_INDEX_PROP);
+                Integer z = (Integer)children.get(componentCount-1).getClientProperty(Z_INDEX_PROP);
                 if (z != null) {
                     zIndex = z.intValue();
                 }
@@ -1124,7 +1168,7 @@ public class Form extends Container {
         } else {
             if (componentCount > 0) {
                 if (componentCount > 0) {
-                    Integer z = (Integer)layeredPaneImpl.getComponentAt(0).getClientProperty(Z_INDEX_PROP);
+                    Integer z = (Integer)children.get(0).getClientProperty(Z_INDEX_PROP);
                     if (z != null) {
                         zIndex = z.intValue();
                     }
@@ -1148,26 +1192,37 @@ public class Form extends Container {
      */
     public Container getLayeredPane(Class c, int zIndex) {
         Container layeredPaneImpl = getLayeredPaneImpl();
+        
         if(c == null) {
-             for(Component cmp : layeredPaneImpl) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
              } 
         }
         String n = c.getName();
-        for(Component cmp : layeredPaneImpl) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        for(Component cmp : children) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
         } 
+        
         Container cnt = new Container();
         cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        int len = layeredPaneImpl.getComponentCount();
+        int len = children.size();
         int insertIndex = -1;
         
         for (int i=0; i<len; i++) {
-            Component cmp = layeredPaneImpl.getComponentAt(i);
+            Component cmp = children.get(i);
             Integer cmpZIndex = (Integer)cmp.getClientProperty(Z_INDEX_PROP);
             int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
             if (cmpZ >= zIndex) {
@@ -1216,11 +1271,16 @@ public class Form extends Container {
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
         }
         if(c == null) {
-             for(Component cmp : formLayeredPane) {
+            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+            // over layeredPaneImpl because the latter won't find components while an animation
+            // is in progress.... We could end up adding a whole bunch of layered panes
+            // by accident
+             for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
-             } 
+             }
+             
              Container cnt = new Container();
              cnt.setWidth(getWidth());
              cnt.setHeight(getHeight());
@@ -1230,7 +1290,11 @@ public class Form extends Container {
              return cnt;
         }
         String n = c.getName();
-        for(Component cmp : formLayeredPane) {
+        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
+        // over layeredPaneImpl because the latter won't find components while an animation
+        // is in progress.... We could end up adding a whole bunch of layered panes
+        // by accident
+        for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
@@ -1873,6 +1937,11 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     void deinitializeImpl() {
+        try {
+            setCurrentInputDevice(null);
+        } catch (Exception ex) {
+            Log.e(ex);
+        }
         super.deinitializeImpl();
         animMananger.flush();
         buttonsAwatingRelease = null;
@@ -2024,6 +2093,12 @@ public class Form extends Container {
             contentStyle.setMarginUnit(null);
             initDialogBgPainter(p, previousForm);
             revalidate();
+        } else {
+            // If the keyboard was opened the top/bottom/left/right calculations
+            // may be zeroes right now, but this will change when the keyboard
+            // finishes closing, so we still need to add a BgPainter.
+            // Fixes issue described at https://github.com/codenameone/CodenameOne/issues/1751#issuecomment-394707781
+            initDialogBgPainter(p, previousForm);
         }
 
         initFocused();
@@ -2317,6 +2392,270 @@ public class Form extends Container {
     protected boolean shouldSendPointerReleaseToOtherForm() {
         return false;
     }
+    
+    /**
+     * Gets the next component in focus traversal order.  This will return the {@link Component#getNextFocusRight() }
+     * if it is set.  If not, it will return {@link Component#getNextFocusDown() } if it is set.  If not, it will 
+     * return the next component according to the traversal order.
+     * @param current The current component.
+     * @return The next component in the focus traversal order.
+     */
+    public Component getNextComponent(Component current) {
+        return getTabIterator(current).getNext();
+    }
+    
+    /**
+     * Gets the previous component in focus traversal order.  This will return the {@link Component#getNextFocusLeft() }
+     * if it is set.  If not, it will return {@link Component#getNextFocusUp() } if it is set.  If not, it will 
+     * return the previous component according to the traversal order defined by {@link Form#getTabIterator(com.codename1.ui.Component) }.
+     * @param current The current component.
+     * @return The previous component in the traversal order.
+     */
+    public Component getPreviousComponent(Component current) {
+        return getTabIterator(current).getPrevious();
+    }
+    
+    /**
+     * Iterates through the components on this form in traversal order.  
+     * @see #getTabIterator(com.codename1.ui.Component) 
+     */
+    public class TabIterator implements ListIterator<Component> {
+        private java.util.List<Component> components;
+        private int currPos;
+        private Component current;
+        
+        private TabIterator(java.util.List<Component> components, Component current) {
+            this.components = components;
+            setCurrent(current);
+        }
+        
+        /**
+         * Gets the current component in this iterator.
+         * @return 
+         */
+        public Component getCurrent() {
+            return current;
+        }
+        
+        /**
+         * Gets the next component in this iterator.  If the current component explicitly specifies
+         * a nextFocusRight or nextFocusDown component, then that component will be returned.
+         * Otherwise it will follow the tab index order.
+         * @return The next component to be traversed after {@link #getCurrent() }
+         */
+        public Component getNext() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+            
+            Component next = current != null ? current.getNextFocusRight() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            next = current != null ? current.getNextFocusDown() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                return components.get(0);
+            }
+            if (currPos < components.size()-1) {
+                return components.get(currPos+1);
+            }
+            return null;
+        }
+        
+        /**
+         * Gets the previous component that should be traversed when going "back" in through the
+         * form components.  If the current component has a nextFocusLeft or nextFocusUp field
+         * explicitly specified, then it will return that.  Otherwise it just follows the traversal 
+         * order using the tab index.
+         * @return The previous component according to traversal order.
+         */
+        public Component getPrevious() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+            Component prev = current != null ? current.getNextFocusLeft() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            prev = current != null ? current.getNextFocusUp() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                // Negative current position means that we pick the last 
+                // component on the form.
+                return components.get(components.size()-1);
+            }
+            if (currPos > 0 && currPos <= components.size()) {
+                return components.get(currPos-1);
+            }
+            return null;
+        }
+        
+        /**
+         * Sets the current component in the iterator.  This reposition the iterator
+         * to the given component.
+         * @param cmp The component to set as the current component.
+         */
+        public void setCurrent(Component cmp) {
+            current = cmp;
+            
+            currPos = cmp != null ? components.indexOf(cmp) : -1;
+        }
+        
+        /**
+         * Checks to see if there is a "next" component to traverse focus to in this iterator.
+         * @return True if there is a "next" component in this iterator.
+         */
+        public boolean hasNext() {
+            return getNext() != null;
+        }
+
+        /**
+         * Returns the next component in this iterator, and repositions the iterator at this component.
+         * 
+         * @return The "next" component in the iterator.
+         */
+        @Override
+        public Component next() {
+            Component next = getNext();
+            setCurrent(next);
+            return next;
+        }
+
+        /**
+         * Checks if this iterator has a "previous" component.
+         * @return 
+         */
+        @Override
+        public boolean hasPrevious() {
+            return getPrevious() != null;
+        }
+
+        /**
+         * Returns the previous component in this iterator, and repositions the iterator at this component.
+         * @return 
+         */
+        @Override
+        public Component previous() {
+            Component prev = getPrevious();
+            setCurrent(prev);
+            return prev;
+        }
+
+        /**
+         * Gets the index within the iterator of the next component.
+         * @return 
+         */
+        @Override
+        public int nextIndex() {
+            Component next = getNext();
+            if (next == null) {
+                return -1;
+            }
+            return components.indexOf(next);
+        }
+
+        /**
+         * Gets the index within the iterator of the previous component.
+         * @return 
+         */
+        @Override
+        public int previousIndex() {
+            Component prev = getPrevious();
+            if (prev == null) {
+                return -1;
+            }
+            return components.indexOf(prev);
+        }
+
+        /**
+         * Removes the current component from the iterator, and repositions the iterator to the previous 
+         * component, or the next component (if previous doesn't exist).
+         */
+        @Override
+        public void remove() {
+            Component newCurr = getPrevious();
+            if (newCurr == null) {
+                newCurr = getNext();
+            }
+            if (current != null) {
+                components.remove(current);
+                setCurrent(newCurr);
+            }
+            
+        }
+
+        /**
+         * Replaces the current component, in the iterator, with the provided component.
+         * This will not actually replace the component in the form's hierarchy.  Just within
+         * the iterator.
+         * @param e The component to set as the current component.
+         */
+        @Override
+        public void set(Component e) {
+            if (currPos >= 0 && currPos < components.size()-1) {
+                components.set(currPos, e);
+                setCurrent(e);
+            }
+        }
+
+        /**
+         * Adds a component to the end of the iterator.
+         * @param e The component to add to the iterator.
+         */
+        @Override
+        public void add(Component e) {
+            components.add(e);
+        }
+        
+    }
+    
+    /**
+     * Returns an iterator that iterates over all of the components in this form, ordered
+     * by their tab index. 
+     * @param start The start position.  The iterator will automatically initialized such that {@link ListIterator#next() }
+     * will return the next component in the traversal order, and the {@link ListIterator#previous() } returns the previous
+     * component in traversal order.
+     * @return An iterator for the traversal order of the components in this form.
+     * 
+     * @see #getNextComponent(com.codename1.ui.Component) 
+     * @see #getPreviousComponent(com.codename1.ui.Component) 
+     * @see Component#getPreferredTabIndex() 
+     * @see Component#setPreferredTabIndex(int) 
+     */
+    public TabIterator getTabIterator(Component start) {
+        updateTabIndices(0);
+        java.util.List<Component> out = new ArrayList<Component>();
+        out.addAll(ComponentSelector.select("*", this).filter(new Filter() {
+
+            @Override
+            public boolean filter(Component c) {
+                return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled();
+            }
+            
+        }));
+        Collections.sort(out, new Comparator<Component>() {
+
+            @Override
+            public int compare(Component o1, Component o2) {
+                return o1.getTabIndex() < o2.getTabIndex() ? -1 :
+                        o2.getTabIndex() < o1.getTabIndex() ? 1 :
+                        0;
+            }
+            
+        });
+        
+        return new TabIterator(out, start);
+    }
+    
+    
+    
     
     /**
      * {@inheritDoc}
@@ -3249,9 +3588,13 @@ public class Form extends Container {
         }
         return bestCandidate;
     }
-
+    
     /**
      * This method returns the next focusable Component vertically
+     * 
+     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusDown() } or {@link Component#getNextFocusUp() }. 
+     * It simply finds the next focusable component on the form based solely on absolute Y coordinate.</p>
+     * 
      * @param down if true will the return the next focusable on the bottom else
      * on the top
      * @return a focusable Component or null if not found
@@ -3282,9 +3625,14 @@ public class Form extends Container {
         }
         return null;
     }
-
+    
+    
     /**
      * This method returns the next focusable Component horizontally
+     * 
+     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusLeft() } or {@link Component#getNextFocusRight() }. 
+     * It simply finds the next focusable component on the form based solely on absolute X coordinate.</p>
+     * 
      * @param right if true will the return the next focusable on the right else
      * on the left
      * @return a focusable Component or null if not found
@@ -3315,7 +3663,12 @@ public class Form extends Container {
         }
         return null;
     }
-
+    
+    /**
+     * Finds next focusable component.  This will first check {@link Component#getNextFocusDown() }
+     * on the currently focused component.  Failing that it will scan the form based on Y-coord.
+     * @return 
+     */
     Component findNextFocusDown() {
         if (focused != null) {
             if (focused.getNextFocusDown() != null) {
@@ -3326,6 +3679,11 @@ public class Form extends Container {
         return null;
     }
 
+    /**
+     * Finds next focusable component in upward direction.  This will first check {@link Component#getNextFocusUp() }
+     * on the currently focused component.  Failing that it will scan the form based on Y-coord.
+     * @return 
+     */
     Component findNextFocusUp() {
         if (focused != null) {
             if (focused.getNextFocusUp() != null) {
@@ -3336,6 +3694,11 @@ public class Form extends Container {
         return null;
     }
 
+    /**
+     * Finds next focusable component in rightward direction.  This will first check {@link Component#getNextFocusRight() }
+     * on the currently focused component.  Failing that it will scan the form based on X-coord.
+     * @return 
+     */
     Component findNextFocusRight() {
         if (focused != null) {
             if (focused.getNextFocusRight() != null) {
@@ -3346,6 +3709,11 @@ public class Form extends Container {
         return null;
     }
 
+    /**
+     * Finds next focusable component in leftward direction.  This will first check {@link Component#getNextFocusLeft() }
+     * on the currently focused component.  Failing that it will scan the form based on X-coord.
+     * @return 
+     */
     Component findNextFocusLeft() {
         if (focused != null) {
             if (focused.getNextFocusLeft() != null) {

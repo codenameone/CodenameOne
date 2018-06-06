@@ -162,6 +162,7 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import org.sqlite.SQLiteConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -892,6 +893,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         C() {
             super(null);
+            setFocusTraversalKeysEnabled(false);
             addKeyListener(this);
             addMouseListener(this);
             addMouseWheelListener(this);
@@ -1849,8 +1851,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         return canvas;
     }
 
+    public static JavaSEPort instance;
+    
     public JavaSEPort() {
         canvas = new C();
+        instance = this;
     }
 
     public void paintDirty() {
@@ -9178,12 +9183,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             // of the db.
             // It can contain directory names relative to the
             // current working directory
+            SQLiteConfig config = new SQLiteConfig();
+            config.enableLoadExtension(true);
             File dir = new File(getStorageDir() + "/database");
             if (!dir.exists()) {
                 dir.mkdir();
             }
             java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
-                    + getStorageDir() + "/database/" + databaseName);
+                    + getStorageDir() + "/database/" + databaseName,
+                    config.toProperties()
+            );
 
             return new SEDatabase(conn);
         } catch (SQLException ex) {

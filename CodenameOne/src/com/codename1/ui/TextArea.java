@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -34,6 +35,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.UITimer;
+import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -211,6 +213,7 @@ public class TextArea extends Component {
 
     private EventDispatcher actionListeners = null;
     private EventDispatcher bindListeners = null;
+    private EventDispatcher closeListeners = null;
     private String lastTextValue = "";
     
     /**
@@ -355,6 +358,7 @@ public class TextArea extends Component {
      */
     private TextArea(String text, int maxSize, int rows, int columns, int constraint){
         setUIID("TextArea");
+        setPreferredTabIndex(0);
         this.maxSize = maxSize;
         setText(text);
         setConstraint(constraint);
@@ -476,6 +480,16 @@ public class TextArea extends Component {
         return editable;
     }
 
+    @Override
+    public int getPreferredTabIndex() {
+        if (isEditable()) {
+            return super.getPreferredTabIndex();
+        }
+        return -1;
+    }
+
+    
+    
     /**
      * Sets this text area to be editable or readonly
      * 
@@ -587,6 +601,7 @@ public class TextArea extends Component {
             }
             Display d = Display.getInstance();
             if(action == 0 && isTypedKey(keyCode)) {
+                //registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);
             }
         }
@@ -615,6 +630,7 @@ public class TextArea extends Component {
     void editString() {
         if(autoDegradeMaxSize && (!hadSuccessfulEdit) && (maxSize > 1024)) {
             try {
+                //registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());
             } catch(IllegalArgumentException err) {
                 maxSize -= 1024;
@@ -622,6 +638,7 @@ public class TextArea extends Component {
                 editString();
             }
         } else {
+            //registerAsInputDevice();
             Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());
         }
     }
@@ -1204,6 +1221,47 @@ public class TextArea extends Component {
     }
     
     /**
+     * Adds a listener to be called with this TextArea is "closed".  I.e. when it is
+     * no longer the active virtual input device for the form.
+     * @param l 
+     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
+     */
+    public void addCloseListener(ActionListener l) {
+        if (closeListeners == null) {
+            closeListeners = new EventDispatcher();
+        }
+        closeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes close listener.
+     * @param l 
+     * @see #addCloseListener(com.codename1.ui.events.ActionListener) 
+     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
+     */
+    public void removeCloseListener(ActionListener l) {
+        if (closeListeners != null && closeListeners.hasListeners()) {
+            closeListeners.removeListener(l);
+            if (!closeListeners.hasListeners()) {
+                closeListeners = null;
+            }
+        }
+    }
+    
+    /**
+     * Fires a close event.  This is fired when the TextArea is no longer the active
+     * virtual input device for the form.
+     * 
+     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
+     */
+    void fireCloseEvent() {
+        if (closeListeners != null && closeListeners.hasListeners()) {
+            ActionEvent evt = new ActionEvent(this);
+            closeListeners.fireActionEvent(evt);
+        }
+    }
+    
+    /**
      * {@inheritDoc}
      */
     void onEditComplete(String text) {
@@ -1741,12 +1799,76 @@ public class TextArea extends Component {
         return endsWith3Points;
     }
     
+    private static class TextAreaInputDevice implements VirtualInputDevice {
+        private TextArea editedTextArea;
+        private boolean deferStopEditingToNativeLayer;
+        private boolean enabled = true;
 
+        TextAreaInputDevice(TextArea ta) {
+            editedTextArea = ta;
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (!enabled) {
+                return;
+            }
+            editedTextArea.fireCloseEvent();
+            if (deferStopEditingToNativeLayer) {
+                return;
+            }
+            if (editedTextArea.isEditing()) {
+                editedTextArea.stopEditing();
+            }
+        }
+        
+    }
+    
+    /**
+     * Registers this TextArea as the current input device for the current form.
+     * 
+     * @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
+     * primarily by implementation APIs.
+     */
+    public void registerAsInputDevice() {
+        final TextArea cmp = this;
+        Form f = this.getComponentForm();
+        
+        if (f != null && Display.impl.getEditingText() != this) {
+            try {
+                TextAreaInputDevice previousInput = null;
+                if (f.getCurrentInputDevice() instanceof TextAreaInputDevice) {
+                    previousInput = (TextAreaInputDevice)f.getCurrentInputDevice();
+                    if (previousInput.editedTextArea == this) {
+                        // If the previous input is the same input, let's disable it's close 
+                        // handler altogether.
+                        previousInput.enabled = false;
+                    }
+                    
+                }
+                if (previousInput != null) {
+                    previousInput.deferStopEditingToNativeLayer = true;
+                }
+                TextAreaInputDevice currInput = new TextAreaInputDevice(this);
+                f.setCurrentInputDevice(currInput);
+                
+                
+            } catch (Exception ex) {
+                Log.e(ex);
+                // Failed to edit string because the previous input device would not
+                // give up control
+                return;
+            }
+        }
+    }
+    
     /**
      * Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
      */
     public void startEditing() {
         if(!Display.getInstance().isTextEditing(this)) {
+            final TextArea cmp = this;
+            //registerAsInputDevice();
             Display.getInstance().editString(this, maxSize, constraint, text);
         }
     }
@@ -1754,6 +1876,7 @@ public class TextArea extends Component {
     /**
      * Launches the text field editing in a callserially call
      */
+    @Override
     public void startEditingAsync() {
         if(!Display.getInstance().isTextEditing(this)) {
             if (Display.impl.usesInvokeAndBlockForEditString()) {
@@ -1770,6 +1893,7 @@ public class TextArea extends Component {
                         UITimer.timer(30, false, new Runnable() {
                             public void run() {
                                 ta.repaint();
+                                //registerAsInputDevice();
                                 Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
                             }
                         });
@@ -1779,6 +1903,7 @@ public class TextArea extends Component {
             }
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
+                    //registerAsInputDevice();
                     Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
                 }
             });
@@ -1789,6 +1914,7 @@ public class TextArea extends Component {
      * Indicates whether we are currently editing this text area
      * @return true if Display.getInstance().isTextEditing(this)
      */
+    @Override
     public boolean isEditing() {
         return Display.getInstance().isTextEditing(this);
     }
@@ -1806,6 +1932,7 @@ public class TextArea extends Component {
      * Stops text editing of this field if it is being edited
      * @param onFinish invoked when editing stopped
      */
+    @Override
     public void stopEditing(Runnable onFinish) {
         if(isEditing()) {
             Display.getInstance().stopEditing(this, onFinish);

@@ -739,6 +739,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            
+            if (current != null) {
+                Component nextComponent = current.getNextComponent(cmp);
+                TextEditUtil.setNextEditComponent(nextComponent);
+            }
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -5073,7 +5078,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 int largest = Math.max(dispWidth, getDisplayHeight());
                 if(largest > 2000) {
-                    dDensity = Display.DENSITY_HD;
+                    dDensity = Display.DENSITY_560;
                     return dDensity;
                 }
                 dDensity = Display.DENSITY_VERY_HIGH;

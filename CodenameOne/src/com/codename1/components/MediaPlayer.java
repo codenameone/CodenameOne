@@ -31,11 +31,13 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
+import com.codename1.ui.Slider;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
 import java.io.IOException;
@@ -58,10 +60,33 @@ public class MediaPlayer extends Container {
     private Image pauseIcon;
     private Image backIcon;
     private Image fwdIcon;
+    private Image maxIcon;
     private Container buttonsBar;
     private boolean hideNativeVideoControls;
     private boolean showControls=true;
     private Runnable loopOnCompletion;
+    private Slider progress;
+    private UITimer progressUpdater;
+    
+    /**
+     * Shows the buttons on top of the video
+     */
+    private boolean onTopMode = true;
+    
+    /**
+     * Shows video position bar as a slider
+     */
+    private boolean seekBar = true;
+    
+    /**
+     * UIID for the seekBar slider
+     */
+    private String seekBarUIID = null;
+
+    /**
+     * Includes a maximize icon in the bar to show the native player
+     */
+    private boolean maximize = true;
     
     private boolean userSetIcons = false;
     private Media video;
@@ -80,6 +105,7 @@ public class MediaPlayer extends Container {
         pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, "Button", 3);
         fwdIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_FORWARD, "Button", 3);
         backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, "Button", 3);
+        maxIcon = FontImage.createMaterial(FontImage.MATERIAL_FULLSCREEN, "Button", 3);
     }
     
     /**
@@ -200,6 +226,10 @@ public class MediaPlayer extends Container {
             if(fwd != null){
                 fwdIcon = fwd;
             }
+            Image max = UIManager.getInstance().getThemeImageConstant("mediaMaxImage");
+            if(max != null){
+                maxIcon = max;
+            }
             
         }
         if(pendingDataURI != null) {
@@ -209,6 +239,31 @@ public class MediaPlayer extends Container {
         initUI();
     }
 
+    private void checkProgressSlider() {
+        if(progressUpdater == null) {
+            progressUpdater = UITimer.timer(1000, true, getComponentForm(),
+                new Runnable() {
+                public void run() {
+                    float dur = video.getDuration();
+                    if(dur > 0) {
+                        float pos = video.getTime();
+                        int offset = (int)(pos / dur * 100.0f);
+                        if(offset > -1 && offset < 101) {
+                            progress.setProgress(offset);
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    private void stopProgressSlider() {
+        if(progressUpdater != null) {
+            progressUpdater.cancel();
+            progressUpdater = null;
+        }
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -218,6 +273,7 @@ public class MediaPlayer extends Container {
         if(autoplay) {
             if(video != null && video.isPlaying()){
                 video.pause();
+                stopProgressSlider();
             }
         }
     }
@@ -247,6 +303,16 @@ public class MediaPlayer extends Container {
      */
     public void setFwdIcon(Image fwdIcon) {
         this.fwdIcon = fwdIcon;
+        userSetIcons = true;
+    }
+
+
+    /**
+     * Sets the maximize Button Icon
+     * @param maxIcon 
+     */
+    public void setMaxIcon(Image maxIcon ) {
+        this.maxIcon = maxIcon ;
         userSetIcons = true;
     }
 
@@ -335,42 +401,73 @@ public class MediaPlayer extends Container {
 
     private void initUI() {
         removeAll();
-        setLayout(new BorderLayout());        
+        if(onTopMode) {
+            setLayout(new LayeredLayout());        
+        } else {
+            setLayout(new BorderLayout());        
+        }
         
         if(video != null && video.getVideoComponent() != null){
             Component videoComponent = video.getVideoComponent();
             if (videoComponent != null) {
-                addComponent(BorderLayout.CENTER, videoComponent);        
+                if(onTopMode) {
+                    addComponent(videoComponent);        
+                } else {
+                    addComponent(BorderLayout.CENTER, videoComponent);        
+                }
             }
         }
         
-        buttonsBar = new Container(new FlowLayout(Container.CENTER));
-        addComponent(BorderLayout.SOUTH, buttonsBar);
+        
+        if(seekBar) {
+            buttonsBar = new Container(new BorderLayout());
+            progress = new Slider();
+            progress.setEditable(true);
+            buttonsBar.addComponent(BorderLayout.CENTER, 
+                FlowLayout.encloseCenterMiddle(progress));
+            progress.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    float dur = video.getDuration();
+                    if(dur > 0) {
+                        float pos = progress.getProgress();
+                        int t = (int)(pos / 100.0f * dur);
+                        video.setTime(t);
+                    }
+                }
+            });
+        } else {
+            buttonsBar = new Container(new FlowLayout(Container.CENTER));
+        }
+        if(onTopMode) {
+            addComponent(BorderLayout.south(buttonsBar));
+        } else {
+            addComponent(BorderLayout.SOUTH, buttonsBar);
+        }
         if (usesNativeVideoControls() || !showControls) {
             buttonsBar.setVisible(false);
             buttonsBar.setHidden(true);
         }
         
-        //if(video == null || !video.isNativePlayerMode()){
-        Button back = new Button();
-        back.setUIID("MediaPlayerBack");
-        if(backIcon != null){
-            back.setIcon(backIcon);
-        }else{
-            back.setText("Back");
-        }
-        buttonsBar.addComponent(back);
-        back.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if(video == null){
-                    return;
-                }
-                int t = video.getTime();
-                video.setTime(t - 2);
+        if(!seekBar) {
+            Button back = new Button();
+            back.setUIID("MediaPlayerBack");
+            if(backIcon != null){
+                back.setIcon(backIcon);
+            }else{
+                back.setText("Back");
             }
-        });        
-        //}
+            buttonsBar.addComponent(back);
+            back.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    if(video == null){
+                        return;
+                    }
+                    int t = video.getTime();
+                    video.setTime(t - 2);
+                }
+            });        
+        }
         
         final Button play = new Button();
         play.setUIID("MediaPlayerPlay");
@@ -394,6 +491,7 @@ public class MediaPlayer extends Container {
                                 public void run() {
                                     if (video != null && !video.isPlaying() && isInitialized()) {
                                         video.play();
+                                        checkProgressSlider();
                                     }
                                 }
                             });
@@ -414,6 +512,7 @@ public class MediaPlayer extends Container {
                 
                 if(!video.isPlaying()){
                     video.play();
+                    checkProgressSlider();
                     play.setUIID("MediaPlayerPause");
                     if (getPauseIcon() != null) {
                         play.setIcon(getPauseIcon());
@@ -423,6 +522,7 @@ public class MediaPlayer extends Container {
                     play.repaint();
                 }else{
                     video.pause();
+                    stopProgressSlider();
                     play.setUIID("MediaPlayerPlay");
                     if (getPlayIcon() != null) {
                         play.setIcon(getPlayIcon());
@@ -452,27 +552,56 @@ public class MediaPlayer extends Container {
                 }
             }
         });
-        buttonsBar.addComponent(play);
+        if(seekBar) {
+            buttonsBar.addComponent(BorderLayout.WEST, play);
+        } else {
+            buttonsBar.addComponent(play);
+        }
 
         //if(video == null || !video.isNativePlayerMode()){        
-        Button fwd = new Button();
-        fwd.addActionListener(new ActionListener() {
+        if(!seekBar) {
+            Button fwd = new Button();
+            fwd.addActionListener(new ActionListener() {
 
-            public void actionPerformed(ActionEvent evt) {
-                if(video == null){
-                    return;
+                public void actionPerformed(ActionEvent evt) {
+                    if(video == null){
+                        return;
+                    }
+                    int t = video.getTime();
+                    video.setTime(t + 1);
                 }
-                int t = video.getTime();
-                video.setTime(t + 1);
+            });
+            fwd.setUIID("MediaPlayerFwd");
+            if(fwdIcon != null){
+                fwd.setIcon(fwdIcon);
+            }else{
+                fwd.setText("fwd");
             }
-        });
-        fwd.setUIID("MediaPlayerFwd");
-        if(fwdIcon != null){
-            fwd.setIcon(fwdIcon);
-        }else{
-            fwd.setText("fwd");
+            buttonsBar.addComponent(fwd);           
         }
-        buttonsBar.addComponent(fwd);           
+        
+        if(maximize) {
+            Button max = new Button();
+            max.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if(video == null){
+                        return;
+                    }
+                    video.setNativePlayerMode(true);
+                }
+            });
+            max.setUIID("MediaPlayerMax");
+            if(maxIcon != null){
+                max.setIcon(maxIcon);
+            }else{
+                max.setText("max");
+            }
+            if(seekBar) {
+                buttonsBar.addComponent(BorderLayout.EAST, max);
+            } else {
+                buttonsBar.addComponent(max);
+            }
+        }
         //}
         if(isInitialized()) {
             revalidate();
@@ -609,6 +738,7 @@ public class MediaPlayer extends Container {
                     if (video != null) {
                         video.setTime(0);
                         video.play();
+                        checkProgressSlider();
                     }
                 }
 
@@ -650,4 +780,68 @@ public class MediaPlayer extends Container {
         }
     }
     */
+
+    /**
+     * Shows the buttons on top of the video
+     * @return the onTopMode
+     */
+    public boolean isOnTopMode() {
+        return onTopMode;
+    }
+
+    /**
+     * Shows the buttons on top of the video
+     * @param onTopMode the onTopMode to set
+     */
+    public void setOnTopMode(boolean onTopMode) {
+        this.onTopMode = onTopMode;
+    }
+
+    /**
+     * Shows video position bar as a slider
+     * @return the seekBar
+     */
+    public boolean isSeekBar() {
+        return seekBar;
+    }
+
+    /**
+     * Shows video position bar as a slider
+     * @param seekBar the seekBar to set
+     */
+    public void setSeekBar(boolean seekBar) {
+        this.seekBar = seekBar;
+    }
+
+    /**
+     * UIID for the seekBar slider
+     * @return the seekBarUIID
+     */
+    public String getSeekBarUIID() {
+        return seekBarUIID;
+    }
+
+    /**
+     * UIID for the seekBar slider
+     * @param seekBarUIID the seekBarUIID to set
+     */
+    public void setSeekBarUIID(String seekBarUIID) {
+        this.seekBarUIID = seekBarUIID;
+    }
+
+    /**
+     * Includes a maximize icon in the bar to show the native player
+     * @return the maximize
+     */
+    public boolean isMaximize() {
+        return maximize;
+    }
+
+    /**
+     * Includes a maximize icon in the bar to show the native player
+     * @param maximize the maximize to set
+     */
+    public void setMaximize(boolean maximize) {
+        this.maximize = maximize;
+    }
 }

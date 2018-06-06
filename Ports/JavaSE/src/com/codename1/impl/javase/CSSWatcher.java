@@ -12,11 +12,15 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,9 +29,11 @@ import java.util.logging.Logger;
  * @author shannah
  */
 public class CSSWatcher implements Runnable {
-    private Thread watchThread;
+    private Thread watchThread, pulseThread;
+    private ServerSocket pulseSocket;
     private Process childProcess;
     private boolean closing;
+    private static final int MIN_DESIGNER_VERSION=6;
     
     public CSSWatcher() {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -45,30 +51,103 @@ public class CSSWatcher implements Runnable {
         }));
     }
     
+    /**
+     * Checks whether the CSS watcher is supported currently. This will check the
+     * update project's properties to see the current version of the designer. 
+     * CSS watcher is only supported for designer version 5 or higher.
+     * 
+     * <p>This can be overridden by setting {@literal csswatcher.enabled=true|false} in 
+     * the codenameone_settings.properties file</p>
+     * @return 
+     */
+    public static boolean isSupported() {
+        File userHome = new File(System.getProperty("user.home"));
+        File cn1Home = new File(userHome, ".codenameone");
+        File updateStatusProps = new File(cn1Home, "UpdateStatus.properties");
+        
+        File cn1Props = new File("codenameone_settings.properties");
+        if (cn1Props.exists()) {
+            java.util.Properties cn1Properties = new Properties();
+            try (InputStream input = new FileInputStream(cn1Props)) {
+                cn1Properties.load(input);
+                String cssWatcherEnabled = cn1Properties.getProperty("csswatcher.enabled", null);
+                if (cssWatcherEnabled != null) {
+                    return "true".equals(cssWatcherEnabled.toLowerCase());
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+        }
+        
+        
+        if (updateStatusProps.exists()) {
+            java.util.Properties updateStatusProperties = new Properties();
+            try (InputStream input = new FileInputStream(updateStatusProps)){
+                updateStatusProperties.load(input);
+                String designerVersionStr = updateStatusProperties.getProperty("designer", "0");
+                Double designerVersionDbl = Double.parseDouble(designerVersionStr);
+                if (designerVersionDbl >= MIN_DESIGNER_VERSION) {
+                    return true;
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
+        return false;
+    }
+    
     private void watch() throws IOException {
+        if (pulseSocket == null || pulseSocket.isClosed()) {
+            // If the the Simulator is killed then the shutdown hook doesn't run
+            // so we need an alternative way for the ResourceEditorApp to know that
+            // the parent is dead so that it will close itself.
+            // So we create a ServerSocket to serve as a "pulse".  
+            // We pass the port to the ResourceEditorApp so that it can connect.
+            // When the socket is disconnected for any reason, the ResourceEditor app will exit.
+            pulseSocket = new ServerSocket(0);
+            pulseThread = new Thread(new Runnable() {
+                public void run() {
+                    while (true) {
+                        try {
+                            Socket clientSocket = pulseSocket.accept();
+                            
+                        } catch (IOException ex) {
+                            Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                }
+            });
+            pulseThread.setDaemon(true);
+            
+        }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
         final File srcFile = new File("css", "theme.css");
         if (!srcFile.exists()) {
-            System.out.println("No theme.css file found.  CSSWatcher canceled");
+            //System.out.println("No theme.css file found.  CSSWatcher canceled");
             return;
         } else {
             System.out.println("Found theme.css file.  Watching for changes...");
         }
-        final File destFile = new File("src", "theme.css.res");
+        final File destFile = new File("src", "theme.res");
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
         
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", designerJar.getAbsolutePath(),
+                "-jar", "-Dcli=true", "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
                 "-css",
                 srcFile.getAbsolutePath(),
+                destFile.getAbsolutePath(),
                 "-watch",
                 "-Dprism.order=sw"
                 
         );
+        
         Process p = pb.start();
+        
         if (childProcess != null) {
             try {
                 childProcess.destroyForcibly();
@@ -161,11 +240,10 @@ public class CSSWatcher implements Runnable {
     public void start() {
         if (watchThread == null) {
             watchThread = new Thread(this);
-            watchThread.start();
+            watchThread.setDaemon(true);
+            watchThread.start(); 
         }
     }
-
-    
     
     
     

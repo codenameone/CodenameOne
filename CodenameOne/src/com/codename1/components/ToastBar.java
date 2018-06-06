@@ -25,7 +25,6 @@ package com.codename1.components;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
-import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
@@ -43,7 +42,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.FailureCallback;
@@ -597,6 +595,7 @@ public class ToastBar {
                         //newLabel.setRows(l.getText().length()+1);
                         newLabel.setFocusable(false);
                         newLabel.setEditable(false);
+                        newLabel.setVerticalAlignment(Component.CENTER);
                         
                         //newLabel.getAllStyles().setFgColor(0xffffff);
                         if (s.getMessageUIID() != null) {
@@ -687,7 +686,7 @@ public class ToastBar {
             label = new TextArea();
             label.setEditable(false);
             label.setFocusable(false);
-            
+            label.setVerticalAlignment(CENTER);
             
             progressLabel = new InfiniteProgress();
             

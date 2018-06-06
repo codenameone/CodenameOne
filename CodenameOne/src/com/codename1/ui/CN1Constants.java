@@ -109,6 +109,12 @@ public class CN1Constants {
      * Duration picker type.  It returns Long result (milliseconds).
      */
     public static final int PICKER_TYPE_DURATION_MINUTES = 7;
+    
+    
+    /**
+     * Calendar picker type.  It returns java.util.Date result;
+     */
+    public static final int PICKER_TYPE_CALENDAR = 8;
 
     /**
      * Used by getSMSSupport to indicate that SMS is not supported

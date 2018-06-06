@@ -754,7 +754,7 @@ public class InPlaceEditView extends FrameLayout{
             fontHeight = s.getFont().getHeight();
             textArea = ta;
             isRTL = ta.isRTL();
-            nextDown = textArea.getNextFocusDown() != null ? textArea.getNextFocusDown() : textArea.getComponentForm().findNextFocusVertical(true);
+            nextDown = textArea.getComponentForm().getNextComponent(textArea);
             isSingleLineTextArea = textArea.isSingleLineTextArea();
             hint = ta.getHint();
             nativeHintBool = textArea.getUIManager().isThemeConstant("nativeHintBool", false);
@@ -890,7 +890,7 @@ public class InPlaceEditView extends FrameLayout{
                     } else {
                         if(textArea.isTextField && textArea.getDoneListener() != null){
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
-                        } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
+                        } else if (nextDown != null) {
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);
                         } else {
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
@@ -1059,6 +1059,14 @@ public class InPlaceEditView extends FrameLayout{
         endEditing(reason, forceVKBOpen, false, actionCode);
     }
 
+    private Component getNextComponent(Component curr) {
+        Form f = curr.getComponentForm();
+        if (f != null) {
+            return f.getNextComponent(curr);
+        }
+        return null;
+    }
+
     /**
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
@@ -1067,6 +1075,7 @@ public class InPlaceEditView extends FrameLayout{
         //if (cursorTimer != null) {
         //    cursorTimer.cancel();
         //}
+        System.out.println("-------In endEditing");
         if (!mIsEditing || mEditText == null) {
             return;
         }
@@ -1078,11 +1087,30 @@ public class InPlaceEditView extends FrameLayout{
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
         boolean isNextActionFlagSet = ((mEditText.getImeOptions() & 0xf) == EditorInfo.IME_ACTION_NEXT);
-        boolean leaveKeyboardShowing = impl.isAsyncEditMode() || (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
+
+
+
+        boolean leaveKeyboardShowing = impl.isAsyncEditMode();
+        System.out.println("Next flag: "+isNextActionFlagSet);
+        System.out.println("Next cmp: "+getNextComponent(mEditText.mTextArea));
+        System.out.println("Reason : "+reason+" IME Action: "+REASON_IME_ACTION);
+        if (reason == REASON_IME_ACTION && isNextActionFlagSet) {
+            if (getNextComponent(mEditText.mTextArea) instanceof TextArea) {
+                leaveKeyboardShowing = true;
+            } else {
+                leaveKeyboardShowing = false;
+            }
+
+        }
+        if (forceVKBOpen) {
+            leaveKeyboardShowing = true;
+        }
         if (forceVKBClose) {
             leaveKeyboardShowing = false;
         }
+        System.out.println("-----LEAVE KEYBOARD SHOWING: "+leaveKeyboardShowing);
         if (!leaveKeyboardShowing || actionCode == EditorInfo.IME_ACTION_DONE || actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
+            System.out.println("Hiding virtual keyboard");
             showVirtualKeyboard(false);
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
@@ -1143,33 +1171,56 @@ public class InPlaceEditView extends FrameLayout{
         actionCode = actionCode & 0xf;
         final int fActionCode = actionCode;
         boolean hasNext = false;
+        Component next = null;
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
-            Component next = mEditText.mTextArea.getNextFocusDown();
-            if (next == null) {
-                next = mEditText.mTextArea.getComponentForm().findNextFocusVertical(true);
-            }
-
-            if (next != null && next instanceof TextArea && ((TextArea)next).isEditable() && ((TextArea)next).isEnabled()) {
+            next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);
+            if (next != null) {
                 hasNext = true;
+            }
+            
+            if (next != null && next instanceof TextArea) {
                 nextTextArea = (TextArea) next;
             }
         }
-		if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
-			//in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
+        if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
+            //in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
             TextArea theNext = nextTextArea;
-			nextTextArea = null;
+            nextTextArea = null;
             edit(sInstance.impl, theNext, theNext.getConstraint());
-			return null;
+            return null;
+        
         } else {
-			return new Runnable() {
+            final Component fNext = next;
+            final boolean fHasNext = hasNext;
+            return new Runnable() {
 
-				@Override
-				public void run() {
-        endEditing(REASON_IME_ACTION, false, fActionCode);
-    }
-			};
-		}
+                @Override
+                public void run() {
+                    endEditing(REASON_IME_ACTION, false, fActionCode);
+                    if (fHasNext && fNext != null) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                final Form f = fNext.getComponentForm();
+                                if (f == null) {
+                                    return;
+                                }
+                                f.addSizeChangedListener(new ActionListener() {
+                                    @Override
+                                    public void actionPerformed(ActionEvent evt) {
+                                        f.removeSizeChangedListener(this);
+                                        fNext.requestFocus();
+                                        fNext.startEditingAsync();
+                                    }
+                                });
+
+                            }
+                        });
+                    }
+                    
+                }
+            };
+        }
     }
 
     private static int trySetEditModeCount=0;
@@ -1434,6 +1485,7 @@ public class InPlaceEditView extends FrameLayout{
 
 
         final TextArea textArea = (TextArea) component;
+        textArea.registerAsInputDevice();
         final String initialText = textArea.getText();
         textArea.putClientProperty("InPlaceEditView.initialText", initialText);
         
