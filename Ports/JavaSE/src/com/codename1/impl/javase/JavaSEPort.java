@@ -4243,6 +4243,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
+                
                 /*
                 ((JTextField)t).addActionListener(new ActionListener() {
 
@@ -4308,6 +4309,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             textCmp = pane;
+        }
+        if (cmp.isRTL()) {
+            textCmp.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         }
         DefaultCaret caret = (DefaultCaret) swingT.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);            
