@@ -3319,6 +3319,11 @@ extern JAVA_LONG defaultDatePickerDate;
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
+            JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
+            
+            if (stringPickerSelection < 0 && arr->length > 0) {
+                stringPickerSelection = 0;
+            }
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
 #ifndef NEW_CODENAME_ONE_VM
             pickerStringArray = nil;
