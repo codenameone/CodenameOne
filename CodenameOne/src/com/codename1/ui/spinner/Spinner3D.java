@@ -11,6 +11,7 @@ import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Transform;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.SelectionListener;
@@ -51,7 +52,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
     }
     
     private static boolean usePerspective() {
-        return false;
+        return false;//Transform.isPerspectiveSupported();
     }
     
     public int getSelectedIndex() {
