@@ -65,7 +65,7 @@ public class SimpleDateFormatTests extends AbstractTest {
             }
         
         }
-        
+        /*
         if (true) {
             long[] timestamps = new long[]{
                 1524755070511L, 1524798240000L, 1524801840000L, 1524773040000L
@@ -100,7 +100,7 @@ public class SimpleDateFormatTests extends AbstractTest {
 
             }
         }
-
+                */
         return true;
 
     }
