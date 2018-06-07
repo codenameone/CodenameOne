@@ -129,6 +129,9 @@ public final class IOSNative {
     native boolean isTablet();
     native boolean isIOS7();
     
+    native float fontScale();
+    native String getModelID();
+    
     native void setImageName(long nativeImage, String name);
     
     native boolean canExecute(String url);
