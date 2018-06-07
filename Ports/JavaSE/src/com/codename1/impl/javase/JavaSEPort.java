@@ -327,15 +327,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
-            
-            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
-            //    return Display.DENSITY_MEDIUM;
-            //}
-            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
-            //    return Display.DENSITY_VERY_HIGH;
-            //}
-            //System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
-            
+            /*
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
+                return Display.DENSITY_MEDIUM;
+            }
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
+                return Display.DENSITY_VERY_HIGH;
+            }
+            System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            */
             if (retinaScale > 1.5) {
                 return Display.DENSITY_VERY_HIGH;
             } else {
@@ -344,11 +344,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return super.getDeviceDensity();
     }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
     */
     
     public int getDeviceDPI() {
@@ -369,10 +364,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return super.convertToPixels(dipCount, horizontal);
     }
-<<<<<<< HEAD
->>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
-=======
->>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
     
     /**
      * @return the defaultPixelMilliRatio
