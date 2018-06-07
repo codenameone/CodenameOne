@@ -22,6 +22,8 @@
  */
 package com.codename1.l10n;
 
+import com.codename1.util.DateUtil;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -438,7 +440,12 @@ public class SimpleDateFormat extends DateFormat {
         int startIndex = 0;
         // parse based on GMT timezone for handling offsets
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(GMT));
+        TimeZone parsedTimeZone = null;
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
         int tzMinutes = -1;
+        int pmMinutes = 0;
         List<String> pattern = getPatternTokens();
         for (int i = 0; i < pattern.size(); i++) {
             String token = (String) pattern.get(i);
@@ -463,7 +470,7 @@ public class SimpleDateFormat extends DateFormat {
                         throwInvalid("am/pm marker", startIndex);
                     }
                     if (v == Calendar.PM) {
-                        tzMinutes = ((tzMinutes == -1) ? 0 : tzMinutes) + 12 * 60;
+                        pmMinutes = 12 * 60;
                     }
                     break;
                 case DAY_OF_WEEK_LETTER:
@@ -475,8 +482,13 @@ public class SimpleDateFormat extends DateFormat {
                 case TIMEZONE_LETTER:
                 case TIMEZONE822_LETTER:
                     s = readTimeZone(source, startIndex);
-                    if (s == null || (v = parseTimeZone(s, startIndex)) == -1) {
+                    TimeZoneResult res = new TimeZoneResult();
+                    if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) {
+                    
                         throwInvalid("timezone", startIndex);
+                    }
+                    if (res != null) {
+                        parsedTimeZone = res.timeZone;
                     }
                     tzMinutes = ((tzMinutes == -1) ? 0 : tzMinutes) + v;
                     break;
@@ -534,18 +546,37 @@ public class SimpleDateFormat extends DateFormat {
             }
         }
         TimeZone localTimezone = Calendar.getInstance().getTimeZone();
+        calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone
         calendar.setTimeZone(localTimezone);
-		// If timezone offset not part of date, the date passed will be treated
-        // as if it's local timezone.
-        if (tzMinutes != -1) {
-			// Adjusting the time to be GMT time, accounting for DST.
-            // Doing this here allows tzoffset to be specified before or after
-            // actual time in the pattern.
-            tzMinutes += getDSTOffset(calendar);
-            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) + tzMinutes);
-            // Now adjust the time again to local time.
-            calendar.set(Calendar.MILLISECOND, calendar.get(Calendar.MILLISECOND) + localTimezone.getRawOffset());
+        if (pmMinutes != 0) {
+            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) + pmMinutes);
         }
+        long rawOffset = localTimezone.getRawOffset();
+        int rawOffsetMinutes = (int)(rawOffset / MILLIS_TO_MINUTES);
+        if (tzMinutes != -1) {
+            tzMinutes = -rawOffsetMinutes - tzMinutes;
+            int tzDstOffset = 0;
+            if (parsedTimeZone != null) {
+                Calendar tzCalendar = Calendar.getInstance(parsedTimeZone);
+                tzDstOffset = getDSTOffset(tzCalendar);
+            }
+            
+            int localDSTOffset = getDSTOffset(calendar);
+            tzMinutes = tzMinutes - (localDSTOffset - tzDstOffset);
+            
+            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);
+            
+            
+        }
+        
+        
+            
+            
+            // Now adjust the time again to local time.
+            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes);
+            
+            
+       
         return calendar.getTime();
     }
 
@@ -781,12 +812,12 @@ public class SimpleDateFormat extends DateFormat {
         }
         String markers[] = getDateFormatSymbols().getAmPmStrings();
         for (String marker : markers) {
-            if (fragment.startsWith(marker)) {
+            if (fragment.toLowerCase().startsWith(marker.toLowerCase())) {
                 return readSubstring(source, ofs, ofs + marker.length());
             }
         }
         for (String marker : markers) {
-            if (fragment.charAt(0) == marker.charAt(0)) {
+            if (fragment.toLowerCase().charAt(0) == marker.toLowerCase().charAt(0)) {
                 return readSubstring(source, ofs, ofs + 1);
             }
         }
@@ -924,7 +955,7 @@ public class SimpleDateFormat extends DateFormat {
             return null;
         }
         // 8 is length of "GMT-H:MM"
-        if (len >= 8 && fragment.startsWith(GMT)) {
+        if (len >= 8 && fragment.toUpperCase().startsWith(GMT)) {
             return readSubstring(source, ofs);
         }
         int ch = fragment.charAt(0);
@@ -941,6 +972,10 @@ public class SimpleDateFormat extends DateFormat {
         return null;
     }
 
+    private static class TimeZoneResult {
+        TimeZone timeZone;
+    }
+    
     /**
      * Parse the timezone to an offset from GMT in minutes. The source can be
      * RFC-822 (ie. -0400), ISO8601 (ie. GMT+08:50), or TimeZone ID (ie. PDT,
@@ -952,7 +987,7 @@ public class SimpleDateFormat extends DateFormat {
      * @return offset from GMT in minutes.
      * @throws ParseException if the source could not be parsed.
      */
-    int parseTimeZone(String source, int ofs) throws ParseException {
+    int parseTimeZone(String source, int ofs, TimeZoneResult res) throws ParseException {
         if (source == null) {
             throwInvalid("timezone", ofs);
         }
@@ -979,7 +1014,7 @@ public class SimpleDateFormat extends DateFormat {
             return tzMinutes;
         }
         // handle explicit GMT offset (GMT+H:MM)
-        if (source.startsWith(GMT)) {
+        if (source.toUpperCase().startsWith(GMT)) {
             int index = source.indexOf(':');
             if (index != -1) {
                 String part1 = readSubstring(source, 3, index);
@@ -991,13 +1026,17 @@ public class SimpleDateFormat extends DateFormat {
             } else {
                 source = readSubstring(source, 3);
             }
-            return parseTimeZone(source, ofs);
+            if (source.length() == 0) {
+                return 0;
+            }
+            return parseTimeZone(source, ofs, res);
         }
         // Handle timezone based on ID or full name
         for (String timezone[] : getDateFormatSymbols().getZoneStrings()) {
             for (String z : timezone) {
                 if (z.equalsIgnoreCase(source)) {
                     TimeZone tz = TimeZone.getTimeZone(timezone[DateFormatSymbols.ZONE_ID]);
+                    res.timeZone = tz;
                     return -(tz.getRawOffset() / MILLIS_TO_MINUTES);
                 }
             }
@@ -1015,7 +1054,7 @@ public class SimpleDateFormat extends DateFormat {
     int findEndText(String source, int ofs) {
         int slen = source.length();
         for (int i = ofs; i < slen; i++) {
-            if (isAlpha(source.charAt(i)) == false && isNumeric(source.charAt(i)) == false) {
+            if (!isAlpha(source.charAt(i)) && !isNumeric(source.charAt(i))) {
                 return i;
             }
         }
