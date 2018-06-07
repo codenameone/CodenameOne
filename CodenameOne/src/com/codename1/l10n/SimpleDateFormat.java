@@ -545,6 +545,7 @@ public class SimpleDateFormat extends DateFormat {
                 startIndex += s.length();
             }
         }
+        
         TimeZone localTimezone = Calendar.getInstance().getTimeZone();
         calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone
         calendar.setTimeZone(localTimezone);
@@ -558,25 +559,17 @@ public class SimpleDateFormat extends DateFormat {
             int tzDstOffset = 0;
             if (parsedTimeZone != null) {
                 Calendar tzCalendar = Calendar.getInstance(parsedTimeZone);
+                tzCalendar.setTime(calendar.getTime());
                 tzDstOffset = getDSTOffset(tzCalendar);
             }
-            
-            int localDSTOffset = getDSTOffset(calendar);
+            int localDSTOffset = getLocalDSTOffset(calendar);
             tzMinutes = tzMinutes - (localDSTOffset - tzDstOffset);
             
             calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);
             
             
         }
-        
-        
-            
-            
-            // Now adjust the time again to local time.
-            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes);
-            
-            
-       
+        calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes);
         return calendar.getTime();
     }
 
@@ -592,9 +585,10 @@ public class SimpleDateFormat extends DateFormat {
      * ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
      */
     int parseHour(String source, char patternChar, int offset) throws ParseException {
-        int min = (patternChar == HOUR_1_LETTER || patternChar == HOUR12_1_LETTER) ? 1 : 0;
-        int max = ((patternChar == HOUR_LETTER || patternChar == HOUR_1_LETTER) ? 23 : 11) + min;
-        return parseNumber(source, offset, "hour", min, max) - min;
+        int min = 0;
+        boolean oneBased = (patternChar == HOUR_1_LETTER || patternChar == HOUR12_1_LETTER);
+        int max = ((patternChar == HOUR_LETTER || patternChar == HOUR_1_LETTER) ? 23 : 11) + (oneBased ? 1 : 0);
+        return parseNumber(source, offset, "hour", min, max);
     }
 
     /**
@@ -650,10 +644,16 @@ public class SimpleDateFormat extends DateFormat {
      * @param source
      * @return
      */
-    int getDSTOffset(Calendar source) {
+    int getLocalDSTOffset(Calendar source) {
         TimeZone localTimezone = Calendar.getInstance().getTimeZone();
         int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;
         return getOffsetInMinutes(source, localTimezone) - rawOffset;
+    }
+    
+    int getDSTOffset(Calendar source) {
+        TimeZone timeZone = source.getTimeZone();
+        int rawOffset = timeZone.getRawOffset() / MILLIS_TO_MINUTES;
+        return getOffsetInMinutes(source, timeZone) - rawOffset;
     }
 
     /**
