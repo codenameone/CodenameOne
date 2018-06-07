@@ -2342,12 +2342,8 @@ public final class Display extends CN1Constants {
     public int convertToPixels(float dipCount) {
         return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
     }
-<<<<<<< HEAD
-
-=======
     
     
->>>>>>> 606ebb76... add missing files to previous commit
     /**
      * Checks to see if the platform supports a native image cache.
      * @return True on platforms that support a native image cache.  Currently only Javascript.
@@ -2943,12 +2939,6 @@ public final class Display extends CN1Constants {
      *
      * @return one of the DENSITY constants of Display
      */
-<<<<<<< HEAD
-    public int getDeviceDensity() {
-        return impl.getDeviceDensity();
-    }
-
-=======
     @Deprecated
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
@@ -2975,7 +2965,6 @@ public final class Display extends CN1Constants {
     }
 
  
->>>>>>> 606ebb76... add missing files to previous commit
     /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
