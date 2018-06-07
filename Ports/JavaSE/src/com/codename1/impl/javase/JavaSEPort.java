@@ -327,15 +327,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
-            /*
-            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
-                return Display.DENSITY_MEDIUM;
-            }
-            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
-                return Display.DENSITY_VERY_HIGH;
-            }
-            System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
-            */
+            
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
+            //    return Display.DENSITY_MEDIUM;
+            //}
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
+            //    return Display.DENSITY_VERY_HIGH;
+            //}
+            //System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            
             if (retinaScale > 1.5) {
                 return Display.DENSITY_VERY_HIGH;
             } else {
