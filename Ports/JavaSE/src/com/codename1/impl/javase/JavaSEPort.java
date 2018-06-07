@@ -345,7 +345,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.getDeviceDensity();
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
     */
     
     public int getDeviceDPI() {
@@ -366,6 +369,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return super.convertToPixels(dipCount, horizontal);
     }
+<<<<<<< HEAD
+>>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
+=======
 >>>>>>> 61eac2a7... Refactor getDeviceDensity() and introduce getDeviceDPI() and getFontScale()
     
     /**
