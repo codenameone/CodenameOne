@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
 import com.codename1.l10n.L10NManager;
+import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -1452,7 +1453,24 @@ public class Toolbar extends Container {
         constructOnTopSideMenu(false);
     }
 
+    
+    
     void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component currEditing = f.findCurrentlyEditingComponent();
+            if (currEditing != null) {
+                currEditing.stopEditing(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        showOnTopSidemenu(draggedX, fromCurrent);
+                    }
+                    
+                });
+                return;
+            }
+        }
         AnimationManager a = getAnimationManager();
         if (a != null) {
             a.flushAnimation(new Runnable() {
@@ -1560,6 +1578,21 @@ public class Toolbar extends Container {
     }
 
     void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component currEditing = f.findCurrentlyEditingComponent();
+            if (currEditing != null) {
+                currEditing.stopEditing(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        showOnTopRightSidemenu(draggedX, fromCurrent);
+                    }
+                    
+                });
+                return;
+            }
+        }
         AnimationManager a = getAnimationManager();
         if (a != null) {
             a.flushAnimation(new Runnable() {

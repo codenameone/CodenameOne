@@ -437,6 +437,23 @@ public class Form extends Container {
     }
     
     /**
+     * Returns the component on this form that is currently being edited, or null
+     * if no component is currently being edited.
+     * @return The currently edited component on this form.
+     * @see Component#isEditing() 
+     */
+    public Component findCurrentlyEditingComponent() {
+        return ComponentSelector.select("*", this).filter(new Filter() {
+
+            @Override
+            public boolean filter(Component c) {
+                return c.isEditing();
+            }
+            
+        }).asComponent();
+    }
+    
+    /**
      * {@inheritDoc}
      */
     public void setAlwaysTensile(boolean alwaysTensile) {
