@@ -1002,6 +1002,14 @@ public class SideMenuBar extends MenuBar {
         return menu;
     }
     
+    Container constructRightSideNavigationPanel(){
+        Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        menu.setUIID("RightSideNavigationPanel");
+        menu.setScrollableY(true);
+        menu.setScrollVisible(getUIManager().isThemeConstant("rightSideMenuScrollVisibleBool", false));
+        return menu;
+    }
+    
     Container createSideNavigationPanel(Vector commands, String placement) {
         Container menu = constructSideNavigationComponent();
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
