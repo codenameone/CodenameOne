@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
 import com.codename1.l10n.L10NManager;
+import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -165,6 +166,7 @@ public class Toolbar extends Container {
     private boolean isPointerReleasedListenerAdded = false;
     private boolean isPointerPressedListenerAdded = false;
     private boolean isPointerDraggedListenerAdded = false;
+    private boolean rightSideMenuCmdsAlignedToLeft = false;
 
     private Container permanentSideMenuContainer;
     private Container permanentRightSideMenuContainer;
@@ -780,7 +782,7 @@ public class Toolbar extends Container {
      */
     public Command addMaterialCommandToRightSideMenu(String name, char icon, final ActionListener ev) {
         Command cmd = Command.create(name, null, ev);
-        setCommandMaterialIcon(cmd, icon, "SideCommand");
+        setCommandMaterialIcon(cmd, icon, "RightSideCommand");
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
@@ -844,7 +846,7 @@ public class Toolbar extends Container {
      */
     public Command addMaterialCommandToRightSideMenu(String name, char icon, float size, final ActionListener ev) {
         Command cmd = Command.create(name, null, ev);
-        setCommandMaterialIcon(cmd, icon, size, "SideCommand");
+        setCommandMaterialIcon(cmd, icon, size, "RightSideCommand");
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
@@ -1010,7 +1012,7 @@ public class Toolbar extends Container {
         addCommandToSideMenu(cmd, false);
     }
     
-    private void addCommandToSideMenu(Command cmd, boolean isLeft) {
+    private void addCommandToSideMenu(Command cmd, boolean isLeft) {        
         checkIfInitialized();
         if (permanentSideMenu) {
             if (isLeft) {
@@ -1025,7 +1027,7 @@ public class Toolbar extends Container {
             if (gap != null) {
                 b.setGap(gap.intValue());
             }
-            if (isLeft) {
+            if (isLeft || rightSideMenuCmdsAlignedToLeft) {
                 b.setTextPosition(Label.RIGHT);
             } else {
                 b.setTextPosition(Label.LEFT);
@@ -1035,12 +1037,19 @@ public class Toolbar extends Container {
                 String luiid = (String) cmd.getClientProperty("luiid");
                 b.setUIID(uiid, luiid);
             } else {
-                b.setUIID("SideCommand");
+                if (isLeft) {
+                    b.setUIID("SideCommand");
+                } else {
+                    b.setUIID("RightSideCommand");
+                }
             }
             if (isLeft) {
                 addComponentToLeftSideMenu(permanentSideMenuContainer, b);
             } else {
-                addComponentToRightSideMenu(permanentRightSideMenuContainer, FlowLayout.encloseRight(b));
+                if (!rightSideMenuCmdsAlignedToLeft) {
+                    b.getAllStyles().setAlignment(Font.RIGHT);
+                }
+                addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
             }
         } else {
             if (onTopSideMenu) {
@@ -1056,7 +1065,7 @@ public class Toolbar extends Container {
                 if (gap != null) {
                     b.setGap(gap.intValue());
                 }
-                if (isLeft) {
+                if (isLeft || rightSideMenuCmdsAlignedToLeft) {
                     b.setTextPosition(Label.RIGHT);
                 } else {
                     b.setTextPosition(Label.LEFT);
@@ -1066,12 +1075,18 @@ public class Toolbar extends Container {
                     String luiid = (String) cmd.getClientProperty("luiid");
                     b.setUIID(uiid, luiid);
                 } else {
-                    b.setUIID("SideCommand");
+                    if (isLeft) {
+                        b.setUIID("SideCommand");
+                    } else {
+                        b.setUIID("RightSideCommand");
+                    }
                 }
                 if (isLeft) {
-                    addComponentToSideMenu(permanentSideMenuContainer, b);
+                    addComponentToLeftSideMenu(permanentSideMenuContainer, b);
                 } else {
-                    b.getAllStyles().setAlignment(Font.RIGHT);
+                    if (!rightSideMenuCmdsAlignedToLeft) {
+                        b.getAllStyles().setAlignment(Font.RIGHT);
+                    }
                     addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
                 }
             } else {
@@ -1101,7 +1116,7 @@ public class Toolbar extends Container {
 
     private void constructPermanentRightSideMenu() {
         if (permanentRightSideMenuContainer == null) {
-            permanentRightSideMenuContainer = constructSideNavigationComponent();
+            permanentRightSideMenuContainer = constructRightSideNavigationComponent();
             Form parent = getComponentForm();
             if (rightSidemenuSouthComponent != null) {
                 Container c = BorderLayout.center(permanentRightSideMenuContainer);
@@ -1114,11 +1129,12 @@ public class Toolbar extends Container {
     }
 
     private void constructOnTopSideMenu(boolean isLeft) {
+        
         if ((isLeft && sidemenuDialog == null) || (!isLeft && rightSidemenuDialog == null)) {
             if (isLeft) {
                 permanentSideMenuContainer = constructSideNavigationComponent();
             } else {
-                permanentRightSideMenuContainer = constructSideNavigationComponent();
+                permanentRightSideMenuContainer = constructRightSideNavigationComponent();
             }
 
             final Form parent = getComponentForm();
@@ -1437,7 +1453,24 @@ public class Toolbar extends Container {
         constructOnTopSideMenu(false);
     }
 
+    
+    
     void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component currEditing = f.findCurrentlyEditingComponent();
+            if (currEditing != null) {
+                currEditing.stopEditing(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        showOnTopSidemenu(draggedX, fromCurrent);
+                    }
+                    
+                });
+                return;
+            }
+        }
         AnimationManager a = getAnimationManager();
         if (a != null) {
             a.flushAnimation(new Runnable() {
@@ -1545,6 +1578,21 @@ public class Toolbar extends Container {
     }
 
     void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component currEditing = f.findCurrentlyEditingComponent();
+            if (currEditing != null) {
+                currEditing.stopEditing(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        showOnTopRightSidemenu(draggedX, fromCurrent);
+                    }
+                    
+                });
+                return;
+            }
+        }
         AnimationManager a = getAnimationManager();
         if (a != null) {
             a.flushAnimation(new Runnable() {
@@ -2234,10 +2282,17 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Creates an empty side navigation panel.
+     * Creates an empty left side navigation panel.
      */
     protected Container constructSideNavigationComponent() {
         return sideMenu.constructSideNavigationPanel();
+    }
+    
+    /**
+     * Creates an empty right side navigation panel.
+     */
+    protected Container constructRightSideNavigationComponent() {
+        return sideMenu.constructRightSideNavigationPanel();
     }
 
     /**
@@ -2537,5 +2592,23 @@ public class Toolbar extends Container {
         }
 
     }
+
+    /**
+     * Normally on a right side menu the alignment should be "mirrored" in
+     * comparision with the left side menu, also for non-RTL languages: this
+     * method allows to change this default behaviour for non-RTL languages,
+     * forcing the alignment of the Commands of the right side menu to left.
+     * Note that for RTL languages this method does nothing. This method should
+     * be called before adding commands to the right side menu.
+     *
+     * @param toLeft false is the default, true changes the alignment.
+     */
+    public void setRightSideMenuCmdsAlignedToLeft(boolean toLeft) {
+        if (!isRTL()) {
+            rightSideMenuCmdsAlignedToLeft = toLeft;
+        }
+    }
+    
+    
 
 }
