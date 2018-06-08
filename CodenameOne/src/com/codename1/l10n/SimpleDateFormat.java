@@ -554,6 +554,7 @@ public class SimpleDateFormat extends DateFormat {
         }
         long rawOffset = localTimezone.getRawOffset();
         int rawOffsetMinutes = (int)(rawOffset / MILLIS_TO_MINUTES);
+        int localDSTOffset = getLocalDSTOffset(calendar);
         if (tzMinutes != -1) {
             tzMinutes = -rawOffsetMinutes - tzMinutes;
             int tzDstOffset = 0;
@@ -562,14 +563,10 @@ public class SimpleDateFormat extends DateFormat {
                 tzCalendar.setTime(calendar.getTime());
                 tzDstOffset = getDSTOffset(tzCalendar);
             }
-            int localDSTOffset = getLocalDSTOffset(calendar);
             tzMinutes = tzMinutes - (localDSTOffset - tzDstOffset);
-            
-            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);
-            
-            
+            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);  
         }
-        calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes);
+        calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes - localDSTOffset);
         return calendar.getTime();
     }
 
