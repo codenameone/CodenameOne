@@ -347,6 +347,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     */
     
     public int getDeviceDPI() {
+        if (pixelMilliRatio != null) {
+            return (int) Math.round(pixelMilliRatio.doubleValue()*25.4);
+        }
         if(defaultPixelMilliRatio != null) {
             if (retinaScale > 1.5) {
                 return Display.DPI_XHIGH;
