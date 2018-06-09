@@ -874,11 +874,28 @@ public class UIManager {
             themeProps.put("SideCommand.press#align", leftAlign);
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("RightSideCommand.derive")) {
+            themeProps.put("RightSideCommand.derive", "SideCommand");
+            themeProps.put("RightSideCommand.align", rightAlign);
+        }
+        if (installedTheme == null || !installedTheme.containsKey("RightSideCommand.sel#.derive")) {
+            themeProps.put("RightSideCommand.sel#derive", "SideCommand.sel");
+            themeProps.put("RightSideCommand.sel#align", rightAlign);
+        }
+        if (installedTheme == null || !installedTheme.containsKey("RightSideCommand.press#.derive")) {
+            themeProps.put("RightSideCommand.press#derive", "SideCommand.press");
+            themeProps.put("RightSideCommand.press#align", rightAlign);
+        }
+        
         if(installedTheme == null || !installedTheme.containsKey("SideNavigationPanel.derive")) {
             themeProps.put("SideNavigationPanel.padding", "0,0,0,0");
             themeProps.put("SideNavigationPanel.margin", "0,0,0,0");
             themeProps.put("SideNavigationPanel.bgColor", "343434");
             themeProps.put("SideNavigationPanel.transparency", "255");
+        }
+        
+        if(installedTheme == null || !installedTheme.containsKey("RightSideNavigationPanel.derive")) {
+            themeProps.put("RightSideNavigationPanel.derive", "SideNavigationPanel");
         }
         
         if(installedTheme == null || !installedTheme.containsKey("PullToRefresh.derive")) {

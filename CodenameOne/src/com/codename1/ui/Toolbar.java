@@ -1036,7 +1036,7 @@ public class Toolbar extends Container {
                 String luiid = (String) cmd.getClientProperty("luiid");
                 b.setUIID(uiid, luiid);
             } else {
-                if (isLeft) {
+                if (isLeft || rightSideMenuCmdsAlignedToLeft) {
                     b.setUIID("SideCommand");
                 } else {
                     b.setUIID("RightSideCommand");
@@ -1045,9 +1045,6 @@ public class Toolbar extends Container {
             if (isLeft) {
                 addComponentToLeftSideMenu(permanentSideMenuContainer, b);
             } else {
-                if (!rightSideMenuCmdsAlignedToLeft) {
-                    b.getAllStyles().setAlignment(Font.RIGHT);
-                }
                 addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
             }
         } else {
@@ -1074,7 +1071,7 @@ public class Toolbar extends Container {
                     String luiid = (String) cmd.getClientProperty("luiid");
                     b.setUIID(uiid, luiid);
                 } else {
-                    if (isLeft) {
+                    if (isLeft || rightSideMenuCmdsAlignedToLeft) {
                         b.setUIID("SideCommand");
                     } else {
                         b.setUIID("RightSideCommand");
@@ -1083,9 +1080,6 @@ public class Toolbar extends Container {
                 if (isLeft) {
                     addComponentToLeftSideMenu(permanentSideMenuContainer, b);
                 } else {
-                    if (!rightSideMenuCmdsAlignedToLeft) {
-                        b.getAllStyles().setAlignment(Font.RIGHT);
-                    }
                     addComponentToRightSideMenu(permanentRightSideMenuContainer, b);
                 }
             } else {
