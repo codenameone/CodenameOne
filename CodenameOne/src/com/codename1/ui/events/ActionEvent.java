@@ -153,7 +153,13 @@ public class ActionEvent {
             /**
              * Fired when a {@link com.codename1.ui.Form} is rotated 
              */
-            OrientationChange	
+            OrientationChange,
+            
+            
+            /**
+             * Fired when a component drag is finished
+             */
+            DragFinished
             } ;
     private Type trigger;
     
@@ -357,6 +363,14 @@ public class ActionEvent {
      * @return the key that triggered the event
      */
     public int getKeyEvent() {
+        return keyEvent;
+    }
+
+    /**
+     * Returns the numeric progress of native browser loading on Android
+     * @return the progress value
+     */
+    public int getProgress() {
         return keyEvent;
     }
 

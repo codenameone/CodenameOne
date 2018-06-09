@@ -75,12 +75,23 @@ public class InfiniteProgress extends Component {
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
      */
     private int angleIncrease = 16;
-    
+        
     /**
      * Default constructor to define the UIID
      */
     public InfiniteProgress() {
         setUIID("InfiniteProgress");
+    }
+
+    /**
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
+     * on the returned <code>Dialog</code>.
+     *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
+     * @deprecated typo in method name please use {@link #showInfiniteBlocking()} instead
+     */
+    public Dialog showInifiniteBlocking() {
+        return showInfiniteBlocking();
     }
     
     /**
@@ -89,7 +100,7 @@ public class InfiniteProgress extends Component {
      *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
      */
-    public Dialog showInifiniteBlocking() {
+    public Dialog showInfiniteBlocking() {
         Form f = Display.getInstance().getCurrent();
         if(f == null) {
             f = new Form();
@@ -146,6 +157,9 @@ public class InfiniteProgress extends Component {
         // reduce repaint thrushing of the UI from the infinite progress
         boolean val = super.animate() || tick % tickCount == 0;
         tick++;
+        if(val) {
+            angle += angleIncrease;            
+        }
         return val;
     }
     
@@ -198,10 +212,8 @@ public class InfiniteProgress extends Component {
         
         Image rotated;
         if(animation instanceof FontImage) {
-            angle += angleIncrease;
             rotated = animation.rotate(v);
         } else {
-            angle += angleIncrease;
             Integer angle = new Integer(v);
             rotated = cache.get(angle);
             if(rotated == null) {

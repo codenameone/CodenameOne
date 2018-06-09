@@ -80,6 +80,17 @@ public class MorphTransition extends Transition {
     
     /**
      * Morphs the component with the given source name in the source container hierarchy 
+     * to the component with the same name in the destination hierarchy
+     * @param cmp the compoennt name
+     * @return this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph("a").("c");
+     */
+    public MorphTransition morph(String cmp) {
+        fromTo.put(cmp, cmp);
+        return this;
+    }
+
+    /**
+     * Morphs the component with the given source name in the source container hierarchy 
      * to the component with the given name in the destination hierarchy
      * @param source
      * @param to
@@ -103,6 +114,7 @@ public class MorphTransition extends Transition {
         int size = fromTo.size();
         fromToComponents = new CC[size];
         Form destForm = d.getComponentForm();
+        destForm.forceRevalidate();
         Form sourceForm = s.getComponentForm();
         for(int iter = 0 ; iter < size ; iter++) {
             String k = keyIterator.next();

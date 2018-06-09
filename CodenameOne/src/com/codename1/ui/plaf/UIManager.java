@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.charts.util.ColorUtil;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
@@ -411,6 +412,11 @@ public class UIManager {
         if (installedTheme == null || !installedTheme.containsKey("ToolbarSearch.derive")) {
             themeProps.put("ToolbarSearch.derive", "Toolbar");
         }
+        
+        themeProps.put("ToolbarLandscape.derive", "Toolbar");
+        themeProps.put("TitleCommandLandscape.derive", "TitleCommand");
+        themeProps.put("BackCommandLandscape.derive", "BackCommand");
+        themeProps.put("TitleLandscape.derive", "Title");
         
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
             themeProps.put("TextFieldSearch.derive", "Title");
@@ -940,7 +946,7 @@ public class UIManager {
             themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");
         }
-        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
+        if(installedTheme == null || !installedTheme.containsKey("Badge.derive")) {
             themeProps.put("Badge.fgColor", "ffffff");
             themeProps.put("Badge.bgColor", "d32f2f");
             themeProps.put("Badge.press#fgColor", "ffffff");
@@ -979,6 +985,95 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("TextComponent.derive")) {
             themeProps.put("TextComponent.derive", "Container");
         }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Spinner3DRow")) {
+            // For the rows of the Spinner3D widget
+            themeProps.put("Spinner3DRow.derive", "Label");
+            themeProps.put("Spinner3DRow.sel#derive", "Label");
+            themeProps.put("Spinner3DRow.fgColor", "878A93");
+            themeProps.put("Spinner3DRow.transparency", "0");
+            themeProps.put("Spinner3DRow.sel#fgColor", "2A2B2F");
+            themeProps.put("Spinner3DRow.border", Border.createEmpty());
+            themeProps.put("Spinner3DRow.align", centerAlign);
+            themeProps.put("Spinner3DRow.sel#align", centerAlign);
+            themeProps.put("Spinner3DRow.padding", "1.5,1.5,1,1");
+            themeProps.put("Spinner3DRow.sel#padding", "1.5,1.5,1,1");
+            themeProps.put("Spinner3DRow.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("Spinner3DRow.sel#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            
+            themeProps.put("Spinner3DRow.font", Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));
+            themeProps.put("Spinner3DRow.sel#font", Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Spinner3DOverlay")) {
+            //themeProps.put("Spinner3DOverlay.border", Border.createCompoundBorder(
+            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)),
+            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)), Border.createEmpty(), Border.createEmpty()
+            //));
+            themeProps.put("Spinner3DOverlay.transparency", "255");
+            themeProps.put("Spinner3DOverlay.bgColor", "efeff4");
+            themeProps.put("Spinner3DOverlay.fgColor", "abb8b7");
+            
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialog")) {
+            // For the interaction dialog when showing a Picker in lightweight mode
+            themeProps.put("PickerDialog.padding", "0,0,0,0");
+            themeProps.put("PickerDialog.border", Border.createEmpty());
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialogTablet")) {
+            themeProps.put("PickerDialogTablet.derive", "Dialog");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialogContent")) {
+            // For the content pane of the interaction dialog when showing a Picker in lightweight mode
+            themeProps.put("PickerDialogContent.padding", "0,0,0,0");
+            themeProps.put("PickerDialogContent.margin", "0,0,0,0");
+            themeProps.put("PickerDialogContent.border", Border.createEmpty());
+            themeProps.put("PickerDialogContent.bgColor", "D1D4DD");
+            themeProps.put("PickerDialogContent.transparency", "255");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PicketDialogContentTablet")) {
+            themeProps.put("PickerDialogContentTablet.derive", "PopupContentPane");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonBar")) {
+            // For the button bar (with Cancel and Done) of the Picker interaction dialog in lightweight mode
+            themeProps.put("PickerButtonBar.margin", "0,0,0,0");
+            themeProps.put("PickerButtonBar.border", Border.createCompoundBorder(Border.createLineBorder(1, ColorUtil.rgb(148, 150, 151)), Border.createEmpty(), Border.createEmpty(), Border.createEmpty()));
+            themeProps.put("PickerButtonBar.bgColor", "F0F1F3");
+            themeProps.put("PickerButtonBar.transparency", "255");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonBarTablet")) {
+            themeProps.put("PickerButtonBarTablet.derive", "Container");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButton")) {
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+            themeProps.put("PickerButton.derive", "Button");
+            themeProps.put("PickerButton.sel#derive", "Button");
+            themeProps.put("PickerButton.press#derive", "Button");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonTablet")) {
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+            themeProps.put("PickerButtonTablet.derive", "Button");
+            themeProps.put("PickerButtonTablet.sel#derive", "Button");
+            themeProps.put("PickerButtonTablet.press#derive", "Button");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Picker")) {
+            themeProps.put("Picker.derive", "TextField");
+            themeProps.put("Picker.sel#derive", "TextField");
+            themeProps.put("Picker.press#derive", "TextField");
+            themeProps.put("Picker.dis#derive", "TextField");
+            themeProps.put("Picker.sel#border", Border.createLineBorder(1, 0x206afb));
+        }
+        
+        
     }
 
     /**

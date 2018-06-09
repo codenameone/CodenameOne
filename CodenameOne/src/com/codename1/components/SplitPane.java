@@ -66,6 +66,188 @@ import java.util.Set;
 public class SplitPane extends Container {
     
     /**
+     * An object to configure settings for a SplitPane.  Build an instance of this
+     * class to define such things as the divider thickness, the insets, and the 
+     * UIIDs to use for the various icons (collapse/expand/drag) on the divider.
+     * Once you have set all of the settings, you can pass this to {@link #SplitPane(com.codename1.components.SplitPane.Settings, com.codename1.ui.Component, com.codename1.ui.Component) }
+     * to create the corresponding SplitPane instance.
+     */
+    public static class Settings {
+        private int orientation=HORIZONTAL_SPLIT;
+        private String expandButtonUIID="Label";
+        private String collapseButtonUIID="Label";
+        private String dragHandleUIID="Label";
+        private float dividerThicknessMM=3;
+        private boolean showExpandCollapseButtons=true;
+        private boolean showDragHandle=true;
+        private String minInset="0";
+        private String preferredInset="50%";
+        private String maxInset="100%";
+        
+        /**
+         * Creates a new Settings with default values.
+         */
+        public Settings() {
+            
+        }
+        
+        /**
+         * Creates a new Settings with the provided orientation, and insets.
+         * @param orientation The orientation.  One of {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}.
+         * @param minInset The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @param preferredInset The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. "75%", "50mm", "20px".
+         * @param maxInset The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "20px".
+         */
+        public Settings(int orientation, String minInset, String preferredInset, String maxInset) {
+            this.orientation = orientation;
+            this.minInset = minInset;
+            this.preferredInset = preferredInset;
+            this.maxInset = maxInset;
+        }
+        
+        /**
+         * Sets the orientation.
+         * @param orientation The orientation.  One of {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}.
+         * @return Self for chaining.
+         */
+        public Settings orientation(int orientation) {
+            this.orientation = orientation;
+            return this;
+        }
+        
+        /**
+         * Sets the UIID to use for the expand button.  Default is "Label"
+         * @param expandButtonUIID The UIID to use for the expand button.
+         * @return Self for chaining.
+         * @see #collapseButtonUIID(java.lang.String) 
+         * @see #dragHandleUIID(java.lang.String) 
+         * @see #buttonUIIDs(java.lang.String) 
+         */
+        public Settings expandButtonUIID(String expandButtonUIID) {
+            this.expandButtonUIID = expandButtonUIID;
+            return this;
+        }
+        
+        /**
+         * Sets the UIID to use for the collapse button.  Default is "Label"
+         * @param collapseButtonUIID The UIID to use for the collapse button.
+         * @return Self for chaining.
+         * @see #dragHandleUIID(java.lang.String) 
+         * @see #buttonUIIDs(java.lang.String) 
+         * @see #expandButtonUIID(java.lang.String) 
+         */
+        public Settings collapseButtonUIID(String collapseButtonUIID) {
+            this.collapseButtonUIID = collapseButtonUIID;
+            return this;
+        }
+        
+        /**
+         * Sets the UIID to use for the drag handle on the divider.  Default is "Label"
+         * @param dragHandleUIID The UIID to use for the drag handle of the divider.
+         * @return Self for chaining.
+         * @see #buttonUIIDs(java.lang.String) 
+         * @see #expandButtonUIID(java.lang.String) 
+         * @see #collapseButtonUIID(java.lang.String) 
+         */
+        public Settings dragHandleUIID(String dragHandleUIID) {
+            this.dragHandleUIID = dragHandleUIID;
+            return this;
+        }
+        
+        /**
+         * Sets the UIID to use for all of the buttons on the divider.  This includes the drag handle,
+         * the collapse button, and the expand button.  This is a convenience method that is equivalent of
+         * calling {@link #expandButtonUIID(java.lang.String) }, {@link #collapseButtonUIID(java.lang.String)},
+         * and {@link #dragHandleUIID(java.lang.String) } all with the same value.
+         * @param uiid The UIID to use for the buttons on the divider.
+         * @return Self for chaining.
+         */
+        public Settings buttonUIIDs(String uiid) {
+            this.dragHandleUIID = uiid;
+            this.collapseButtonUIID = uiid;
+            this.expandButtonUIID = uiid;
+            return this;
+        }
+        
+        /**
+         * Sets the preferred divider thickness in Millimetres.
+         * @param dividerThicknessMM The divider thickness in Millimetres.
+         * @return Self for chaining.
+         */
+        public Settings dividerThicknessMM(float dividerThicknessMM) {
+            this.dividerThicknessMM = dividerThicknessMM;
+            return this;
+        }
+        
+        /**
+         * Sets the minimum inset for the divider. 
+         * @param minInset The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @return Self for chaining.
+         */
+        public Settings minInset(String minInset) {
+            this.minInset = minInset;
+            return this;
+        }
+        
+        /**
+         * Sets the preferred inset for the divider.
+         * @param preferredInset The preferred inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @return Self for chaining.
+         */
+        public Settings preferredInset(String preferredInset) {
+            this.preferredInset = preferredInset;
+            return this;
+        }
+        
+        /**
+         * Sets the max inset for the divider.
+         * @param maxInset The max inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @return 
+         */
+        public Settings maxInset(String maxInset) {
+            this.maxInset = maxInset;
+            return this;
+        }
+        
+        /**
+         * Sets the min, preferred, and max insets in a single method.  This is equivalent of calling {@link #minInset(java.lang.String) },
+         * {@link #maxInset(java.lang.String) }, and {@link #preferredInset(java.lang.String) } separately.
+         * @param min The min inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @param preferred The preferred inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+         * @param max The max inset for the divider.
+         * @return Self for chaining.
+         */
+        public Settings insets(String min, String preferred, String max) {
+            this.minInset = min;
+            this.preferredInset = preferred;
+            this.maxInset = max;
+            return this;
+        }
+        
+        /**
+         * Set whether to show the expand/collapse buttons on the divider. Default is {@literal true}.
+         * @param show {@literal true} to show the expand/collapse buttons.  {@literal false} to hide them.
+         * @return Self for chaining.
+         */
+        public Settings showExpandCollapseButtons(boolean show) {
+            this.showExpandCollapseButtons = show;
+            return this;
+        }
+        
+        /**
+         * Set whether to show the drag handle on the divider.  Default is {@literal true}.
+         * @param show {@literal true} to show the expand/collapse buttons.  {@literal false} to hide them.
+         * @return Self for chaining.
+         */
+        public Settings showDragHandle(boolean show) {
+            this.showDragHandle = show;
+            return this;
+        }
+        
+    }
+    
+    
+    /**
      * The orientation.  One of {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}
      */
     private final int orientation;
@@ -89,6 +271,36 @@ public class SplitPane extends Container {
      * Container for the bottom or right component.
      */
     private final Container bottomOrRight;
+    
+    /**
+     * UIID to use for the expand button
+     */
+    private String expandButtonUIID = "Label";
+    
+    /**
+     * UIID to use for the collapse button
+     */
+    private String collapseButtonUIID = "Label";
+    
+    /**
+     * UIID to use for the drag handle on the divider
+     */
+    private String dragHandleUIID = "Label";
+    
+    /**
+     * The preferred divider thickness in millimetres
+     */
+    private float dividerThicknessMM = 3;
+    
+    /**
+     * Whether to show the expand/collapse buttons.
+     */
+    private boolean showExpandCollapseButtons=true;
+    
+    /**
+     * Whether to show the drag handle.
+     */
+    private boolean showDragHandle=true;
     
     /**
      * The draggable divider.
@@ -122,23 +334,28 @@ public class SplitPane extends Container {
      */
     private boolean isCollapsed;
 
-    
     /**
      * Creates a new SplitPane.
-     * @param orientation Either {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}
+     * @param settings The settings for the split pane (e.g. insets, styles, etc...).
      * @param topOrLeft The component to place in the "top" (for vertical), or "left" (for horizontal).
      * @param bottomOrRight The component to place in the "bottom" (for vertical) or "right" (for horizontal).
-     * @param minInset The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
-     * @param preferredInset The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. "75%", "50mm", "20px".
-     * @param maxInset The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "20px".
      */
-    public SplitPane(int orientation, Component topOrLeft, Component bottomOrRight, String minInset, String preferredInset, String maxInset) {
+    public SplitPane(Settings settings, Component topOrLeft, Component bottomOrRight) {
         super(new LayeredLayout());
+        int orientation = settings.orientation;
+        String minInset = settings.minInset;
+        String preferredInset = settings.preferredInset;
+        String maxInset = settings.maxInset;
         
         this.orientation = orientation;
         this.topOrLeft = BorderLayout.center(topOrLeft);
         this.bottomOrRight = BorderLayout.center(bottomOrRight);
-        
+        this.expandButtonUIID = settings.expandButtonUIID;
+        this.collapseButtonUIID = settings.collapseButtonUIID;
+        this.dragHandleUIID = settings.dragHandleUIID;
+        this.dividerThicknessMM = settings.dividerThicknessMM;
+        this.showDragHandle = settings.showDragHandle;
+        this.showExpandCollapseButtons = settings.showExpandCollapseButtons;
 
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);
@@ -168,6 +385,20 @@ public class SplitPane extends Container {
         }
         
         
+    }
+    
+    
+    /**
+     * Creates a new SplitPane.
+     * @param orientation Either {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}
+     * @param topOrLeft The component to place in the "top" (for vertical), or "left" (for horizontal).
+     * @param bottomOrRight The component to place in the "bottom" (for vertical) or "right" (for horizontal).
+     * @param minInset The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+     * @param preferredInset The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. "75%", "50mm", "20px".
+     * @param maxInset The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "20px".
+     */
+    public SplitPane(int orientation, Component topOrLeft, Component bottomOrRight, String minInset, String preferredInset, String maxInset) {
+        this(new Settings(orientation, minInset, preferredInset, maxInset), topOrLeft, bottomOrRight);
     }
     
     /**
@@ -487,16 +718,29 @@ public class SplitPane extends Container {
      * Sets the inset of the divider explicitly.  This The inset is measured from the top for
      * vertical split panes and the left for horizontal split panes.  Setting this to "50%" will
      * move the divider to the middle point.  Setting it to "0" would set it all the way to the 
+     * left/top.  This will clamp the value at the minimum and maximum offsets if clamp is true.
+     * @param inset 
+     * @param clamp True to clamp the inset to prevent it from running off the page.
+     */
+    public void setInset(String inset, boolean clamp) {
+        getDividerInset().setValueAsString(inset);
+        isExpanded = false;
+        isCollapsed = false;
+        if (clamp) {
+            clampInset();
+        }
+    }
+    
+    /**
+     * Sets the inset of the divider explicitly.  This The inset is measured from the top for
+     * vertical split panes and the left for horizontal split panes.  Setting this to "50%" will
+     * move the divider to the middle point.  Setting it to "0" would set it all the way to the 
      * left/top.  This will clamp the value at the minimum and maximum offsets.
      * @param inset 
      */
     public void setInset(String inset) {
-        getDividerInset().setValueAsString(inset);
-        isExpanded = false;
-        isCollapsed = false;
-        clampInset();
+        setInset(inset, true);
     }
-    
     /**
      * Sets the preferred inset of this split pane.  The preferred inset will be automatically 
      * changed whenever the user explicitly moves the divider to a new position.
@@ -615,7 +859,7 @@ public class SplitPane extends Container {
         Divider() {
             super(new LayeredLayout());
             btnCollapse = $(new Button())
-                    .setUIID("Label")
+                    .setUIID(collapseButtonUIID)
                     .setCursor(Component.HAND_CURSOR)
                     .setIcon(getCollapseIcon())
                     .addActionListener(new ActionListener() {
@@ -629,7 +873,7 @@ public class SplitPane extends Container {
                     .asComponent(Button.class);
             btnExpand =  $(new Button())
                     .setCursor(Component.HAND_CURSOR)
-                    .setUIID("Label")
+                    .setUIID(expandButtonUIID)
                     .setIcon(getExpandIcon())
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {
@@ -642,6 +886,7 @@ public class SplitPane extends Container {
                     .asComponent(Button.class);
             
             dragHandle = $(new Label())
+                    .setUIID(dragHandleUIID)
                     .setIcon(getDragIconImage())
                     .setMargin(0)
                     .setIgnorePointerEvents(true)
@@ -649,8 +894,12 @@ public class SplitPane extends Container {
                     .setDraggable(true)
                     .setCursor(getDragCursor())
                     .asComponent(Label.class);
-            
-            add(btnCollapse).add(btnExpand).add(dragHandle);
+            if (showExpandCollapseButtons) {
+                add(btnCollapse).add(btnExpand);
+            }
+            if (showDragHandle) {
+                add(dragHandle);
+            }
             
             LayeredLayout l = (LayeredLayout)getLayout();
             switch (orientation) {
@@ -701,8 +950,8 @@ public class SplitPane extends Container {
         protected Dimension calcPreferredSize() {
             Display d = Display.getInstance();
             switch (orientation) {
-                case VERTICAL_SPLIT : return new Dimension(d.getDisplayWidth(), d.convertToPixels(3));
-                default: return new Dimension(d.convertToPixels(3), d.getDisplayHeight());
+                case VERTICAL_SPLIT : return new Dimension(d.getDisplayWidth(), d.convertToPixels(dividerThicknessMM));
+                default: return new Dimension(d.convertToPixels(dividerThicknessMM), d.getDisplayHeight());
             }
         }
         

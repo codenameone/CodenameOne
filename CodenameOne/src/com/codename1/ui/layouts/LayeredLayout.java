@@ -36,6 +36,8 @@ import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -901,6 +903,47 @@ public class LayeredLayout extends Layout {
                         + constraint.insets[Component.BOTTOM].preferredValue;
                 hInsets += constraint.insets[Component.LEFT].preferredValue
                         + constraint.insets[Component.RIGHT].preferredValue;
+                
+                Component topRef = constraint.top().getReferenceComponent();
+                LayeredLayoutConstraint currConstraint = constraint;
+                int maxIterations = numOfcomponents;
+                int iter = 0;
+                while (topRef != null) {
+                    if (iter++ >= maxIterations) break;
+                    vInsets += Math.max(0, topRef.getOuterPreferredH() * currConstraint.top().getReferencePosition());
+                    currConstraint = getOrCreateConstraint(topRef);
+                    topRef = currConstraint.top().getReferenceComponent();
+                }
+                Component bottomRef = constraint.bottom().getReferenceComponent();
+                currConstraint = constraint;
+                iter = 0;
+                while (topRef != null) {
+                    if (iter++ >= maxIterations) break;
+                    vInsets += Math.max(0, bottomRef.getOuterPreferredH() * currConstraint.bottom().getReferencePosition());
+                    currConstraint = getOrCreateConstraint(bottomRef);
+                    bottomRef = currConstraint.bottom().getReferenceComponent();
+                }
+                
+                Component leftRef = constraint.left().getReferenceComponent();
+                currConstraint = constraint;
+                iter = 0;
+                while (leftRef != null) {
+                    if (iter++ >= maxIterations) break;
+                    hInsets += Math.max(0, leftRef.getOuterPreferredW() * currConstraint.left().getReferencePosition());
+                    currConstraint = getOrCreateConstraint(leftRef);
+                    leftRef = currConstraint.left().getReferenceComponent();
+                }
+                
+                Component rightRef = constraint.right().getReferenceComponent();
+                currConstraint = constraint;
+                iter = 0;
+                while (rightRef != null) {
+                    if (iter++ >= maxIterations) break;
+                    hInsets += Math.max(0, rightRef.getOuterPreferredW() * currConstraint.right().getReferencePosition());
+                    currConstraint = getOrCreateConstraint(rightRef);
+                    rightRef = currConstraint.right().getReferenceComponent();
+                }
+                
             }
             maxHeight = Math.max(maxHeight, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom() + vInsets);
             maxWidth = Math.max(maxWidth, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL() + hInsets);
@@ -908,7 +951,7 @@ public class LayeredLayout extends Layout {
         }
         Style s = parent.getStyle();
         Dimension d = new Dimension(maxWidth + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(),
-                maxHeight + s.getPaddingTop() + s.getPaddingBottom());
+                maxHeight + s.getPaddingTop() + s.getPaddingBottom() + parent.getBottomGap());
         if (preferredWidthMM > 0) {
             int minW = Display.getInstance().convertToPixels(preferredWidthMM);
             if (d.getWidth() < minW) {
@@ -1129,7 +1172,7 @@ public class LayeredLayout extends Layout {
             }
             
             if (right().getReferenceComponent() == null) {
-                box.setWidth(parent.getWidth() - box.getX() - parentStyle.getPaddingRightNoRTL() - parent.getSideGap());
+                box.setWidth(parent.getLayoutWidth() - box.getX() - parentStyle.getPaddingRightNoRTL() - parent.getSideGap());
             } else {
                 Component ref = right().getReferenceComponent();
                 int refX = (int)(getOuterX(ref) + getOuterWidth(ref) - (right().getReferencePosition() * getOuterWidth(ref)));
@@ -1137,7 +1180,7 @@ public class LayeredLayout extends Layout {
             }
             
             if (bottom().getReferenceComponent() == null) {
-                box.setHeight(parent.getHeight() - box.getY() - parentStyle.getPaddingBottom() - parent.getBottomGap());
+                box.setHeight(parent.getLayoutHeight() - box.getY() - parentStyle.getPaddingBottom() - parent.getBottomGap());
             } else {
                 Component ref = bottom().getReferenceComponent();
                 int refY = (int)(getOuterY(ref) + getOuterHeight(ref) - (bottom().getReferencePosition() * getOuterHeight(ref)));
@@ -3165,4 +3208,39 @@ public class LayeredLayout extends Layout {
 
     }
 
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+        return true;
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        java.util.List<Component> cmps = new ArrayList<Component>();
+        for (Component cmp : parent) {
+            cmps.add(cmp);
+        }
+        
+        Collections.sort(cmps, new Comparator<Component>() {
+
+            @Override
+            public int compare(Component o1, Component o2) {
+                if (o1.getY() < o2.getY()) {
+                    return -1;
+                } else if (o1.getY() > o2.getY()) {
+                    return 1;
+                } else {
+                    if (o1.getX() < o2.getX()) {
+                        return -1;
+                    } else if (o1.getX() > o2.getX()) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+            }
+            
+        });
+        Component[] cmpArr = cmps.toArray(new Component[cmps.size()]);
+        return cmpArr;
+    } 
 }

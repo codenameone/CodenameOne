@@ -36,4 +36,8 @@ public class Accessor {
     public static boolean isPaintPeersBehindEnabled(Graphics g) {
         return g.paintPeersBehind;
     }
+    
+    public static boolean scrollableYFlag(Container cnt) {
+        return cnt.scrollableYFlag();
+    }
 }

@@ -29,6 +29,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import java.awt.Desktop;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -416,6 +417,27 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         final File javaExe = javaBin;
         final File resourceEditorFinal = resourceEditor;
         final String themeFile = themePaths.get(themes.getSelectedIndex());
+        if (themeFile.endsWith(".css.res")) {
+            File srcDir = new File(themeFile).getParentFile();
+            File projectDir = srcDir.getParentFile();
+            File cssDir = new File(projectDir, "css");
+            String cssThemeFileName = new File(themeFile).getName();
+            int lastDot = cssThemeFileName.lastIndexOf(".");
+            if (lastDot >= 0) {
+                cssThemeFileName = cssThemeFileName.substring(0, lastDot);
+            }
+            File cssThemeFile = new File(cssDir, cssThemeFileName);
+            System.out.println("Trying to open "+cssThemeFile);
+            if (cssThemeFile.exists()) {
+                try {
+                    Desktop.getDesktop().edit(cssThemeFile);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    
+                }
+                return;
+            }
+        }
         final String themeName = themeNames.get(themes.getSelectedIndex());
         final String uiid = componentUIID.getText();
         

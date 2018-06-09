@@ -5473,4 +5473,12 @@ public class FontImage extends Image {
     public String getText() {
         return text;
     }
+    
+    /**
+     * Allows manipulating the background transparency value of the image
+     * @param t a value between 0 and 255 where 0 is fully transparent
+     */
+    public void setBgTransparency(int t) {
+        backgroundOpacity = (byte)t;
+    }
 }

@@ -29,6 +29,7 @@ import java.util.Hashtable;
  * This class contains several useful static methods for HTML
  *
  * @author Ofir Leitner
+ * @deprecated the HTML package is no longer used or maintained and may be removed in a future revision
  */
 public class HTMLUtils {
 
@@ -279,7 +280,7 @@ public class HTMLUtils {
     static int getStringVal(String str,String[] options,int[] vals,int defaultValue) {
         if (str!=null) {
             for(int i=0;i<options.length;i++) {
-                if (str.equalsIgnoreCase(options[i])) {
+                if (str.equals(options[i])) {
                     if (vals!=null) {
                         return vals[i];
                     } else {

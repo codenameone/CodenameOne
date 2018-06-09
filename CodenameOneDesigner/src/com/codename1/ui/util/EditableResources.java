@@ -1118,7 +1118,7 @@ public class EditableResources extends Resources implements TreeModel {
                                             + "shadowBlur=\"" + rb.getShadowBlur()+ "\" " 
                                             + "topOnlyMode=\"" + rb.isTopOnlyMode()+ "\" " 
                                             + "bottomOnlyMode=\"" + rb.isBottomOnlyMode()+ "\" " 
-                                            + "CornerRadius=\"" + rb.getCornerRadius()+ "\" " 
+                                            + "cornerRadius=\"" + rb.getCornerRadius()+ "\" " 
                                             + "bezierCorners=\"" + rb.isBezierCorners()+ "\" />\n");
                             
                                     continue;

@@ -178,9 +178,24 @@ public class Log {
     }
     
     /**
-     * Sends the current log to the cloud regardless of the reporting level
+     * Sends the current log to the cloud. Notice that this method is synchronous and 
+     * returns only when the sending completes
      */
     public static void sendLog() {
+        sendLogImpl(true);
+    }
+    
+    /**
+     * Sends the current log to the cloud and returns immediately
+     */
+    public static void sendLogAsync() {
+        sendLogImpl(true);
+    }
+
+    /**
+     * Sends the current log to the cloud regardless of the reporting level
+     */
+    private static void sendLogImpl(boolean sync) {
         if(Display.getInstance().getProperty("cloudServerURL", null) != null) {
             sendLogLegacy();
             return;
@@ -210,7 +225,11 @@ public class Log {
             m.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
             m.addData("log", read, "text/plain");
             m.setFailSilently(true);
-            NetworkManager.getInstance().addToQueueAndWait(m);
+            if(sync) {
+                NetworkManager.getInstance().addToQueueAndWait(m);
+            } else {
+                NetworkManager.getInstance().addToQueue(m);
+            }
         } catch (Throwable ex) {
             ex.printStackTrace();
         }
@@ -300,6 +319,10 @@ public class Log {
      * @param t
      */
     protected void logThrowable(Throwable t) {
+        if(t == null) {
+            p("Exception logging invoked with null exception...");
+            return;
+        }
         print("Exception: " + t.getClass().getName() + " - " + t.getMessage(), ERROR);
         Thread thr = Thread.currentThread();
         if(thr instanceof CodenameOneThread && ((CodenameOneThread)thr).hasStackFrame()) {

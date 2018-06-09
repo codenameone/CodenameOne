@@ -43,6 +43,8 @@ import com.codename1.ui.geom.Rectangle;
 public class RoundBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rbcache";
     
+    private long modificationTime;
+    
     /**
      * The color of the border background
      */
@@ -117,6 +119,11 @@ public class RoundBorder extends Border {
     
     private boolean uiid;
     
+    /**
+     * This is useful for showing an Uber like stroke effect progress bar
+     */
+    private int strokeAngle = 360;
+    
     private RoundBorder() {
         shadowSpread = Display.getInstance().convertToPixels(2);
         instanceCounter++;
@@ -145,6 +152,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder uiid(boolean uiid) {
         this.uiid = uiid;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
     
@@ -163,6 +171,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder color(int color) {
         this.color = color;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -173,6 +182,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder opacity(int opacity) {
         this.opacity = opacity;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -183,6 +193,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder strokeOpacity(int strokeOpacity) {
         this.strokeOpacity = strokeOpacity;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
     
@@ -193,6 +204,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder strokeColor(int strokeColor) {
         this.strokeColor = strokeColor;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -203,6 +215,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder stroke(Stroke stroke) {
         this.stroke = stroke;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -226,6 +239,17 @@ public class RoundBorder extends Border {
     }
     
     /**
+     * Sets the stroke angle of the circle, this only applies to circular versions
+     * @param strokeAngle the stroke angle in degrees
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder strokeAngle(int strokeAngle) {
+        this.strokeAngle = strokeAngle;
+        modificationTime = System.currentTimeMillis();
+        return this;
+    }
+    
+    /**
      * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
      * @param shadowSpread the amount in pixels representing the size of the shadow
      * @param mm set to true to indicate the value is in millimeters, false indicates pixels
@@ -234,6 +258,7 @@ public class RoundBorder extends Border {
     public RoundBorder shadowSpread(int shadowSpread, boolean mm) {
         this.shadowMM = mm;
         this.shadowSpread = shadowSpread;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -244,6 +269,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder shadowSpread(int shadowSpread) {
         this.shadowSpread = shadowSpread;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -254,6 +280,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder shadowOpacity(int shadowOpacity) {
         this.shadowOpacity = shadowOpacity;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -264,6 +291,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder shadowX(float shadowX) {
         this.shadowX = shadowX;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -274,6 +302,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder shadowY(float shadowY) {
         this.shadowY = shadowY;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -284,6 +313,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder shadowBlur(float shadowBlur) {
         this.shadowBlur = shadowBlur;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -294,6 +324,7 @@ public class RoundBorder extends Border {
      */
     public RoundBorder rectangle(boolean rectangle) {
         this.rectangle = rectangle;
+        modificationTime = System.currentTimeMillis();
         return this;
     }
 
@@ -380,10 +411,14 @@ public class RoundBorder extends Border {
         int x = c.getX();
         int y = c.getY();
         if(w > 0 && h > 0) {
-            Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-            if(background != null && background.getWidth() == w && background.getHeight() == h) {
-                g.drawImage(background, x, y);
-                return;
+            Object k = c.getClientProperty(CACHE_KEY + instanceVal);
+            if(k instanceof CacheValue) {
+                CacheValue val = (CacheValue)k;
+                if(val.modificationTime == modificationTime && 
+                        val.img.getWidth() == w && val.img.getHeight() == h) {
+                    g.drawImage(val.img, x, y);
+                    return;
+                }
             }
         } else {
             return;
@@ -391,14 +426,14 @@ public class RoundBorder extends Border {
                 
         Image target = createTargetImage(c, w, h, true);
         g.drawImage(target, x, y);
-        c.putClientProperty(CACHE_KEY + instanceVal, target);
+        c.putClientProperty(CACHE_KEY + instanceVal, new CacheValue(target, modificationTime));
         
         // update the cache with a more refined version and repaint
         Display.getInstance().callSeriallyOnIdle(new Runnable() {
             public void run() {
                 if(w == c.getWidth() && h == c.getHeight()) {
                     Image target = createTargetImage(c, w, h, false);
-                    c.putClientProperty(CACHE_KEY + instanceVal, target);
+                    c.putClientProperty(CACHE_KEY + instanceVal, new CacheValue(target, modificationTime));
                     c.repaint();
                 }
             }
@@ -443,6 +478,10 @@ public class RoundBorder extends Border {
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);
+                if(strokeAngle != 360) {
+                    arc = new GeneralPath();
+                    arc.arc(x+sw/2, y+sw/2, size-2*sw, size-2*sw, Math.PI / 2, -Math.toRadians(strokeAngle));
+                }
                 g.drawShape(arc, this.stroke);
             } else {
                 g.fillArc(x, y, size, size, 0, 360);
@@ -632,5 +671,16 @@ public class RoundBorder extends Border {
         return true;
     }
     
-    
+
+    static class CacheValue {
+        public CacheValue() {}
+
+        public CacheValue(Image img, long modificationTime) {
+            this.img = img;
+            this.modificationTime = modificationTime;
+        }
+        
+        Image img;
+        long modificationTime;
+    }
 }

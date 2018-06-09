@@ -42,13 +42,17 @@ int connections = 0;
         allHeaderFields = nil;
         connection = nil;
         sslCertificates = nil;
+        pendingDataPos = 0;
+        pendingData = nil;
     }
     
     return self;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
-    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+    });
     connections++;
     float time = ((float)timeout) / 1000.0;
     
@@ -219,6 +223,78 @@ extern void connectionError(void* peer, NSString* message);
     return [[n allObjects] objectAtIndex:offset];
 }
 
+- (JAVA_INT)available {
+    int count = 0;
+    if (pendingData == nil) {
+        return 0;
+    }
+    for (NSData* data in pendingData) {
+        count += [data length];
+    }
+    return count;
+    
+}
+- (JAVA_INT)shiftByte {
+    if (pendingData == nil || [pendingData count] == 0) {
+        return (JAVA_INT)-1;
+    }
+    NSData* data = (NSData*)[pendingData firstObject];
+    if (pendingDataPos >= [data length]) {
+        pendingDataPos = 0;
+        [pendingData removeObjectAtIndex:0];
+        return [self shiftByte];
+    }
+    const char* fileBytes = (const char*)[data bytes];
+    JAVA_INT result = fileBytes[pendingDataPos];
+    
+    pendingDataPos++;
+    return result;
+    
+}
+- (void)appendData:(NSData*)data {
+    if (pendingData == nil) {
+        pendingData = [[NSMutableArray alloc] init];
+    }
+    [pendingData addObject:data];
+            
+}
+- (JAVA_INT)readData:(JAVA_OBJECT)buffer offset:(JAVA_INT)offset len:(JAVA_INT)len {
+    if (pendingData == nil || [pendingData count] == 0) {
+        return (JAVA_INT)0;
+    }
+    NSData* data = (NSData*)[pendingData firstObject];
+    if (pendingDataPos >= [data length]) {
+        pendingDataPos = 0;
+        [pendingData removeObjectAtIndex:0];
+        return [self readData:buffer offset:offset len:len];
+    }
+    int count = 0;
+    int toFill = len;
+    
+    while (toFill > 0) {
+        if ([data length] - pendingDataPos >= toFill) {
+            [data getBytes:((JAVA_ARRAY)buffer)->data+offset+count range:NSMakeRange(pendingDataPos, toFill)];
+            count += toFill;
+            pendingDataPos += toFill;
+            toFill = 0;
+            return count;
+        } else {
+            [data getBytes:((JAVA_ARRAY)buffer)->data+offset+count range:NSMakeRange(pendingDataPos, [data length] - pendingDataPos)];
+            count += ([data length] - pendingDataPos);
+            
+            toFill -= ([data length]- pendingDataPos);
+            pendingDataPos = 0;
+            [pendingData removeObjectAtIndex:0];
+            if ([pendingData count] == 0) {
+                return count;
+            } else {
+                data = (NSData*)[pendingData firstObject];
+            }
+        }
+    }
+    return count;
+}
+
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {
@@ -230,6 +306,9 @@ extern void connectionError(void* peer, NSString* message);
     }
     if (sslCertificates != nil) {
        [sslCertificates release];
+    }
+    if (pendingData != nil) {
+        [pendingData release];
     }
     [request release];
 	[super dealloc];

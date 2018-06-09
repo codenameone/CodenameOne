@@ -276,6 +276,8 @@ class AndroidGraphics {
             this.tmppath.lineTo(xPoints[i], yPoints[i]);
         }
         paint.setStyle(Paint.Style.STROKE);
+        float strokeW = 1;
+        paint.setStrokeWidth(strokeW);
         canvas.save();
         applyTransform();
         canvas.drawPath(this.tmppath, paint);
@@ -311,13 +313,16 @@ class AndroidGraphics {
     }
 
     public void drawRect(int x, int y, int width, int height) {
+
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.STROKE);
         paint.setAntiAlias(false);
+        float strokeW = 1;
 
+        paint.setStrokeWidth(strokeW);
         canvas.save();
         applyTransform();
-        canvas.drawRect(x, y, x + width, y + height, paint);
+        canvas.drawRect(x +strokeW/2, y+strokeW/2, x + width - strokeW/2, y + height - strokeW/2, paint);
         paint.setAntiAlias(antialias);
         unapplyTransform();
         canvas.restore();
@@ -327,10 +332,12 @@ class AndroidGraphics {
             int height, int arcWidth, int arcHeight) {
 
         paint.setStyle(Paint.Style.STROKE);
-        this.tmprectF.set(x, y, x + width, y + height);
+        float strokeW = 1;
+        paint.setStrokeWidth(strokeW);
+        this.tmprectF.set(x+strokeW/2, y+strokeW/2, x + width-strokeW/2, y + height-strokeW/2);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }
@@ -346,7 +353,9 @@ class AndroidGraphics {
     public void drawArc(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
         paint.setStyle(Paint.Style.STROKE);
-        this.tmprectF.set(x, y, x + width, y + height);
+        float strokeW = 1;
+        paint.setStrokeWidth(strokeW);
+        this.tmprectF.set(x+strokeW/2, y+strokeW/2, x + width - strokeW/2, y + height - strokeW/2);
         canvas.save();
         applyTransform();
         canvas.drawArc(this.tmprectF, 360 - startAngle,
@@ -792,9 +801,9 @@ class AndroidGraphics {
         paint.setAntiAlias(false);
         paint.setAlpha(255);
         if(!horizontal) {
-            paint.setShader(new LinearGradient(0, 0, 0, height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x, y+height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         } else {
-            paint.setShader(new LinearGradient(0, 0, width, 0, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x+width, y, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         }
         canvas.save();
         applyTransform();
@@ -1261,7 +1270,7 @@ class AndroidGraphics {
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }

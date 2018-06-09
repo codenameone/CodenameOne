@@ -101,9 +101,7 @@ public class SEBrowserComponent extends PeerComponent {
         public boolean shouldNavigate(String url) {
             BrowserComponent browserComp = weakBrowserComp.get();
             if (browserComp != null) {
-                if (browserComp.getBrowserNavigationCallback() != null) {
-                    return browserComp.getBrowserNavigationCallback().shouldNavigate(url);
-                }
+                return browserComp.fireBrowserNavigationCallbacks(url);
             }
             return true;
         } 
@@ -112,6 +110,9 @@ public class SEBrowserComponent extends PeerComponent {
             System.out.println("[JS Console] "+val);
         }
     }
+
+    
+    
     
     
     
@@ -378,7 +379,7 @@ public class SEBrowserComponent extends PeerComponent {
                 if (self == null || p == null) {
                     return;
                 }
-                if ( !p.getBrowserNavigationCallback().shouldNavigate(self.web.getEngine().getLocation()) ){
+                if ( !p.fireBrowserNavigationCallbacks(self.web.getEngine().getLocation()) ){
                     self.web.getEngine().getLoadWorker().cancel();
                 }
             }
@@ -480,11 +481,16 @@ public class SEBrowserComponent extends PeerComponent {
         }
         return result[0];
     }
-     
+    
     public void execute(final String js) {
         Platform.runLater(new Runnable() {
             public void run() {
-                web.getEngine().executeScript(js);
+                try {
+                    web.getEngine().executeScript(js);
+                } catch (Throwable t) {
+                    Log.p("Javascript exception occurred while running expression: "+js);
+                    throw t;
+                }
             }
         });
     }
@@ -533,6 +539,8 @@ public class SEBrowserComponent extends PeerComponent {
                     //SEBrowserComponent.this.repaint();
                     
                     
+                } else {
+                    complete[0] = true;
                 }
                 synchronized(DEINIT_LOCK) {
                     DEINIT_LOCK.notify();
@@ -550,6 +558,7 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         });
+        //getComponentForm().deregisterAnimated(this);
         super.deinitialize();
     }
 
@@ -557,6 +566,7 @@ public class SEBrowserComponent extends PeerComponent {
     protected void initComponent() {
         super.initComponent(); //To change body of generated methods, choose Tools | Templates.
         init();
+        //getComponentForm().registerAnimated(this);
     }
     
     
@@ -585,6 +595,8 @@ public class SEBrowserComponent extends PeerComponent {
                     frm.repaint();
                     SEBrowserComponent.this.repaint();
 
+                } else {
+                    completed[0] = true;
                 }
 
             }

@@ -25,6 +25,7 @@ package com.codename1.ui.layouts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -110,8 +111,9 @@ public class FlowLayout extends Layout{
      */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
-        int x = s.getPaddingLeft(parent.isRTL());
-        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingLeft(parent.isRTL()) - x;
+        int containerPaddingLeft = s.getPaddingLeft(parent.isRTL());
+        int x = containerPaddingLeft;
+        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL()) - x;
         
         boolean rtl = parent.isRTL();
         if(rtl) {
@@ -130,18 +132,20 @@ public class FlowLayout extends Layout{
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
             Style style = cmp.getStyle();
-            int marginX = style.getMarginLeftNoRTL() + style.getMarginRightNoRTL();
+            int marginX = style.getHorizontalMargins();
             cmp.setWidth(Math.min(maxComponentWidth - marginX, cmp.getPreferredW()));
             cmp.setHeight(cmp.getPreferredH());
 
-            if((x == s.getPaddingLeft(rtl)) || ( x+ cmp.getPreferredW() <= width) ) {
+            // first component never breaks the line. Since width already removed padding and X already includes the 
+            // left padding we need to re-add the left padding to the width
+            if((x == s.getPaddingLeft(rtl)) || ( x+ cmp.getPreferredW() <= width + containerPaddingLeft) ) {
                 // We take the actual LEFT since drawing is done in reverse
                 x += cmp.getStyle().getMarginLeftNoRTL();
-            	if(rtl) {
+                if(rtl) {
                 	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
-            	} else {
-            		cmp.setX(x);
-            	}
+                } else {
+                    cmp.setX(x);
+                }
 
                 cmp.setY(y + cmp.getStyle().getMarginTop());
 
@@ -249,7 +253,11 @@ public class FlowLayout extends Layout{
                 }
                 break;
             case Component.RIGHT:
-                x+=width;  // this will remove the last gap
+                if(!target.isRTL()) {
+                    x+=width;  // this will remove the last gap                    
+                } else {
+                    x -= width;
+                }
                 break;
         }
         Style parentStyle = target.getStyle();
@@ -297,7 +305,9 @@ public class FlowLayout extends Layout{
      */
     public  Dimension getPreferredSize(Container parent) {
         int parentWidth = parent.getWidth();
-        if(parentWidth == 0){
+        
+        // display width can be larger on orientation change when the UI didn't have time to adapt
+        if(parentWidth == 0 || parentWidth > Display.getInstance().getDisplayWidth()) {
             parent.invalidate();
         }
         int width = 0;
@@ -310,10 +320,10 @@ public class FlowLayout extends Layout{
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
             height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
-            int prefW = cmp.getPreferredW()+ cmp.getStyle().getMarginRightNoRTL()+ cmp.getStyle().getMarginLeftNoRTL();
+            int prefW = cmp.getPreferredW()+ cmp.getStyle().getHorizontalMargins();
             w += prefW;
             //we need to break a line
-            if (parentWidth > parentPadding && w > parentWidth && i > 0) {
+            if (parentWidth > parentPadding && w > parentWidth - parentPadding && i > 0) {
                 height += cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom();
                 width = Math.max(w, width);
                 w = prefW;
@@ -478,6 +488,15 @@ public class FlowLayout extends Layout{
      */
     public static Container encloseRightMiddle(Component... cmps) {
         return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+    }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
     }
 
     /**

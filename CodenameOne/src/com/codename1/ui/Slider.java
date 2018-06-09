@@ -370,6 +370,8 @@ public class Slider extends Label {
         int width = getWidth();
         int height = getHeight();
         
+        int voffset = (thumbImage != null)? thumbImage.getHeight() : 0;
+        
         int y = getY();
         if(infinite) {
             int blockSize = getWidth() / 5;
@@ -377,8 +379,8 @@ public class Slider extends Label {
             g.clipRect(x, y, blockSize, height - 1);
         } else {
             if(vertical) {
-                int actualHeight = (int) ((((float) value) / ((float)maxValue - minValue)) * getHeight());
-                y += height - actualHeight;
+                int actualHeight = (int) ((((float) value) / ((float)maxValue - minValue)) * (getHeight() - voffset));
+                y += height - actualHeight - voffset;
             } else {
                 width = (int) ((((float) value) / ((float)maxValue - minValue)) * getWidth());
             }

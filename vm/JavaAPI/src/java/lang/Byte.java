@@ -26,7 +26,7 @@ package java.lang;
  * The Byte class is the standard wrapper for byte values.
  * Since: JDK1.1, CLDC 1.0
  */
-public final class Byte extends Number {
+public final class Byte extends Number implements Comparable<Byte> {
     /**
      * The maximum value a Byte can have.
      * See Also:Constant Field Values
@@ -123,5 +123,13 @@ public final class Byte extends Number {
     @Override
     public double doubleValue() {
         return value;
+    }
+
+    public static int compare(byte f1, byte f2) {
+        return f1 - f2;
+    }
+
+    public int compareTo(Byte another) {
+        return value < another.value ? -1 : value > another.value ? 1 : 0;
     }
 }

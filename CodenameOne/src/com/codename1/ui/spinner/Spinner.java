@@ -44,7 +44,7 @@ import java.util.Date;
  * in a similar way to a list or a combo box.
  *
  * @author Shai Almog
- * @deprecated use the Numeric/Date/Time spinners instead
+ * @deprecated use Picker instead
  */
 class Spinner extends List {
     /**

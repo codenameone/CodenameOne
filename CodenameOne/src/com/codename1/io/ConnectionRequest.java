@@ -1037,7 +1037,15 @@ public class ConnectionRequest implements IOProgressListener {
                         "EEE, dd-MMM-yyyy HH:mm:ss Z", 
                         "EEE dd-MMM-yyyy HH:mm:ss Z",
                         "EEE, dd MMM yyyy HH:mm:ss Z",
-                        "EEE dd MMM yyyy HH:mm:ss Z"
+                        "EEE dd MMM yyyy HH:mm:ss Z",
+                        "EEE, dd-MMM-yy HH:mm:ss z", 
+                        "EEE dd-MMM-yy HH:mm:ss z",
+                        "EEE, dd MMM yy HH:mm:ss z",
+                        "EEE dd MMM yy HH:mm:ss z",
+                        "EEE, dd-MMM-yy HH:mm:ss Z", 
+                        "EEE dd-MMM-yy HH:mm:ss Z",
+                        "EEE, dd MMM yy HH:mm:ss Z",
+                        "EEE dd MMM yy HH:mm:ss Z"
                         );
                 if (dt != null) {
                     c.setExpires(dt.getTime());
@@ -2401,6 +2409,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     private void downloadImage(final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail, boolean useCache) {
+        setReadResponseForErrors(false);
         if (useCache) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
                 public void run() {

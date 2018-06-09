@@ -160,6 +160,11 @@
         <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
         <zip basedir="build/tmp" compress="true" file="updatedLibs.zip" />
         <deltree dir="build/tmp"/>        
+        
+        <copy file="dist/CodenameOne.jar" todir="../../../Dropbox/website/files/updates" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../../../Dropbox/website/files/updates" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../../../Dropbox/website/files/updates" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="../../../Dropbox/website/files/updates" />        
     </target>
             
     <target name="release" depends="stamp,jar">
@@ -359,6 +364,7 @@
         <copy file="${codenameone.dir}/NBPlugin/CodenameOne_Template/build.xml" tofile="${codenameone.dir}/CodenameOneSettings/src/build.xml" />
         <ant inheritall="false" antfile="${codenameone.dir}/GUIBuilder/GUIBuilderSE/build.xml" target="pack" />
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
+        <ant inheritall="false" antfile="../../UpdateCodenameOne/build.xml" target="release" />
         <!-- zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" / -->
         
         <!-- prepare the NB Plugin -->

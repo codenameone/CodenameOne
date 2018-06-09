@@ -853,7 +853,7 @@ public class MenuBar extends Container implements ActionListener {
             if (leftContainer.getComponentCount() - componentCountOffset(leftContainer) <= 0) {
                 Button back = createBackCommandButton();
                 leftContainer.addComponent(back);
-                if(!back.getUIID().equals("BackCommand")) {
+                if(!back.getUIID().startsWith("BackCommand")) {
                     back.setUIID("BackCommand");
                 }
                 hideEmptyCommand(back);
@@ -862,7 +862,7 @@ public class MenuBar extends Container implements ActionListener {
                 Button b = (Button) leftContainer.getComponentAt(0);
                 if (b.getCommand() != parent.getBackCommand()) {
                     b.setCommand(parent.getBackCommand());
-                    if(!b.getUIID().equals("BackCommand")) {
+                    if(!b.getUIID().startsWith("BackCommand")) {
                         b.setUIID("BackCommand");
                     }
                     verifyBackCommandRTL(b);
@@ -959,7 +959,7 @@ public class MenuBar extends Container implements ActionListener {
     private void ensureCommandsInContainer(Command a, Command b, Container c, String styleA, String styleB) {
         if (c.getComponentCount() - componentCountOffset(c) == 0) {
             Button btn = new Button(a);
-            if(!btn.getUIID().equals(styleA)) {
+            if(!btn.getUIID().startsWith(styleA)) {
                 btn.setUIID(styleA);
             }
             c.addComponent(btn);

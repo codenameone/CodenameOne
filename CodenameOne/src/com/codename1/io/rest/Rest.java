@@ -49,6 +49,15 @@ public class Rest {
 	}
 
 	/**
+         * Creates a PATCH request builder
+         * @param url The request URL
+         * @return RequestBuilder instance
+         */
+         public static RequestBuilder patch(String url) {
+		return new RequestBuilder("PATCH", url);
+	}
+
+	/**
          * Creates a OPTIONS request builder
          * @param url The request URL
          * @return RequestBuilder instance

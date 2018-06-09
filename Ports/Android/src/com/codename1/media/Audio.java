@@ -37,6 +37,8 @@ import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
 
 /**
@@ -47,7 +49,8 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
     private static final int MEDIA_INFO_BUFFERING_START = 701;
     private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;
-    private Runnable onComplete;
+    //private Runnable onComplete;
+    private List<Runnable> completionHandlers;
     private InputStream stream;
     private int lastTime;
     private int lastDuration;
@@ -63,7 +66,9 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         this.activity = activity;
         this.player = player;
         this.stream = stream;
-        this.onComplete = onComplete;
+        if (onComplete != null) {
+            addCompletionHandler(onComplete);
+        }
         bindPlayerCleanupOnComplete();
 
         AudioManager audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
@@ -96,6 +101,28 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         }
     }
 
+    private void fireCompletionHandlers() {
+        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                        List<Runnable>  toRun;
+                    
+                        synchronized(Audio.this) {
+                            toRun = new ArrayList<Runnable>(completionHandlers);
+                        }
+                        for (Runnable r : toRun) {
+                            r.run();
+                        }
+                    }
+                }
+                
+            });
+        }
+    }
+    
     private void bindPlayerCleanupOnComplete() {
         if(player == null) {
             return;
@@ -106,9 +133,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                 if(disposeOnComplete){
                     run();
                 }
-                if (onComplete != null) {
-                    Display.getInstance().callSerially(onComplete);
-                }
+                fireCompletionHandlers();
                 
             }
         });
@@ -116,6 +141,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
 
             public boolean onError(MediaPlayer arg0, int arg1, int arg2) {
                 run();
+                fireCompletionHandlers();
                 return true;
             }
         });
@@ -358,6 +384,24 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                     setVolume(10);
                 }
                 break;
+        }
+    }
+
+    public void addCompletionHandler(Runnable onCompletion) {
+        synchronized(this) {
+            if (completionHandlers == null) {
+                completionHandlers = new ArrayList<Runnable>();
+            }
+        
+            completionHandlers.add(onCompletion);
+        }
+    }
+    
+    public void removeCompletionHandler(Runnable onCompletion) {
+        if (completionHandlers != null) {
+            synchronized(this) {
+                completionHandlers.remove(onCompletion);
+            }
         }
     }
 }

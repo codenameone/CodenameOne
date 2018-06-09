@@ -28,6 +28,10 @@ package java.lang;
  */
 public abstract class Number {
     public abstract int intValue();
+    
+    public byte byteValue() {
+        return (byte)intValue();
+    }
 
     public abstract long longValue();
 

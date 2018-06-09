@@ -41,7 +41,7 @@ import com.codename1.ui.geom.Rectangle;
  * @author Shai Almog
  */
 public class RoundRectBorder extends Border {
-    private static final String CACHE_KEY = "cn1$$-rbcache";
+    private static final String CACHE_KEY = "cn1$$-rrbcache";
         
     /**
      * The color of the edge of the border if applicable
@@ -100,20 +100,12 @@ public class RoundRectBorder extends Border {
      * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
      */
     private boolean bezierCorners;
-    
-    /**
-     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
-     */
-    private boolean topOnlyMode;
-    
-    /**
-     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
-     */
-    private boolean bottomOnlyMode;
-    
+        
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;
     private final int instanceVal;
+
+    private boolean topLeft = true, topRight = true, bottomLeft = true, bottomRight = true;
     
     private RoundRectBorder() {
         shadowSpread = Display.getInstance().convertToPixels(0.2f);
@@ -194,7 +186,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowSpread(int shadowSpread) {
-        this.shadowSpread = shadowSpread;
+        this.shadowSpread = shadowSpread * 100f/Display.getInstance().convertToPixels(100f);
         return this;
     }
 
@@ -260,6 +252,50 @@ public class RoundRectBorder extends Border {
         return this;
     }
     
+
+    /**
+     * True to draw the top left corner rounded, false to draw it as a corner
+     * 
+     * @param topLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topLeftMode(boolean topLeft) {
+        this.topLeft = topLeft;
+        return this;
+    }
+    
+    /**
+     * True to draw the top right corner rounded, false to draw it as a corner
+     * 
+     * @param topRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topRightMode(boolean topRight) {
+        this.topRight = topRight;
+        return this;
+    }
+    
+    /**
+     * True to draw the bottom left corner rounded, false to draw it as a corner
+     * 
+     * @param bottomLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
+        this.bottomLeft = bottomLeft;
+        return this;
+    }
+    
+    /**
+     * True to draw the bottom right corner rounded, false to draw it as a corner
+     * 
+     * @param bottomRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomRightMode(boolean bottomRight) {
+        this.bottomRight = bottomRight;
+        return this;
+    }
     
     /**
      * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
@@ -268,7 +304,15 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
-        this.topOnlyMode = topOnlyMode;
+        if(topOnlyMode) {
+            this.topLeft = false;
+            this.topRight = false;
+            this.bottomLeft = true;
+            this.bottomRight = true;
+        } else {
+            this.topLeft = true;
+            this.topRight = true;
+        }
         return this;
     }
     
@@ -279,7 +323,15 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
-        this.bottomOnlyMode = bottomOnlyMode;
+        if(bottomOnlyMode) {
+            this.topLeft = true;
+            this.topRight = true;
+            this.bottomLeft = false;
+            this.bottomRight = false;
+        } else {
+            this.bottomLeft = true;
+            this.bottomRight = true;
+        }
         return this;
     }
     
@@ -305,7 +357,8 @@ public class RoundRectBorder extends Border {
             // draw a gradient of sort for the shadow
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
-                fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
+                int iterOpacity = Math.max(0, Math.min(255, (int)(shadowOpacity * (shadowSpreadL - iter)/(float)shadowSpreadL)));
+                drawShape(tg, 0, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
                 tg.translate(-iter, -iter);
             }
             
@@ -318,11 +371,30 @@ public class RoundRectBorder extends Border {
             }
         }
         tg.translate(shapeX, shapeY);
-        c.getStyle().setBorder(Border.createEmpty());
 
         GeneralPath gp = createShape(shapeW, shapeH);
+        Style s = c.getStyle();
+        if(s.getBgImage() == null ) {
+            byte type = s.getBackgroundType();
+            if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                byte bgt = c.getStyle().getBgTransparency();
+                if(bgt != 0) {
+                    tg.setAlpha(bgt &0xff);
+                    tg.setColor(s.getBgColor());
+                    tg.fillShape(gp);
+                }
+                if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                    tg.setAlpha(strokeOpacity);
+                    tg.setColor(strokeColor);
+                    tg.drawShape(gp, this.stroke);
+                }            
+                return target;
+            }
+        }
+        
+        c.getStyle().setBorder(Border.createEmpty());
         tg.setClip(gp);
-        c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+        s.getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
         if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
             tg.setClip(0, 0, w, h);
             tg.setAlpha(strokeOpacity);
@@ -339,30 +411,70 @@ public class RoundRectBorder extends Border {
         final int h = c.getHeight();
         int x = c.getX();
         int y = c.getY();
-        if(w > 0 && h > 0) {
-            Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-            if(background != null && background.getWidth() == w && background.getHeight() == h) {
-                g.drawImage(background, x, y);
+        boolean antiAliased = g.isAntiAliased();
+        g.setAntiAliased(true);
+        try {
+            if(shadowOpacity == 0) {
+                Style s = c.getStyle();
+                if(s.getBgImage() == null ) {
+                    byte type = s.getBackgroundType();
+                    if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                        GeneralPath gp = createShape(w, h);
+                        byte bgt = c.getStyle().getBgTransparency();
+                        if(bgt != 0) {
+                            int a = g.getAlpha();
+                            g.setAlpha(bgt &0xff);
+                            g.setColor(s.getBgColor());
+                            g.translate(x, y);
+                            g.fillShape(gp);
+                            if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                                g.setAlpha(strokeOpacity);
+                                g.setColor(strokeColor);
+                                g.drawShape(gp, this.stroke);
+                            }            
+                            g.translate(-x, -y);
+                            g.setAlpha(a);
+                        }
+                        if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                            int a = g.getAlpha();
+                            g.setAlpha(strokeOpacity);
+                            g.setColor(strokeColor);
+                            g.translate(x, y);
+                            g.drawShape(gp, this.stroke);
+                            g.translate(-x, -y);
+                            g.setAlpha(a);
+                        }      
+                        return;
+                    }
+                }        
+            }
+            if(w > 0 && h > 0) {
+                Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
+                if(background != null && background.getWidth() == w && background.getHeight() == h) {
+                    g.drawImage(background, x, y);
+                    return;
+                }
+            } else {
                 return;
             }
-        } else {
-            return;
-        }
-                
-        Image target = createTargetImage(c, w, h, true);
-        g.drawImage(target, x, y);
-        c.putClientProperty(CACHE_KEY + instanceVal, target);
 
-        // update the cache with a more refined version and repaint
-        Display.getInstance().callSeriallyOnIdle(new Runnable() {
-            public void run() {
-                if(w == c.getWidth() && h == c.getHeight()) {
-                    Image target = createTargetImage(c, w, h, false);
-                    c.putClientProperty(CACHE_KEY + instanceVal, target);
-                    c.repaint();
+            Image target = createTargetImage(c, w, h, true);
+            g.drawImage(target, x, y);
+            c.putClientProperty(CACHE_KEY + instanceVal, target);
+
+            // update the cache with a more refined version and repaint
+            Display.getInstance().callSeriallyOnIdle(new Runnable() {
+                public void run() {
+                    if(w == c.getWidth() && h == c.getHeight()) {
+                        Image target = createTargetImage(c, w, h, false);
+                        c.putClientProperty(CACHE_KEY + instanceVal, target);
+                        c.repaint();
+                    }
                 }
-            }
-        });
+            });
+        } finally {
+            g.setAntiAliased(antiAliased);
+        }
     }
     
     private GeneralPath createShape(int shapeW, int shapeH) {
@@ -388,16 +500,37 @@ public class RoundRectBorder extends Border {
                 y += 0.5f;
             }
         }            
+                        
+        if(topLeft) {
+            gp.moveTo(x + radius, y);
+        } else {
+            gp.moveTo(x, y);            
+        }
+        if(topRight) {
+            gp.lineTo(x + widthF - radius, y);            
+            gp.quadTo(x + widthF, y, x + widthF, y + radius);
+        } else {
+            gp.lineTo(x + widthF, y);
+        }
+        if(bottomRight) {
+            gp.lineTo(x + widthF, y + heightF - radius);
+            gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
+        } else {
+            gp.lineTo(x + widthF, y + heightF);
+        }
+        if(bottomLeft) {
+            gp.lineTo(x + radius, y + heightF);
+            gp.quadTo(x, y + heightF, x, y + heightF - radius);
+        } else {
+            gp.lineTo(x, y + heightF);
+        }
+        if(topLeft) {
+            gp.lineTo(x, y + radius);
+            gp.quadTo(x, y, x + radius, y);
+        } else {
+            gp.lineTo(x, y);            
+        }
         
-        gp.moveTo(x + radius, y);
-        gp.lineTo(x + widthF - radius, y);
-        gp.quadTo(x + widthF, y, x + widthF, y + radius);
-        gp.lineTo(x + widthF, y + heightF - radius);
-        gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
-        gp.lineTo(x + radius, y + heightF);
-        gp.quadTo(x, y + heightF, x, y + heightF - radius);
-        gp.lineTo(x, y + radius);
-        gp.quadTo(x, y, x + radius, y);
         gp.closePath();            
         return gp;
     }
@@ -423,6 +556,19 @@ public class RoundRectBorder extends Border {
             g.setColor(strokeColor);
             g.drawShape(gp, this.stroke);
         }            
+    }
+    
+    private Stroke stroke1;
+    
+    private void drawShape(Graphics g, int color, int opacity, int width, int height) {
+        g.setColor(color);
+        g.setAlpha(opacity);
+        GeneralPath gp = createShape(width, height);
+        if (stroke1 == null) {
+            stroke1 = new Stroke(1f, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1f);
+        }
+        g.drawShape(gp, stroke1);
+                   
     }
     
     @Override
@@ -528,7 +674,7 @@ public class RoundRectBorder extends Border {
      * @return whether this is the top only mode
      */
     public boolean isTopOnlyMode() {
-        return topOnlyMode;
+        return topLeft && topRight && (!bottomLeft) && (!bottomRight);
     }
     
     /**
@@ -537,7 +683,7 @@ public class RoundRectBorder extends Border {
      * @return whether this is the bottom only mode
      */
     public boolean isBottomOnlyMode() {
-        return bottomOnlyMode;
+        return (!topLeft) && (!topRight) && bottomLeft && bottomRight;
     }
     
     @Override
@@ -587,6 +733,38 @@ public class RoundRectBorder extends Border {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the topLeft value
+     */
+    public boolean isTopLeft() {
+        return topLeft;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the topRight value
+     */
+    public boolean isTopRight() {
+        return topRight;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the bottomLeft value
+     */
+    public boolean isBottomLeft() {
+        return bottomLeft;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the bottomRight value
+     */
+    public boolean isBottomRight() {
+        return bottomRight;
     }
     
     

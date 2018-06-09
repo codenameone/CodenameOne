@@ -100,6 +100,18 @@ public class AutoCompleteTextField extends TextField {
         popup.setScrollable(false);
         popup.setUIID("AutoCompletePopup");
         setConstraint(TextArea.NON_PREDICTIVE);
+        addCloseListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                if (popup.isVisible()) {
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    Form f = getComponentForm();
+                    if (f != null) {
+                        f.repaint();
+                    }
+                }
+            }
+        });
         
     }
 
@@ -110,7 +122,7 @@ public class AutoCompleteTextField extends TextField {
     public AutoCompleteTextField() {
         this(new DefaultListModel(new Object[]{""}));
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -163,8 +175,10 @@ public class AutoCompleteTextField extends TextField {
      */
     @Override
     public void setText(String text) {
+        String old = getText();
         super.setText(text);
-        if (text == null || (pickedText != null && pickedText.equals(text))) {
+        if (text == null || text.equals(old) || (pickedText != null && pickedText.equals(text))) {
+            pickedText = null;
             return;
         }
         pickedText = null;
@@ -181,11 +195,11 @@ public class AutoCompleteTextField extends TextField {
         Form f = getComponentForm();
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if(v != popup.isVisible()) {
-            popup.getComponentAt(0).setScrollY(0);
+            if(popup.getComponentCount() > 0) {popup.getComponentAt(0).setScrollY(0);}
             popup.setVisible(v);
             popup.setEnabled(v);
             f.repaint();
-        } 
+        }
         if(f != null) {
             dontCalcSize = false;
             f.revalidate();
@@ -215,23 +229,18 @@ public class AutoCompleteTextField extends TextField {
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(v);
                 popup.setEnabled(v);
-                Form f = getComponentForm();
-                if(f != null) {
-                    if(popup.getHeight() < f.getContentPane().getHeight()/2){
-                        int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
-                        popup.setHeight(popupHeight);
-                        dontCalcSize = false;                        
-                        popup.forceRevalidate();
-                        dontCalcSize = true;
-                        f.repaint();
-                    }                  
-                }
+            }
+            Form f = getComponentForm();
 
-                if(!v) {
-                    if(f != null) {
-                        f.repaint();
-                    }
-                }
+            if (popup.getComponentCount() > 0) {
+                int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
+                popup.setHeight(popupHeight);
+                dontCalcSize = false;                        
+                popup.forceRevalidate();
+                dontCalcSize = true;
+            }
+            if (f != null) {
+                f.repaint();
             }
         }
         return res;
@@ -338,7 +347,7 @@ public class AutoCompleteTextField extends TextField {
             public void actionPerformed(ActionEvent evt) {
                 pickedText = (String) l.getSelectedItem();
                 setParentText(pickedText);
-                
+                fireActionEvent();
                 // relaunch text editing if we are still editing
                 if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
                     Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());

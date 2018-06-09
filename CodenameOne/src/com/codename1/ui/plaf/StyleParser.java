@@ -571,6 +571,31 @@ public class StyleParser {
         }
         
         /**
+         * Sets the alignment for this style.  One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
+         * @param alignment One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
+         * @return Self for chaining.
+         */
+        public StyleInfo setAlignment(int alignment) {
+            values.put("alignment", String.valueOf(alignment));
+            return this;
+        }
+        
+        /**
+         * Sets the alignment for this style as a String.  Accepts either a string representation of the integer values for {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}.  Or the 
+         * literal strings "center", "left", or "right".  Or null to unset this property.
+         * @param alignment
+         * @return 
+         */
+        public StyleInfo setAlignment(String alignment) {
+            if (alignment == null || alignment.length() == 0) {
+                values.remove("alignment");
+            } else {
+                values.put("alignment", alignment);
+            }
+            return this;
+        }
+        
+        /**
          * Returns the alignment as a string.  "center", "left", "right", or null.
          * @return 
          */
@@ -1195,6 +1220,179 @@ public class StyleParser {
         }
         return 0;
     }
+    
+    private static float getMMValue(String val) {
+        ScalarValue v = parseSingleTRBLValue(val);
+        switch (v.getUnit()) {
+            case Style.UNIT_TYPE_PIXELS:
+                return (float)v.getValue() / Display.getInstance().convertToPixels(1f);
+            case Style.UNIT_TYPE_DIPS:
+                return (float)v.getValue();
+            case Style.UNIT_TYPE_SCREEN_PERCENTAGE :
+                return (int)Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0) / Display.getInstance().convertToPixels(1f);
+        }
+        return 0;
+    }
+    
+    private static String parseStroke(BorderInfo out, String rem) {
+        // parse the stroke
+        int p1 = rem.indexOf("(");
+        int p2 = rem.indexOf(")");
+        if (p1 != -1 && p2 != -1) {
+            String strokeStr = rem.substring(p1+1, p2).trim();
+            String[] strokeArgs = Util.split(strokeStr, " ");
+            for (String strokeArg : strokeArgs) {
+                strokeArg = strokeArg.trim();
+                if (strokeArg.endsWith("mm") || strokeArg.endsWith("px")) {
+                    ScalarValue sv = parseScalarValue(strokeArg);
+                    out.width = (float)sv.value;
+                    out.widthUnit = sv.unit;
+                } else if (strokeArg.length() > 0) {
+                    //int strokeColor = Integer.parseInt(strokeArg, 16);
+                    if (strokeArg.length() == 8) {
+                        // there is an alpha bit
+                        out.setStrokeOpacity(Integer.parseInt(strokeArg.substring(0, 2), 16) & 0xff);
+                        out.setStrokeColor(Integer.parseInt(strokeArg.substring(2), 16) & 0xffffff);
+                    } else {
+                        out.setStrokeOpacity(0xff);
+                        out.setStrokeColor(Integer.parseInt(strokeArg, 16) & 0xffffff);
+                    }
+                }
+            }
+            rem = rem.substring(p2+1);
+        } else {
+
+            rem = rem.substring(6); // at least get past stroke
+        }
+        return rem;
+    }
+    
+    private static String parseShadow(BorderInfo out, String rem) {
+        int p1 = rem.indexOf("(");
+        int p2 = rem.indexOf(")");
+        if (p1 != -1 && p2 != -1) {
+            String shadowStr = rem.substring(p1+1, p2);
+            String[] shadowArgs = Util.split(shadowStr, " ");
+            for (String shadowArg : shadowArgs) {
+                shadowArg = shadowArg.trim();
+                if (shadowArg.startsWith("shadowSpread:") || shadowArg.endsWith("mm") || shadowArg.endsWith("px")) {
+                    int colonPos = shadowArg.indexOf(":");
+                    if (colonPos != -1) {
+                        shadowArg = shadowArg.substring(colonPos+1);
+                    }
+                    out.setShadowSpread(parseScalarValue(shadowArg));
+                } else if (shadowArg.startsWith("x:")) {
+                    out.setShadowX((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                } else if (shadowArg.startsWith("y:")) {
+                    out.setShadowY((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                } else if (shadowArg.startsWith("blur:")) {
+                    out.setShadowBlur((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                } else if (shadowArg.startsWith("opacity:")) {
+                    out.setShadowOpacity((Integer) Integer.parseInt(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                }
+            }
+
+            if (out.getShadowSpread() == null) {
+                out.setShadowSpread(parseScalarValue("0.5mm"));
+            }
+            if (out.getShadowX() == null) {
+                out.setShadowX((Float) (float)0.5);
+            }
+            if (out.getShadowY() == null) {
+                out.setShadowY((Float) (float)0.5);
+            }
+            if (out.getShadowBlur() == null) {
+                out.setShadowBlur((Float) (float)0.1);
+            }
+            if (out.getShadowOpacity() == null) {
+                out.setShadowOpacity((Integer) 128);
+            }
+            rem = rem.substring(p2+1);
+        } else {
+            rem = rem.substring(6); // at least get past the shadow param
+        }
+        return rem;
+    }
+    
+    private static BorderInfo parseRoundBorder(BorderInfo out, String args, String[] parts1) {
+        int plen = parts1.length;
+        out.setType("round");
+        if (plen > 1) {
+            int nextSpacePos;
+            String rem = args;
+            while ((nextSpacePos = rem.indexOf(" ")) != -1) {
+                rem = rem.substring(nextSpacePos+1).trim();
+                if (rem.startsWith("rect")) {
+                    out.setRectangle((Boolean) true);
+                } else if (rem.startsWith("stroke")) {
+                    rem = parseStroke(out, rem);
+
+                } else if (rem.startsWith("shadow")) {
+                    rem = parseShadow(out, rem);
+                } else if (rem.length() == 8 || rem.indexOf(" ") == 8) {
+                    String colorStr = rem.substring(0, 8);
+                    out.color = Integer.parseInt(colorStr.substring(2), 16) & 0xffffff;
+                    out.setOpacity((Integer) Integer.parseInt(colorStr.substring(0, 2), 16) & 0xff);
+                    rem = rem.substring(8);
+                } else {
+                    int spacePos = rem.indexOf(" ");
+
+                    String colorStr = rem;
+                    if (spacePos != -1) {
+                        colorStr = colorStr.substring(0, spacePos);
+                    }
+                    if (colorStr.length() > 0 && colorStr.length() <= 6) {
+                        out.color = Integer.parseInt(colorStr, 16) & 0xffffff;
+                        out.setOpacity((Integer) 255);
+                    }
+                    rem = rem.substring(colorStr.length());
+
+
+                }
+            }
+        }
+        
+        return out;
+    }
+    
+    private static BorderInfo parseRoundRectBorder(BorderInfo out, String args, String[] parts1) {
+        int plen = parts1.length;
+        out.setType("roundRect");
+        if (plen > 1) {
+            int nextSpacePos;
+            String rem = args;
+            while ((nextSpacePos = rem.indexOf(" ")) != -1) {
+                rem = rem.substring(nextSpacePos+1).trim();
+                if (rem.startsWith("stroke")) {
+                    rem = parseStroke(out, rem);
+
+                } else if (rem.startsWith("shadow")) {
+                    rem = parseShadow(out, rem);
+                } else if (rem.startsWith("-") || rem.startsWith("+")) {
+                    boolean value = rem.charAt(0) == '+';
+                    String flagName = rem.substring(1);
+                    if (flagName.startsWith("top-only")) {
+                        out.setTopOnlyMode((Boolean) value);
+                    } else if (flagName.startsWith("bottom-only")) {
+                        out.setBottomOnlyMode((Boolean) value);
+                    } else if (flagName.startsWith("top-left")) {
+                        out.setTopLeftMode((Boolean) value);
+                    } else if (flagName.startsWith("top-right")) {
+                        out.setTopRightMode((Boolean) value);
+                    } else if (flagName.startsWith("bottom-left")) {
+                        out.setBottomLeftMode((Boolean) value);
+                    } else if (flagName.startsWith("bottom-right")) {
+                        out.setBottomRightMode((Boolean) value);
+                    }
+                } else if (rem.length()> 0 && Character.isDigit(rem.charAt(0))) {
+                    out.setCornerRadius(getMMValue(rem));
+                }
+            }
+        }
+        
+        return out;
+    }
+    
     static BorderInfo parseBorder(BorderInfo out, String args) {
         if (args == null) {
             out.setType("empty");
@@ -1230,114 +1428,11 @@ public class StyleParser {
         }
         
         if ("round".equals(parts1[0])) {
-            out.setType("round");
-            if (plen > 1) {
-                int nextSpacePos;
-                String rem = args;
-                while ((nextSpacePos = rem.indexOf(" ")) != -1) {
-                    rem = rem.substring(nextSpacePos+1).trim();
-                    if (rem.startsWith("rect")) {
-                        out.setRectangle((Boolean) true);
-                    } else if (rem.startsWith("stroke")) {
-                        // parse the stroke
-                        int p1 = rem.indexOf("(");
-                        int p2 = rem.indexOf(")");
-                        if (p1 != -1 && p2 != -1) {
-                            String strokeStr = rem.substring(p1+1, p2).trim();
-                            String[] strokeArgs = Util.split(strokeStr, " ");
-                            for (String strokeArg : strokeArgs) {
-                                strokeArg = strokeArg.trim();
-                                if (strokeArg.endsWith("mm") || strokeArg.endsWith("px")) {
-                                    ScalarValue sv = parseScalarValue(strokeArg);
-                                    out.width = (float)sv.value;
-                                    out.widthUnit = sv.unit;
-                                } else if (strokeArg.length() > 0) {
-                                    //int strokeColor = Integer.parseInt(strokeArg, 16);
-                                    if (strokeArg.length() == 8) {
-                                        // there is an alpha bit
-                                        out.setStrokeOpacity(Integer.parseInt(strokeArg.substring(0, 2), 16) & 0xff);
-                                        out.setStrokeColor(Integer.parseInt(strokeArg.substring(2), 16) & 0xffffff);
-                                    } else {
-                                        out.setStrokeOpacity(0xff);
-                                        out.setStrokeColor(Integer.parseInt(strokeArg, 16) & 0xffffff);
-                                    }
-                                }
-                            }
-                            rem = rem.substring(p2+1);
-                        } else {
-                            
-                            rem = rem.substring(6); // at least get past stroke
-                        }
-                        
-                        
-                    } else if (rem.startsWith("shadow")) {
-                        int p1 = rem.indexOf("(");
-                        int p2 = rem.indexOf(")");
-                        if (p1 != -1 && p2 != -1) {
-                            String shadowStr = rem.substring(p1+1, p2);
-                            String[] shadowArgs = Util.split(shadowStr, " ");
-                            for (String shadowArg : shadowArgs) {
-                                shadowArg = shadowArg.trim();
-                                if (shadowArg.startsWith("shadowSpread:") || shadowArg.endsWith("mm") || shadowArg.endsWith("px")) {
-                                    int colonPos = shadowArg.indexOf(":");
-                                    if (colonPos != -1) {
-                                        shadowArg = shadowArg.substring(colonPos+1);
-                                    }
-                                    out.setShadowSpread(parseScalarValue(shadowArg));
-                                } else if (shadowArg.startsWith("x:")) {
-                                    out.setShadowX((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
-                                } else if (shadowArg.startsWith("y:")) {
-                                    out.setShadowY((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
-                                } else if (shadowArg.startsWith("blur:")) {
-                                    out.setShadowBlur((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
-                                } else if (shadowArg.startsWith("opacity:")) {
-                                    out.setShadowOpacity((Integer) Integer.parseInt(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
-                                }
-                            }
-                            
-                            if (out.getShadowSpread() == null) {
-                                out.setShadowSpread(parseScalarValue("0.5mm"));
-                            }
-                            if (out.getShadowX() == null) {
-                                out.setShadowX((Float) (float)0.5);
-                            }
-                            if (out.getShadowY() == null) {
-                                out.setShadowY((Float) (float)0.5);
-                            }
-                            if (out.getShadowBlur() == null) {
-                                out.setShadowBlur((Float) (float)0.1);
-                            }
-                            if (out.getShadowOpacity() == null) {
-                                out.setShadowOpacity((Integer) 128);
-                            }
-                            rem = rem.substring(p2+1);
-                        } else {
-                            rem = rem.substring(6); // at least get past the shadow param
-                        }
-                    } else if (rem.length() == 8 || rem.indexOf(" ") == 8) {
-                        String colorStr = rem.substring(0, 8);
-                        out.color = Integer.parseInt(colorStr.substring(2), 16) & 0xffffff;
-                        out.setOpacity((Integer) Integer.parseInt(colorStr.substring(0, 2), 16) & 0xff);
-                        rem = rem.substring(8);
-                    } else {
-                        int spacePos = rem.indexOf(" ");
-                        
-                        String colorStr = rem;
-                        if (spacePos != -1) {
-                            colorStr = colorStr.substring(0, spacePos);
-                        }
-                        if (colorStr.length() > 0 && colorStr.length() <= 6) {
-                            out.color = Integer.parseInt(colorStr, 16) & 0xffffff;
-                            out.setOpacity((Integer) 255);
-                        }
-                        rem = rem.substring(colorStr.length());
-                        
-                    
-                    }
-                }
-            }
-            return out;
-            
+            return parseRoundBorder(out, args, parts1);
+        }
+        
+        if ("roundRect".equals(parts1[0])) {
+            return parseRoundRectBorder(out, args, parts1);
         }
         
         if (plen == 3) {
@@ -1398,7 +1493,7 @@ public class StyleParser {
      */
     public static class BorderInfo {
         
-        // Used for round border
+        // Used for round and roundrect border
         private Integer opacity;
         private Integer strokeColor;
         private Integer strokeOpacity;
@@ -1407,8 +1502,13 @@ public class StyleParser {
         private Float shadowY;
         private Float shadowBlur;
         private ScalarValue shadowSpread;
+        
+        // Used for round border
         private Boolean rectangle;
         
+        // Used for roundrect border
+        private Boolean topOnlyMode, bottomOnlyMode, topLeftMode, topRightMode, bottomLeftMode, bottomRightMode;
+        private Float cornerRadius;
         
         /**
          * The type of the border.  E.g. {@literal line}, {@literal dashed}, {@literal image}, etc..
@@ -1446,85 +1546,171 @@ public class StyleParser {
         private Integer color;
 
         /**
+         * Form "splicedImage" type
+         * @return 
+         */
+        private String splicedImageToString() {
+            return getType() + " " + getSpliceImage() + " "+BorderInfo.this.getSpliceInsets();
+        }
+        
+        /**
+         * For "image", "horizontalImage", and "verticalImage" types
+         * @return 
+         */
+        private String imageToString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(getType()).append(" ");
+            for (String img: getImages()) {
+                sb.append(img).append(" ");
+            }
+            return sb.toString().trim();
+        }
+        
+        /**
+         * Used for "line", "dashed", "dotted", and "underline" types.
+         * @return 
+         */
+        private String lineToString() {
+            int color = getColor() == null ? 0 : getColor();
+            return widthString()+" "+lineTypeString()+" "+Integer.toHexString(color);
+        }
+        
+        private void shadowToString(StringBuilder sb) {
+            sb.append("shadow(");
+            sb.append("opacity:").append(getShadowOpacity()).append(" ");
+            if (getShadowSpread() != null) {
+                sb.append("spread:").append(getShadowSpread().toString()).append(" ");
+            }
+            if (getShadowX() != null) {
+                sb.append("x:").append(round(getShadowX(), 3)).append(" ");
+            }
+            if (getShadowY() != null) {
+                sb.append("y:").append(round(getShadowY(), 3)).append(" ");
+            }
+            if (getShadowBlur() != null) {
+                sb.append("blur:").append(round(getShadowBlur(), 3)).append(" ");
+            }
+
+            sb.append(") ");
+        }
+        
+        private void strokeToString(StringBuilder sb) {
+            sb.append("stroke(");
+            if (width != null) {
+                sb.append(widthString()).append(" ");
+            }
+            int c = getStrokeColor() & 0xffffff;
+            String hex = Integer.toHexString(c);
+            while (hex.length() < 6) {
+                hex = "0" + hex;
+            }
+            if (getStrokeOpacity() != null && getStrokeOpacity() != 255) {
+                String opacityStr = Integer.toHexString(getStrokeOpacity());
+                while (opacityStr.length() < 2) {
+                    opacityStr = "0"+opacityStr;
+                }
+                hex = opacityStr + hex;
+            }
+            sb.append(hex).append(") ");
+        }
+        
+        private void colorToString(StringBuilder sb) {
+            String hex = Integer.toHexString(color & 0xffffff);
+            while (hex.length() < 6) hex = "0" + hex;
+
+            if (getOpacity() != null) {
+                String opacityStr = Integer.toHexString(getOpacity() & 0xff);
+                while (opacityStr.length() < 2) opacityStr = "0" + opacityStr;
+                hex = opacityStr + hex;
+            }
+            sb.append(hex).append(" ");
+        }
+        
+        /**
+         * Used for "round" type
+         * @return 
+         */
+        private String roundToString() {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("round ");
+            if (color != null) {
+                colorToString(sb);
+            }
+            if (getShadowOpacity() != null && getShadowOpacity() != 0) {
+                shadowToString(sb);
+            }
+            if (width != null && width != 0 && getStrokeColor() != null) {
+                strokeToString(sb);
+
+            }
+            if (getRectangle() != null && getRectangle()) {
+                sb.append("rect").append(" ");
+            }
+
+            return sb.toString().trim();
+        }
+        
+        private String roundRectToString() {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("roundRect ");
+            if (color != null) {
+                colorToString(sb);
+            }
+            if (getShadowOpacity() != null && getShadowOpacity() != 0) {
+                shadowToString(sb);
+            }
+            if (width != null && width != 0 && getStrokeColor() != null) {
+                strokeToString(sb);
+
+            }
+            if (getTopLeftMode() != null) {
+                String prefix = getTopLeftMode() ? "+" : "-";
+                sb.append(prefix).append("top-left ");
+            }
+            if (getTopRightMode() != null) {
+                String prefix = getTopRightMode() ? "+" : "-";
+                sb.append(prefix).append("top-right ");
+            }
+            if (getBottomLeftMode() != null) {
+                String prefix = getBottomLeftMode() ? "+" : "-";
+                sb.append(prefix).append("bottom-left ");
+            }
+            if (getBottomRightMode() != null) {
+                String prefix = getBottomRightMode() ? "+" : "-";
+                sb.append(prefix).append("bottom-right ");
+            }
+            if (getTopOnlyMode() != null) {
+                String prefix = getTopOnlyMode() ? "+" : "-";
+                sb.append(prefix).append("top-only ");
+            }
+            if (getBottomOnlyMode() != null) {
+                String prefix = getBottomOnlyMode() ? "+" : "-";
+                sb.append(prefix).append("bottom-only ");
+            }
+            if (cornerRadius != null) {
+                sb.append(round(cornerRadius, 2)).append("mm");
+            }
+            return sb.toString().trim();
+        }
+        
+        /**
          * Returns the border as a style string value.  This value is formatted in a way that can be parsed by the StyleParser.
          * @return 
          */
         @Override
         public String toString() {
             if ("splicedImage".equals(getType())) {
-                return getType() + " " + getSpliceImage() + " "+BorderInfo.this.getSpliceInsets();
+                return splicedImageToString();
             } else if ("image".equals(getType()) || "horizontalImage".equals(getType()) || "verticalImage".equals(getType())) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(getType()).append(" ");
-                for (String img: getImages()) {
-                    sb.append(img).append(" ");
-                }
-                return sb.toString().trim();
+                return imageToString();
             } else if ("line".equals(getType()) || "dashed".equals(getType()) || "dotted".equals(getType()) || "underline".equals(getType())) {
-                int color = getColor() == null ? 0 : getColor();
-                
-                return widthString()+" "+lineTypeString()+" "+Integer.toHexString(color);
+                return lineToString();
             } else if ("round".equals(getType())) {
-                StringBuilder sb = new StringBuilder();
-                
-                sb.append("round ");
-                if (color != null) {
-                    String hex = Integer.toHexString(color & 0xffffff);
-                    while (hex.length() < 6) hex = "0" + hex;
-                    
-                    if (getOpacity() != null) {
-                        String opacityStr = Integer.toHexString(getOpacity() & 0xff);
-                        while (opacityStr.length() < 2) opacityStr = "0" + opacityStr;
-                        hex = opacityStr + hex;
-                    }
-                    sb.append(hex).append(" ");
-                }
-                if (getShadowOpacity() != null && getShadowOpacity() != 0) {
-                    sb.append("shadow(");
-                    sb.append("opacity:").append(getShadowOpacity()).append(" ");
-                    if (getShadowSpread() != null) {
-                        sb.append("spread:").append(getShadowSpread().toString()).append(" ");
-                    }
-                    if (getShadowX() != null) {
-                        sb.append("x:").append(round(getShadowX(), 3)).append(" ");
-                    }
-                    if (getShadowY() != null) {
-                        sb.append("y:").append(round(getShadowY(), 3)).append(" ");
-                    }
-                    if (getShadowBlur() != null) {
-                        sb.append("blur:").append(round(getShadowBlur(), 3)).append(" ");
-                    }
-                    
-                    sb.append(") ");
-                    
-                }
-                if (width != null && width != 0 && getStrokeColor() != null) {
-                    sb.append("stroke(");
-                    if (width != null) {
-                        sb.append(widthString()).append(" ");
-                    }
-                    int c = getStrokeColor() & 0xffffff;
-                    String hex = Integer.toHexString(c);
-                    while (hex.length() < 6) {
-                        hex = "0" + hex;
-                    }
-                    if (getStrokeOpacity() != null && getStrokeOpacity() != 255) {
-                        String opacityStr = Integer.toHexString(getStrokeOpacity());
-                        while (opacityStr.length() < 2) {
-                            opacityStr = "0"+opacityStr;
-                        }
-                        hex = opacityStr + hex;
-                    }
-                    sb.append(hex).append(") ");
-
-                }
-                if (getRectangle() != null && getRectangle()) {
-                    sb.append("rect").append(" ");
-                }
-                
-                return sb.toString().trim();
-                
-                        
+                return roundToString();
+            } else if ("roundRect".equals(getType())) {
+                return roundRectToString();
             } else {
                 return "none";
             }
@@ -1566,6 +1752,177 @@ public class StyleParser {
             return getType();
         }
         
+        private Border createLineBorder() {
+            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                return Border.createLineBorder((float)getWidth(), getColor());
+            } else {
+                return Border.createLineBorder(getWidth().intValue(), getColor());
+            }
+        }
+        
+        private Border createDashedBorder() {
+            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                return Border.createDashedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else {
+                return Border.createDashedBorder(getWidth().intValue(), getColor());
+            }
+        }
+        
+        private Border createDottedBorder() {
+            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                return Border.createDottedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else {
+                return Border.createDottedBorder(getWidth().intValue(), getColor());
+            }
+        }
+        
+        private Border createUnderlineBorder() {
+            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                return Border.createUnderlineBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else {
+                return Border.createUnderlineBorder(getWidth().intValue(), getColor());
+            }
+        }
+        
+        private Border createImageBorder(Resources theme) {
+            int ilen = getImages().length;
+            if (ilen == 9) {
+                return Border.createImageBorder(getImage(theme, getImages()[0]), 
+                        getImage(theme, getImages()[1]), 
+                        getImage(theme, getImages()[2]), 
+                        getImage(theme, getImages()[3]), 
+                        getImage(theme, getImages()[4]), 
+                        getImage(theme, getImages()[5]), 
+                        getImage(theme, getImages()[6]), 
+                        getImage(theme, getImages()[7]), 
+                        getImage(theme, getImages()[8])
+                );
+            }
+            if (ilen == 3) {
+                return Border.createImageBorder(getImage(theme, getImages()[0]), 
+                        getImage(theme, getImages()[1]), 
+                        getImage(theme, getImages()[2])
+                );
+            }
+            return Border.createEmpty();
+        }
+        
+        private Border createHorizontalImageBorder(Resources theme) {
+            return Border.createHorizonalImageBorder(getImage(theme, getImages()[0]), 
+                    getImage(theme, getImages()[1]), 
+                    getImage(theme, getImages()[2])
+            );
+        }
+        
+        private Border createVerticalImageBorder(Resources theme) {
+            return Border.createVerticalImageBorder(getImage(theme, getImages()[0]), 
+                    getImage(theme, getImages()[1]), 
+                    getImage(theme, getImages()[2])
+            );
+        }
+        
+        private Border createSplicedImageBorder(Resources theme) {
+            double[] insets = getSpliceInsets(new double[4]);
+            return Border.createImageSplicedBorder(getImage(theme, getSpliceImage()), insets[Component.TOP], insets[Component.RIGHT], insets[Component.BOTTOM], insets[Component.LEFT]);
+
+        }
+        
+        private Border createRoundBorder() {
+            RoundBorder b = RoundBorder.create();
+            if (width != null) {
+                b.stroke(getWidthInPixels(), false);
+            }
+            if (getOpacity() != null) {
+                b.opacity(getOpacity());
+            }
+            if (getStrokeColor() != null) {
+                b.strokeColor(getStrokeColor());
+            }
+            if (getStrokeOpacity() != null) {
+                b.strokeOpacity(getStrokeOpacity());
+            }
+            if (getShadowOpacity() != null) {
+                b.shadowOpacity(getShadowOpacity());
+            }
+            if (getShadowSpread() != null) {
+                b.shadowSpread(getShadowSpread().getPixelValue(), false);
+            }
+            if (getShadowX() != null) {
+                b.shadowX(getShadowX());
+            }
+            if (getShadowY() != null) {
+                b.shadowY(getShadowY());
+            }
+            if (getShadowBlur() != null) {
+                b.shadowBlur(getShadowBlur());
+            }
+            if (getRectangle() != null && getRectangle()) {
+                b.rectangle(getRectangle());
+            }
+            if (color != null) {
+                b.color(color);
+            }
+            return b;
+        }
+        
+        private Border createRoundRectBorder() {
+            RoundRectBorder b = RoundRectBorder.create();
+            if (width != null) {
+                
+                b.stroke(getWidthInPixels(), false);
+            }
+            if (getStrokeColor() != null) {
+                b.strokeColor(getStrokeColor());
+            }
+            if (getStrokeOpacity() != null) {
+                b.strokeOpacity(getStrokeOpacity());
+            }
+            if (getShadowOpacity() != null) {
+                b.shadowOpacity(getShadowOpacity());
+            }
+            if (getShadowSpread() != null) {
+                ScalarValue sv = getShadowSpread();
+                switch (sv.unit) {
+                    case Style.UNIT_TYPE_PIXELS:
+                        b.shadowSpread(sv.getPixelValue());
+                        break;
+                    case Style.UNIT_TYPE_DIPS:
+                        b.shadowSpread((float)sv.getValue());
+                }
+            }
+            if (getShadowX() != null) {
+                b.shadowX(getShadowX());
+            }
+            if (getShadowY() != null) {
+                b.shadowY(getShadowY());
+            }
+            if (getShadowBlur() != null) {
+                b.shadowBlur(getShadowBlur());
+            }
+            if (getTopOnlyMode() != null) {
+                b.topOnlyMode(getTopOnlyMode());
+            }
+            if (getBottomOnlyMode() != null) {
+                b.bottomOnlyMode(getBottomOnlyMode());
+            }
+            if (getTopLeftMode() != null) {
+                b.topLeftMode(getTopLeftMode());
+            }
+            if (getTopRightMode() != null) {
+                b.topRightMode(getTopRightMode());
+            }
+            if (getBottomLeftMode() != null) {
+                b.bottomLeftMode(getBottomLeftMode());
+            }
+            if (getBottomRightMode() != null) {
+                b.bottomRightMode(getBottomRightMode());
+            }
+            if (cornerRadius != null) {
+                b.cornerRadius(cornerRadius);
+            }
+            return b;
+        }
+        
         /**
          * Creates the border that is described by this border info.
          * @param theme Theme resource file used to load images that are referenced.
@@ -1576,113 +1933,34 @@ public class StyleParser {
                 return Border.createEmpty();
             }
             if ("line".equals(getType())) {
-                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
-                    return Border.createLineBorder((float)getWidth(), getColor());
-                } else {
-                    return Border.createLineBorder(getWidth().intValue(), getColor());
-                }
+                return createLineBorder();
             }
             if ("dashed".equals(getType())) {
-                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
-                    return Border.createDashedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
-                } else {
-                    return Border.createDashedBorder(getWidth().intValue(), getColor());
-                }
+                return createDashedBorder();
             }
             if ("dotted".equals(getType())) {
-                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
-                    return Border.createDottedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
-                } else {
-                    return Border.createDottedBorder(getWidth().intValue(), getColor());
-                }
+                return createDottedBorder();
             }
             if ("underline".equals(getType())) {
-                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
-                    return Border.createUnderlineBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
-                } else {
-                    return Border.createUnderlineBorder(getWidth().intValue(), getColor());
-                }
+                return createUnderlineBorder();
             }
             if ("image".equals(getType())) {
-                int ilen = getImages().length;
-                if (ilen == 9) {
-                    return Border.createImageBorder(getImage(theme, getImages()[0]), 
-                            getImage(theme, getImages()[1]), 
-                            getImage(theme, getImages()[2]), 
-                            getImage(theme, getImages()[3]), 
-                            getImage(theme, getImages()[4]), 
-                            getImage(theme, getImages()[5]), 
-                            getImage(theme, getImages()[6]), 
-                            getImage(theme, getImages()[7]), 
-                            getImage(theme, getImages()[8])
-                    );
-                }
-                if (ilen == 3) {
-                    return Border.createImageBorder(getImage(theme, getImages()[0]), 
-                            getImage(theme, getImages()[1]), 
-                            getImage(theme, getImages()[2])
-                    );
-                }
-                
-                
+                return createImageBorder(theme);
             }
-            
             if ("horizontalImage".equals(getType())) {
-                return Border.createHorizonalImageBorder(getImage(theme, getImages()[0]), 
-                        getImage(theme, getImages()[1]), 
-                        getImage(theme, getImages()[2])
-                );
+                return createHorizontalImageBorder(theme);
             }
-            
             if ("verticalImage".equals(getType())) {
-                return Border.createVerticalImageBorder(getImage(theme, getImages()[0]), 
-                        getImage(theme, getImages()[1]), 
-                        getImage(theme, getImages()[2])
-                );
+                return createVerticalImageBorder(theme);
             }
-            
             if ("splicedImage".equals(getType())) {
-                double[] insets = getSpliceInsets(new double[4]);
-                return Border.createImageSplicedBorder(getImage(theme, getSpliceImage()), insets[Component.TOP], insets[Component.RIGHT], insets[Component.BOTTOM], insets[Component.LEFT]);
+                return createSplicedImageBorder(theme);
             }
-            
             if ("round".equals(getType())) {
-                RoundBorder b = RoundBorder.create();
-                if (width != null) {
-                    b.stroke(getWidthInPixels(), false);
-                }
-                if (getOpacity() != null) {
-                    b.opacity(getOpacity());
-                }
-                if (getStrokeColor() != null) {
-                    b.strokeColor(getStrokeColor());
-                }
-                if (getStrokeOpacity() != null) {
-                    b.strokeOpacity(getStrokeOpacity());
-                }
-                if (getShadowOpacity() != null) {
-                    b.shadowOpacity(getShadowOpacity());
-                }
-                if (getShadowSpread() != null) {
-                    b.shadowSpread(getShadowSpread().getPixelValue(), false);
-                }
-                if (getShadowX() != null) {
-                    b.shadowX(getShadowX());
-                }
-                if (getShadowY() != null) {
-                    b.shadowY(getShadowY());
-                }
-                if (getShadowBlur() != null) {
-                    b.shadowBlur(getShadowBlur());
-                }
-                if (getRectangle() != null && getRectangle()) {
-                    b.rectangle(getRectangle());
-                }
-                if (color != null) {
-                    b.color(color);
-                }
-                return b;
-                        
+                return createRoundBorder();  
+            }
+            if ("roundRect".equals(getType())) {
+                return createRoundRectBorder();
             }
             return Border.createEmpty();
              
@@ -2046,7 +2324,163 @@ public class StyleParser {
         public void setRectangle(Boolean rectangle) {
             this.rectangle = rectangle;
         }
+
+        /**
+         * Used only for roundRect border.  The value to set for {@link RoundRectBorder#topOnlyMode(boolean) }.  Returns {@literal null}
+         * if this flag isn't set at all.
+         * @return the topOnlyMode 
+         */
+        public Boolean getTopOnlyMode() {
+            return topOnlyMode;
+        }
+
+        /**
+         * 
+         * Used only for roundRect border.  The value to set for {@link RoundRectBorder#topOnlyMode(boolean) }.  Set to {@literal null} to
+         * not set this flag at all.
+         *
+         * @param topOnlyMode the topOnlyMode to set
+         */
+        public void setTopOnlyMode(Boolean topOnlyMode) {
+            this.topOnlyMode = topOnlyMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomOnlyMode(boolean) }.  Returns {@literal null} if 
+         * this property is ignored.
+         * @return the bottomOnlyMode
+         */
+        public Boolean getBottomOnlyMode() {
+            return bottomOnlyMode;
+        }
+
+        /**
+         * Used for roundRect border. The value to set for {@link RoundRectBorder#bottomOnlyMode(boolean) }.  Set to {@literal null} to 
+         * ignore this property.
+         * @param bottomOnlyMode the bottomOnlyMode to set
+         */
+        public void setBottomOnlyMode(Boolean bottomOnlyMode) {
+            this.bottomOnlyMode = bottomOnlyMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topLeftMode(boolean) }.  Returns {@literal null} if 
+         * this property is ignored.
+         * @return the topLeftMode
+         */
+        public Boolean getTopLeftMode() {
+            return topLeftMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topLeftMode(boolean) }.  Set {@literal null} to ignore
+         * property.
+         * @param topLeftMode the topLeftMode to set
+         */
+        public void setTopLeftMode(Boolean topLeftMode) {
+            this.topLeftMode = topLeftMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topRightMode(boolean)}.  Returns {@literal null} if
+         * property is ignored.
+         * @return the topRightMode
+         */
+        public Boolean getTopRightMode() {
+            return topRightMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topRightMode(boolean) }.  Sets {@literal null} to ignore
+         * property.
+         * @param topRightMode the topRightMode to set
+         */
+        public void setTopRightMode(Boolean topRightMode) {
+            this.topRightMode = topRightMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomLeftMode(boolean) }.  Returns {@literal null} if
+         * property is ignored.
+         * @return the bottomLeftMode
+         */
+        public Boolean getBottomLeftMode() {
+            return bottomLeftMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomLeftMode(boolean) }.  Set {@literal null} to ignore
+         * property.
+         * @param bottomLeftMode the bottomLeftMode to set
+         */
+        public void setBottomLeftMode(Boolean bottomLeftMode) {
+            this.bottomLeftMode = bottomLeftMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomRightMode(boolean) }.  Returns {@literal null}
+         * if property is ignored.
+         * @return the bottomRightMode
+         */
+        public Boolean getBottomRightMode() {
+            return bottomRightMode;
+        }
+
+        /**
+         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomRightMode(boolean) }.  Set {@literal null} to ignore
+         * property.
+         * @param bottomRightMode the bottomRightMode to set
+         */
+        public void setBottomRightMode(Boolean bottomRightMode) {
+            this.bottomRightMode = bottomRightMode;
+        }
+
+        /**
+         * Used for roundRect border.  The corner radius.
+         * @return the cornerRadius
+         * @see RoundRectBorder#cornerRadius(float) 
+         */
+        public Float getCornerRadius() {
+            return cornerRadius;
+        }
+
+        /**
+         * Used for roundRect border.  Sets the corner radius.
+         * @param cornerRadius the cornerRadius to set
+         * @see RoundRectBorder#cornerRadius(float) 
+         */
+        public void setCornerRadius(Float cornerRadius) {
+            this.cornerRadius = cornerRadius;
+        }
         
+        /**
+         * Used for roundRect border.  Sets the corner radius as a scalar value.  E.g. "2mm" or "2px'
+         * @param cornerRadius the cornerRadius to set
+         * @see RoundRectBorder#cornerRadius(float) 
+         * @see #setCornerRadius(java.lang.Float) 
+         * @see #setCornerRadius(com.codename1.ui.plaf.StyleParser.ScalarValue) 
+         * @see RoundRectBorder#cornerRadius(float) 
+         */
+        public void setCornerRadius(String cornerRadius) {
+            setCornerRadius(getMMValue(cornerRadius));
+        }
+        
+        /**
+         * Used for roundRect border.  Sets the corner radius
+         * @param sv The corner radius to set.
+         * @see #setCornerRadius(java.lang.Float) 
+         * @see #setCornerRadius(java.lang.String) 
+         * @see RoundRectBorder#cornerRadius(float) 
+         */
+        public void setCornerRadius(ScalarValue sv) {
+            switch (sv.getUnit()) {
+                case Style.UNIT_TYPE_DIPS:
+                    setCornerRadius((float)sv.getValue());
+                    break;
+                default:
+                    setCornerRadius(sv.getPixelValue() / (float)Display.getInstance().convertToPixels(1f));
+            }
+        }
     }
     
     /**

@@ -100,6 +100,8 @@ import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
+import java.util.Collections;
 
 
 /**
@@ -331,9 +333,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         repaintTextEditor(false);
     }
 
+    private boolean pendingEditingText;
     @Override
     public boolean isEditingText(Component c) {
         if(textEditorHidden) {
+            return false;
+        }
+        if (pendingEditingText) {
             return false;
         }
         //return c == currentEditing;
@@ -346,12 +352,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             return false;
         }*/
         //return currentEditing != null;
+        
         return super.isEditingText();
     }
 
     @Override
-    public void stopTextEditing() {    
-        foldKeyboard();
+    public void stopTextEditing() {  
+        if (isAsyncEditMode()) {
+            foldKeyboard();
+        } else {
+            if (currentEditing != null) {
+                editingUpdate(currentEditing.getText(), currentEditing.getCursorPosition(), true);
+            }
+        }
     }
     
     public static void foldKeyboard() {
@@ -570,6 +583,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         //  We do this because the nativeInstance.isAsyncEditMode() value changes
         // to reflect the currently edited field so it isn't a good way to keep a
         // system default.
+        pendingEditingText = false;
         String defaultAsyncEditingSetting = Display.getInstance().getProperty("ios.VKBAlwaysOpen", null);
         if (defaultAsyncEditingSetting == null) {
             defaultAsyncEditingSetting = nativeInstance.isAsyncEditMode() ? "true" : "false";
@@ -592,13 +606,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
+                        pendingEditingText = true;
                         Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                     }
                 });
                 return;
             }
             
-           if(!cmp.hasFocus()) {
+           if(cmp.isFocusable() && !cmp.hasFocus()) {
                 doNotHideTextEditorSemaphore++;
                 try {
                     cmp.requestFocus();
@@ -614,6 +629,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
+                            pendingEditingText = true;
                             Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                         }
                     });
@@ -656,7 +672,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // async editing viable.  We start with half-way down the screen.
                 int keyboardClippingThresholdY = Display.getInstance().getDisplayWidth() / 2;
                 while(p != null) {
-                    if(p.isScrollableY()  && p.getAbsoluteY() < keyboardClippingThresholdY) {
+                    if(Accessor.scrollableYFlag(p)  && p.getAbsoluteY() < keyboardClippingThresholdY) {
                         break;
                     }
                     p = p.getParent();
@@ -723,6 +739,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            
+            if (current != null) {
+                Component nextComponent = current.getNextComponent(cmp);
+                TextEditUtil.setNextEditComponent(nextComponent);
+            }
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -765,6 +786,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         textEditorHidden = false;
                     }
                     boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                    if(showToolbar && Display.getInstance().getProperty("iosHideToolbar", "false").equalsIgnoreCase("true")) {
+                        showToolbar = false;
+                    }
                     if ( currentEditing != null ){
                         nativeInstance.editStringAt(x,
                                 y,
@@ -1470,7 +1494,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
-        ((Matrix)nativeTransform).transformCoord(in, out);
+        ((Matrix)nativeTransform).transformPoints(Math.min(3, in.length), in, 0, out, 0, 1);
     }
 
     @Override
@@ -1530,6 +1554,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
     }
+
+    @Override
+    public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        if(ng.alpha == 0) {
+            return;
+        }
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.fillPolygon(ng.color, ng.alpha, xPoints, yPoints, nPoints);
+    }
+    
+    
     
     public void clearRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
@@ -2742,6 +2780,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public LocationManager getLocationManager() {
+        if (!nativeInstance.checkLocationUsage()) {
+            throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
+        }
         if(lm == null) {
             lm = new Loc();
         }
@@ -2776,6 +2817,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public void captureAudio(ActionListener response) {
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         dropEvents = false;
         String p = FileSystemStorage.getInstance().getAppHomePath();
         if(!p.endsWith("/")) {
@@ -2818,6 +2862,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting image
      */
     public void capturePhoto(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
@@ -2831,6 +2878,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
         return new Media() {
             private boolean playing;
@@ -2938,6 +2988,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
@@ -2951,6 +3004,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openGallery(ActionListener response, int type) {
+        if (!nativeInstance.checkPhotoLibraryUsage()) {
+            throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
@@ -3034,6 +3090,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             cb.nsObserverPeer = nsObserverPeer;
         }
     }
+    // To prevent media from being GC'd before they are finished playing
+    // https://github.com/codenameone/CodenameOne/issues/2380
+    private List<IOSMedia> activeMedia;
     
     class IOSMedia implements Media {
         private String uri;
@@ -3047,11 +3106,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         private long moviePlayerPeer;
         private boolean fullScreen;
         private boolean embedNativeControls=true;
+        private List<Runnable> completionHandlers;
+        
         
         
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
             this.isVideo = isVideo;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    unmarkActive();
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);
             if(!isVideo) {
                 moviePlayerPeer = nativeInstance.createAudio(uri, onCompletion);
@@ -3061,6 +3134,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
             this.stream = stream;
             this.mimeType = mimeType;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    unmarkActive();
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);            
             isVideo = mimeType.indexOf("video") > -1;
             if(!isVideo) {
@@ -3071,8 +3156,58 @@ public class IOSImplementation extends CodenameOneImplementation {
                     ex.printStackTrace();
                 }
             }
+            
+        }
+        
+        private void markActive() {
+            if (activeMedia == null) {
+                activeMedia = Collections.synchronizedList(new ArrayList<IOSMedia>());
+            }
+            // Prevent premature GC
+            // https://github.com/codenameone/CodenameOne/issues/2380
+            activeMedia.add(this);
+        }
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            List<Runnable>  toRun;
+
+                            synchronized(IOSMedia.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+
+                });
+            }
         }
 
+        public void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+
+                completionHandlers.add(onCompletion);
+            }
+        }
+
+        public void removeCompletionHandler(Runnable onCompletion) {
+            if (completionHandlers != null) {
+                synchronized(this) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
+        
         @Override
         public void play() {
             if(isVideo) {
@@ -3105,8 +3240,15 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 nativeInstance.playAudio(moviePlayerPeer);                
             }
+            markActive();
         }
 
+        private void unmarkActive() {
+            if (activeMedia != null && activeMedia.contains(this)) {
+                activeMedia.remove(this);
+            }
+        }
+        
         @Override
         public void pause() {
             if(moviePlayerPeer != 0) {
@@ -3116,6 +3258,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.pauseAudio(moviePlayerPeer);
                 }
             }
+            unmarkActive();
         }
 
         public void prepare() {
@@ -3136,7 +3279,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.releasePeer(moviePlayerPeer);
                     moviePlayerPeer = 0;
                 }
+                unmarkActive();
             }
+            
         }
         
         protected void finalize() {
@@ -3212,6 +3357,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         byte[] data = toByteArray(stream);
                         Util.cleanup(stream);
                         moviePlayerPeer = nativeInstance.createVideoComponent(data, onCompletionCallbackId);
+                        nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                         component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                     } catch (IOException ex) {
                         ex.printStackTrace();
@@ -3296,6 +3442,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new IOSMedia(uri, isVideo, onCompletion);
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
 
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return new IOSMedia(stream, mimeType, onCompletion);
@@ -4257,6 +4421,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.clearRectMutable(x, y, width, height);
         }
 
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            
+            // With mutable contexts the performance should be similar between
+            // drawing a shape and drawing a polygon, so let's just use
+            // the more generate fillShape code.
+            GeneralPath path = GeneralPath.createFromPool();
+            try {
+                for (int i=0; i<nPoints; i++) {
+                    if (i==0) {
+                        path.moveTo(xPoints[0], yPoints[0]);
+                    } else {
+                        path.lineTo(xPoints[i], yPoints[i]);
+                    }
+                }
+                path.closePath();
+                this.nativeFillShape(path);
+            } finally {
+                GeneralPath.recycle(path);
+            }
+        }
+
         
     }
 
@@ -4272,6 +4457,30 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Currently global graphics doesn't support antialiasing.
             return false;
         }
+
+        @Override
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            if (GeneralPath.isConvexPolygon(xPoints, yPoints)) {
+                nativeInstance.fillPolygonGlobal(color, alpha, xPoints, yPoints, nPoints);
+            } else {
+                GeneralPath path = GeneralPath.createFromPool();
+                try {
+                    for (int i=0; i<nPoints; i++) {
+                        if (i==0) {
+                            path.moveTo(xPoints[0], yPoints[0]);
+                        } else {
+                            path.lineTo(xPoints[i], yPoints[i]);
+                        }
+                    }
+                    path.closePath();
+                    this.nativeFillShape(path);
+                } finally {
+                    GeneralPath.recycle(path);
+                }
+            }
+        }
+        
+        
         
         @Override
         boolean isAntiAliasingSupported() {
@@ -4378,6 +4587,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingGlobal(x, y, width, height, firstClip);
         }
         
+        @Override
         void setNativeClipping(ClipShape clip){
             if (clip.isRect()) {
                 clip.getBounds(reusableRect);
@@ -4843,6 +5053,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int getDeviceDensity() {
+        // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
+        // to the getDeviceDensity() method in the Shooter project or the iOS screenshots
+        // will produce slightly different results than the actual device.
+        
         if(dDensity == -1) {
             if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
                 dDensity = super.getDeviceDensity();
@@ -4864,7 +5078,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 int largest = Math.max(dispWidth, getDisplayHeight());
                 if(largest > 2000) {
-                    dDensity = Display.DENSITY_HD;
+                    dDensity = Display.DENSITY_560;
                     return dDensity;
                 }
                 dDensity = Display.DENSITY_VERY_HIGH;
@@ -4878,6 +5092,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
+        // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
+        // to the convertToPixels() method in the Shooter project or the iOS screenshots
+        // will produce slightly different results than the actual device.
+        
         // ipad mini is ignored, there is no sensible way to detect it
         if(ppi == 0) {
             int dispWidth = getDisplayWidth();
@@ -4892,15 +5110,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                     ppi = 6.4173236936575;
                 } else {
                     int largest = Math.max(dispWidth, getDisplayHeight());
-                    if(largest > 2000) {
-                        // iphone 6 plus
-                        ppi = 19.25429416;                    
+                    if (largest == 2436) {
+                        // iphone X
+                        ppi = 18.031496062992126;
                     } else {
-                        if(largest > 1300) {
-                            // iphone 6
-                            ppi = 12.8369704749679;                    
+                        if(largest > 2000) {
+                            // iphone 6 plus
+                            ppi = 19.25429416;                    
                         } else {
-                            ppi = 12.8369704749679;                    
+                            if(largest > 1300) {
+                                // iphone 6
+                                ppi = 12.8369704749679;                    
+                            } else {
+                                ppi = 12.8369704749679;                    
+                            }
                         }
                     }
                 }
@@ -4908,9 +5131,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return (int)Math.round((((float)dipCount) * ppi));
     }
-
+    
+    
+    @Override
+    public Object getPasteDataFromClipboard() {
+        String s = nativeInstance.getClipboardString();
+        if(s != null) {
+            return s;
+        }
+        return super.getPasteDataFromClipboard();
+    }
+    
     @Override
     public void copyToClipboard(Object obj) {
+        if(obj instanceof String) {
+            nativeInstance.setClipboardString((String)obj);
+            super.copyToClipboard(obj);
+            return;
+        }
+        nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
     }
 
@@ -5130,6 +5369,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         if(nativeInstance.canExecute(url)) {
             return Boolean.TRUE;
         }
@@ -5138,6 +5380,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         nativeInstance.execute(url);
     }
 
@@ -5209,12 +5454,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public int getKeyboardType() {
         return Display.KEYBOARD_TYPE_VIRTUAL;
-    }
-
-    @Override
-    public Object getPasteDataFromClipboard() {
-        // TODO
-        return super.getPasteDataFromClipboard();
     }
 
     /**
@@ -5484,17 +5723,26 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
     }
 
     @Override
     public boolean deleteContact(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.deleteContact(Integer.parseInt(id));
     }
     
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
         int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
@@ -5507,11 +5755,17 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void refreshContacts() {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         nativeInstance.refreshContacts();
     }
 
     @Override
     public String[] getLinkedContactIds(Contact c) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(c.getId());
         int num = nativeInstance.countLinkedContacts(recId);
         String[] out = new String[num];
@@ -5530,6 +5784,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId(id);
@@ -5548,6 +5805,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Contact getContactById(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return getContactById(id, true, true, true, true, true);
         
         /*c.setId("" + id);
@@ -5781,6 +6041,29 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isURLWithCustomHeadersSupported() {
+        return true;
+    }        
+    
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        url = unfile(url);
+        if(url.startsWith("jar://")) {
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            url = "file://localhost" + str + url.substring(6);
+        } 
+        
+        String[] keys = new String[headers.size()];
+        headers.keySet().toArray(keys);
+        String[] values = new String[keys.length];
+        for(int iter = 0 ; iter < keys.length ; iter++) {
+            values[iter] = headers.get(keys[iter]);
+        }
+        
+        nativeInstance.setBrowserURL(get(browserPeer), url, keys, values);
+    }
+
+    @Override
     public void setBuiltinSoundsEnabled(boolean enabled) {
         // TODO
         super.setBuiltinSoundsEnabled(enabled);
@@ -5866,7 +6149,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(lightweightMode != l) {
                     lightweightMode = l;
                     nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
-                    getComponentForm().repaint();
+                    // fix for https://groups.google.com/d/msg/codenameone-discussions/LKxy16PhYEY/bvusdq-ICwAJ
+                    Form f = getComponentForm();
+                    if(f != null) {
+                        f.repaint();
+                    }
                 }
             }
         }
@@ -5918,14 +6205,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
     
-    public static void appendData(long peer, byte[] data) {
+    public static void appendData(long peer, long data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
             n = instance.connections.get(peer);
         }
         if(n != null) {
             synchronized(n.LOCK) {
-                n.appendData(data);
+                nativeInstance.appendData(peer, data);
                 n.connected = true;
                 n.LOCK.notifyAll();
             }
@@ -6095,8 +6382,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static class NetworkConnection extends InputStream {
         private long peer;
+        private boolean closed;
         private FileBackedOutputStream body;
-        private Vector pendingData = new Vector();
+        //private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
         private String[] sslCertificates;
@@ -6171,6 +6459,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         
+        /*
         public void appendData(byte[] data) {
             boolean w = false;
             synchronized(LOCK) {
@@ -6188,16 +6477,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 System.gc();
             }
         }
+        */
+        
+        private int shiftByte() {
+            return nativeInstance.shiftByte(peer);
+        }
         
         @Override
         public int read() throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
@@ -6205,21 +6499,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(error != null) {
                             throw new IOException(error);
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                int val = chunk[0] & 0xff;
-                if(chunk.length == 1) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - 1];
-                    System.arraycopy(chunk, 1, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                int val = shiftByte() & 0xff;
+                //if(chunk.length == 1) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - 1];
+                //    System.arraycopy(chunk, 1, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
@@ -6232,6 +6526,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(error != null) {
                 throw new IOException(error);
             }
+            return nativeInstance.available(peer);
+            /*
             synchronized(LOCK) {
                 int count = 0;
                 for(int iter = 0 ; iter < pendingData.size() ; iter++) {
@@ -6240,16 +6536,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 return count;
             }
+            */
         }
 
         @Override
         public void close() throws IOException {
             synchronized(LOCK) {
-                if(pendingData == null) {
+                //if(pendingData == null) {
+                //    return;
+                //}
+                if (closed) {
                     return;
                 }
+                closed = true;
                 completed = true;
-                pendingData = null;
+                //pendingData = null;
                 super.close();
                 nativeInstance.closeConnection(peer);
             }
@@ -6269,37 +6570,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int read(byte[] bytes, int off, int len) throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
+                len = nativeInstance.readData(peer, bytes, off, len);
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                //if(chunk.length < len) {
+                //    len = chunk.length;
+                //}
+                //for(int iter = 0 ; iter < len ; iter++) {
+                //    bytes[iter + off] = chunk[iter];
+                //}
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                if(chunk.length < len) {
-                    len = chunk.length;
-                }
-                for(int iter = 0 ; iter < len ; iter++) {
-                    bytes[iter + off] = chunk[iter];
-                }
-
-                if(chunk.length == len) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - len];
-                    System.arraycopy(chunk, len, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //if(chunk.length == len) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - len];
+                //    System.arraycopy(chunk, len, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
@@ -6626,6 +6927,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.getFileSize(getStorageDirectory() + "/" + name);
     }
 
+    @Override
+    public String toNativePath(String path) {
+        return unfile(path);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
@@ -6647,7 +6955,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int rlen = roots.length;
         for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
-                roots[iter] = "file:/" + roots[iter];
+                roots[iter] = "file://" + roots[iter];
             }
             if(!roots[iter].endsWith("/")) {
                 roots[iter] = roots[iter] + "/";
@@ -6736,11 +7044,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private String unfile(String file) {
-        if(file.startsWith("file:/")) {
-            file = file.substring(5);
-            if(file.startsWith("//")) {
-                 file = file.substring(1);
-            }
+        if (file.startsWith("file:///")) {
+            return file.substring(7);
+        }
+        if (file.startsWith("file://")) {
+            return file.substring(6);
+        }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
         }
         return file;
     }
@@ -7261,7 +7572,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
             if (instance.isEditingText()) {
-                foldKeyboard();
+                instance.stopTextEditing();
             }
         }
     }
@@ -7924,6 +8235,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             return isRect;
         }
         
+        public String toString() {
+            if (isRect()) {
+                return rect.toString();
+            } else {
+                return p.toString();
+            }
+        }
         
         
         @Override

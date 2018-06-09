@@ -107,8 +107,8 @@ public abstract class CodenameOneImplementation {
     private int dragStartPercentage = 3;
     private Form currentForm;
     private static Object displayLock;
-    private Animation[] paintQueue = new Animation[100];
-    private Animation[] paintQueueTemp = new Animation[100];
+    private Animation[] paintQueue = new Animation[200];
+    private Animation[] paintQueueTemp = new Animation[200];
     private int paintQueueFill = 0;
     private Graphics codenameOneGraphics;
 
@@ -305,6 +305,9 @@ public abstract class CodenameOneImplementation {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public final void editStringImpl(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (cmp instanceof TextArea) {
+            ((TextArea)cmp).registerAsInputDevice();
+        }
         editingText = cmp;
         editString(cmp, maxSize, constraint, text, initiatingKeycode);
         if(!isAsyncEditMode()) {
@@ -331,6 +334,15 @@ public abstract class CodenameOneImplementation {
      * Invoked for special cases to stop text editing and clear native editing state
      */
     public void stopTextEditing() {    
+    }
+
+    
+    /**
+     * Invoked for special cases to stop text editing and clear native editing state
+     */
+    public void stopTextEditing(Runnable onFinish) {    
+        stopTextEditing();
+        onFinish.run();
     }
     
     /**
@@ -3684,6 +3696,28 @@ public abstract class CodenameOneImplementation {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return null;
     }
+    
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     * 
+     * @param media The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see Display#addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+    }
+    
+    /**
+     * Removes onComplete callback from Media element.
+     * @param media The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see Display#removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        
+    }
 
     /**
      * Plays the sound in the given stream
@@ -3978,6 +4012,24 @@ public abstract class CodenameOneImplementation {
             setBrowserURL(browserPeer, tardir  + "/" + url);            
         }
     }
+
+    /**
+     * Sets the page URL, jar: URL's must be supported by the implementation
+     * @param browserPeer browser instance
+     * @param url  the URL
+     * @param headers custom headers for the request URL
+     */
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) { 
+        throw new RuntimeException();
+    }
+    
+    /**
+     * Returns true if setBrowserURL with custom headers is supported
+     * @return returns false by default
+     */
+    public boolean isURLWithCustomHeadersSupported() {
+        return false;
+    }
     
     /**
      * Sets the page URL, jar: URL's must be supported by the implementation
@@ -4221,10 +4273,14 @@ public abstract class CodenameOneImplementation {
 
     private void purgeOldCookies(Map<String,Cookie> cookies) {
         long now = System.currentTimeMillis();
+        ArrayList<String> toRemove = new ArrayList<String>();
         for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
             if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
-                cookies.remove(e.getKey());
+                toRemove.add(e.getKey());
             }
+        }
+        for (String key : toRemove) {
+            cookies.remove(key);
         }
     }
     
@@ -6438,6 +6494,15 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Converts a FileSystemStorage path to a native path.
+     * @param path The file system storage path.
+     * @return The native path.
+     */
+    public String toNativePath(String path) {
+        return path;
+    }
+    
     /**
      * This will return the application home directory.
      * 

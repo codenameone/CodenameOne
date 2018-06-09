@@ -195,6 +195,10 @@ public class Thread implements java.lang.Runnable{
     public java.lang.String toString(){
         return "Thread " + name; 
     }
+    
+    public StackTraceElement[] getStackTrace() {
+        return new StackTraceElement[0];
+    }
 
     /**
      * Causes the currently executing thread object to temporarily pause and allow other threads to execute.

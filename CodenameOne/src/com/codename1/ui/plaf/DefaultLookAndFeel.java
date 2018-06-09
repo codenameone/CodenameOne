@@ -570,6 +570,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());
         int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());
         int topPadding = ta.getStyle().getPaddingTop();
+        switch (ta.getVerticalAlignment()) {
+            case Component.CENTER :
+                topPadding += Math.max(0, (ta.getHeight() - (ta.getRowsGap() + fontHeight) * line)/2);
+                break;
+            case Component.BOTTOM :
+                topPadding += Math.max(0, (ta.getHeight() - (ta.getRowsGap() + fontHeight) * line));
+        }
         boolean shouldBreak = false;
         
         for (int i = 0; i < line; i++) {
@@ -1753,6 +1760,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         Image combo = m.getThemeImageConstant("comboImage");
         if(combo != null) {
             setComboBoxImage(combo);
+        } else {
+            if(Font.isNativeFontSchemeSupported()) {
+                Style c = UIManager.getInstance().createStyle("ComboBox.", "", false);
+                combo = FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, c);
+                setComboBoxImage(combo);
+            }
         }
         updateCheckBoxConstants(m, false, "");
         updateCheckBoxConstants(m, true, "Focus");

@@ -18,6 +18,7 @@
 package java.util;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 
 /**
  * {@code Arrays} contains static methods which operate on arrays.
@@ -3580,20 +3581,23 @@ public class Arrays {
                 Class<?> elemClass = elem.getClass();
                 if (elemClass.isArray()) {
                     // element is an array type
-
-                    // get the declared Class of the array (element)
-                    //Class<?> elemElemClass = elemClass.getComponentType();
-                    // element is an Object[], so we assert that
-                    if (deepToStringImplContains(origArrays, elem)) {
-                        sb.append("[...]"); //$NON-NLS-1$
+                    if (isPrimitiveArray(elem)) {
+                        sb.append(toStringObj((Object)elem));
                     } else {
-                        Object[] newArray = (Object[]) elem;
-                        Object[] newOrigArrays = new Object[origArrays.length + 1];
-                        System.arraycopy(origArrays, 0, newOrigArrays, 0,
-                                origArrays.length);
-                        newOrigArrays[origArrays.length] = newArray;
-                        // make the recursive call to this method
-                        deepToStringImpl(newArray, newOrigArrays, sb);
+                        // get the declared Class of the array (element)
+                        //Class<?> elemElemClass = elemClass.getComponentType();
+                        // element is an Object[], so we assert that
+                        if (deepToStringImplContains(origArrays, elem)) {
+                            sb.append("[...]"); //$NON-NLS-1$
+                        } else {
+                            Object[] newArray = (Object[]) elem;
+                            Object[] newOrigArrays = new Object[origArrays.length + 1];
+                            System.arraycopy(origArrays, 0, newOrigArrays, 0,
+                                    origArrays.length);
+                            newOrigArrays[origArrays.length] = newArray;
+                            // make the recursive call to this method
+                            deepToStringImpl(newArray, newOrigArrays, sb);
+                        }
                     }
                 } else { // element is NOT an array, just an Object
                     sb.append(array[i]);
@@ -3603,7 +3607,47 @@ public class Arrays {
         sb.append(']');
         return sb.toString();
     }
+    
+    private static boolean isPrimitiveArray(Object arr) {
+        return arr instanceof int[]
+                || arr instanceof byte[]
+                || arr instanceof char[]
+                || arr instanceof boolean[]
+                || arr instanceof long[]
+                || arr instanceof short[]
+                || arr instanceof double[]
+                || arr instanceof float[];
+    }
+    
 
+    private static String toStringObj(Object arr) {
+        if (arr instanceof Object[]) {
+            return toString((Object[])arr);
+        }
+        if (arr instanceof int[]) {
+            return toString((int[])arr);
+        }
+        if (arr instanceof byte[]) {
+            return toString((byte[])arr);
+        }
+        if (arr instanceof char[]) {
+            return toString((char[])arr);
+        }
+        if (arr instanceof short[]) {
+            return toString((short[])arr);
+        }
+        if (arr instanceof long[]) {
+            return toString((long[])arr);
+        }
+        if (arr instanceof double[]) {
+            return toString((double[])arr);
+        }
+        if (arr instanceof float[]) {
+            return toString((float[])arr);
+        }
+        return String.valueOf(arr);
+    }
+    
     /**
      * Utility method used to assist the implementation of
      * {@link #deepToString(Object[])}.
@@ -3663,6 +3707,17 @@ public class Arrays {
             throw new ArrayIndexOutOfBoundsException();
         }
         throw new IllegalArgumentException();
+    }
+    
+    public static <T> T[] copyOf(T[] original, int newLength,  Class<? extends T[]> newType) {
+        T[] arr = (T[])Array.newInstance(newType.getComponentType(), newLength);
+        int len = Math.min(original.length, newLength);
+        System.arraycopy(original, 0, arr, 0, len);
+        return arr;
+    }
+    
+    public static <T> T[] copyOf(T[] original, int newLength) {
+        return copyOf(original, newLength, (Class<T[]>)original.getClass());
     }
 
     /**
@@ -3807,6 +3862,57 @@ public class Arrays {
             throw new ArrayIndexOutOfBoundsException();
         }
         throw new IllegalArgumentException();
+    }
+    
+    public static boolean[] copyOf(boolean[] original) {
+        return copyOfRange(new boolean[original.length], 0, original.length);
+    }
+    
+    public static char[] copyOf(char[] original) {
+        return copyOfRange(new char[original.length], 0, original.length);
+    }
+    
+    public static double[] copyOf(double[] original) {
+        return copyOfRange(new double[original.length], 0, original.length);
+    }
+    
+    public static float[] copyOf(float[] original) {
+        return copyOfRange(new float[original.length], 0, original.length);
+    }
+    
+    public static long[] copyOf(long[] original) {
+        return copyOfRange(new long[original.length], 0, original.length);
+    }
+    
+    public static int[] copyOf(int[] original) {
+        return copyOfRange(new int[original.length], 0, original.length);
+    }
+    
+    public static byte[] copyOf(byte[] original) {
+        return copyOfRange(new byte[original.length], 0, original.length);
+    }
+    
+    public static short[] copyOf(short[] original) {
+        return copyOfRange(new short[original.length], 0, original.length);
+    }
+    
+    public static <T,U> T[] copyOfRange(U[] original,
+                    int from,
+                    int to,
+                    Class<? extends T[]> newType) {
+        if (from < 0 || to > original.length) {
+            throw new ArrayIndexOutOfBoundsException();
+        }
+        T[] out = (T[])Array.newInstance(newType.getComponentType(), to-from);
+        System.arraycopy(original, from, out, 0, to-from);
+        
+        return out;
+    }
+    
+    public static <T> T[] copyOfRange(T[] original,
+                  int from,
+                  int to) {
+        return copyOfRange(original, from, to, (Class<T[]>)original.getClass());
     }
 
     /**

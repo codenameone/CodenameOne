@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#define NO_USE_ES2 1
+#define USE_ES2 1
 enum CN1GLenum {
     CN1_GL_ALPHA_TEXTURE,
     CN1_GL_VERTEX_COLORS

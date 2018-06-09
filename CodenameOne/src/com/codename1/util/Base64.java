@@ -74,6 +74,9 @@ public class Base64 {
         int quantum = 0;
         for (int i=0; i<len; i++) {
             chr = in[i];
+            if (chr == '=') {
+                break;
+            }
             // skip the neutral characters
             if ((chr == '\n') || (chr == '\r') || 
                     (chr == ' ') || (chr == '\t')) {

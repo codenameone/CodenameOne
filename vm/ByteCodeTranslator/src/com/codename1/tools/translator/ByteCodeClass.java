@@ -23,12 +23,10 @@
 
 package com.codename1.tools.translator;
 
-import com.codename1.tools.translator.bytecodes.Instruction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -45,6 +43,7 @@ public class ByteCodeClass {
     private List<BytecodeMethod> methods = new ArrayList<BytecodeMethod>();
     private List<ByteCodeField> fields = new ArrayList<ByteCodeField>();
     private String clsName;
+    private String originalClassName;
     private String baseClass;
     private List<String> baseInterfaces;
     private boolean isInterface;
@@ -67,9 +66,24 @@ public class ByteCodeClass {
     private static ByteCodeClass mainClass;
     private boolean finalClass;
     private boolean isEnum;
+    private static Set<String> writableFields = new HashSet<String>();
     
-    public ByteCodeClass(String clsName) {
+    /**
+     * 
+     * @param clsName Class name with mangling.  e.g. java_lang_String
+     * @param originalClassName Classname without mangling.  e.g. java/lang/String
+     */
+    public ByteCodeClass(String clsName, String originalClassName) {
         this.clsName = clsName;
+        this.originalClassName = originalClassName;
+    }
+    
+    /**
+     * Class name in original JVM format:  e.g. java/lang/String
+     * @return 
+     */
+    public String getOriginalClassName() {
+        return originalClassName;
     }
     static ByteCodeClass getMainClass() {
 		return mainClass;
@@ -98,6 +112,10 @@ public class ByteCodeClass {
     
     public String generateCSharpCode() {
         return "";
+    }
+    
+    public void addWritableField(String field) {
+        writableFields.add(field);
     }
 
     public static void markDependencies(List<ByteCodeClass> lst) {
@@ -466,7 +484,7 @@ public class ByteCodeClass {
         // static fields for the class
         for(ByteCodeField bf : staticFieldList) {
             if(bf.isStaticField() && bf.getClsName().equals(clsName)) {
-                if(bf.isFinal() && bf.getValue() != null) {
+                if(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName())) {
                     // static getter 
                     b.append(bf.getCDefinition());
                     b.append(" get_static_");
@@ -597,7 +615,7 @@ public class ByteCodeClass {
         
         String nullCheck = "";
         if (System.getProperty("fieldNullChecks", "false").equals("true")) {
-            nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));} ";
+            nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));}\n";
         }
         for(ByteCodeField fld : fullFieldList) {
             b.append(fld.getCDefinition());
@@ -1143,7 +1161,7 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     b.append("();\n");
-                    if(!(bf.isFinal() && bf.getValue() != null)) {
+                    if(!(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName()))) {
                         b.append("extern ");
                         b.append(bf.getCDefinition());
                         b.append(" STATIC_FIELD_");

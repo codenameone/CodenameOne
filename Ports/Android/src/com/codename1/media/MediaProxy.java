@@ -23,6 +23,7 @@
 package com.codename1.media;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 
 /**
  *
@@ -127,4 +128,12 @@ public class MediaProxy implements Media{
         return media.getVariable(key);
     }
     
+    
+    public void addCompletionHandler(Runnable onCompletion) {
+        Display.getInstance().addCompletionHandler(media, onCompletion);
+    }
+    
+    public void removeCompletionHandler(Runnable onCompletion) {
+        Display.getInstance().removeCompletionHandler(media, onCompletion);
+    }
 }

@@ -128,7 +128,7 @@ public interface Media {
     public void setTime(int time);
 
     /**
-     * Returns the length in seconds of the audio file or -1 if not known
+     * Returns the length in milliseconds of the audio file or -1 if not known
      *
      * @return time in milli seconds
      */

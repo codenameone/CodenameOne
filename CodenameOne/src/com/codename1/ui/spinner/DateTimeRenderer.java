@@ -36,6 +36,7 @@ import java.util.Map;
  * for seconds since midnight. This is formatted accordingly by the renderer
  *
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 class DateTimeRenderer extends SpinnerRenderer<Object> {
     static final String[] MONTHS = {

@@ -217,12 +217,19 @@ int isIPad() {
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
 int cn1IsIOS8 = -1;
+int cn1IsIOS8_2 = -1;
 
 BOOL isIOS8() {
     if (cn1IsIOS8 < 0) {
         cn1IsIOS8 = !SYSTEM_VERSION_LESS_THAN(@"8.0") ? 1:0;
     }
     return cn1IsIOS8 > 0;
+}
+BOOL isIOS8_2() {
+    if (cn1IsIOS8_2 < 0) {
+        cn1IsIOS8_2 = !SYSTEM_VERSION_LESS_THAN(@"8.2") ? 1:0;
+    }
+    return cn1IsIOS8_2 > 0;
 }
 
 BOOL isVKBAlwaysOpen() {
@@ -666,7 +673,7 @@ int maxVal(int a, int b) {
 CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
     CGRect rrect = CGRectMake(x, y, width, height);
-    CGFloat radius = MAX(arcWidth, arcHeight);
+    CGFloat radius = MAX(arcWidth, arcHeight)/2.0;
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
     CGFloat miny = CGRectGetMinY(rrect), midy = CGRectGetMidY(rrect), maxy = CGRectGetMaxY(rrect);
     CGContextMoveToPoint(context, minx, midy);
@@ -1878,12 +1885,22 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
                 if(largest < 1400) {
                     img = [UIImage imageNamed:@"Default-667h@2x.png"];
                 } else {
-                    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
-                    // iphone 6+
-                    if(isPortrait) {
-                        img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                    if (largest == 2436) {
+                        // iPhone X
+                        bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+                        if(isPortrait) {
+                            img = [UIImage imageNamed:@"Default-iPhoneX@3.png"];
+                        } else {
+                            img = [UIImage imageNamed:@"Default-iPhoneX-Landscape@3.png"];
+                        }
                     } else {
-                        img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                        bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+                        // iphone 6+
+                        if(isPortrait) {
+                            img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                        } else {
+                            img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                        }
                     }
                 }
             }
@@ -2237,6 +2254,8 @@ BOOL prefersStatusBarHidden = NO;
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
 }
 
+// NOTE:  This is deprecated.  It is no longer called at all in iOS 11.3 (at least!) and higher.
+// You should handle device rotation in the viewWillTransitionToSize method.
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
     if(firstTime) {
         return;
@@ -2345,6 +2364,58 @@ BOOL prefersStatusBarHidden = NO;
             }
     }
     return NO;
+}
+
+-(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
+    
+    if(editingComponent != nil) {
+        // Since willRotateToInterfaceOrientation is deprecated, newer versions (tested 11.3)
+        // don't call it anymore on rotation.
+        // So we duplicate this check for text editing here now.
+        // Currently we just end text editing when the device is rotated.  A smoother UX would
+        // result from a more nuanced approach (e.g. close it and reopen it when rotation is 
+        // complete.  But we'll tackle that as required/requested.
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            UITextView* v = (UITextView*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        } else {
+            UITextField* v = (UITextField*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        }
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
+        [editingComponent release];
+#endif
+        editingComponent = nil;
+    }
+    
+    // simply create a property of 'BOOL' type
+    [(EAGLView *)self.view updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [(EAGLView *)self.view deleteFramebuffer];
+    
+    displayWidth = (int)size.width * scaleValue;
+    displayHeight = (int)size.height * scaleValue;
+    
+    lockDrawing = NO;
+    
+    screenSizeChanged(displayWidth, displayHeight);
+    repaintUI();
+    
+    if ( currentActionSheet != nil ){
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.5];
+        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        
+        currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
+        [UIView commitAnimations];
+    }
+#ifdef INCLUDE_MOPUB
+    CGSize adsize = [self.adView adContentViewSize];
+    CGFloat centeredX = (size.width - size.width) / 2;
+    CGFloat bottomAlignedY =size.height - size.height;
+    self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
+#endif
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
@@ -3248,6 +3319,11 @@ extern JAVA_LONG defaultDatePickerDate;
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
+            JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
+            
+            if (stringPickerSelection < 0 && arr->length > 0) {
+                stringPickerSelection = 0;
+            }
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
 #ifndef NEW_CODENAME_ONE_VM
             pickerStringArray = nil;

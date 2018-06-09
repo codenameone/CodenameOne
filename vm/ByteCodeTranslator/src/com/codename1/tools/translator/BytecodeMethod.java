@@ -49,6 +49,7 @@ import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,7 +61,7 @@ import org.objectweb.asm.Opcodes;
  *
  * @author Shai Almog
  */
-public class BytecodeMethod {    
+public class BytecodeMethod implements SignatureSet {    
 
     /**
      * @return the acceptStaticOnEquals
@@ -107,6 +108,7 @@ public class BytecodeMethod {
     static {
         String op = System.getProperty("optimizer");
         optimizerOn = op == null || op.equalsIgnoreCase("on");
+        //optimizerOn = false;
     }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
@@ -238,8 +240,43 @@ public class BytecodeMethod {
         }
     }
 
+    // use this instead of isMethodUsed to compare traditional with new results
+    public boolean isMethodUsedTester(BytecodeMethod bm)
+    {
+        boolean oldway = isMethodUsedOldWay(bm);
+        boolean newway = isMethodUsed(bm);
+        if(oldway!=newway)
+        	{ throw new Error("different result"); 
+        	}
+        return newway;
+    }
+    
+    private Hashtable<String,SignatureSet> usedSigs;
+    
+    // [ddyer 4/2017] avoid creating a lot of temporary objects. 
+    // more than 3x faster than the old way.
+    public boolean isMethodUsed(BytecodeMethod bm0) {
+    	SignatureSet bm = (SignatureSet)bm0;
+        if(usedSigs == null) {
+        	usedSigs = new Hashtable<String,SignatureSet>();
+            for(Instruction ins : instructions) {
+            	String sname = ins.getMethodName();
+            	if(sname!=null)
+            	{
+            		SignatureSet ss = usedSigs.get(sname);
+            		// either use the instruction itself, or create a set of them
+            		ss = ss==null ? ins : new MultipleSignatureSet((SignatureSet)ins,ss); 
+            		usedSigs.put(sname,ss);
+            	}
+            }
+        }
+        String name = bm.getMethodName();
+        SignatureSet ss = usedSigs.get("__INIT__".equals(name)?"<init>":name);
+        return ((ss==null) ? false : ss.containsSignature(bm));
+    }
+    
     private Set<String> usedMethods;
-    public boolean isMethodUsed(BytecodeMethod bm) {
+    public boolean isMethodUsedOldWay(BytecodeMethod bm) {
         if(usedMethods == null) {
             usedMethods = new TreeSet<String>();
             for(Instruction ins : instructions) {
@@ -253,6 +290,16 @@ public class BytecodeMethod {
             return usedMethods.contains(bm.desc + ".<init>");
         }
         return usedMethods.contains(bm.desc + "." + bm.methodName);
+    }
+    
+    public void findWritableFields(Set<String> outSet) {
+        int len = instructions.size();
+        for (int i=0; i<len; i++) {
+            Instruction instr = instructions.get(i);
+            if (instr instanceof Field) {
+                
+            }
+        }
     }
     
     public static String appendMethodSignatureSuffixFromDesc(String desc, StringBuilder b, List<String> arguments) {
@@ -965,7 +1012,10 @@ public class BytecodeMethod {
         addInstruction(new Jump(opcode, label));
     }
 
-    public void addField(int opcode, String owner, String name, String desc) {
+    public void addField(ByteCodeClass cls, int opcode, String owner, String name, String desc) {
+        if (cls.getOriginalClassName().equals(owner) && (opcode == Opcodes.PUTFIELD || opcode == Opcodes.PUTSTATIC)) {
+            cls.addWritableField(name);
+        }
         addInstruction(new Field(opcode, owner, name, desc));
     }
     
@@ -1915,4 +1965,19 @@ public class BytecodeMethod {
         }
         return -1;
     }
+
+    // support for the SignatureSet interface
+	public boolean containsSignature(SignatureSet sig) {
+		return desc.equals(sig.getSignature());
+	}
+	public String getSignature() {
+		return desc;
+	}
+
+    @Override
+    public SignatureSet nextSignature() {
+        return null;
+    }
+
+
 }

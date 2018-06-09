@@ -1507,13 +1507,13 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                         // underline border
                         if(thicknessMillimeters.isSelected()) {
                             if(themeColors.isSelected()) {
-                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).floatValue());
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue());
                             } else {
                                 currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
                             }
                         } else {
                             if(themeColors.isSelected()) {
-                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).intValue());
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue());
                             } else {
                                 currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
                             }
@@ -1728,7 +1728,7 @@ private void bottomRightActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     }//GEN-LAST:event_rrModeActionPerformed
 
     private void thicknessMillimetersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_thicknessMillimetersActionPerformed
-        // TODO add your handling code here:
+        updateBorder();
     }//GEN-LAST:event_thicknessMillimetersActionPerformed
 
 public Border getResult() {

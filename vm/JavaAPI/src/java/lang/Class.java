@@ -34,7 +34,7 @@ import java.lang.annotation.*;
  * loaded. The following example uses a Class object to print the class name of
  * an object: Since: JDK1.0, CLDC 1.0
  */
-public final class Class<T> {
+public final class Class<T> implements java.lang.reflect.Type {
 
     /**
      * Returns the Class object associated with the class with the given string
@@ -270,5 +270,15 @@ public final class Class<T> {
 
     public boolean desiredAssertionStatus() {
         return false;
-    }        
+    }
+    
+    public native Class getComponentType();
+    
+    public java.lang.reflect.Type[] getGenericInterfaces() {
+        throw new UnsupportedOperationException("Class.getGenericInterfaces() not supported on this platform");
+    }
+    
+    public boolean isPrimitive() {
+        return false;
+    }
 }

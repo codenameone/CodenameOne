@@ -56,6 +56,7 @@ import java.util.ArrayList;
  * 
  * 
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 public class TimeSpinner extends BaseSpinner {
     private Spinner hour;

@@ -33,7 +33,7 @@ import java.util.List;
  *
  * @author Shai Almog
  */
-public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
+public class ListProperty<T, K> extends CollectionProperty<T, K> {
     private ArrayList<T> value = new ArrayList<T>();
     
     /**
@@ -59,9 +59,6 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         for(T t : values) {
             value.add(t);
         }
-        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
-            throw new IllegalArgumentException(
-                    "the element type class needs to be a subclass of PropertyBusinessObject");
     }
     
     /**
@@ -106,13 +103,23 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * @param t the collection of elements to set
      * @return the parent object for chaining
      */
-    public K setList(Collection<T> t) {
+    public K set(Collection<T> t) {
         value.clear();
         value.addAll(t);
-        firePropertyChanged();        
+        firePropertyChanged();
         return (K)parent.parent;
-    } 
+    }
     
+    /**
+     * Historical alias of set(Collection<T> t)
+     * Sets the entire content of the property
+     * @param t the collection of elements to set
+     * @return the parent object for chaining
+     */
+    public K setList(Collection<T> t) {
+        return set(t);
+    }
+        
     /**
      * Adds a property value and fires a change event
      * @param offset the position for the new value
@@ -124,7 +131,6 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         return (K)parent.parent;
     }
 
-
     /**
      * Adds a property value to the end of the list and fires a change event
      * @param v the new value
@@ -134,17 +140,50 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         firePropertyChanged();
         return (K)parent.parent;
     }
-
-
+    
+    /**
+     * Adds a all properties value to the list and fires a change event
+     * @param v the collection of values to add
+     */
+    public K addAll(Collection<? extends T> v) {
+        if (value.addAll(v)) {
+                firePropertyChanged();
+        }
+        return (K)parent.parent;
+    }
+    
     /**
      * Removes the item at the given offset
      * @param offset the offset
      */
     public K remove(int offset) {
         value.remove(offset);
+        firePropertyChanged();
         return (K)parent.parent;
     }
     
+    /**
+     * Removes the item with this value
+     * @param v the value object
+     */
+    public K remove(T v) {
+    	if (value.remove(v)) {
+    		firePropertyChanged();
+    	}
+        return (K)parent.parent;
+    }
+    
+    /**
+     * Removes from the list all values from the given collection and fires a change event if the list has changed
+     * @param the item to remove
+     */
+    public K removeAll(Collection<? extends T>  v) {
+        if (value.removeAll(v)) {
+        	firePropertyChanged();
+        }
+        return (K)parent.parent;
+    }
+        
     /**
      * Compares this property to another property
      * @param obj the other property

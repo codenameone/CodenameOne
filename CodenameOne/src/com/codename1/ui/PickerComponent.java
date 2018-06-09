@@ -42,11 +42,20 @@ import java.util.Date;
  * @author Shai Almog
  */
 public class PickerComponent extends InputComponent {
-    private final Picker picker = new Picker();
+    private final Picker picker = createPickerInstance();
     
     private PickerComponent() {
         initInput();
         picker.setTickerEnabled(false);
+    }
+    
+    /**
+     * Allows developers to subclass the Picker component instance to customize
+     * behaviors of the subclass
+     * @return the picker instance
+     */
+    protected Picker createPickerInstance() {
+        return new Picker();
     }
     
     /**

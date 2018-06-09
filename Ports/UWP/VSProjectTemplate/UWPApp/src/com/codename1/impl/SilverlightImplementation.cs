@@ -1027,7 +1027,23 @@ namespace com.codename1.impl
             return new CN1Media(uri, isVideo, onCompletion, cl);
         }
 
-        
+         public override void addCompletionHandler(media.Media media, java.lang.Runnable onCompletion)
+        {
+            base.addCompletionHandler(media, onCompletion);
+            if (media is CN1Media)
+            {
+                ((CN1Media)media).addCompletionHandler(onCompletion);
+            }
+        }
+
+        public override void removeCompletionHandler(media.Media media, java.lang.Runnable onCompletion)
+        {
+            if (media is CN1Media)
+            {
+                ((CN1Media)media).removeCompletionHandler(onCompletion);
+            }
+            base.removeCompletionHandler(media, onCompletion);
+        }
 
         public override void lockOrientation(bool portrait)
         {
@@ -1301,9 +1317,42 @@ namespace com.codename1.impl
                         commitEditing();
                     }
                 }
+            } else if (e.Key == Windows.System.VirtualKey.Tab)
+            {
+                if (currentlyEditing != null && currentlyEditing is TextField)
+                {
+                    TextField tf = (TextField)currentlyEditing;
+                    commitEditing();
+                    Display.getInstance().callSerially(new EditNext(tf));
+                    
+                }
             }
 
             
+        }
+
+
+        public class EditNext : java.lang.Runnable
+        {
+            TextField tf;
+            public EditNext(TextField tf)
+            {
+                this.tf = tf;
+            }
+
+            public void run()
+            {
+                Form f = tf.getComponentForm();
+                if (f != null)
+                {
+                    Component next = f.getNextComponent(tf);
+                    if (next != null)
+                    {
+                        next.requestFocus();
+                        next.startEditingAsync();
+                    }
+                }
+            }
         }
 
         public class DoneEditing : java.lang.Runnable
@@ -1409,7 +1458,9 @@ namespace com.codename1.impl
                            }
                        }
                    }
+
                    cl.Children.Add(textInputInstance);
+  
                    Canvas.SetZIndex(textInputInstance, 50000);
                    textInputInstance.IsEnabled = true;
                    Font fnt = currentlyEditing.getStyle().getFont();
@@ -2506,8 +2557,7 @@ namespace com.codename1.impl
 
             void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
             {
-                BrowserNavigationCallback bn = bc.getBrowserNavigationCallback();
-                if (bn != null && e.Uri != null && !bn.shouldNavigate(e.Uri.ToString()))
+                if (e.Uri != null && !bc.fireBrowserNavigationCallbacks(e.Uri.ToString()))
                 {
                     e.Cancel = true;
                     return;
@@ -2814,11 +2864,13 @@ namespace com.codename1.impl
         public override void browserExecute(PeerComponent n1, string n2)
         {
             WebView webView = null;
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal,  () =>
             {
+                
                 webView = (WebView)((SilverlightPeer)n1).element;
-                await webView.InvokeScriptAsync(n2, new string[] { "document.title.toString()" });
-            }).AsTask().GetAwaiter();
+                
+                webView.InvokeScriptAsync("eval", new string[] { n2 });
+            });
         }
 
         public override string browserExecuteAndReturnString(PeerComponent n1, string n2)

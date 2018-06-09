@@ -831,6 +831,19 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /**
+     * Returns true if the system is currently in the process of transitioning between
+     * forms
+     * 
+     * @return true if in the middle of form transition
+     */
+    public boolean isInTransition() {
+        if (animationQueue != null && animationQueue.size() > 0) {
+            Animation ani = (Animation) animationQueue.get(0);
+            return ani instanceof Transition;
+        }
+        return false;
+    }
 
     private void paintTransitionAnimation() {
         Animation ani = (Animation) animationQueue.get(0);
@@ -1500,6 +1513,17 @@ public final class Display extends CN1Constants {
         }
     }
     
+    /**
+     * Allows us to stop editString on the given text component
+     * @param cmp the text field/text area component
+     * @param onFinish invoked when editing stopped
+     */
+    public void stopEditing(Component cmp, Runnable onFinish) {
+        if(isTextEditing(cmp)) {
+            impl.stopTextEditing(onFinish);
+        }
+    }
+
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
     }
@@ -2466,6 +2490,7 @@ public final class Display extends CN1Constants {
      * Boolean value.
      * 
      * @param l the listener 
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */
     public void setVirtualKeyboardListener(ActionListener l){
         virtualKeyboardListener = l;
@@ -2475,6 +2500,7 @@ public final class Display extends CN1Constants {
      * Gets the VirtualKeyboardListener Objects of exists.
      * 
      * @return a Listener Object or null if not exists
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */ 
     public ActionListener getVirtualKeyboardListener() {
         return virtualKeyboardListener;
@@ -2983,6 +3009,27 @@ public final class Display extends CN1Constants {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
 
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     * 
+     * @param media The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        impl.addCompletionHandler(media, onCompletion);
+    }
+    
+    /**
+     * Removes onComplete callback from Media element.
+     * @param media The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        impl.removeCompletionHandler(media, onCompletion);
+    }
+    
     /**
      * Create the sound in the given stream
      * Notice that an audio is "auto destroyed" on completion and cannot be played

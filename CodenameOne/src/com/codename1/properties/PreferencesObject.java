@@ -64,33 +64,33 @@ public class PreferencesObject {
             Class type = pb.getGenericType();
             String n = prefix + name;
             if(type == String.class || type == null) {
-                ((Property)pb).set(Preferences.get(n, (String)((Property)pb).get()));
+                ((Property)pb).set(Preferences.getAndSet(n, (String)((Property)pb).get()));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }
             Object obj = ((Property)pb).get();
             if(type == Boolean.class) {
-                ((Property)pb).set(Preferences.get(n, obj == null ? false : (Boolean)obj));
+                ((Property)pb).set(Preferences.getAndSet(n, obj == null ? false : (Boolean)obj));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }
             if(type == Double.class) {
-                ((Property)pb).set(Preferences.get(n, obj == null ? 0.0 : (Double)obj));
+                ((Property)pb).set(Preferences.getAndSet(n, obj == null ? 0.0 : (Double)obj));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }
             if(type == Float.class) {
-                ((Property)pb).set(Preferences.get(n, obj == null ? 0.0f : (Float)obj));
+                ((Property)pb).set(Preferences.getAndSet(n, obj == null ? 0.0f : (Float)obj));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }
             if(type == Integer.class) {
-                ((Property)pb).set(Preferences.get(n, obj == null ? 0 : (Integer)obj));
+                ((Property)pb).set(Preferences.getAndSet(n, obj == null ? 0 : (Integer)obj));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }
             if(type == Long.class) {
-                ((Property)pb).set(Preferences.get(n, obj == null ? (long)0 : (Long)obj));
+                ((Property)pb).set(Preferences.getAndSet(n, obj == null ? (long)0 : (Long)obj));
                 bindChangeListener((Property)pb, n, type);
                 continue;
             }

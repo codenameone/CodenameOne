@@ -37,6 +37,7 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.InputComponent;
+import com.codename1.ui.PickerComponent;
 import com.codename1.ui.TextComponent;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -45,17 +46,21 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Binds validation constraints to form elements, when validation fails it can be highlighted directly on
+ * <p>Binds validation constraints to form elements, when validation fails it can be highlighted directly on
  * the component via an emblem or change of the UIID (to original UIID name + "Invalid" e.g. "TextFieldInvalid").
- * Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.
+ * Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.</p>
  *
+ * <p>It's possible to create any custom logic of validation. Example (see
+ * <a href="https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465">this
+ * discussion</a> on StackOverflow): </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6a67dd4d151bedf1bc3db6abb7b945ee.js"></script>
+ * 
  * @author Shai Almog
  */
 public class Validator {    
@@ -388,7 +393,7 @@ public class Validator {
             return ((TextArea)cmp).getText();
         }
         if(cmp instanceof Picker) {
-            ((Picker)cmp).getValue();
+            return ((Picker)cmp).getValue();
         }
         if(cmp instanceof RadioButton || cmp instanceof CheckBox) {
             if(((Button)cmp).isSelected()) {
@@ -492,6 +497,14 @@ public class Validator {
             ((Button)cmp).addActionListener(new ComponentListener(cmp));
             return;
         } 
+        if(cmp instanceof Picker) {
+            ((Picker)cmp).addActionListener(new ComponentListener(cmp));
+            return;
+        }
+        if(cmp instanceof PickerComponent) {
+            ((PickerComponent)cmp).getPicker().addActionListener(new ComponentListener(cmp));
+            return;
+        }
     }
 
     /**

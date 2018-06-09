@@ -25,6 +25,7 @@ package com.codename1.tools.translator;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
@@ -63,12 +64,13 @@ public class Parser extends ClassVisitor {
             System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
         }*/
         Parser p = new Parser();
+        
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
         if(p.clsName.startsWith("java_lang_annotation") || p.clsName.startsWith("java_lang_Deprecated")
                  || p.clsName.startsWith("java_lang_Override") || p.clsName.startsWith("java_lang_SuppressWarnings")) {
             return;
         }
-        p.cls = new ByteCodeClass(p.clsName);
+        p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         r.accept(p, ClassReader.EXPAND_FRAMES);
         
         classes.add(p.cls);
@@ -344,12 +346,12 @@ public class Parser extends ClassVisitor {
         char[] chr = str.toCharArray();
         for(int iter = 0 ; iter < len ; iter++) {
             char c = chr[iter];
-            if(c > 127) {
+            if(c > 127 || c < 32) {
                 // needs encoding... Verify there are no more characters to encode
                 StringBuilder d = new StringBuilder();
                 for(int internal = 0 ; internal < len ; internal++) {
                     c = chr[internal];
-                    if(c > 127) {
+                    if(c > 127 || c < 32) {
                         d.append("~~u");
                         d.append(fourChars(Integer.toHexString(c)));
                     } else {
@@ -422,7 +424,13 @@ public class Parser extends ClassVisitor {
             readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
-            eliminateUnusedMethods();
+            if (BytecodeMethod.optimizerOn) {
+                Date now = new Date();
+                int neliminated = eliminateUnusedMethods();
+                Date later = new Date();
+                long dif = later.getTime()-now.getTime();
+                System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+            }
 
             generateClassAndMethodIndexHeader(outputDirectory);
 
@@ -456,27 +464,35 @@ public class Parser extends ClassVisitor {
             }
         });
         nativeSources = new String[mFiles.length];
+        int size = 0;
+        System.out.println(""+mFiles.length +" native files");
         for(int iter = 0 ; iter < mFiles.length ; iter++) { 
-            DataInputStream di = new DataInputStream(new FileInputStream(mFiles[iter]));
-            byte[] dat = new byte[(int)mFiles[iter].length()];
+        	FileInputStream fi = new FileInputStream(mFiles[iter]);
+            DataInputStream di = new DataInputStream(fi);
+            int len = (int)mFiles[iter].length();
+            size += len;
+            byte[] dat = new byte[len];
             di.readFully(dat);
+            fi.close();
             nativeSources[iter] = new String(dat, "UTF-8");
         }
+        System.out.println("Native files total "+(size/1024)+"K");
         
     }
     
-    private static void eliminateUnusedMethods() {
+    private static int eliminateUnusedMethods() {
         usedByNativeCheck();
-        eliminateUnusedMethods(0);
+    	return(eliminateUnusedMethods(0));
     }
 
-    private static void eliminateUnusedMethods(int depth) {
-        boolean found = false;
-        found = cullMethods(found);
-        cullClasses(found, depth);
+    private static int eliminateUnusedMethods(int depth) {
+        int nfound = cullMethods(false);
+        cullClasses(nfound>0, depth);
+        return(nfound);
     }
 
-    private static boolean cullMethods(boolean found) {
+    private static int cullMethods(boolean found) {
+    	int nfound = 0;
         for(ByteCodeClass bc : classes) {
             bc.unmark();
             if(bc.isIsInterface() || bc.getBaseClass() == null) {
@@ -493,13 +509,14 @@ public class Parser extends ClassVisitor {
                     }
                     found = true;
                     mtd.setEliminated(true);
+                    nfound++;
                     /*if(ByteCodeTranslator.verbose) {
                     System.out.println("Eliminating method: " + mtd.getClsName() + "." + mtd.getMethodName());
                     }*/
                 } 
             }
         }
-        return found;
+        return nfound;
     }
     
     private static boolean isMethodUsedByBaseClassOrInterface(BytecodeMethod mtd, ByteCodeClass cls) {
@@ -827,7 +844,7 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            mtd.addField(opcode, owner, name, desc);
+            mtd.addField(cls, opcode, owner, name, desc);
             super.visitFieldInsn(opcode, owner, name, desc); 
         }
 

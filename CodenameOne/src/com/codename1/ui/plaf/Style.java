@@ -1867,7 +1867,7 @@ public class Style {
     /**
      * Sets the background color for the component
      * 
-     * @param bgColor RRGGBB color that ignors the alpha component
+     * @param bgColor RRGGBB color that ignores the alpha component
      * @param override If set to true allows the look and feel/theme to override 
      * the value in this attribute when changing a theme/look and feel
      */

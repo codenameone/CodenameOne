@@ -42,6 +42,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
+#import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
 #import <MediaPlayer/MediaPlayer.h>
@@ -243,6 +244,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y
 extern int isIPad();
 extern int isIOS7();
 extern int isIOS8();
+extern int isIOS8_2();
 
 NSString* fixFilePath(NSString* ns) {
     if([ns hasPrefix:@"file:"]) {
@@ -320,6 +322,23 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
     return i;
     //XMLVM_END_WRAPPER
 }
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG pasteboard.string);
+    POOL_END();
+    return str;
+}
+
+void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+    POOL_BEGIN();
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    pasteboard.string = ns;
+    POOL_END();
+}
+
 
 void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
@@ -660,6 +679,9 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h);
 //native void clearRectMutable(int x, int y, int width, int height);
 void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
@@ -685,6 +707,34 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+/*
+
+    native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
+ */
+
+
+void com_codename1_impl_ios_IOSNative_fillPolygonGlobal___int_int_int_1ARRAY_int_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_OBJECT xPoints, JAVA_OBJECT yPoints, JAVA_INT nPoints) {
+    POOL_BEGIN();
+    JAVA_INT* x = (JAVA_INT*)((JAVA_ARRAY)xPoints)->data;
+    JAVA_INT* y = (JAVA_INT*)((JAVA_ARRAY)yPoints)->data;
+    JAVA_FLOAT xFloats[nPoints];
+    JAVA_FLOAT yFloats[nPoints];
+    for (int i=0; i<nPoints; i++) {
+        xFloats[i] = (JAVA_FLOAT)*(x+i);
+        yFloats[i] = (JAVA_FLOAT)*(y+i);
+    }
+    FillPolygon* f = [[FillPolygon alloc] initWithArgs:xFloats y:yFloats num:nPoints color:color alpha:alpha];
+    
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
@@ -1522,6 +1572,58 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+/*
+// Checks avaiable bytes for NetworkConnection
+    native int available(long peer);
+
+    // Read pending data from NetworkConnection
+    native int readData(long peer, byte[] bytes, int off, int len);
+
+    // Reads next byte from NetworkConnection
+    native int shiftByte(long peer);
+
+    // Appends pending data to NetworkConnection
+    // data is a NSData* object
+    // We go through java in order to use locking concurrency
+    native void appendData(long peer, long data);
+*/
+
+JAVA_INT com_codename1_impl_ios_IOSNative_available___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl available];
+    
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_appendData___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG data) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    NSData* nsData = (BRIDGE_CAST NSData*)((void *)data);
+    [impl appendData:nsData];    
+    POOL_END();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_readData___long_byte_1ARRAY_int_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT len) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_INT result = [impl readData:buffer offset:offset len:len];
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_shiftByte___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl shiftByte];
+    
+    POOL_END();
+    return result;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1624,30 +1726,9 @@ void connectionComplete(void* peer) {
 }
 
 void connectionReceivedData(void* peer, NSData* data) {
-#ifndef NEW_CODENAME_ONE_VM
-    if (!__TIB_byte.classInitialized) __INIT_byte();
-    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [data length]);
-    [data getBytes:byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_];
-    com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, byteArray);
-#else
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    enteringNativeAllocations();
-    if([data length] > 65536) {
-        int offset = 0;
-        while(offset < [data length]) {
-            int currentLength = MIN(65536, [data length] - offset);
-            JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, currentLength);
-            [data getBytes:((JAVA_ARRAY)byteArray)->data range:NSMakeRange(offset, currentLength)];
-            com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-            offset += 65536;
-        }
-    } else {
-        JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-        [data getBytes:((JAVA_ARRAY)byteArray)->data];
-        com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-    }
-    finishedNativeAllocations();
-#endif
+    com_codename1_impl_ios_IOSImplementation_appendData___long_long(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, (JAVA_LONG)data);
+
+
 }
 
 void connectionError(void* peer, NSString* message) {
@@ -1670,7 +1751,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
     __block JAVA_BOOLEAN result;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        
         NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+        if([ns hasPrefix:@"file:"]) {
+            ns = [NSURL fileURLWithPath:[ns substringFromIndex:5]];
+        }
         result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
         POOL_END();
     });
@@ -2225,8 +2310,8 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         
-        w.scrollView.scrollEnabled = NO;
-        w.scrollView.bounces = NO;
+        w.scrollView.scrollEnabled = enabled;
+        w.scrollView.bounces = enabled;
         
         POOL_END();
     });
@@ -2240,6 +2325,28 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
         NSURL* nu = [NSURL URLWithString:str];
         NSURLRequest* r = [NSURLRequest requestWithURL:nu];
         [w loadRequest:r];
+        POOL_END();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url, JAVA_OBJECT keys, JAVA_OBJECT values) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+        NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+        NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
+
+        JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
+        JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+        int count = ((JAVA_ARRAY)keys)->length;
+
+        for(int iter = 0 ; iter < count ; iter++) {
+            NSString* k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG keyData[iter]);
+            NSString* v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG valueData[iter]);
+            [request setValue:v forHTTPHeaderField:k];
+        }
+        
+        [w loadRequest:request];
         POOL_END();
     });
 }
@@ -2929,9 +3036,11 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_END();
     });
 }
-
+#ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
+#endif
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_LOCATION_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createCLLocation = [[CLLocationManager alloc] init];
         if ([com_codename1_impl_ios_IOSNative_createCLLocation respondsToSelector:@selector     (CN1_REQUEST_LOCATION_AUTH)]) {
@@ -2944,9 +3053,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_M
     CLLocationManager* c = com_codename1_impl_ios_IOSNative_createCLLocation;
     com_codename1_impl_ios_IOSNative_createCLLocation = nil;
     return (JAVA_LONG)((BRIDGE_CAST void*)c);
+#else
+    return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
@@ -2959,46 +3072,78 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getCurrentLocationObject___long(CN1_T
     CLLocationManager* c = com_codename1_impl_ios_IOSNative_createCLLocation;
     com_codename1_impl_ios_IOSNative_createCLLocation = nil;
     return (JAVA_LONG)((BRIDGE_CAST void*)c);
+#else
+    return 0;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLatitude___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.coordinate.latitude;
+#else
+    return 0;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAltitude___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.altitude;
+#else
+    return 0;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLongtitude___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.coordinate.longitude;
+#else
+    return 0;
+#endif;
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAccuracy___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.horizontalAccuracy;
+#else
+    return 0;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationDirection___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.course;
+#else
+    return 0;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationVelocity___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.speed;
+#else
+    return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     NSTimeInterval t = [loc.timestamp timeIntervalSince1970];
     return (JAVA_LONG)(t * 1000.0);
+#else
+    return 0;
+#endif
 }
 
 UIPopoverController* popoverController;
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie) {
+#ifdef INCLUDE_CAMERA_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
@@ -3044,9 +3189,11 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             POOL_END();
         }
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
@@ -3093,6 +3240,7 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
         }
         POOL_END();
     });
+#endif
 }
 int popoverSupported()
 {
@@ -3235,6 +3383,7 @@ void com_codename1_impl_ios_IOSNative_removeGeofencing___long_java_lang_String(C
     }
 }
 
+#ifdef INCLUDE_CONTACTS_USAGE
 ABAddressBookRef globalAddressBook = nil;
 bool grantedPermission;
 ABAddressBookRef getAddressBook() {
@@ -3256,16 +3405,22 @@ ABAddressBookRef getAddressBook() {
     }
     return globalAddressBook;
 }
-
+#endif
 JAVA_VOID com_codename1_impl_ios_IOSNative_refreshContacts__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CONTACTS_USAGE
     globalAddressBook = nil;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     getAddressBook();
     POOL_END();
     return grantedPermission;
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 
@@ -3286,6 +3441,7 @@ void throwError(CFErrorRef error) {
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT firstName, JAVA_OBJECT surname, JAVA_OBJECT officePhone, JAVA_OBJECT homePhone, JAVA_OBJECT cellPhone, JAVA_OBJECT email) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     
     ABAddressBookRef addressBook = getAddressBook();
@@ -3330,9 +3486,13 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_createContact___java_lang_String_ja
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"%i", ABRecordGetRecordID(person)]);
     POOL_END();
     return o;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_deleteContact___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT i) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABAddressBookRef addressBook = getAddressBook();
     if(!grantedPermission) {
@@ -3344,10 +3504,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_deleteContact___int(CN1_THREAD_STA
     }
     POOL_END();
     return ref != nil;
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN includeNumbers) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABAddressBookRef addressBook = getAddressBook();
     if(!grantedPermission) {
@@ -3373,9 +3537,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(CN1_THREAD_S
     
     POOL_END();
     return MAX(nPeople, 0);
+#else
+    return 0;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
     NSArray *linkedRecordsArray = (__bridge NSArray *)ABPersonCopyArrayOfAllLinkedPeople(i);
@@ -3383,6 +3551,9 @@ JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_S
     [linkedRecordsArray release];
     POOL_END();
     return numLinked;
+#else
+    return 0;
+#endif
 }
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -3394,6 +3565,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int_R_int(CN1_TH
 
 
 void com_codename1_impl_ios_IOSNative_getLinkedContactIds___int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT num, JAVA_INT refId, JAVA_OBJECT out) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* iArray = intArray;
@@ -3413,10 +3585,12 @@ void com_codename1_impl_ios_IOSNative_getLinkedContactIds___int_int_int_1ARRAY(C
     }
     [linkedRecordsArray release];
     POOL_END();
+#endif
 }
 
 
 void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* iArray = intArray;
@@ -3469,32 +3643,46 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
         data[iter] = ABRecordGetRecordID(ref);
     }
     POOL_END();
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonFirstName___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonFirstNameProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonSurnameName___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonLastNameProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getPersonPhoneCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     //POOL_BEGIN();
     //POOL_END();
     return 1;
+#else
+    return 0;
+#endif
 }
 
+#ifdef INCLUDE_CONTACTS_USAGE
 JAVA_OBJECT copyValueAsString(CN1_THREAD_STATE_MULTI_ARG ABMultiValueRef r) {
     JAVA_OBJECT ret = JAVA_NULL;
     if(ABMultiValueGetCount(r) > 0) {
@@ -3503,17 +3691,23 @@ JAVA_OBJECT copyValueAsString(CN1_THREAD_STATE_MULTI_ARG ABMultiValueRef r) {
     }
     return ret;
 }
+#endif
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhone___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
+#else 
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT offset) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     //ABRecordRef i = (ABRecordRef)peer;
     //ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneMainLabel);
@@ -3521,36 +3715,52 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPhoneType___long_int(CN1_T
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG @"work");
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonPrimaryPhone___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE    
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef k = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonPhoneProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonEmail___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     ABMultiValueRef emails = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
     JAVA_OBJECT ret = copyValueAsString(CN1_THREAD_STATE_PASS_ARG emails);
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPersonAddress___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     NSString* k = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonAddressProperty);
     JAVA_OBJECT ret = fromNSString(CN1_THREAD_STATE_PASS_ARG k);
     POOL_END();
     return ret;
+#else
+    return JAVA_NULL;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = (ABRecordRef)peer;
     GLUIImage* g = nil;
@@ -3560,8 +3770,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(CN1_THR
     }
     POOL_END();
     return (JAVA_LONG)((BRIDGE_CAST void*)g);
+#else
+    return 0;
+#endif
 }
 
+#ifdef INCLUDE_CONTACTS_USAGE
 void addToHashtable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT hash, ABMultiValueRef ref, int count) {
     for(int iter = 0 ; iter < count ; iter++) {
         NSString *key = (BRIDGE_CAST NSString *)ABMultiValueCopyLabelAtIndex(ref, iter);
@@ -3584,9 +3798,11 @@ void addToHashtable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT hash, ABMultiValueRef
 #endif
     }
 }
+#endif
 
 void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codename1_contacts_Contact_boolean_boolean_boolean_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId, JAVA_OBJECT cnt,
-                                                                                                                                            JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
+                                                                                                                                 JAVA_BOOLEAN includesFullName, JAVA_BOOLEAN includesPicture, JAVA_BOOLEAN includesNumbers, JAVA_BOOLEAN includesEmail, JAVA_BOOLEAN includeAddress) {
+#ifdef INCLUDE_CONTACTS_USAGE     
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
     
@@ -3759,10 +3975,12 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     }
     
     POOL_END();
+#endif
 }
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+#ifdef INCLUDE_CONTACTS_USAGE
     POOL_BEGIN();
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
 #ifndef CN1_USE_ARC
@@ -3770,6 +3988,114 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREA
 #endif
     POOL_END();
     return (JAVA_LONG)i;
+#else
+    return (JAVA_LONG)0;
+#endif
+}
+
+//native boolean checkContactsUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkContactsUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_CONTACTS_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkCalendarsUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkCalendarsUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_CALENDARS_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkCameraUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkCameraUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_CAMERA_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkFaceIDUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkFaceIDUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_FACEID_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkLocationUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkLocationUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_LOCATION_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkMicrophoneUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkMicrophoneUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_MICROPHONE_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkMotionUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkMotionUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_MOTION_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkPhotoLibraryAddUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryAddUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_PHOTOLIBRARYADD_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkPhotoLibraryUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkRemindersUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkRemindersUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_REMINDERS_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkSiriUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkSiriUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_SIRI_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkSpeechRecognitionUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkSpeechRecognitionUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_SPEECHRECOGNITION_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkNFCReaderUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkNFCReaderUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_NFCREADER_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
@@ -3974,6 +4300,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile) {
+#ifdef INCLUDE_MICROPHONE_USAGE
     __block AVAudioRecorder* recorder = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4051,10 +4378,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+#else
+    return (JAVA_LONG)0;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                               JAVA_LONG  peer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4069,20 +4400,24 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_M
 #endif
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_pauseAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                               JAVA_LONG  peer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         [recorder pause];
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                 JAVA_LONG  peer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
     AVAudioRecorder* recorder = (BRIDGE_CAST AVAudioRecorder*)((void *)peer);
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4092,6 +4427,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE
 #endif
         POOL_END();
     });
+#endif
 }
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -4865,7 +5201,35 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     pSize *= scaleValue;
     POOL_BEGIN();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    UIFont* fnt = [UIFont fontWithName:str size:pSize];
+    
+    UIFont* fnt;
+    if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
+        if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
+            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightUltraLight];
+        } else {
+            if([str isEqualToString:@"HelveticaNeue-Light"]) {
+                fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightLight];
+            } else {
+                if([str isEqualToString:@"HelveticaNeue-Medium"]) {
+                    fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightMedium];
+                } else {
+                    if([str isEqualToString:@"HelveticaNeue-Bold"]) {
+                        fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightBold];
+                    } else {
+                        if([str isEqualToString:@"HelveticaNeue-CondensedBlack"]) {
+                            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightHeavy];
+                        } else {
+                            // this is probably an italic font, fallback to regular code...
+                            fnt = [UIFont fontWithName:str size:pSize];
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        fnt = [UIFont fontWithName:str size:pSize];
+    }
+    
 #ifndef CN1_USE_ARC
     [fnt retain];
 #endif
@@ -5067,7 +5431,7 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
-UIPopoverController* popoverControllerInstance;
+extern UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
 
@@ -6117,10 +6481,10 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
         GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
         
         int d0 = destPos + i;
-        outData[d0++] = outputVector.v[0];
-        outData[d0++] = outputVector.v[1];
+        outData[d0++] = outputVector.v[0] / outputVector.v[3];
+        outData[d0++] = outputVector.v[1] / outputVector.v[3];
         if (pointSize==3) {
-            outData[d0] = outputVector.v[2];
+            outData[d0] = outputVector.v[2] / outputVector.v[3];
         }     
     }
     
@@ -7308,7 +7672,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
     }
     JAVA_OBJECT bgImageOrig = com_codename1_ui_plaf_Style_getBgImage___R_com_codename1_ui_Image(threadStateData, s);
     if (bgImageOrig == JAVA_NULL) {
-        if (com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s) ==get_static_com_codename1_ui_plaf_Style_BACKGROUND_GRADIENT_LINEAR_VERTICAL()) {
+        if (com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s) >=get_static_com_codename1_ui_plaf_Style_BACKGROUND_GRADIENT_LINEAR_VERTICAL()) {
             com_codename1_impl_CodenameOneImplementation_drawGradientBackground___com_codename1_ui_plaf_Style_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, s, nativeGraphics, x, y, width, height);
             return;
         }
