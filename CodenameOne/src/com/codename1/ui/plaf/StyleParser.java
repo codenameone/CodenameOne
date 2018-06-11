@@ -978,6 +978,9 @@ public class StyleParser {
                 case UNIT_INHERIT: {
                     int px = baseStyle.getPadding(side);
                     byte[] units = baseStyle.getPaddingUnit();
+                    if (units == null) {
+                        return px;
+                    }
                     switch (units[side]) {
                         case Style.UNIT_TYPE_DIPS:
                             return px / (float)Display.getInstance().convertToPixels(1f);
@@ -1006,6 +1009,9 @@ public class StyleParser {
             switch (v.unit) {
                 case UNIT_INHERIT: {
                     byte[] units = baseStyle.getPaddingUnit();
+                    if (units == null) {
+                        return Style.UNIT_TYPE_PIXELS;
+                    }
                     return units[side];
                 }
                 default:
@@ -1042,6 +1048,9 @@ public class StyleParser {
                 case UNIT_INHERIT: {
                     int px = baseStyle.getPadding(side);
                     byte[] units = baseStyle.getMarginUnit();
+                    if (units == null) {
+                        return px;
+                    }
                     switch (units[side]) {
                         case Style.UNIT_TYPE_DIPS:
                             return px / (float)Display.getInstance().convertToPixels(1f);
@@ -1070,6 +1079,10 @@ public class StyleParser {
             switch (v.unit) {
                 case UNIT_INHERIT: {
                     byte[] units = baseStyle.getMarginUnit();
+                    if (units == null) {
+                        return Style.UNIT_TYPE_PIXELS;
+                    }
+                        
                     return units[side];
                 }
                 default:
