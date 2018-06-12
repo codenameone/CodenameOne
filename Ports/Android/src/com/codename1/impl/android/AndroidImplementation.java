@@ -6230,6 +6230,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        if (Build.VERSION.SDK_INT < 21) {
+            List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                String packageName = resolveInfo.activityInfo.packageName;
+                getContext().grantUriPermission(packageName, imageUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
 
         getActivity().startActivityForResult(intent, CAPTURE_IMAGE);
     }
@@ -6264,7 +6272,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, videoUri);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
+        if (Build.VERSION.SDK_INT < 21) {
+            List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                String packageName = resolveInfo.activityInfo.packageName;
+                getContext().grantUriPermission(packageName, videoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
+        
         this.getActivity().startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
