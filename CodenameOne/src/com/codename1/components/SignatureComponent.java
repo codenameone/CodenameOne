@@ -294,9 +294,15 @@ public class SignatureComponent extends Container {
             setLayout(new BorderLayout());
             signaturePanel = new SignaturePanel();
             addComponent(BorderLayout.CENTER, signaturePanel);
-            doneButton = new Button(localize("SignatureComponent.SaveButtonLabel", "Save"));
-            resetButton = new Button(localize("SignatureComponent.ResetButtonLabel", "Reset"));
-            cancelButton = new Button(localize("SignatureComponent.CancelButtonLabel", "Cancel"));
+            doneButton = new Button(
+                localize("SignatureComponent.SaveButtonLabel", "Save"),
+                getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
+            resetButton = new Button(
+                localize("SignatureComponent.ResetButtonLabel", "Reset"),
+                getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
+            cancelButton = new Button(
+                localize("SignatureComponent.CancelButtonLabel", "Cancel"),
+                getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
 
             doneButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
