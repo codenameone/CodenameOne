@@ -537,17 +537,28 @@ public class CN extends  CN1Constants {
     public static void execute(String url) {
         Display.impl.execute(url);
     }
-    
-    
+        
     /**
      * Returns one of the density variables appropriate for this device, notice that
      * density doesn't always correspond to resolution and an implementation might
      * decide to change the density based on DPI constraints.
      *
      * @return one of the DENSITY constants of Display
+     * @deprecated you should use the more precise getDeviceDPI() method instead
      */
     public static int getDeviceDensity() {
         return Display.impl.getDeviceDensity();
+    }
+        
+    /**
+     * Returns the screen density DPI value for this device, notice that
+     * there might be some approximation on this value depending on the
+     * information provided by the native platform
+     *
+     * @return the screen DPI value
+     */
+    public static int getDeviceDPI() {
+        return Display.impl.getDeviceDPI();
     }
 
     /**

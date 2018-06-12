@@ -5051,6 +5051,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private int dDensity = -1;
     
+    /* Override of this function no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
     public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
@@ -5087,49 +5088,78 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return dDensity;
     }
+    */
     
-    double ppi = 0;
+    
+    private int dDPI = -1;
     
     @Override
-    public int convertToPixels(int dipCount, boolean horizontal) {
-        // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
-        // to the convertToPixels() method in the Shooter project or the iOS screenshots
-        // will produce slightly different results than the actual device.
-        
-        // ipad mini is ignored, there is no sensible way to detect it
-        if(ppi == 0) {
+    public int getDeviceDPI() {
+         if(dDPI == -1) {
+            if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
+                dDPI = super.getDeviceDPI();
+            }
             int dispWidth = getDisplayWidth();
             if(isTablet()) {
-                if(dispWidth < 1100) {
-                    ppi = 5.1975051975052;
+                if(dispWidth < 1100) { 
+                    //iPad gen1, iPad 2, iPad Mini gen 1
+                    dDPI = 132;
                 } else {
-                    ppi = 10.3939299449122;
+                    boolean isiPadMiniRetina = false;
+                    String mID = nativeInstance.getModelID();
+                    if ( mID.equalsIgnoreCase("iPad4,4") // iPad Mini 2 Wifi (model A1489)
+                      || mID.equalsIgnoreCase("iPad4,5") // iPad Mini 2 Wifi + Cellular (model A1490)
+                      || mID.equalsIgnoreCase("iPad4,6") // iPad Mini 2 Wifi + Cellular (model A1491)
+                      || mID.equalsIgnoreCase("iPad4,7") // iPad Mini 3 Wifi (model A1599)
+                      || mID.equalsIgnoreCase("iPad4,8") // iPad Mini 3 Wifi + Cellular (model A1600)
+                      || mID.equalsIgnoreCase("iPad4,9") // iPad Mini 3 Wifi + Cellular (model A1601)
+                      || mID.equalsIgnoreCase("iPad5,1") // iPad Mini 4 Wifi (model A1538)
+                      || mID.equalsIgnoreCase("iPad5,2") // iPad Mini 4 Wifi + Cellular (model A1550)
+                    ) {
+                        isiPadMiniRetina = true;
+                    }
+                    
+                    if (isiPadMiniRetina){
+                        //ipad Mini retina 
+                        dDPI = 326;
+                    } else {
+                        //iPad gen 3, iPad gen 4, iPad 2017, iPod Air, iPod Air 2, iPad Pro
+                        dDPI = 264;
+                    }
                 }
             } else {
                 if(dispWidth < 500) {
-                    ppi = 6.4173236936575;
+                    //iphone 2G, 3G, 3GS, iPod touch gen 1 to 3
+                    dDPI = 163;
                 } else {
                     int largest = Math.max(dispWidth, getDisplayHeight());
                     if (largest == 2436) {
                         // iphone X
-                        ppi = 18.031496062992126;
+                        dDPI = 458;
                     } else {
                         if(largest > 2000) {
-                            // iphone 6 plus
-                            ppi = 19.25429416;                    
+                            // iphone 6+, 6s+, 7+ or 8+
+                            dDPI = 458; //401;  //458 is the DPI value used by the iOS toolkit before downsampling to 401 DPI (which is the real physical device density)                 
                         } else {
                             if(largest > 1300) {
-                                // iphone 6
-                                ppi = 12.8369704749679;                    
+                                // iphone 6, 6s, 7, 8, iPod touch gen 4 to 6
+                                dDPI = 326;                    
                             } else {
-                                ppi = 12.8369704749679;                    
+                                // iphone 4, 4s, 5, 5s, 5c, SE
+                                dDPI = 326;                    
                             }
                         }
                     }
                 }
             }
         }
-        return (int)Math.round((((float)dipCount) * ppi));
+        return dDPI;
+    }
+       
+    
+    @Override
+    public float getFontScale() {
+        return nativeInstance.fontScale();
     }
     
     

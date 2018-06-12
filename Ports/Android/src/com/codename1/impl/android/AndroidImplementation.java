@@ -756,6 +756,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Thread.NORM_PRIORITY;
     }
 
+    /* Override of this function no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
@@ -795,7 +796,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         return Display.DENSITY_MEDIUM;
     }
+    */
+    
+    private int dDPI = -1;
+    
+    @Override
+    public int getDeviceDPI() {
+        if (dDPI == -1) {
+            DisplayMetrics metrics = new DisplayMetrics();
+            if (getActivity() != null) {
+                getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            } else {
+                metrics = getContext().getResources().getDisplayMetrics();
+            }
 
+            dDPI = metrics.densityDpi; // (int) (metrics.density * 160f);
+        }
+        return dDPI;
+    }
+    
+    
+    private float fScale = -1;
+    
+    @Override
+    public float getFontScale() {
+        if (fScale == -1) {
+            fScale = getContext().getResources().getConfiguration().fontScale;
+        }
+        return fScale;
+    }
+    
+    
     /**
      * A status flag to indicate that CN1 is in the process of deinitializing.
      */
@@ -4056,12 +4087,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         });
     }
-
-    public int convertToPixels(int dipCount, boolean horizontal) {
-        DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
-        float ppi = dm.density * 160f;
-        return (int) (((float) dipCount) / 25.4f * ppi);
-    }
+    
 
     public boolean isPortrait() {
         int orientation = getContext().getResources().getConfiguration().orientation;
@@ -6106,7 +6132,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
-        
+
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
