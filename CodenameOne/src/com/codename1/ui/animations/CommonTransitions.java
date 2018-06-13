@@ -1049,9 +1049,9 @@ public final class CommonTransitions extends Transition {
         } 
 
         if(transitionType == TYPE_UNCOVER) {
+            source.paintBackgrounds(g);
             paint(g, dest, 0, 0);
             if(source.getParent() != null || buffer == null) {
-                source.paintBackgrounds(g);
                 paint(g, source, slideX + w, slideY + h);
             } else {
                 g.drawImage(buffer, slideX + w, slideY + h);        
