@@ -163,7 +163,18 @@ public class Button extends Label {
      * from the button
      */
     public Button(Command cmd) {
-        this(cmd.getCommandName(), cmd.getIcon());
+        this(cmd, "Button");
+    }		
+
+    /**
+     * Allows binding a command to a button for ease of use
+     * 
+     * @param cmd command whose text would be used for the button and would recive action events
+     * @param id UIID unique identifier for button
+     * from the button
+     */
+    public Button(Command cmd, String id) {
+        this(cmd.getCommandName(), cmd.getIcon(), id);
         addActionListener(cmd);
         this.cmd = cmd;
         setEnabled(cmd.isEnabled());
