@@ -2045,7 +2045,7 @@ public final class GeneralPath implements Shape {
      * include additional path segments so that all points of intersection are
      * start/end points of a segment.
      */
-    public static Shape segmentShape(Rectangle r, Shape s) {
+    static Shape segmentShape(Rectangle r, Shape s) {
         return segmentShape(r, s, new GeneralPath());
     }
     private static GeneralPath segmentShape(Rectangle r, Shape s, GeneralPath out) {
