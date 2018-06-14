@@ -490,6 +490,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
+            checkIosBackgroundFetch();
             stopBackgroundFetchService();
             if (getPreferredBackgroundFetchInterval() > 0) {
                 backgroundFetchTimer = new java.util.Timer();
@@ -8284,6 +8285,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private void checkIosBackgroundFetch() {
+        if (!iosBackgroundFetchChecked) {
+            iosBackgroundFetchChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                
+                String existingModes = m.get("ios.background_modes");
+                if (existingModes == null) {
+                    existingModes = "fetch";
+                } else if (!existingModes.contains("fetch")) {
+                    existingModes += ",fetch";
+                }
+                Display.getInstance().setProjectBuildHint("ios.background_modes", existingModes);
+                
+            }
+        }
+    }
+    
+    private boolean iosBackgroundFetchChecked;
     
     private boolean appleMusicUsageDescriptionChecked;
     
