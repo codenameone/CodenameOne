@@ -340,7 +340,7 @@ public class SimpleDateFormat extends DateFormat {
                     if (len == 2) {
                         v %= 100;
                     }
-                    toAppendTo.append(v);
+                    toAppendTo.append(leftPad(v, len));
                     break;
                 case MONTH_LETTER:
                     v = calendar.get(Calendar.MONTH) - Calendar.JANUARY;
