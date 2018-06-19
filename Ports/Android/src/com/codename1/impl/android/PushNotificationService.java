@@ -101,7 +101,9 @@ public abstract class PushNotificationService extends Service implements PushCal
             NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             Intent newIntent = new Intent(this, getStubClass());
             PendingIntent contentIntent = PendingIntent.getActivity(this, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-            
+
+
+
             Notification.Builder builder = new Notification.Builder(this)
                     .setContentIntent(contentIntent)
                     .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -109,7 +111,57 @@ public abstract class PushNotificationService extends Service implements PushCal
                     .setAutoCancel(true)
                     .setWhen(System.currentTimeMillis())
                     .setContentTitle(value)
+
                     .setDefaults(Notification.DEFAULT_ALL);
+
+
+
+
+            // The following section is commented out so that builds against SDKs below 26
+            // won't fail.
+            /*<SDK26>
+            if(android.os.Build.VERSION.SDK_INT >= 21){
+                builder.setCategory("Notification");
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+                String id = Display.getInstance().getProperty("android.NotificationChannel.id", "cn1-channel");
+
+                CharSequence name = Display.getInstance().getProperty("android.NotificationChannel.name", "Notifications");
+
+                String description = Display.getInstance().getProperty("android.NotificationChannel.description", "Remote notifications");
+
+                int importance = Integer.parseInt(Display.getInstance().getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_LOW));
+
+                android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
+
+                mChannel.setDescription(description);
+
+                mChannel.enableLights(Boolean.parseBoolean(Display.getInstance().getProperty("android.NotificationChannel.enableLights", "true")));
+
+                mChannel.setLightColor(Integer.parseInt(Display.getInstance().getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
+
+                mChannel.enableVibration(Boolean.parseBoolean(Display.getInstance().getProperty("android.NotificationChannel.enableVibration", "false")));
+                String vibrationPatternStr = Display.getInstance().getProperty("android.NotificationChannel.vibrationPattern", null);
+                if (vibrationPatternStr != null) {
+                    String[] parts = vibrationPatternStr.split(",");
+                    int len = parts.length;
+                    long[] pattern = new long[len];
+                    for (int i=0; i<len; i++) {
+                        pattern[i] = Long.parseLong(parts[i].trim());
+                    }
+                    mChannel.setVibrationPattern(pattern);
+                }
+
+
+
+                mNotificationManager.createNotificationChannel(mChannel);
+                System.out.println("Setting push channel to "+id);
+                builder.setChannelId(id);
+            }
+            </SDK26>*/
+
             Notification notif = builder.build();
             nm.notify((int)System.currentTimeMillis(), notif);
         }
