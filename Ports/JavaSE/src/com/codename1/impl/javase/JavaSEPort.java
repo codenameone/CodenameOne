@@ -89,6 +89,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
@@ -9231,8 +9232,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public String getDatabasePath(String databaseName) {
         if(exposeFilesystem){
-            return getStorageDir() + "/database/" + databaseName;
+            File f = getDatabaseFile(databaseName);
+        
+            return f.getAbsolutePath();
         }else{
+            if (databaseName.startsWith("file://")) {
+                return databaseName;
+            }
             return getAppHomePath() + "database/" + databaseName;        
         }
     }
@@ -9253,12 +9259,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             // current working directory
             SQLiteConfig config = new SQLiteConfig();
             config.enableLoadExtension(true);
-            File dir = new File(getStorageDir() + "/database");
+            File file = getDatabaseFile(databaseName);
+             
+            
+            File dir = file.getParentFile();
             if (!dir.exists()) {
                 dir.mkdir();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
-                    + getStorageDir() + "/database/" + databaseName,
+            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
+                    file.getAbsolutePath(),
                     config.toProperties()
             );
 
@@ -9269,19 +9278,42 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    
+    private File getDatabaseFile(String databaseName) {
+        File f = new File(getStorageDir() + "/database/" + databaseName);
+        if (exposeFilesystem) {
+            if (databaseName.contains("/") || databaseName.contains("\\")) {
+                f = new File(databaseName);
+            }
+        } else {
+            if (databaseName.startsWith("file://")) {
+                f = new File(FileSystemStorage.getInstance().toNativePath(databaseName));
+            }
+            
+        }
+        return f;
+    }
+    
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+    
     @Override
     public void deleteDB(String databaseName) throws IOException {
         System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         if (f.exists()) {
             f.delete();
         }
     }
+    
+    
 
     @Override
     public boolean existsDB(String databaseName) {
         System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         return f.exists();
     }
 

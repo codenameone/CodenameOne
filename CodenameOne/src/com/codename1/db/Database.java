@@ -48,14 +48,34 @@ import java.io.IOException;
 public abstract class Database {
     
     /**
-     * Opens a database or create one if not exists
+     * Checks if this platform supports custom database paths.  On platforms that
+     * support this, you can pass a file path to {@link #openOrCreate(java.lang.String) }, {@link #exists(java.lang.String) },
+     * {@link #delete(java.lang.String) }, and {@link #getDatabasePath(java.lang.String) }.
+     * @return True on platorms that support custom database paths.
+     */
+    public static boolean isCustomPathSupported() {
+        return Display.getInstance().isDatabaseCustomPathSupported();
+    }
+    
+    private static void validateDatabaseNameArgument(String databaseName) {
+        if (!isCustomPathSupported()) {
+            if (databaseName.indexOf("/") != -1 || databaseName.indexOf("\\") != -1) {
+                throw new IllegalArgumentException("This platform does not support custom database paths.  The database name cannot contain file separators.");
+            }
+        }
+    }
+    
+    /**
+     * Opens a database or create one if not exists.  
      * 
-     * @param databaseName the name of the database
+     * @param databaseName the name of the database.  Platforms that support custom database
+     * paths (i.e. {@link #isCustomPathSupported() } return {@literal true}), will also accept a file path here.
      * @return Database Object or null if not supported on the platform
      * 
      * @throws IOException if database cannot be created
      */
     public static Database openOrCreate(String databaseName) throws IOException{
+        validateDatabaseNameArgument(databaseName);
         return Display.getInstance().openOrCreate(databaseName);
     }
         
@@ -64,10 +84,12 @@ public abstract class Database {
      * 
      * <p><strong>NOTE:</strong> Not supported in the  Javascript port.  Will always return false.</p>
      * 
-     * @param databaseName the name of the database
+     * @param databaseName the name of the database.  Platforms that support custom database
+     * paths (i.e. {@link #isCustomPathSupported() } return {@literal true}), will also accept a file path here.
      * @return true if database exists
      */
     public static boolean exists(String databaseName){
+        validateDatabaseNameArgument(databaseName);
         return Display.getInstance().exists(databaseName);
     }
     
@@ -76,10 +98,12 @@ public abstract class Database {
      * 
      * <p><strong>NOTE:</strong> This method is not supported in the  Javascript port.  Will silently fail.</p>
      * 
-     * @param databaseName the name of the database
+     * @param databaseName the name of the database. Platforms that support custom database
+     * paths (i.e. {@link #isCustomPathSupported() } return {@literal true}), will also accept a file path here.
      * @throws IOException if database cannot be deleted
      */
     public static void delete(String databaseName) throws IOException{
+        validateDatabaseNameArgument(databaseName);
         Display.getInstance().delete(databaseName);
     }
     
@@ -87,10 +111,13 @@ public abstract class Database {
      * Returns the file path of the Database if exists and if supported on 
      * the platform.
      * 
+     * @param databaseName The name of the database. Platforms that support custom database
+     * paths (i.e. {@link #isCustomPathSupported() } return {@literal true}), will also accept a file path here.
      * <p><strong>NOTE:</strong> This method will return null in the Javascript port.</p>
      * @return the file path of the database
      */
     public static String getDatabasePath(String databaseName){
+        validateDatabaseNameArgument(databaseName);
         return Display.getInstance().getDatabasePath(databaseName);    
     }
     

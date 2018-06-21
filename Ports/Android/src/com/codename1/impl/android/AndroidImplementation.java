@@ -6852,22 +6852,44 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        SQLiteDatabase db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        SQLiteDatabase db;
+        if (databaseName.startsWith("file://")) {
+            db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
+        } else {
+            db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        }
         return new AndroidDB(db);
     }
 
     @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+    
+    
+
+    @Override
     public void deleteDB(String databaseName) throws IOException {
+        if (databaseName.startsWith("file://")) {
+            deleteFile(databaseName);
+            return;
+        }
         getContext().deleteDatabase(databaseName);
     }
 
     @Override
     public boolean existsDB(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return exists(databaseName);
+        }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.exists();
     }
 
     public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.getAbsolutePath();
     }
