@@ -127,6 +127,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
@@ -7565,8 +7566,49 @@ public class JavaSEPort extends CodenameOneImplementation {
                 nr.setMethod(method.toUpperCase());
             }
         }
+        if(method.equalsIgnoreCase("patch")) {
+            allowPatch((HttpURLConnection) connection);
+        }
         ((HttpURLConnection) connection).setRequestMethod(method);
     }
+    
+    // the following block is based on a few suggestions in this stack overflow 
+    // answer https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch
+    private static boolean enabledPatch;
+    private static boolean patchFailed;
+    private static void allowPatch(HttpURLConnection connection) {
+        if(enabledPatch) {
+            return;
+        }
+        if(patchFailed) {
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            return;
+        }
+        try {
+            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
+
+            methodsField.setAccessible(true);
+
+            String[] oldMethods = (String[]) methodsField.get(null);
+            Set<String> methodsSet = new LinkedHashSet<String>(Arrays.asList(oldMethods));
+            methodsSet.addAll(Arrays.asList("PATCH"));
+            String[] newMethods = methodsSet.toArray(new String[0]);
+
+            methodsField.set(null/*static field*/, newMethods);
+            enabledPatch = true;
+        } catch (NoSuchFieldException e) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        } catch(IllegalAccessException ee) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        }
+    }    
+    
 
     /**
      * @inheritDoc
