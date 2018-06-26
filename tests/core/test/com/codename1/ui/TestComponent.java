@@ -711,6 +711,11 @@ public class TestComponent extends AbstractTest {
             
             format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
             java.util.Date dt = format.parse("tue 21-nov-2017 17:04:27 gmt");
+            if (Display.getInstance().isSimulator()) {
+                java.text.SimpleDateFormat format0 = new java.text.SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
+                java.util.Date dt0 = format0.parse("tue 21-nov-2017 17:04:27 gmt");
+                TestUtils.assertEqual(dt0, dt, "SimpleDateFormat gives different result than java.text version on tue 21-nov-2017 17:04:27 gmt with format \"EEE, dd-MMM-yyyy HH:mm:ss z\"");
+            }
             TestUtils.assertBool(dt.getTime() / 1000L == 1511283867L, "Incorrect date for simple date format parse");
             
             format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");

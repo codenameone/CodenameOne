@@ -39,6 +39,10 @@
 
     <target depends="compile-test" name="-do-test-run">        
         <!-- JavaSE.jar is added here since the test execution might fail otherwise for a pre-existing project -->
+        <echo>Updating unitTests.jar with native files</echo>
+        <jar destfile="dist/unitTests.jar" update="true">
+            <fileset dir="native/internal_tmp"/>
+        </jar>
         <java classpath="dist/unitTests.jar:${javac.test.classpath}:${file.reference.JavaSE.jar}" classname="com.codename1.impl.javase.TestRunner" fork="true">
             <arg value="${codename1.packageName}.${codename1.mainName}" />
         </java>

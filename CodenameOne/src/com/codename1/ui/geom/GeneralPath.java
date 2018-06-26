@@ -25,6 +25,7 @@ package com.codename1.ui.geom;
 
 import com.codename1.io.Log;
 import com.codename1.ui.Transform;
+import com.codename1.ui.geom.Geometry.BezierCurve;
 import com.codename1.util.MathUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1451,17 +1452,14 @@ public final class GeneralPath implements Shape {
      * @return The bounding box of the path.
      */
     public Rectangle getBounds() {
-        
+        // NOTE (SJH20180614): If the path contains bezier curves,  may be larger than drawn bounds.
+        // See note in getBounds(Rectangle) for more details.
         float[] r = getBounds2D();
         int x1 = (int)Math.floor(r[0]);
         int y1 = (int)Math.floor(r[1]);
         int x2 = (int)Math.ceil(r[0]+r[2]);
         int y2 = (int)Math.ceil(r[1]+r[3]);
         return new Rectangle(x1, y1, x2-x1, y2-y1);
-        /*
-        float[] r = getBounds2D();
-        return new Rectangle((int)r[0], (int)r[1], (int)r[2], (int)r[3]);*/
-
     }
     
     /**
@@ -1469,6 +1467,16 @@ public final class GeneralPath implements Shape {
      * @param out 
      */
     public void getBounds(Rectangle out) {
+        // NOTE (SJH20180614): If the path contains bezier curves, this bounds
+        // may be much larger than the actual drawn bounds because it includes
+        // the control points in the bounds (and control points are not actually
+        // drawn.
+        // We can get an accurate bounds for the bezier curves using BezierCurve.getBoundingRect()
+        // but this is a relatively expensive operation as it must solve cubic or quadratic
+        // equations for each curve.
+        // This this method is used inside the Graphics clipping functionality 
+        // we need to make sure it's fast.
+        
         float rx1, ry1, rx2, ry2;
         if (pointSize == 0) {
             rx1 = ry1 = rx2 = ry2 = 0.0f;
@@ -1507,6 +1515,8 @@ public final class GeneralPath implements Shape {
      * @return True if this path forms a rectangle.  False otherwise.
      */
     public boolean isRectangle() {
+        // NOTE (SJH20180614): This is used extensively in clipping.   We can probably
+        // do this more efficiently without needing to call getBounds()
         float[] tmpPointsBuf = createFloatArrayFromPool(6);
         boolean[] tmpCornersBuf = createBoolArrayFromPool(4);
         Iterator it = createIteratorFromPool(this, null);
@@ -1716,7 +1726,6 @@ public final class GeneralPath implements Shape {
     public boolean intersect(Rectangle rect) {
         GeneralPath intersectionScratchPath = createPathFromPool();
         try {
-            
             Shape result = ShapeUtil.intersection(rect, this, intersectionScratchPath);
             if (result != null) {
                 this.setPath(intersectionScratchPath, null);
@@ -1809,7 +1818,7 @@ public final class GeneralPath implements Shape {
      *
      * @author shannah
      */
-    private static class ShapeUtil {
+    static class ShapeUtil {
     
     
         
@@ -1828,7 +1837,11 @@ public final class GeneralPath implements Shape {
         
     
     private static Shape intersection(Rectangle r, Shape s, GeneralPath out) {
-        
+        if (r.getWidth() == 0 || r.getHeight() == 0) {
+            out.setRect(r, null);
+            return out;
+        }
+        Rectangle2D rect2D = null;
         Shape segmentedShape = segmentShape(r, s);
         Iterator it = createIteratorFromPool((GeneralPath)segmentedShape, null);
         //GeneralPath out = new GeneralPath();
@@ -1847,7 +1860,12 @@ public final class GeneralPath implements Shape {
 
             float prevX=0; 
             float prevY=0;
-
+            double origPrevX=0;
+            double origPrevY=0;
+            BezierCurve curve = null;
+            
+            double epsilon = 0.01;
+            
             while (!it.isDone()) {
                 int type = it.currentSegment(buf);
 
@@ -1857,9 +1875,103 @@ public final class GeneralPath implements Shape {
                         //System.out.println("Closing path");
                         out.closePath();
                         break;
+                    case PathIterator.SEG_CUBICTO:    
+                    case PathIterator.SEG_QUADTO:
+                        if (rect2D == null) {
+                            rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                        }
+                        curve = type==PathIterator.SEG_QUADTO ? new BezierCurve(origPrevX, origPrevY, buf[0], buf[1], buf[2], buf[3]) :
+                                new BezierCurve(origPrevX, origPrevY, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+                        //Point2D curveStart = curve.getStartPoint();
+                        Point2D curveEnd = curve.getEndPoint();
+                        Rectangle2D boundingRect = curve.getBoundingRect();
+                        if (!started || (boundingRect.getX() < minX)) {
+                            minX = (float)boundingRect.getX();
+                        }
+                        if (!started || (boundingRect.getX() + boundingRect.getWidth() > maxX)) {
+                            maxX = (float)(boundingRect.getX() + boundingRect.getWidth());
+                        }
 
+                        if (!started || (boundingRect.getY() < minY)) {
+                            minY = (float)(boundingRect.getY());
+                        }
+                        if (!started || (boundingRect.getY() + boundingRect.getHeight()> maxY)) {
+                            maxY = (float)(boundingRect.getY() + boundingRect.getHeight());
+                        }
+                        if (rect2D.contains(curve.x(0.5), curve.y(0.5))) {
+                            // It is fully inside, we can just add it to the out path
+                            curve.addToPath(out, false);
+                            prevX = (float)curveEnd.getX();
+                            prevY = (float)curveEnd.getY();
+                            origPrevX = curveEnd.getX();
+                            origPrevY = curveEnd.getY();
+                            started = true;
+                        } else {
+                            // It is fully outside.
+                            // We will simply draw a line on the edge of the rectangle 
+                            // border
+                            
+                            // Store end point of shadow lines into (buf[0], buf[1])
+                            if (curveEnd.getX() < x1) {
+                                buf[0] = x1;
+                            } else if (curveEnd.getX() > x2) {
+                                buf[0] = x2;
+                            } else {
+                                buf[0] = (float)curveEnd.getX();
+                            }
+                            if (curveEnd.getY() < y1) {
+                                buf[1] = y1;
+                            } else if (curveEnd.getY() > y2) {
+                                buf[1] = y2;
+                            } else {
+                                buf[1] = (float)curveEnd.getY();
+                            }
+                            
+                            // Since the curve was segmented on the rect, the starting point
+                            // of the curve must also be on the edge of the rectangle.
+                            
+                            if (Math.abs(buf[0]-prevX) < epsilon || Math.abs(buf[1]-prevY) < epsilon) {
+                                // Same edge.. we can just do a single line
+                                out.lineTo(buf[0], buf[1]);
+                            } else {
+                                // Different edge.  We can't do a single line.
+                                if (Math.abs(buf[0]-x1) < epsilon) {
+                                    out.lineTo(x1, prevY);
+                                    out.lineTo(buf[0], buf[1]);
+                                } else if (Math.abs(buf[0]-x2) < epsilon) {
+                                    out.lineTo(x2, prevY);
+                                    out.lineTo(buf[0], buf[1]);
+                                } else if (Math.abs(buf[1]-y1) < epsilon) {
+                                    out.lineTo(prevX, y1);
+                                    out.lineTo(buf[0], buf[1]);
+                                } else if (Math.abs(buf[1]-y2) < epsilon) {
+                                    out.lineTo(prevX, y2);
+                                    out.lineTo(buf[0], buf[1]);
+                                } else {
+                                    System.out.println("buf="+Arrays.toString(buf));
+                                    System.out.println("Curve: "+curve);
+                                    System.out.println("Rect: "+rect2D);
+                                    System.out.println("type: "+type);
+                                    throw new RuntimeException("Unexpected shape segmentation on curve-");
+                                }
+                                
+                            }
+                            
+                            prevX = buf[0];
+                            prevY = buf[1];
+                            origPrevX = curveEnd.getX();
+                            origPrevY = curveEnd.getY();
+                            started = true;
+                            
+                        }
+                        
+                        
+
+                        break;
                     case PathIterator.SEG_MOVETO:
                     case PathIterator.SEG_LINETO:
+                        origPrevX = buf[0];
+                        origPrevY = buf[1];
                         if (buf[0] < x1) {
                             buf[0] = x1;
                         } else if (buf[0] > x2) {
@@ -1902,7 +2014,7 @@ public final class GeneralPath implements Shape {
                         //count++;
                         break;
                     default:
-                        throw new RuntimeException("Intersection only supports polygons currently");
+                        throw new RuntimeException("Unsupported segment type for intersection "+type);
                 }
                 it.next();
 
@@ -1937,13 +2049,16 @@ public final class GeneralPath implements Shape {
         return segmentShape(r, s, new GeneralPath());
     }
     private static GeneralPath segmentShape(Rectangle r, Shape s, GeneralPath out) {
+        Rectangle2D rect2D = null;
+        java.util.List<BezierCurve> curveSegments = null;
+        BezierCurve curve = null;
         GeneralPath tmpGeneralPath = null;
         if (s.getClass() != GeneralPath.class) {
             tmpGeneralPath = createPathFromPool();
             tmpGeneralPath.setShape(s, null);
             s = tmpGeneralPath;
         }
-        
+        float[] tmp = null;
         Iterator it = createIteratorFromPool((GeneralPath)s, null);
         //GeneralPath out = new GeneralPath();
         float[] buf = createFloatArrayFromPool(6); // buffer to hold segment coordinates from PathIterator.currentSegment
@@ -1972,6 +2087,52 @@ public final class GeneralPath implements Shape {
                         //System.out.println("Moving to "+prevX+","+prevY);
                         break;
 
+                    case PathIterator.SEG_QUADTO:
+                        if (rect2D == null) {
+                            rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                        }
+                        currX = curr[0] = buf[2];
+                        currY = curr[1] = buf[3];
+                        curve = new BezierCurve(prevX, prevY, buf[0], buf[1], currX, currY);
+                        if (curveSegments == null) {
+                            curveSegments = new ArrayList<BezierCurve>();
+                        } else {
+                            curveSegments.clear();
+                        }
+                        curve.segment(rect2D, curveSegments);
+                        for (BezierCurve segment : curveSegments) {
+                            segment.addToPath(out, true);
+                        }
+                        prevX = currX;
+                        prevY = currY;
+                        tmp = curr;
+                        curr = prev;
+                        prev = tmp;
+                        
+                        break;
+                    case PathIterator.SEG_CUBICTO:
+                        if (rect2D == null) {
+                            rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                        }
+                        currX = curr[0] = buf[4];
+                        currY = curr[1] = buf[5];
+                        curve = new BezierCurve(prevX, prevY, buf[0], buf[1], buf[2], buf[3], currX, currY);
+                        if (curveSegments == null) {
+                            curveSegments = new ArrayList<BezierCurve>();
+                        } else {
+                            curveSegments.clear();
+                        }
+                        curve.segment(rect2D, curveSegments);
+                        for (BezierCurve segment : curveSegments) {
+                            segment.addToPath(out, true);
+                        }
+                        // Set current position to prev for next iteration.
+                        prevX = currX;
+                        prevY = currY;
+                        tmp = curr;
+                        curr = prev;
+                        prev = tmp;
+                        break;
                     case PathIterator.SEG_LINETO:
                         // Line Segment may need to be partitioned if it crosses
                         // an edge of the rectangle.
@@ -1997,7 +2158,7 @@ public final class GeneralPath implements Shape {
                         // Set current position to prev for next iteration.
                         prevX = currX;
                         prevY = currY;
-                        float[] tmp = curr;
+                        tmp = curr;
                         curr = prev;
                         prev = tmp;
 
@@ -2022,7 +2183,7 @@ public final class GeneralPath implements Shape {
 
                         break;
                     default:
-                        throw new RuntimeException("Shape segmentation only supported for polygons");
+                        throw new RuntimeException("Unsupported path segment type: "+type);
                 }
                 it.next();
             }

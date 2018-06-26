@@ -164,8 +164,6 @@ public class Picker extends Button {
                     // we don't want to re-handle it here.
                     return;
                 }
-                System.out.println("In action event");
-                
                 if (isEditing()) {
                     evt.consume();
                     return;
@@ -432,17 +430,11 @@ public class Picker extends Button {
                     
                     Component next = null;
                     Form f = getComponentForm();
-                    if (command == COMMAND_NEXT && f != null) {
-                        ListIterator<Component> traversalIt = f.getTabIterator(Picker.this);
-                        if (traversalIt.hasNext()) {
-                            next = traversalIt.next();
-                        }
-                        System.out.println("Next editable down is "+next);
-                        
-                    } else if (command == COMMAND_PREV) {
-                        ListIterator<Component> traversalIt = f.getTabIterator(Picker.this);
-                        if (traversalIt.hasPrevious()) {
-                            next = traversalIt.previous();
+                    if (f != null) {
+                        if (command == COMMAND_NEXT) {
+                            next = f.getNextComponent(Picker.this);
+                        } else if (command == COMMAND_PREV) {
+                            next = f.getPreviousComponent(Picker.this);
                         }
                     }
                     if (next != null) {
@@ -491,7 +483,12 @@ public class Picker extends Button {
 
                                 @Override
                                 public void actionPerformed(ActionEvent evt) {
-                                    endEditing(COMMAND_NEXT, self, spinner);
+                                    if (Display.getInstance().isShiftKeyDown()) {
+                                        endEditing(COMMAND_PREV, self, spinner);
+                                    } else {
+                                        endEditing(COMMAND_NEXT, self, spinner);
+                                    }
+                                        
                                 }
                                 
                             };
@@ -579,6 +576,11 @@ public class Picker extends Button {
                 ListIterator<Component> traversalIt = getComponentForm().getTabIterator(Picker.this);
                 if (traversalIt.hasNext()) {
                     nextButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
+                    // Javascript port needs to know that this button is going to try to 
+                    // focus a text field (possibly) so that it can prepare the text field
+                    // in the native event handler.  We use this client property to let it know... it
+                    // will handle the rest.
+                    nextButton.putClientProperty("$$focus", ((Form.TabIterator)traversalIt).getNext());
                     FontImage.setMaterialIcon(nextButton, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
                     nextButton.addActionListener(new ActionListener() {
 
@@ -595,6 +597,12 @@ public class Picker extends Button {
                 
                 if (traversalIt.hasPrevious()) {
                     prevButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
+                    
+                    // Javascript port needs to know that this button is going to try to 
+                    // focus a text field (possibly) so that it can prepare the text field
+                    // in the native event handler.  We use this client property to let it know... it
+                    // will handle the rest.
+                    prevButton.putClientProperty("$$focus", ((Form.TabIterator)traversalIt).getPrevious());
                     FontImage.setMaterialIcon(prevButton, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
                     prevButton.addActionListener(new ActionListener() {
 
@@ -657,40 +665,7 @@ public class Picker extends Button {
                         @Override
                         public void run() {
                             dlg.show(top, bottom, left, right);
-                            
-                            final Form f = getComponentForm();
-                            if (f != null) {
-                                f.getAnimationManager().flushAnimation(new Runnable() {
-                                    public void run() {
-                                        Container contentPane = f.getContentPane();
-                                        Style style = contentPane.getStyle();
-                                        byte[] marginUnits = style.getMarginUnit();
-                                        if (marginUnits == null) {
-                                            marginUnits = new byte[]{
-                                                Style.UNIT_TYPE_PIXELS,
-                                                Style.UNIT_TYPE_PIXELS,
-                                                Style.UNIT_TYPE_PIXELS,
-                                                Style.UNIT_TYPE_PIXELS
-                                            };
-                                        }
-                                        if (tmpContentPaneMarginUnit == null) {
-                                            tmpContentPaneMarginUnit = new byte[4];
-                                            System.arraycopy(marginUnits, 0, tmpContentPaneMarginUnit, 0, 4);
-                                            tmpContentPaneBottomMargin = style.getMarginBottom();
-                                        }
-                                        
-                                        
-                                        marginUnits[Component.BOTTOM] = Style.UNIT_TYPE_PIXELS;
-                                        style.setMarginUnit(marginUnits);
-                                        style.setMarginBottom(contentPane.getHeight() - top);
-                                        f.revalidate();
-                                        f.scrollComponentToVisible(Picker.this);
-                                    }
-                                   
-                                });
-                           
-                                
-                            }
+                            padContentPane(top, bottom, left, right);
                         }
                         
                     });
@@ -867,7 +842,46 @@ public class Picker extends Button {
             f.revalidate();
         }
     }
-    
+
+
+
+    private void padContentPane(final int top, final int bottom, final int left, final int right) {
+        final Form f = getComponentForm();
+        if (f != null) {
+            f.getAnimationManager().flushAnimation(new Runnable() {
+                public void run() {
+                    Container contentPane = f.getContentPane();
+                    Style style = contentPane.getStyle();
+                    byte[] marginUnits = style.getMarginUnit();
+                    if (marginUnits == null) {
+                        marginUnits = new byte[]{
+                                Style.UNIT_TYPE_PIXELS,
+                                Style.UNIT_TYPE_PIXELS,
+                                Style.UNIT_TYPE_PIXELS,
+                                Style.UNIT_TYPE_PIXELS
+                        };
+                    }
+                    if (tmpContentPaneMarginUnit == null) {
+                        tmpContentPaneMarginUnit = new byte[4];
+                        System.arraycopy(marginUnits, 0, tmpContentPaneMarginUnit, 0, 4);
+                        tmpContentPaneBottomMargin = style.getMarginBottom();
+                    }
+
+
+                    marginUnits[Component.BOTTOM] = Style.UNIT_TYPE_PIXELS;
+                    style.setMarginUnit(marginUnits);
+                    style.setMarginBottom(Math.max(0, contentPane.getHeight() - top));
+                    f.revalidate();
+
+                    f.scrollComponentToVisible(Picker.this);
+                }
+
+            });
+
+
+        }
+    }
+
     private void registerAsInputDevice(final InteractionDialog dlg) {
         
         final Form f = this.getComponentForm();
@@ -894,6 +908,11 @@ public class Picker extends Button {
                             @Override
                             public void run() {
                                 dlg.resize(top, bottom, left, right);
+                                padContentPane(top, bottom, left, right);
+
+
+
+
                             }
 
                         });
@@ -1319,15 +1338,5 @@ public class Picker extends Button {
         }
         return super.getStyle(); 
     }
-
-    @Override
-    protected void focusGained() {
-        super.focusGained();
-        if (!isEditing()) {
-            startEditingAsync();
-        }
-    }
-    
-    
-    
+ 
 }

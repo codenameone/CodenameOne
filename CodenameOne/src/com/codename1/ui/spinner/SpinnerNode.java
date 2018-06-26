@@ -9,6 +9,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
+import com.codename1.ui.Transform;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.SelectionListener;
@@ -104,7 +105,7 @@ class SpinnerNode extends Node {
     
     private static boolean usePerspective() {
         // Disabling perspective for now because need to work out a few issues
-        return false;
+        return false; //Transform.isPerspectiveSupported();
     }
     
     public SpinnerNode() {

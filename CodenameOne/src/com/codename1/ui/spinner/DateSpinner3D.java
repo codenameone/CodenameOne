@@ -95,6 +95,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                     if (input != null) {
                         Calendar c = Calendar.getInstance();
                         c.set(Calendar.MONTH, new Double(Double.parseDouble(input)).intValue()-1);
+                        c.set(Calendar.DAY_OF_MONTH, 15);
                         return fmt.format(c.getTime());
                     }
                     return null;

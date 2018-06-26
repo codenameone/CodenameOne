@@ -74,7 +74,7 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
     
     /**
      * Removes the given item 
-     * @param the item to remove
+     * @param v the item to remove
      */
     public abstract K remove(T v);
     

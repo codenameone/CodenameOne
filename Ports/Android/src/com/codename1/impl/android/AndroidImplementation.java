@@ -100,6 +100,7 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.FileProvider;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -164,6 +165,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.CookieHandler;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -4844,9 +4847,49 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void setHttpMethod(Object connection, String method) throws IOException {
+        if(method.equalsIgnoreCase("patch")) {
+            allowPatch((HttpURLConnection) connection);
+        }
         ((HttpURLConnection) connection).setRequestMethod(method);
     }
 
+    // the following block is based on a few suggestions in this stack overflow 
+    // answer https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch
+    private static boolean enabledPatch;
+    private static boolean patchFailed;
+    private static void allowPatch(HttpURLConnection connection) {
+        if(enabledPatch) {
+            return;
+        }
+        if(patchFailed) {
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            return;
+        }
+        try {
+            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
+
+            methodsField.setAccessible(true);
+
+            String[] oldMethods = (String[]) methodsField.get(null);
+            Set<String> methodsSet = new LinkedHashSet<String>(Arrays.asList(oldMethods));
+            methodsSet.addAll(Arrays.asList("PATCH"));
+            String[] newMethods = methodsSet.toArray(new String[0]);
+
+            methodsField.set(null/*static field*/, newMethods);
+            enabledPatch = true;
+        } catch (NoSuchFieldException e) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        } catch(IllegalAccessException ee) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        }
+    }    
+    
     /**
      * @inheritDoc
      */
@@ -6105,7 +6148,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
-
+        
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
@@ -6218,8 +6261,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 
         File newFile = getOutputMediaFile(false);
-        Uri imageUri = Uri.fromFile(newFile);
-
+        newFile.getParentFile().mkdirs();
+        newFile.getParentFile().setWritable(true, false);
+        //Uri imageUri = Uri.fromFile(newFile);
+        Uri imageUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
 
         String lastImageID = getLastImageId();
@@ -6227,6 +6272,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        if (Build.VERSION.SDK_INT < 21) {
+            List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                String packageName = resolveInfo.activityInfo.packageName;
+                getContext().grantUriPermission(packageName, imageUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
 
         getActivity().startActivityForResult(intent, CAPTURE_IMAGE);
     }
@@ -6255,13 +6308,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
 
         File newFile = getOutputMediaFile(true);
-        Uri videoUri = Uri.fromFile(newFile);
+        Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
 
         Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, videoUri);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
+        if (Build.VERSION.SDK_INT < 21) {
+            List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                String packageName = resolveInfo.activityInfo.packageName;
+                getContext().grantUriPermission(packageName, videoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
+        
         this.getActivity().startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
@@ -6455,16 +6515,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public static File getOutputMediaFile(boolean isVideo, Context activity, CharSequence title) {
 
 
-            File mediaStorageDir = null;
-            if(android.os.Build.VERSION.SDK_INT >= 8) {
-                mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                        Environment.DIRECTORY_PICTURES), "" + title);
-            } else {
-                mediaStorageDir = new File(Environment.getExternalStorageDirectory(), "" + title);
-            }
-
-            // This location works best if you want the created images to be shared
-            // between applications and persist after your app has been uninstalled.
+            File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), ""+title);
 
             // Create the storage directory if it does not exist
             if (!mediaStorageDir.exists()) {
@@ -6801,22 +6852,44 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        SQLiteDatabase db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        SQLiteDatabase db;
+        if (databaseName.startsWith("file://")) {
+            db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
+        } else {
+            db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        }
         return new AndroidDB(db);
     }
 
     @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+    
+    
+
+    @Override
     public void deleteDB(String databaseName) throws IOException {
+        if (databaseName.startsWith("file://")) {
+            deleteFile(databaseName);
+            return;
+        }
         getContext().deleteDatabase(databaseName);
     }
 
     @Override
     public boolean existsDB(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return exists(databaseName);
+        }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.exists();
     }
 
     public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.getAbsolutePath();
     }
@@ -7427,7 +7500,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if(type == Display.PICKER_TYPE_DATE) {
             final java.util.Calendar cl = java.util.Calendar.getInstance();
-            cl.setTime((Date)currentValue);
+            if(currentValue != null) {
+                cl.setTime((Date)currentValue);
+            }
             class DatePick implements DatePickerDialog.OnDateSetListener,DatePickerDialog.OnCancelListener, Runnable {
                 Date result = (Date)currentValue;
 

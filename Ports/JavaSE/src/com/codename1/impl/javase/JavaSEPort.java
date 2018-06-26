@@ -89,6 +89,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
@@ -126,6 +127,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
@@ -490,6 +492,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
+            checkIosBackgroundFetch();
             stopBackgroundFetchService();
             if (getPreferredBackgroundFetchInterval() > 0) {
                 backgroundFetchTimer = new java.util.Timer();
@@ -4243,6 +4246,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
+                
                 /*
                 ((JTextField)t).addActionListener(new ActionListener() {
 
@@ -4308,6 +4312,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             textCmp = pane;
+        }
+        if (cmp.isRTL()) {
+            textCmp.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         }
         DefaultCaret caret = (DefaultCaret) swingT.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);            
@@ -7559,8 +7566,49 @@ public class JavaSEPort extends CodenameOneImplementation {
                 nr.setMethod(method.toUpperCase());
             }
         }
+        if(method.equalsIgnoreCase("patch")) {
+            allowPatch((HttpURLConnection) connection);
+        }
         ((HttpURLConnection) connection).setRequestMethod(method);
     }
+    
+    // the following block is based on a few suggestions in this stack overflow 
+    // answer https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch
+    private static boolean enabledPatch;
+    private static boolean patchFailed;
+    private static void allowPatch(HttpURLConnection connection) {
+        if(enabledPatch) {
+            return;
+        }
+        if(patchFailed) {
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            return;
+        }
+        try {
+            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
+
+            methodsField.setAccessible(true);
+
+            String[] oldMethods = (String[]) methodsField.get(null);
+            Set<String> methodsSet = new LinkedHashSet<String>(Arrays.asList(oldMethods));
+            methodsSet.addAll(Arrays.asList("PATCH"));
+            String[] newMethods = methodsSet.toArray(new String[0]);
+
+            methodsField.set(null/*static field*/, newMethods);
+            enabledPatch = true;
+        } catch (NoSuchFieldException e) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        } catch(IllegalAccessException ee) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        }
+    }    
+    
 
     /**
      * @inheritDoc
@@ -8280,6 +8328,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private void checkIosBackgroundFetch() {
+        if (!iosBackgroundFetchChecked) {
+            iosBackgroundFetchChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                
+                String existingModes = m.get("ios.background_modes");
+                if (existingModes == null) {
+                    existingModes = "fetch";
+                } else if (!existingModes.contains("fetch")) {
+                    existingModes += ",fetch";
+                }
+                Display.getInstance().setProjectBuildHint("ios.background_modes", existingModes);
+                
+            }
+        }
+    }
+    
+    private boolean iosBackgroundFetchChecked;
     
     private boolean appleMusicUsageDescriptionChecked;
     
@@ -9163,8 +9232,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public String getDatabasePath(String databaseName) {
         if(exposeFilesystem){
-            return getStorageDir() + "/database/" + databaseName;
+            File f = getDatabaseFile(databaseName);
+        
+            return f.getAbsolutePath();
         }else{
+            if (databaseName.startsWith("file://")) {
+                return databaseName;
+            }
             return getAppHomePath() + "database/" + databaseName;        
         }
     }
@@ -9185,12 +9259,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             // current working directory
             SQLiteConfig config = new SQLiteConfig();
             config.enableLoadExtension(true);
-            File dir = new File(getStorageDir() + "/database");
+            File file = getDatabaseFile(databaseName);
+             
+            
+            File dir = file.getParentFile();
             if (!dir.exists()) {
                 dir.mkdir();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
-                    + getStorageDir() + "/database/" + databaseName,
+            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
+                    file.getAbsolutePath(),
                     config.toProperties()
             );
 
@@ -9201,19 +9278,42 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    
+    private File getDatabaseFile(String databaseName) {
+        File f = new File(getStorageDir() + "/database/" + databaseName);
+        if (exposeFilesystem) {
+            if (databaseName.contains("/") || databaseName.contains("\\")) {
+                f = new File(databaseName);
+            }
+        } else {
+            if (databaseName.startsWith("file://")) {
+                f = new File(FileSystemStorage.getInstance().toNativePath(databaseName));
+            }
+            
+        }
+        return f;
+    }
+    
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+    
     @Override
     public void deleteDB(String databaseName) throws IOException {
         System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         if (f.exists()) {
             f.delete();
         }
     }
+    
+    
 
     @Override
     public boolean existsDB(String databaseName) {
         System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         return f.exists();
     }
 

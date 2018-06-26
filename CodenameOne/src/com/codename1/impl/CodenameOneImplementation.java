@@ -6012,6 +6012,16 @@ public abstract class CodenameOneImplementation {
         
     }
 
+    /**
+     * Checks if this platform supports custom database paths.  On platforms
+     * where this returns {@literal true}, {@link #openOrCreateDB(java.lang.String) }
+     * will accept a file path (starting with "file://"
+     * @return True if platform supports custom paths.
+     */
+    public boolean isDatabaseCustomPathSupported() {
+        return false;
+    }
+
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {

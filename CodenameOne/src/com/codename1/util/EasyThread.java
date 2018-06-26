@@ -63,6 +63,8 @@ public class EasyThread {
                             ((RunnableWithResult)current).run((SuccessCallback)resultCallback);
                         }
                     }
+                    current = null;
+                    resultCallback = null;
                 }
             }
         }, name);

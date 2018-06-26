@@ -489,6 +489,15 @@ public class FlowLayout extends Layout{
     public static Container encloseRightMiddle(Component... cmps) {
         return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
     }
+    
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+    }
 
     /**
      * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
