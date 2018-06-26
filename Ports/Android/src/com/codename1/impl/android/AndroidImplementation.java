@@ -2545,6 +2545,44 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return type;
     }
 
+    public static void copy(File src, File dst) throws IOException {
+        InputStream in = new FileInputStream(src);
+        try {
+            OutputStream out = new FileOutputStream(dst);
+            try {
+                // Transfer bytes from in to out
+                byte[] buf = new byte[8096];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
+    }
+
+    private static File makeTempCacheCopy(File file) throws IOException {
+        File cacheDir = new File(getContext().getCacheDir(), "intent_files");
+
+        // Create the storage directory if it does not exist
+        if (!cacheDir.exists()) {
+            if (!cacheDir.mkdirs()) {
+                Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "failed to create directory");
+                return null;
+            }
+        }
+
+        File copy = new File(cacheDir, "tmp-"+System.currentTimeMillis()+file.getName());
+        copy(file, copy);
+        return copy;
+
+    }
+
+
+
     private Intent createIntentForURL(String url) {
         Intent intent;
         Uri uri;
@@ -2557,13 +2595,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return null;
                     }
                 }
-                url = fixAttachmentPath(url);
                 intent = new Intent();
                 intent.setAction(Intent.ACTION_VIEW);
                 if (url.startsWith("/")) {
-                    uri = Uri.fromFile(new File(url));
+                    File f = new File(url);
+                    Uri furi = null;
+                    try {
+                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                    } catch (Exception ex) {
+                        f = makeTempCacheCopy(f);
+                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                    }
+        
+        
+                    if (Build.VERSION.SDK_INT < 21) {
+                        List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+                        for (ResolveInfo resolveInfo : resInfoList) {
+                            String packageName = resolveInfo.activityInfo.packageName;
+                            getContext().grantUriPermission(packageName, furi, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        }
+                    }
+                    
+                    uri = furi;
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }else{
-                    uri = Uri.parse(url);
+
+                    if (url.startsWith("file:")) {
+                        File f = new File(removeFilePrefix(url));
+                        System.out.println("File size: "+f.length());
+
+                        Uri furi = null;
+                        try {
+                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                        } catch (Exception ex) {
+                            f = makeTempCacheCopy(f);
+                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                        }
+
+
+                        if (Build.VERSION.SDK_INT < 21) {
+                            List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+                            for (ResolveInfo resolveInfo : resInfoList) {
+                                String packageName = resolveInfo.activityInfo.packageName;
+                                getContext().grantUriPermission(packageName, furi, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            }
+                        }
+                        uri = furi;
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+
+                    } else {
+                        uri = Uri.parse(url);
+                    }
                 }
                 String mimeType = getMimeType(url);
                 if(mimeType != null){
