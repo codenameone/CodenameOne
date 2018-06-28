@@ -21,10 +21,18 @@
  * need additional information or have any questions.
  */
 #import <UIKit/UIKit.h>
+#define INCLUDE_CN1_PUSH3
+#ifdef INCLUDE_CN1_PUSH3
+#import <UserNotifications/UserNotifications.h>
+#endif
 
 @class CodenameOne_GLViewController;
 
-@interface CodenameOne_GLAppDelegate : NSObject <UIApplicationDelegate> {
+@interface CodenameOne_GLAppDelegate : NSObject <UIApplicationDelegate
+#ifdef INCLUDE_CN1_PUSH3
+,UNUserNotificationCenterDelegate
+#endif
+> {
 
 }
 

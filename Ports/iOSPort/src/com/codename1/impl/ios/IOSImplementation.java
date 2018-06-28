@@ -85,6 +85,7 @@ import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
+import com.codename1.push.PushContent;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -7184,6 +7185,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 public void run() {
                     if(type != null) {
                         Display.getInstance().setProperty("pushType", type);
+                        PushContent.setType(Integer.parseInt(type));
                     }
                     pushCallback.push(message);
                 }
