@@ -25,16 +25,24 @@ package com.codename1.impl.javase;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 /**
  *
@@ -222,22 +230,127 @@ public class Executor {
     
 
 
-    public static void push(final String message){
+    public static void push(final String message, final int type){
         if(c != null && app != null){
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        String messageBody = message;
+                        Element messageBodyEl = null;
+                        String messageType = "" + type;
+                        byte messageTypeByte = (byte) type;
+                        if (type == 99) {
+                            
+                            try {
+                                DocumentBuilderFactory factory
+                                        = DocumentBuilderFactory.newInstance();
+                                DocumentBuilder builder = factory.newDocumentBuilder();
+                                if (!messageBody.startsWith("<?xml")) {
+                                    messageBody = "<?xml version=\"1.0\"?>" + messageBody;
+                                }
+                                ByteArrayInputStream input = new ByteArrayInputStream(
+                                        messageBody.getBytes("UTF-8"));
+                                Document doc = builder.parse(input);
+                                Element root = doc.getDocumentElement();
+                                messageType = "1";
+                                messageTypeByte = 1;
+                                if (root.hasAttribute("type")) {
+                                    messageTypeByte = (byte) Integer.parseInt(root.getAttribute("type"));
+                                    messageType = "" + messageTypeByte;
+                                }
+                                messageBody = "";
+                                if (root.hasAttribute("body")) {
+                                    messageBody = root.getAttribute("body");
+                                }
+                                messageBodyEl = root;
+                            } catch (Exception x) {
+                                System.err.println("Failed to parse XML messagse body");
+                                x.printStackTrace();
+                                return;
+
+                            }
+
+                        }
+
                         Method push = c.getDeclaredMethod("push", String.class);
-                        push.invoke(app, message);
+
+                        PushContent.reset();
+                        if (messageBodyEl != null) {
+                            // This was an XML request
+                            NodeList images = messageBodyEl.getElementsByTagName("img");
+                            if (images.getLength() > 0) {
+                                Element img = (Element) images.item(0);
+
+                                PushContent.setImageUrl(img.getAttribute("src"));
+                                JavaSEPort.instance.checkRichPushBuildHints();
+                            }
+                            if (messageBodyEl.hasAttribute("category")) {
+                                PushContent.setCategory(messageBodyEl.getAttribute("category"));
+                                JavaSEPort.instance.checkRichPushBuildHints();
+                            }
+
+                        }
+
+                        String[] parts = null;
+                        switch (messageTypeByte) {
+                            case 0:
+                            case 1:
+                                PushContent.setBody(messageBody);
+                                PushContent.setType(1);
+                                push.invoke(app, messageBody);
+                                break;
+                            case 2:
+                                PushContent.setMetaData(messageBody);
+                                PushContent.setType(2);
+                                push.invoke(app, messageBody);
+                                break;
+                            case 3:
+                                parts = messageBody.split(";");
+                                PushContent.setMetaData(parts[0]);
+                                PushContent.setBody(parts[1]);
+                                PushContent.setType(3);
+                                push.invoke(app, parts[1]);
+                                push.invoke(app, parts[0]);
+                                break;
+                            case 4:
+                                parts = messageBody.split(";");
+                                PushContent.setTitle(parts[0]);
+                                PushContent.setBody(parts[1]);
+                                PushContent.setType(4);
+                                push.invoke(app, messageBody);
+                                break;
+                            case 5:
+                                PushContent.setBody(messageBody);
+                                PushContent.setType(1);
+                                push.invoke(app, messageBody);
+                                break;
+                            case 101:
+                                PushContent.setBody(messageBody.substring(messageBody.indexOf(" ") + 1));
+                                PushContent.setType(1);
+                                push.invoke(app, messageBody.substring(messageBody.indexOf(" ") + 1));
+                                break;
+                            case 102:
+                                parts = messageBody.split(";");
+                                PushContent.setTitle(parts[1]);
+                                PushContent.setBody(parts[2]);
+                                PushContent.setType(2);
+                                push.invoke(app, parts[1] + ";" + parts[2]);
+                                break;
+                            default:
+                                throw new RuntimeException("Unsupported push type: " + messageTypeByte);
+
+                        }
+
+                        //push.invoke(app, message);
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                    } 
+                    }
                 }
             });
         }
     }
-    
+
     private static void setProxySettings() {
         Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
         int proxySel = proxyPref.getInt("proxySel", 2);

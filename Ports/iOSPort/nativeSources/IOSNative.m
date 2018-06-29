@@ -83,6 +83,9 @@
 extern int popoverSupported();
 
 #define INCLUDE_CN1_PUSH2
+#ifdef INCLUDE_CN1_PUSH2
+#import <UserNotifications/UserNotifications.h>
+#endif
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
@@ -4139,43 +4142,65 @@ extern int pendingRemoteNotificationRegistrations;
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
-            NSUInteger settingsParam = (/*UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound*/ 7);
-            id categoriesParam = nil;
-            Class settings = NSClassFromString(@"UIUserNotificationSettings");
-            if (settings) {
-                // Prepare class selector
-                SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
-                
-                // Obtain a method signature of selector on UIUserNotificationSettings class
-                NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
-                
-                // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
-                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
-                invocation.selector = sel;
-                invocation.target = settings;
-                
-                // Set arguments
-                [invocation setArgument:&settingsParam atIndex:2];
-                [invocation setArgument:&categoriesParam atIndex:3];
-                
-                // Obtain an instance by firing an invocation
-                NSObject *settingsInstance;
-                [invocation invoke];
-                [invocation getReturnValue:&settingsInstance];
-                
-                // Retain an instance so it can live after quitting method and prevent crash :-)
-                CFRetain((__bridge CFTypeRef)(settingsInstance));
-                
-                // Finally call the desired method with proper settings
-                if (settingsInstance) {
-                    pendingRemoteNotificationRegistrations++;
-                    [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
-                }
-            }
+        if (@available(iOS 10, *)) {
+            // iOS 10 ObjC code
+            pendingRemoteNotificationRegistrations++;
+            UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+            [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+                completionHandler:^(BOOL granted, NSError * _Nullable error) {
+                    // Enable or disable features based on authorization.
+                if (granted) {
+                    [[UIApplication sharedApplication] registerForRemoteNotifications];
+                } else {
+                    pendingRemoteNotificationRegistrations--;
+                    NSString *msg = @"Permission to receive notifications is not granted";
+                    if (error != nil) {
+                        msg = [error localizedDescription];
+                    }
+                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
+                    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jmsg);
+                }   
+            }];
         } else {
-            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-             (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+            // iOS 9 and earlier
+            if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+                NSUInteger settingsParam = (/*UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound*/ 7);
+                id categoriesParam = nil;
+                Class settings = NSClassFromString(@"UIUserNotificationSettings");
+                if (settings) {
+                    // Prepare class selector
+                    SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
+
+                    // Obtain a method signature of selector on UIUserNotificationSettings class
+                    NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
+
+                    // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
+                    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+                    invocation.selector = sel;
+                    invocation.target = settings;
+
+                    // Set arguments
+                    [invocation setArgument:&settingsParam atIndex:2];
+                    [invocation setArgument:&categoriesParam atIndex:3];
+
+                    // Obtain an instance by firing an invocation
+                    NSObject *settingsInstance;
+                    [invocation invoke];
+                    [invocation getReturnValue:&settingsInstance];
+
+                    // Retain an instance so it can live after quitting method and prevent crash :-)
+                    CFRetain((__bridge CFTypeRef)(settingsInstance));
+
+                    // Finally call the desired method with proper settings
+                    if (settingsInstance) {
+                        pendingRemoteNotificationRegistrations++;
+                        [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
+                    }
+                }
+            } else {
+                [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+                 (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+            }
         }
     });
 #endif

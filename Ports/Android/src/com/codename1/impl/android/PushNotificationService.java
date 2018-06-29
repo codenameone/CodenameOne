@@ -42,6 +42,8 @@ import com.codename1.ui.Display;
  */
 public abstract class PushNotificationService extends Service implements PushCallback {
 
+    private java.util.Map<String,String> properties = new java.util.HashMap<String,String>();
+    
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -49,6 +51,19 @@ public abstract class PushNotificationService extends Service implements PushCal
     
     @Override
     public void onCreate() {
+    }
+    
+    private String getProperty(String propertyName, String defaultValue) {
+        String val = properties.get(propertyName);
+        if (val == null) {
+            return defaultValue;
+        }
+        return val;
+    }
+    
+    public void setProperty(String propertyName, String val) {
+        properties.put(propertyName, val);
+        
     }
     
     public static void startServiceIfRequired(Class service, Context ctx) {
@@ -126,24 +141,24 @@ public abstract class PushNotificationService extends Service implements PushCal
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-                String id = Display.getInstance().getProperty("android.NotificationChannel.id", "cn1-channel");
+                String id = getProperty("android.NotificationChannel.id", "cn1-channel");
 
-                CharSequence name = Display.getInstance().getProperty("android.NotificationChannel.name", "Notifications");
+                CharSequence name = getProperty("android.NotificationChannel.name", "Notifications");
 
-                String description = Display.getInstance().getProperty("android.NotificationChannel.description", "Remote notifications");
+                String description = getProperty("android.NotificationChannel.description", "Remote notifications");
 
-                int importance = Integer.parseInt(Display.getInstance().getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_LOW));
+                int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_LOW));
 
                 android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
 
                 mChannel.setDescription(description);
 
-                mChannel.enableLights(Boolean.parseBoolean(Display.getInstance().getProperty("android.NotificationChannel.enableLights", "true")));
+                mChannel.enableLights(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableLights", "true")));
 
-                mChannel.setLightColor(Integer.parseInt(Display.getInstance().getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
+                mChannel.setLightColor(Integer.parseInt(getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
 
-                mChannel.enableVibration(Boolean.parseBoolean(Display.getInstance().getProperty("android.NotificationChannel.enableVibration", "false")));
-                String vibrationPatternStr = Display.getInstance().getProperty("android.NotificationChannel.vibrationPattern", null);
+                mChannel.enableVibration(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableVibration", "false")));
+                String vibrationPatternStr = getProperty("android.NotificationChannel.vibrationPattern", null);
                 if (vibrationPatternStr != null) {
                     String[] parts = vibrationPatternStr.split(",");
                     int len = parts.length;

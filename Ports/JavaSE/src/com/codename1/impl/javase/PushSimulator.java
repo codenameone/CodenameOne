@@ -75,6 +75,8 @@ public class PushSimulator extends javax.swing.JFrame {
         jScrollPane1 = new javax.swing.JScrollPane();
         pushBody = new javax.swing.JTextArea();
         sendPush = new javax.swing.JButton();
+        pushType = new javax.swing.JComboBox();
+        jLabel3 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("Push Simulation");
@@ -108,6 +110,10 @@ public class PushSimulator extends javax.swing.JFrame {
             }
         });
 
+        pushType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "0", "1", "2", "3", "4", "5", "99", "100", "101", "102" }));
+
+        jLabel3.setText("Push Type");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -129,6 +135,12 @@ public class PushSimulator extends javax.swing.JFrame {
                         .addGap(0, 0, Short.MAX_VALUE)
                         .addComponent(sendPush)))
                 .addContainerGap())
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jLabel3)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(pushType, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -139,10 +151,14 @@ public class PushSimulator extends javax.swing.JFrame {
                 .addComponent(registerForPush)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(pushError)
-                .addGap(18, 18, 18)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(pushType, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel3))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel2)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 102, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 81, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(sendPush))
         );
@@ -164,15 +180,17 @@ public class PushSimulator extends javax.swing.JFrame {
     }//GEN-LAST:event_pushErrorActionPerformed
 
     private void sendPushActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sendPushActionPerformed
-        Executor.push(pushBody.getText());
+        Executor.push(pushBody.getText(), Integer.parseInt((String)pushType.getSelectedItem()));
     }//GEN-LAST:event_sendPushActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTextArea pushBody;
     private javax.swing.JButton pushError;
+    private javax.swing.JComboBox pushType;
     private javax.swing.JButton registerForPush;
     private javax.swing.JButton sendPush;
     // End of variables declaration//GEN-END:variables

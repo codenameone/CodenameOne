@@ -8284,6 +8284,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private boolean richPushBuildHintsChecked;
+    
+    public void checkRichPushBuildHints() {
+        if (!richPushBuildHintsChecked) {
+            richPushBuildHintsChecked = true;
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.useNotificationServiceExtension")) {
+                    Display.getInstance().setProjectBuildHint("ios.useNotificationServiceExtension", "true");
+                }
+            }
+        }
+    }
+    
     private boolean cameraUsageDescriptionChecked;
     
     private void checkCameraUsageDescription() {

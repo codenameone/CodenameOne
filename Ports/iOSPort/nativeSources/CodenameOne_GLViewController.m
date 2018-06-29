@@ -218,6 +218,13 @@ int isIPad() {
 
 int cn1IsIOS8 = -1;
 int cn1IsIOS8_2 = -1;
+int cn1IsIOS10 = -1;
+BOOL isIOS10() {
+    if (cn1IsIOS10 < 0) {
+        cn1IsIOS10 = !SYSTEM_VERSION_LESS_THAN(@"10.0") ? 1:0;
+    }
+    return cn1IsIOS10 > 0;
+}
 
 BOOL isIOS8() {
     if (cn1IsIOS8 < 0) {
