@@ -53,6 +53,8 @@ public class Executor {
     private static Class c;
     private static Object app;
     
+    
+    
     public static void main(final String[] argv) throws Exception {
         
         setProxySettings();
@@ -274,7 +276,10 @@ public class Executor {
                         }
 
                         Method push = c.getDeclaredMethod("push", String.class);
-
+                        String[] actionIds = null;
+                        String[] actionLabels = null;
+                        java.awt.Image image;
+                        javax.swing.ImageIcon imageIcon = null;
                         PushContent.reset();
                         if (messageBodyEl != null) {
                             // This was an XML request
@@ -283,22 +288,86 @@ public class Executor {
                                 Element img = (Element) images.item(0);
 
                                 PushContent.setImageUrl(img.getAttribute("src"));
+                                if (!img.getAttribute("src").startsWith("https://")) {
+                                    System.err.println("Push message includes image attachment at non-secure URL.  Image will not be displayed on iOS.  Make sure all image attachments use https://");
+                                }
+                                image = javax.imageio.ImageIO.read(new java.net.URL(img.getAttribute("src")));
+                                imageIcon = new javax.swing.ImageIcon(fitImage(image, 512, 512));
                                 JavaSEPort.instance.checkRichPushBuildHints();
                             }
                             if (messageBodyEl.hasAttribute("category")) {
                                 PushContent.setCategory(messageBodyEl.getAttribute("category"));
                                 JavaSEPort.instance.checkRichPushBuildHints();
+                                try {
+                                    Method getPushActionCategories = c.getDeclaredMethod("getPushActionCategories", new Class[0]);
+                                    Class pushActionCategoryCls = c.getClassLoader().loadClass("com.codename1.push.PushActionCategory");
+                                    Method getCategoryId = pushActionCategoryCls.getDeclaredMethod("getId", new Class[0]);
+                                    Object foundCategory = null;
+                                    if (getPushActionCategories != null) {
+                                        Object[] categories = (Object[])getPushActionCategories.invoke(app, new Object[0]);
+                                        if (categories != null) {
+                                            for (Object category : categories) {
+                                                if (messageBodyEl.getAttribute("category").equals(getCategoryId.invoke(category, new Object[0]))) {
+                                                    foundCategory = category;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (foundCategory != null) {
+                                        Method getActions = pushActionCategoryCls.getDeclaredMethod("getActions", new Class[0]);
+                                        Object[] actions = (Object[])getActions.invoke(foundCategory, new Object[0]);
+                                        actionIds = new String[actions.length];
+                                        actionLabels = new String[actions.length];
+                                        Class pushActionCls = c.getClassLoader().loadClass("com.codename1.push.PushAction");
+                                        Method getActionId = pushActionCls.getDeclaredMethod("getId", new Class[0]);
+                                        Method getActionTitle = pushActionCls.getDeclaredMethod("getTitle", new Class[0]);
+                                        Method getActionIcon = pushActionCls.getDeclaredMethod("getIcon", new Class[0]);
+                                        for (int i=0; i<actions.length; i++) {
+                                            actionIds[i] = (String)getActionId.invoke(actions[i], new Object[0]);
+                                            actionLabels[i] = (String)getActionTitle.invoke(actions[i], new Object[0]);
+                                        }
+                                    }
+                                    
+                                } catch (Exception ex) {
+                                    ex.printStackTrace();
+                                }
+                                
+                                
                             }
 
                         }
+                        
+                        
+                        
 
                         String[] parts = null;
+                        int result = 0;
                         switch (messageTypeByte) {
                             case 0:
                             case 1:
                                 PushContent.setBody(messageBody);
                                 PushContent.setType(1);
-                                push.invoke(app, messageBody);
+                                
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody);
+                                }
+                                
                                 break;
                             case 2:
                                 PushContent.setMetaData(messageBody);
@@ -310,6 +379,22 @@ public class Executor {
                                 PushContent.setMetaData(parts[0]);
                                 PushContent.setBody(parts[1]);
                                 PushContent.setType(3);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                
                                 push.invoke(app, parts[1]);
                                 push.invoke(app, parts[0]);
                                 break;
@@ -318,24 +403,92 @@ public class Executor {
                                 PushContent.setTitle(parts[0]);
                                 PushContent.setBody(parts[1]);
                                 PushContent.setType(4);
-                                push.invoke(app, messageBody);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody);
+                                }
                                 break;
                             case 5:
                                 PushContent.setBody(messageBody);
                                 PushContent.setType(1);
-                                push.invoke(app, messageBody);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody);
+                                }
                                 break;
                             case 101:
                                 PushContent.setBody(messageBody.substring(messageBody.indexOf(" ") + 1));
                                 PushContent.setType(1);
-                                push.invoke(app, messageBody.substring(messageBody.indexOf(" ") + 1));
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody.substring(messageBody.indexOf(" ") + 1), messageBody.substring(messageBody.indexOf(" ") + 1), 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody.substring(messageBody.indexOf(" ") + 1), messageBody.substring(messageBody.indexOf(" ") + 1), 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody.substring(messageBody.indexOf(" ") + 1));
+                                }
                                 break;
                             case 102:
                                 parts = messageBody.split(";");
                                 PushContent.setTitle(parts[1]);
                                 PushContent.setBody(parts[2]);
                                 PushContent.setType(2);
-                                push.invoke(app, parts[1] + ";" + parts[2]);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[2], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[2], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, parts[1] + ";" + parts[2]);
+                                }
                                 break;
                             default:
                                 throw new RuntimeException("Unsupported push type: " + messageTypeByte);
@@ -383,6 +536,15 @@ public class Executor {
     
     static Object getApp() {
         return app;
+    }
+    
+    private static java.awt.Image fitImage(java.awt.Image img, int w, int h) {
+        java.awt.image.BufferedImage resizedimage = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g2 = resizedimage.createGraphics();
+        g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(img, 0, 0, w, h, null);
+        g2.dispose();
+        return resizedimage;
     }
     
 }

@@ -56,6 +56,7 @@ import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -85,6 +86,8 @@ import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
+import com.codename1.push.PushAction;
+import com.codename1.push.PushActionCategory;
 import com.codename1.push.PushContent;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.Container;
@@ -7183,14 +7186,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    if(type != null) {
-                        Display.getInstance().setProperty("pushType", type);
-                        PushContent.setType(Integer.parseInt(type));
+                    try {
+                        if(type != null) {
+                            Display.getInstance().setProperty("pushType", type);
+                            PushContent.setType(Integer.parseInt(type));
+                        }
+
+                        pushCallback.push(message);
+                    } finally {
+                        nativeInstance.firePushCompletionHandler();
                     }
-                    pushCallback.push(message);
                 }
             });
         } else {
+            nativeInstance.firePushCompletionHandler();
+            /*
+            // Removing this section because the race condition shouldn't happen
+            // anymore as setMainClass() is now called before initialization.
+            
             // could be a race condition against the native code... Retry in 2 seconds
             new Thread() {
                 public void run() {
@@ -7204,6 +7217,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
             }.start();
+            */
         }
     }
     public static void pushRegistered(final String deviceKey) {
@@ -7233,6 +7247,27 @@ public class IOSImplementation extends CodenameOneImplementation {
                     pushCallback.pushRegistrationError(message, 0);
                 }
             });
+        }
+    }
+    
+    public static void initPushActionCategories() {
+        if (pushCallback instanceof PushActionsProvider) {
+            PushActionsProvider actionsProvider = (PushActionsProvider)pushCallback;
+            PushActionCategory[] categories = actionsProvider.getPushActionCategories();
+            if (categories != null) {
+                PushAction[] actions = PushActionCategory.getAllActions(categories);
+                for (PushAction action : actions) {
+                    nativeInstance.registerPushAction(action.getId(), action.getTitle());
+                }
+                for (PushActionCategory category : categories) {
+                    nativeInstance.startPushActionCategory(category.getId());
+                    for (PushAction action : category.getActions()) {
+                        nativeInstance.addPushActionToCategory(action.getId());
+                    }
+                    nativeInstance.endPushActionCategory();
+                }
+                nativeInstance.registerPushCategories();
+            }
         }
     }
 

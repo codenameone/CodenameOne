@@ -3129,6 +3129,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
     }
     
+    public static void resumeApp() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Executor.startApp();
+                instance.minimized = false;
+            }
+        });
+        instance.canvas.setEnabled(true);
+        pause.setText("Pause App");
+    }
+    
     File findScreenshotFile() {
         int counter = 1;
         File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");

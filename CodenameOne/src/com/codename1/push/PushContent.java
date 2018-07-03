@@ -32,7 +32,7 @@ import com.codename1.ui.Display;
 public class PushContent {
     private static String PROP_PREFIX = "com.codename1.push.prop.";
 
-    private String title, body, imageUrl, category, metaData;
+    private String title, body, imageUrl, category, metaData, actionId;
     private int type;
     
     private PushContent() {
@@ -41,10 +41,11 @@ public class PushContent {
         imageUrl = p("imageUrl", null);
         category = p("category", null);
         metaData = p("metaData", null);
+        actionId = p("actionId", null);
     }
     
     private static String[] keys() {
-        return new String[] {"title", "body", "imageUrl", "category", "metaData"};
+        return new String[] {"title", "body", "imageUrl", "category", "metaData", "actionId"};
     }
     
     /**
@@ -212,5 +213,31 @@ public class PushContent {
      */
     public static void setType(int type) {
         setProperty("type", ""+type);
+    }
+    
+    /**
+     * If the user selected an action on the push notification, then the ID of the selected action will be stored in the PushContent's
+     * actionId.  If the user did not tap an action, then this will be null.
+     * @return The action ID that was selected by the user.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     */
+    public String getActionId() {
+        return actionId;
+    }
+    
+    
+    /**
+     * Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
+     * in the push notification; and, if set, it will be set to the ID of the action that was selected.
+     * @param actionId The ID of the action that was selected by the user.
+     * @deprecated For internal use only.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     */
+    public static void setActionId(String actionId) {
+        setProperty("actionId", actionId);
     }
 }
