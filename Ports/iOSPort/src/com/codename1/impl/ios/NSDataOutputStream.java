@@ -83,5 +83,14 @@ public class NSDataOutputStream extends OutputStream {
         write(arr);
     }
 
+    @Override
+    public void close() throws IOException {
+        if(!written) {
+            IOSImplementation.nativeInstance.writeToFile(new byte[0], file);
+        }
+        super.close();
+    }
+
+    
     
 }
