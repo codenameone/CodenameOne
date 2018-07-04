@@ -415,6 +415,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
 
+    public static void appendNotification(String type, String body, Context a) {
+        appendNotification(type, body, null, null, a);
+    }
+    
     public static void appendNotification(String type, String body, String image, String category, Context a) {
         try {
             String[] fileList = a.fileList();
