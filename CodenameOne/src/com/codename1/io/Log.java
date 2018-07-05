@@ -597,7 +597,9 @@ public class Log {
                     p("Before the first form!");
                 }
                 e((Throwable)evt.getSource());
-                sendLog();
+                if(getUniqueDeviceKey() != null) {
+                    sendLog();
+                }
             }
         });
         crashBound = true;
