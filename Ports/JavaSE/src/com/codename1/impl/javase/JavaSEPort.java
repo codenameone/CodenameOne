@@ -3129,6 +3129,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
     }
     
+    public static void resumeApp() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Executor.startApp();
+                instance.minimized = false;
+            }
+        });
+        instance.canvas.setEnabled(true);
+        pause.setText("Pause App");
+    }
+    
     File findScreenshotFile() {
         int counter = 1;
         File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
@@ -8436,9 +8447,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                             } else {
                                 ext= imageTypes[0];
                             }
-                            File tmp = File.createTempFile("temp", "." + ext);
-                            tmp.deleteOnExit();
-                            copyFile(selected, tmp);
+                            File tmp = selected;
+                            if (!"true".equals(Display.getInstance().getProperty("openGallery.openFilesInPlace", "false"))) {
+                                tmp = File.createTempFile("temp", "." + ext);
+                                tmp.deleteOnExit();
+                                copyFile(selected, tmp);
+                            }
+                            
                             result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
                         } catch(IOException err) {
                             err.printStackTrace();

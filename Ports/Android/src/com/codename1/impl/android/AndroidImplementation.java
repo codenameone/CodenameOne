@@ -123,7 +123,11 @@ import com.codename1.media.MediaProxy;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
+import com.codename1.push.PushAction;
+import com.codename1.push.PushActionCategory;
+import com.codename1.push.PushActionsProvider;
 import com.codename1.push.PushCallback;
+import com.codename1.push.PushContent;
 import com.codename1.ui.*;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -175,6 +179,8 @@ import java.security.MessageDigest;
 import java.text.ParseException;
 import java.util.*;
 import javax.net.ssl.HttpsURLConnection;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
@@ -410,6 +416,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
     public static void appendNotification(String type, String body, Context a) {
+        appendNotification(type, body, null, null, a);
+    }
+    
+    public static void appendNotification(String type, String body, String image, String category, Context a) {
         try {
             String[] fileList = a.fileList();
             byte[] data = null;
@@ -430,20 +440,322 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 os.writeByte(1);
             }
+            String bodyType = type;
+            if (image != null || category != null) {
+                type = "99";
+            }
             if(type != null) {
                 os.writeBoolean(true);
                 os.writeUTF(type);
             } else {
                 os.writeBoolean(false);
             }
-            os.writeUTF(body);
+            if ("99".equals(type)) {
+                String msg = "body="+java.net.URLEncoder.encode(body, "UTF-8")
+                        +"&type="+java.net.URLEncoder.encode(bodyType, "UTF-8");
+                if (category != null) {
+                    msg += "&category="+java.net.URLEncoder.encode(category, "UTF-8");
+                }
+                if (image != null) {
+                    image += "&image="+java.net.URLEncoder.encode(image, "UTF-8");
+                }
+                os.writeUTF(msg);
+                        
+            } else {
+                os.writeUTF(body);
+            }
             os.writeLong(System.currentTimeMillis());
         } catch(IOException err) {
             err.printStackTrace();
         }
     }
 
-    public static void firePendingPushes(final PushCallback c, Context a) {
+    private static Map<String,String> splitQuery(String urlencodeQueryString) {
+        String[] parts = urlencodeQueryString.split("&");
+        Map<String,String> out = new HashMap<String,String>();
+        for (String part : parts) {
+            int pos = part.indexOf("=");
+            String k,v;
+            if (pos > 0) {
+                k = part.substring(0, pos);
+                v = part.substring(pos+1);
+            } else {
+                k = part;
+                v = "";
+            }
+            try { k = java.net.URLDecoder.decode(k, "UTF-8");} catch (Exception ex){}
+            try {v = java.net.URLDecoder.decode(v, "UTF-8");} catch (Exception ex){}
+            out.put(k, v);
+        }
+        return out;
+    }
+    
+    public static void initPushContent(String message, String image, String messageType, String category, Context context) {
+        com.codename1.push.PushContent.reset();
+        
+        int iMessageType = 1;
+        try {iMessageType = Integer.parseInt(messageType);}catch(Throwable t){}
+        
+        String actionId = null;
+        if (context instanceof Activity) {
+            Activity activity = (Activity)context;
+            Bundle extras = activity.getIntent().getExtras();
+            if (extras != null) {
+                actionId = extras.getString("pushActionId");
+                extras.remove("pushActionId");
+            }
+            
+        }
+        com.codename1.push.PushContent.setType(iMessageType);
+        com.codename1.push.PushContent.setCategory(category);
+        if (actionId != null) {
+            com.codename1.push.PushContent.setActionId(actionId);
+        }
+        switch (iMessageType) {
+            case 1:
+            case 5:
+                com.codename1.push.PushContent.setBody(message);break;
+            case 2: com.codename1.push.PushContent.setMetaData(message);break;
+            case 3: {
+                String[] parts = message.split(";");
+                com.codename1.push.PushContent.setMetaData(parts[0]);
+                com.codename1.push.PushContent.setBody(parts[1]);
+                break;
+            }
+            case 4: {
+                String[] parts = message.split(";");
+                com.codename1.push.PushContent.setTitle(parts[0]);
+                com.codename1.push.PushContent.setBody(parts[1]);
+                break;
+            }
+            case 101: {
+                com.codename1.push.PushContent.setBody(message.substring(message.indexOf(" ") + 1));
+                com.codename1.push.PushContent.setType(1);
+                break;
+            }
+            case 102: {
+                String[] parts = message.split(";");
+                com.codename1.push.PushContent.setTitle(parts[1]);
+                com.codename1.push.PushContent.setBody(parts[2]);
+                com.codename1.push.PushContent.setType(2);
+                break;
+            }
+        }
+    }
+    
+    // Name of file where we install the push notification categories as an XML file
+    // if the main class implements PushActiosProvider
+    private static String FILE_NAME_NOTIFICATION_CATEGORIES = "CN1$AndroidNotificationCategories";
+    
+    
+    
+    /**
+     * Action categories are defined on the Main class by implementing the PushActionsProvider, however
+     * the main class may not be available to the push receiver, so we need to save these categories
+     * to the file system when the app is installed, then the push receiver can load these actions
+     * when it sends a push while the app isn't running.
+     * @param provider A reference to the App's main class 
+     * @throws IOException 
+     */
+    public static void installNotificationActionCategories(PushActionsProvider provider) throws IOException {
+        // Assume that CN1 is running... this will run when the app starts
+        // up
+        Context context = getContext();
+        boolean requiresUpdate = false;
+        
+        File categoriesFile = new File(activity.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
+        if (!categoriesFile.exists()) {
+            requiresUpdate = true;
+        }
+        if (!requiresUpdate) {
+            try {
+                PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getApplicationContext().getPackageName(), PackageManager.GET_PERMISSIONS);
+                if (packageInfo.lastUpdateTime > categoriesFile.lastModified()) {
+                    requiresUpdate = true;
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        
+        if (!requiresUpdate) {
+            return;
+        }
+        
+        OutputStream os = getContext().openFileOutput(FILE_NAME_NOTIFICATION_CATEGORIES, 0);
+        PushActionCategory[] categories = provider.getPushActionCategories();
+        javax.xml.parsers.DocumentBuilderFactory docFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        javax.xml.parsers.DocumentBuilder docBuilder;
+        try {
+            docBuilder = docFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException ex) {
+            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            throw new IOException("Faield to create document builder for creating notification categories XML document", ex);
+        }
+
+        // root elements
+        org.w3c.dom.Document doc = docBuilder.newDocument();
+        org.w3c.dom.Element root = (org.w3c.dom.Element)doc.createElement("categories");
+        doc.appendChild(root);
+        for (PushActionCategory category : categories) {
+            org.w3c.dom.Element categoryEl = (org.w3c.dom.Element)doc.createElement("category");
+            org.w3c.dom.Attr idAttr = doc.createAttribute("id");
+            idAttr.setValue(category.getId());
+            categoryEl.setAttributeNode(idAttr);
+            
+            for (PushAction action : category.getActions()) {
+                org.w3c.dom.Element actionEl = (org.w3c.dom.Element)doc.createElement("action");
+                org.w3c.dom.Attr actionIdAttr = doc.createAttribute("id");
+                actionIdAttr.setValue(action.getId());
+                actionEl.setAttributeNode(actionIdAttr);
+                
+                
+                org.w3c.dom.Attr actionTitleAttr = doc.createAttribute("title");
+                if (action.getTitle() != null) {
+                    actionTitleAttr.setValue(action.getTitle());
+                } else {
+                    actionTitleAttr.setValue(action.getId());
+                }
+                actionEl.setAttributeNode(actionTitleAttr);
+                
+                if (action.getIcon() != null) {
+                    org.w3c.dom.Attr actionIconAttr = doc.createAttribute("icon");
+                    String iconVal = action.getIcon();
+                    try {
+                        // We'll store the resource IDs for the icon
+                        // rather than the icon name because that is what
+                        // the push notifications require.
+                        iconVal = ""+context.getResources().getIdentifier(iconVal, "drawable", context.getPackageName());
+                        actionIconAttr.setValue(iconVal);
+                        actionEl.setAttributeNode(actionIconAttr);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                        
+                    }
+                    
+                }
+                categoryEl.appendChild(actionEl);
+            }
+            root.appendChild(categoryEl);
+            
+        }
+        try {
+            javax.xml.transform.TransformerFactory transformerFactory = javax.xml.transform.TransformerFactory.newInstance();
+            javax.xml.transform.Transformer transformer = transformerFactory.newTransformer();
+            javax.xml.transform.dom.DOMSource source = new javax.xml.transform.dom.DOMSource(doc);
+            javax.xml.transform.stream.StreamResult result = new javax.xml.transform.stream.StreamResult(os);
+            transformer.transform(source, result);
+            
+        } catch (Exception ex) {
+            throw new IOException("Failed to save notification categories as XML.", ex);
+        }
+        
+    }
+    
+    /**
+     * Retrieves the app's available push action categories from the XML file in which they
+     * should have been installed on the first load.
+     * @param context
+     * @return
+     * @throws IOException 
+     */
+    private static PushActionCategory[] getInstalledPushActionCategories(Context context) throws IOException {
+        // NOTE:  This method may be called from the PushReceiver when the app isn't running so we can't access
+        // the main activity context, display properties, or any CN1 stuff.  Just native android
+        
+        File categoriesFile = new File(activity.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
+        if (!categoriesFile.exists()) {
+            return new PushActionCategory[0];
+        }
+        javax.xml.parsers.DocumentBuilderFactory docFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        javax.xml.parsers.DocumentBuilder docBuilder;
+        try {
+            docBuilder = docFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException ex) {
+            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            throw new IOException("Faield to create document builder for creating notification categories XML document", ex);
+        }
+        org.w3c.dom.Document doc;
+        try {
+            doc = docBuilder.parse(context.openFileInput(FILE_NAME_NOTIFICATION_CATEGORIES));
+        } catch (SAXException ex) {
+            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            throw new IOException("Failed to parse instaled push action categories", ex);
+        }
+        org.w3c.dom.Element root = doc.getDocumentElement();
+        java.util.List<PushActionCategory> out = new ArrayList<PushActionCategory>();
+        org.w3c.dom.NodeList l = root.getElementsByTagName("category");
+        int len = l.getLength();
+        for (int i=0; i<len; i++) {
+            org.w3c.dom.Element el = (org.w3c.dom.Element)l.item(i);
+            java.util.List<PushAction> actions = new ArrayList<PushAction>();
+            org.w3c.dom.NodeList al = el.getElementsByTagName("action");
+            int alen = al.getLength();
+            for (int j=0; j<alen; j++) {
+                org.w3c.dom.Element actionEl = (org.w3c.dom.Element)al.item(j);
+                PushAction action = new PushAction(actionEl.getAttribute("id"), actionEl.getAttribute("title"), actionEl.getAttribute("icon"));
+                
+                actions.add(action);
+            }
+            
+            PushActionCategory cat = new PushActionCategory((String)el.getAttribute("id"), actions.toArray(new PushAction[actions.size()]));
+            out.add(cat);
+            
+        }
+        return out.toArray(new PushActionCategory[out.size()]);
+    }
+    
+    /**
+     * Adds actions to a push notification.  This is called by the Push broadcast receiver probably before 
+     * Codename One is initialized
+     * @param provider Reference to the app's main class which implements PushActionsProvider
+     * @param categoryId The category ID of the push notification.
+     * @param builder The builder for the push notification.
+     * @param targetIntent The target intent... this should go to the app's main Activity.
+     * @param context The current context (inside the Broadcast receiver).
+     * @throws IOException 
+     */
+    public static void addActionsToNotification(PushActionsProvider provider, String categoryId, NotificationCompat.Builder builder, Intent targetIntent, Context context) throws IOException {
+        // NOTE:  THis will likely run when the main activity isn't running so we won't have
+        // access to any display properties... just native Android APIs will be accessible.
+        
+        PushActionCategory category = null;
+        PushActionCategory[] categories;
+        if (provider != null) {
+            categories = provider.getPushActionCategories();
+        } else {
+            categories = getInstalledPushActionCategories(context);
+        }
+        for (PushActionCategory candidateCategory : categories) {
+            if (categoryId.equals(candidateCategory.getId())) {
+                category = candidateCategory;
+                break;
+            }
+        }
+        if (category == null) {
+            return;
+        }
+        
+        int requestCode = 1;
+        for (PushAction action : category.getActions()) {
+            Intent newIntent = (Intent)targetIntent.clone();
+            newIntent.putExtra("pushActionId", action.getId());
+            PendingIntent contentIntent = PendingIntent.getActivity(context, requestCode++, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            try {
+                int iconId = 0;
+                try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
+                //android.app.Notification.Action.Builder actionBuilder = new android.app.Notification.Action.Builder(iconId, action.getTitle(), contentIntent);
+
+                System.out.println("Adding action "+action.getId()+", "+action.getTitle()+", icon="+iconId);
+                builder.addAction(iconId, action.getTitle(), contentIntent);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        
+    }
+    
+    public static void firePendingPushes(final PushCallback c, final Context a) {
         try {
             if(c != null) {
                 InputStream i = a.openFileInput("CN1$AndroidPendingNotifications");
@@ -458,14 +770,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if(hasType) {
                         actualType = is.readUTF();
                     }
-                    final String t = actualType;
-                    final String b = is.readUTF();
+                    final String t;
+                    final String b;
+                    final String category;
+                    final String image;
+                    if ("99".equals(actualType)) {
+                        // This was a rich push
+                        Map<String,String> vals = splitQuery(is.readUTF());
+                        t = vals.get("type");
+                        b = vals.get("body");
+                        category = vals.get("category");
+                        image = vals.get("image");
+                    } else {
+                        t = actualType;
+                        b = is.readUTF();
+                        category = null;
+                        image = null;
+                    }
                     long s = is.readLong();
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
                             Display.getInstance().setProperty("pendingPush", "true");
                             Display.getInstance().setProperty("pushType", t);
+                            initPushContent(b, image, t, category, a);
                             if(t != null && ("3".equals(t) || "6".equals(t))) {
                                 String[] a = b.split(";");
                                 c.push(a[0]);
@@ -499,8 +827,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (hasType) {
                     actualType = is.readUTF();
                 }
-                final String t = actualType;
-                final String b = is.readUTF();
+                
+                final String t;
+                final String b;
+                if ("99".equals(actualType)) {
+                    // This was a rich push
+                    Map<String,String> vals = splitQuery(is.readUTF());
+                    t = vals.get("type");
+                    b = vals.get("body");
+                    //category = vals.get("category");
+                    //image = vals.get("image");
+                } else {
+                    t = actualType;
+                    b = is.readUTF();
+                    //category = null;
+                    //image = null;
+                }
                 long s = is.readLong();
                 if(t != null && ("3".equals(t) || "6".equals(t))) {
                     String[] m = b.split(";");
