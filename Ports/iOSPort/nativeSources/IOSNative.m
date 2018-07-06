@@ -4248,12 +4248,14 @@ void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULT
 //#endif
 }
 
+#ifdef INCLUDE_CN1_PUSH2
 static NSMutableArray<UNNotificationAction *>* pushActions;
 static NSMutableArray<UNNotificationAction *>* currentCategoryActions;
 static NSSet<UNNotificationCategory *>* pushCategories;
 static NSString* currentCategoryId;
-
+#endif
 void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title) {
+#ifdef INCLUDE_CN1_PUSH2    
     if (@available(iOS 10, *)) {
         if (pushActions == nil) {
             pushActions = [[NSMutableArray alloc] init];
@@ -4262,11 +4264,12 @@ void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java
         NSString *nsTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG title);
         [pushActions addObject:[UNNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone]];
     }
- 
+#endif
 }
 
 
 void com_codename1_impl_ios_IOSNative_startPushActionCategory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier) {
+#ifdef INCLUDE_CN1_PUSH2
     if (@available(iOS 10, *)) {
         currentCategoryId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
         if (currentCategoryActions != nil) {
@@ -4274,10 +4277,11 @@ void com_codename1_impl_ios_IOSNative_startPushActionCategory___java_lang_String
         }
         currentCategoryActions = [[NSMutableArray alloc] init];
     }
-
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2    
     if (@available(iOS 10, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
         UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:currentCategoryId actions:currentCategoryActions intentIdentifiers:@[] options:UNNotificationCategoryOptionNone];
@@ -4286,9 +4290,11 @@ void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_M
         }
         [pushCategories addObject:category];
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_addPushActionToCategory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier) {
+#ifdef INCLUDE_CN1_PUSH2    
     if (@available(iOS 10, *)) {
         UNNotificationAction *action = nil;
         NSString *nsId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
@@ -4304,15 +4310,18 @@ void com_codename1_impl_ios_IOSNative_addPushActionToCategory___java_lang_String
         }
         [currentCategoryActions addObject:action];
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_registerPushCategories__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2    
     if (@available(iOS 10, *)) {
         if (pushCategories != nil) {
             UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
             [center setNotificationCategories:pushCategories];
         }
     }
+#endif
 }
 
 UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
