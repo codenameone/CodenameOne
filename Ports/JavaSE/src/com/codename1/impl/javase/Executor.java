@@ -343,6 +343,7 @@ public class Executor {
 
                         String[] parts = null;
                         int result = 0;
+                        Display.getInstance().setProperty("pushType", ""+messageTypeByte);
                         switch (messageTypeByte) {
                             case 0:
                             case 1:
@@ -376,27 +377,30 @@ public class Executor {
                                 break;
                             case 3:
                                 parts = messageBody.split(";");
-                                PushContent.setMetaData(parts[0]);
-                                PushContent.setBody(parts[1]);
+                                PushContent.setMetaData(parts[1]);
+                                PushContent.setBody(parts[0]);
                                 PushContent.setType(3);
                                 if (Display.getInstance().isMinimized()) {
                                     
                                     if (actionIds != null) {
-                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[0], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
                                         if (result >= 0) {
                                             PushContent.setActionId(actionIds[result]);
                                         }
                                     } else {
-                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[0], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
                                         
                                     }
                                     if (result >= 0) {
                                         JavaSEPort.resumeApp();
                                     }
                                 }
-                                
-                                push.invoke(app, parts[1]);
-                                push.invoke(app, parts[0]);
+                                if (result >= 0) {
+                                    Display.getInstance().setProperty("pushType", "1");
+                                    push.invoke(app, parts[0]);
+                                    Display.getInstance().setProperty("pushType", "2");
+                                    push.invoke(app, parts[1]);
+                                }
                                 break;
                             case 4:
                                 parts = messageBody.split(";");
@@ -419,7 +423,8 @@ public class Executor {
                                     }
                                 }
                                 if (result >= 0) {
-                                    push.invoke(app, messageBody);
+                                    Display.getInstance().setProperty("pushType", "4");
+                                    push.invoke(app, parts[0]+";"+parts[1]);
                                 }
                                 break;
                             case 5:
@@ -441,6 +446,7 @@ public class Executor {
                                     }
                                 }
                                 if (result >= 0) {
+                                    Display.getInstance().setProperty("pushType", "1");
                                     push.invoke(app, messageBody);
                                 }
                                 break;
@@ -471,6 +477,7 @@ public class Executor {
                                 PushContent.setTitle(parts[1]);
                                 PushContent.setBody(parts[2]);
                                 PushContent.setType(2);
+                                
                                 if (Display.getInstance().isMinimized()) {
                                     
                                     if (actionIds != null) {

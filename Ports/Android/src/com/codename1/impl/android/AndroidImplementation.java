@@ -518,8 +518,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             case 2: com.codename1.push.PushContent.setMetaData(message);break;
             case 3: {
                 String[] parts = message.split(";");
-                com.codename1.push.PushContent.setMetaData(parts[0]);
-                com.codename1.push.PushContent.setBody(parts[1]);
+                com.codename1.push.PushContent.setMetaData(parts[1]);
+                com.codename1.push.PushContent.setBody(parts[0]);
                 break;
             }
             case 4: {
