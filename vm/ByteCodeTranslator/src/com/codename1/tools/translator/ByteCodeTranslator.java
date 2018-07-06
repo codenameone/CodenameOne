@@ -35,7 +35,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  *
@@ -290,6 +292,14 @@ public class ByteCodeTranslator {
             noArcFiles.add("OpenUDID.m");
             
             List<String> includeFrameworks = new ArrayList<String>();
+            Set<String> optionalFrameworks = new HashSet<String>();
+            for (String optionalFramework : System.getProperty("optional.frameworks", "").split(";")) {
+                optionalFramework = optionalFramework.trim();
+                if (!optionalFramework.isEmpty()) {
+                    optionalFrameworks.add(optionalFramework);
+                }
+            }
+            optionalFrameworks.add("UserNotifications.framework");
             includeFrameworks.add("libiconv.dylib");
             //includeFrameworks.add("AdSupport.framework");
             includeFrameworks.add("AddressBookUI.framework");
@@ -377,10 +387,15 @@ public class ByteCodeTranslator {
                 fileOneEntry.append(fileOneValue);
                 fileOneEntry.append("18E9ABBC002F3D1D /* ");
                 fileOneEntry.append(file);
+                String injectFileSettings = "";
+                if (optionalFrameworks.contains(file)) {
+                    injectFileSettings += " ATTRIBUTES = (Weak, );";
+                }
+                String fileSettingsDefault = "settings = {"+injectFileSettings.trim()+" }; ";
                 if(noArcFiles.contains(file)) {
-                    fileOneEntry.append(" */; settings = {COMPILER_FLAGS = \"-fno-objc-arc\"; }; };\n");                
+                    fileOneEntry.append(" */; settings = {COMPILER_FLAGS = \"-fno-objc-arc\";"+injectFileSettings+" }; };\n");                
                 } else {
-                    fileOneEntry.append(" */; };\n");                
+                    fileOneEntry.append(" */;"+fileSettingsDefault+" };\n");                
                 }
                 
                 if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
