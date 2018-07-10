@@ -194,6 +194,12 @@ public class TestUtils {
                 if(n != null && n.equals(text)) {
                     return (Label)c;
                 }
+                
+                // will work for cases of upcase due to Android theme upcasing of buttons
+                n = (String)c.getClientProperty("cn1$origText");
+                if(n != null && n.equals(text)) {
+                    return (Label)c;
+                }
                 continue;
             }
             if(c instanceof Container) {
@@ -557,7 +563,7 @@ public class TestUtils {
             }
 
             Image mute = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
-            Display.getInstance().getCurrent().paint(mute.getGraphics());
+            Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
             screenshotName = screenshotName + ".png";
             if(Storage.getInstance().exists(screenshotName)) {
                 int[] rgba = mute.getRGBCached();
