@@ -8515,6 +8515,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    playing = false;
                     fireCompletionHandlers();
                 }
                 
