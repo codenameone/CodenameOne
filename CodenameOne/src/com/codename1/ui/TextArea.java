@@ -174,6 +174,14 @@ public class TextArea extends Component {
      */
     public static final int INITIAL_CAPS_SENTENCE = 0x200000;
     //private int modifierFlag = 0x00000;
+    
+    /**
+     * This flag is a hint to the implementation that this field contains
+     * a username.
+     */
+    public static final int USERNAME = 0x400000;
+    
+    
              
     /**
      * Input constraint which should be one of ANY, NUMERIC,

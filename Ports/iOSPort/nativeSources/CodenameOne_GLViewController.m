@@ -325,6 +325,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             // PASSWORD
             if((constraint & 0x10000) == 0x10000) {
                 utf.secureTextEntry = YES;
+                if (@available(iOS 11, *)) {
+                    utf.textContentType = UITextContentTypePassword;
+                }
+            }
+            
+            if ((constraint & 0x400000) == 0x400000) {
+                if (@available(iOS 11, *)) {
+                    utf.textContentType = UITextContentTypeUsername;
+                }
             }
             
             // EMAILADDR
@@ -332,6 +341,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if(cccc == 1) {
                 utf.keyboardType = UIKeyboardTypeEmailAddress;
                 utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                if (@available(iOS 10, *)) {
+                    utf.textContentType = UITextContentTypeEmailAddress;
+                }
             } else {
                 // NUMERIC
                 if(cccc == 2) {
@@ -340,11 +352,17 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     // PHONENUMBER
                     if(cccc == 3) {
                         utf.keyboardType = UIKeyboardTypePhonePad;
+                        if (@available(iOS 10, *)) {
+                            utf.textContentType = UITextContentTypeTelephoneNumber;
+                        }
                     } else {
                         // URL
                         if(cccc == 4) {
                             utf.keyboardType = UIKeyboardTypeURL;
                             utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                            if (@available(iOS 10, *)) {
+                                utf.textContentType = UITextContentTypeURL;
+                            }
                         } else {
                             // DECIMAL
                             if(cccc == 5) {
