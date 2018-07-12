@@ -398,28 +398,31 @@ public class Validator {
                     String originalUIID = myLabel.getUIID();
                     Constraint myConstraint = constraint;
 
-                    Runnable showError = () -> {
-                        boolean isValid = false;
-                        if (inputComponent instanceof TextComponent) {
-                            isValid = myConstraint.isValid(((TextComponent) inputComponent).getField().getText());
-                        } else if (inputComponent instanceof PickerComponent) {
-                            isValid = myConstraint.isValid(((PickerComponent) inputComponent).getPicker().getValue());
-                        }
-
-                        String errorMessage = trimLongString(UIManager.getInstance().localize(myConstraint.getDefaultFailMessage(), myConstraint.getDefaultFailMessage()), "ErrorLabel", myLabel.getWidth());
-
-                        if (errorMessage != null && errorMessage.length() > 0 && !isValid) {
-                            // show the error in place of the label for component
-                            myLabel.setUIID("ErrorLabel");
-                            myLabel.setText(errorMessage);
-                            UITimer.timer(2000, false, Display.getInstance().getCurrent(), () -> {
+                    Runnable showError = new Runnable() {
+                        @Override
+                        public void run() {
+                            boolean isValid = false;
+                            if (inputComponent instanceof TextComponent) {
+                                isValid = myConstraint.isValid(((TextComponent) inputComponent).getField().getText());
+                            } else if (inputComponent instanceof PickerComponent) {
+                                isValid = myConstraint.isValid(((PickerComponent) inputComponent).getPicker().getValue());
+                            }
+                            
+                            String errorMessage = trimLongString(UIManager.getInstance().localize(myConstraint.getDefaultFailMessage(), myConstraint.getDefaultFailMessage()), "ErrorLabel", myLabel.getWidth());
+                            
+                            if (errorMessage != null && errorMessage.length() > 0 && !isValid) {
+                                // show the error in place of the label for component
+                                myLabel.setUIID("ErrorLabel");
+                                myLabel.setText(errorMessage);
+                                UITimer.timer(2000, false, Display.getInstance().getCurrent(), () -> {
+                                    myLabel.setUIID(originalUIID);
+                                    myLabel.setText(originalText);
+                                });
+                            } else {
+                                // show the label for component without the error
                                 myLabel.setUIID(originalUIID);
                                 myLabel.setText(originalText);
-                            });
-                        } else {
-                            // show the label for component without the error
-                            myLabel.setUIID(originalUIID);
-                            myLabel.setText(originalText);
+                            }
                         }
                     };
 
