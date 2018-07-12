@@ -414,9 +414,12 @@ public class Validator {
                                 // show the error in place of the label for component
                                 myLabel.setUIID("ErrorLabel");
                                 myLabel.setText(errorMessage);
-                                UITimer.timer(2000, false, Display.getInstance().getCurrent(), () -> {
-                                    myLabel.setUIID(originalUIID);
-                                    myLabel.setText(originalText);
+                                UITimer.timer(2000, false, Display.getInstance().getCurrent(), new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        myLabel.setUIID(originalUIID);
+                                        myLabel.setText(originalText);
+                                    }
                                 });
                             } else {
                                 // show the label for component without the error
