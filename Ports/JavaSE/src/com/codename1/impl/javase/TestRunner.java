@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.StringTokenizer;
+import java.util.prefs.Preferences;
 
 
 /**
@@ -42,6 +43,8 @@ public class TestRunner {
     private String mainClass;
     private String[] testCases;
     private String[] skins; 
+    private boolean forceLandscape;
+    private boolean forcePortrait;
     private boolean quietMode;
     private boolean cleanMode = true;
     private boolean stopOnFail;
@@ -80,14 +83,26 @@ public class TestRunner {
                         pos++;
                         continue;
                     }
-                    
+                                        
                     if(s.equalsIgnoreCase("-skins")) {
                         pos++;
                         skins = argv[pos].split(",");
                         pos++;
                         continue;
                     }
+
+                    if(s.equalsIgnoreCase("-landscape")) {
+                        forceLandscape = true;
+                        pos++;
+                        continue;
+                    }
                     
+                    if(s.equalsIgnoreCase("-portrait")) {
+                        forcePortrait = true;
+                        pos++;
+                        continue;
+                    }
+
                     if(s.equalsIgnoreCase("-quietMode")) {
                         quietMode = true;
                         pos++;
@@ -140,6 +155,20 @@ public class TestRunner {
                 tests = testCases;
             }
 
+            
+            if(forceLandscape) {
+                System.out.println("Forcing landscape");
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("Portrait", false);
+                pref.sync();
+            } else {
+                if(forcePortrait) {
+                    System.out.println("Forcing portrait");
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("Portrait", true);
+                    pref.sync();
+                }
+            }
             
             System.out.println("Preparing to execute " + tests.length + " tests");
             

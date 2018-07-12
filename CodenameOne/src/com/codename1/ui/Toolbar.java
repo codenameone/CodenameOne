@@ -126,6 +126,27 @@ public class Toolbar extends Container {
         onTopSideMenu = aOnTopSideMenu;
     }
 
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     */
+    private static boolean enableSideMenuSwipe = true;
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     * @return the enableSideMenuSwipe
+     */
+    public static boolean isEnableSideMenuSwipe() {
+        return enableSideMenuSwipe;
+    }
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     * @param aEnableSideMenuSwipe the enableSideMenuSwipe to set
+     */
+    public static void setEnableSideMenuSwipe(boolean aEnableSideMenuSwipe) {
+        enableSideMenuSwipe = aEnableSideMenuSwipe;
+    }
+    
     private Component titleComponent;
 
     private ToolbarSideMenu sideMenu;
@@ -1257,7 +1278,7 @@ public class Toolbar extends Container {
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
-                        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null) {
                             return;
                         }
                         if (sidemenuDialog != null) {

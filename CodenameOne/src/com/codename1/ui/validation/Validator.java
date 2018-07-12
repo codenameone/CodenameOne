@@ -46,7 +46,9 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.util.UITimer;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -342,24 +344,131 @@ public class Validator {
     }
     
     /**
-     * Places a constraint on the validator, returns this object so constraint additions can be chained. 
-     * Notice that only one constraint 
+     * Places a constraint on the validator, returns this object so constraint
+     * additions can be chained. Shows validation errors messages even when the
+     * TextModeLayout is not {@code onTopMode} (it's possible to disable this
+     * functionality setting to false the theme constant
+     * {@code showValidationErrorsIfNotOnTopMode}: basically, the error
+     * message is shown for two second in place of the label on the left of the
+     * InputComponent (or on right of the InputComponent for RTL languages);
+     * this solution never breaks the layout, because the error message is
+     * trimmed to fit the available space. The error message UIID is
+     * "ErrorLabel" when it's not onTopMode.
+     *
      * @param cmp the component to validate
      * @param c the constraint or constraints
-     * @return this object so we can write code like v.addConstraint(cmp1, cons).addConstraint(cmp2, otherConstraint);
+     * @return this object so we can write code like v.addConstraint(cmp1,
+     * cons).addConstraint(cmp2, otherConstraint);
      */
     public Validator addConstraint(Component cmp, Constraint... c) {
-        if(c.length == 1) {
-            constraintList.put(cmp, c[0]);
-        } else {
-            constraintList.put(cmp, new GroupConstraint(c));
+        if (!(cmp instanceof InputComponent)) {
+            throw new IllegalArgumentException("addConstraint needs an InputComponent as first argument");
+        }
+        Constraint constraint = null;
+        if (c.length == 1) {
+            constraint = c[0];
+            constraintList.put(cmp, constraint);
+        } else if (c.length > 1) {
+            constraint = new GroupConstraint(c);
+            constraintList.put(cmp, constraint);
+        }
+        if (constraint == null) {
+            throw new IllegalArgumentException("addConstraint needs at least a Constraint, but the Constraint array in empty");
         }
         bindDataListener(cmp);
         boolean isV = isValid();
-        for(Component btn : submitButtons) {
+        for (Component btn : submitButtons) {
             btn.setEnabled(isV);
         }
+
+        // Show validation error on iPhone
+        if (UIManager.getInstance().isThemeConstant("showValidationErrorsIfNotOnTopMode", true)) {
+            final InputComponent inputComponent = (InputComponent) cmp;
+            if (!inputComponent.isOnTopMode()) {
+                Label labelForComponent = null;
+                if (inputComponent instanceof TextComponent) {
+                    labelForComponent = ((TextComponent) inputComponent).getField().getLabelForComponent();
+                } else if (inputComponent instanceof PickerComponent) {
+                    labelForComponent = ((PickerComponent) inputComponent).getPicker().getLabelForComponent();
+                }
+
+                if (labelForComponent != null) {
+                    final Label myLabel = labelForComponent;
+                    final String originalText = myLabel.getText();
+                    final String originalUIID = myLabel.getUIID();
+                    final Constraint myConstraint = constraint;
+
+                    final Runnable showError = new Runnable() {
+                        @Override
+                        public void run() {
+                            boolean isValid = false;
+                            if (inputComponent instanceof TextComponent) {
+                                isValid = myConstraint.isValid(((TextComponent) inputComponent).getField().getText());
+                            } else if (inputComponent instanceof PickerComponent) {
+                                isValid = myConstraint.isValid(((PickerComponent) inputComponent).getPicker().getValue());
+                            }
+                            
+                            String errorMessage = trimLongString(UIManager.getInstance().localize(myConstraint.getDefaultFailMessage(), myConstraint.getDefaultFailMessage()), "ErrorLabel", myLabel.getWidth());
+                            
+                            if (errorMessage != null && errorMessage.length() > 0 && !isValid) {
+                                // show the error in place of the label for component
+                                myLabel.setUIID("ErrorLabel");
+                                myLabel.setText(errorMessage);
+                                UITimer.timer(2000, false, Display.getInstance().getCurrent(), new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        myLabel.setUIID(originalUIID);
+                                        myLabel.setText(originalText);
+                                    }
+                                });
+                            } else {
+                                // show the label for component without the error
+                                myLabel.setUIID(originalUIID);
+                                myLabel.setText(originalText);
+                            }
+                        }
+                    };
+
+                    FocusListener myFocusListener = new FocusListener() {
+
+                        @Override
+                        public void focusLost(Component cmp) {
+                            showError.run();
+                        }
+
+                        @Override
+                        public void focusGained(Component cmp) {
+                            // no code here
+                        }
+                    };
+
+                    if (inputComponent instanceof TextComponent) {
+                        ((TextComponent) inputComponent).getField().addFocusListener(myFocusListener);
+                    } else if (inputComponent instanceof PickerComponent) {
+                        ((PickerComponent) inputComponent).getPicker().addFocusListener(myFocusListener);
+                    }
+
+                }
+            }
+        }
         return this;
+    }
+    
+    /**
+     * Long error messages are trimmed to fit the available space in the layout
+     *
+     * @param errorMessage the string to be trimmed
+     * @param uiid the uiid of the errorMessage
+     * @param width the maximum width
+     * @return the new String trimmed to fit the available width
+     */
+    private String trimLongString(String errorMessage, String uiid, int width) {
+        Label errorLabel = new Label(errorMessage, uiid);
+        while (errorLabel.getPreferredW() > width && errorMessage.length() > 1) {
+            errorMessage = errorMessage.substring(0, errorMessage.length() - 1);
+            errorLabel.setText(errorMessage);
+        }
+        return errorMessage;
     }
     
     /**
