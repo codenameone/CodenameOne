@@ -383,7 +383,7 @@ public class Validator {
 
         // Show validation error on iPhone
         if (UIManager.getInstance().isThemeConstant("showValidationErrorsIfNotOnTopMode", true)) {
-            InputComponent inputComponent = (InputComponent) cmp;
+            final InputComponent inputComponent = (InputComponent) cmp;
             if (!inputComponent.isOnTopMode()) {
                 Label labelForComponent = null;
                 if (inputComponent instanceof TextComponent) {
@@ -393,12 +393,12 @@ public class Validator {
                 }
 
                 if (labelForComponent != null) {
-                    Label myLabel = labelForComponent;
-                    String originalText = myLabel.getText();
-                    String originalUIID = myLabel.getUIID();
-                    Constraint myConstraint = constraint;
+                    final Label myLabel = labelForComponent;
+                    final String originalText = myLabel.getText();
+                    final String originalUIID = myLabel.getUIID();
+                    final Constraint myConstraint = constraint;
 
-                    Runnable showError = new Runnable() {
+                    final Runnable showError = new Runnable() {
                         @Override
                         public void run() {
                             boolean isValid = false;
