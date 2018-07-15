@@ -75,6 +75,25 @@ import java.util.ListIterator;
  * @author Shai Almog
  */
 public class Picker extends Button {
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     * @return the defaultUseLightweightPopup
+     */
+    public static boolean isDefaultUseLightweightPopup() {
+        return defaultUseLightweightPopup;
+    }
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     * @param aDefaultUseLightweightPopup the defaultUseLightweightPopup to set
+     */
+    public static void setDefaultUseLightweightPopup(
+        boolean aDefaultUseLightweightPopup) {
+        defaultUseLightweightPopup = aDefaultUseLightweightPopup;
+    }
     private int type = Display.PICKER_TYPE_DATE;
     private Object value = new Date();
     private boolean showMeridiem;
@@ -90,6 +109,12 @@ public class Picker extends Button {
     // the popup dialog so that we can restore them when the popup is disposed.
     private byte[] tmpContentPaneMarginUnit;
     private float tmpContentPaneBottomMargin;
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     */
+    private static boolean defaultUseLightweightPopup;
     
     /**
      * Flag to indicate that the picker should prefer lightweight components 
@@ -156,6 +181,9 @@ public class Picker extends Button {
             // the default.  This will result in these platforms using the new Spinner3D classes
             // instead of the old Spinner classes
             useLightweightPopup = true;
+        } else {
+            defaultUseLightweightPopup = getUIManager().isThemeConstant("lightweightPickerBool", defaultUseLightweightPopup);
+            useLightweightPopup = defaultUseLightweightPopup;
         }
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
