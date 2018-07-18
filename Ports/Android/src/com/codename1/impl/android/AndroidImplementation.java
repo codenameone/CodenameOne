@@ -170,6 +170,7 @@ import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.CookieHandler;
 import java.net.InetAddress;
@@ -518,8 +519,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             case 2: com.codename1.push.PushContent.setMetaData(message);break;
             case 3: {
                 String[] parts = message.split(";");
-                com.codename1.push.PushContent.setMetaData(parts[0]);
-                com.codename1.push.PushContent.setBody(parts[1]);
+                com.codename1.push.PushContent.setMetaData(parts[1]);
+                com.codename1.push.PushContent.setBody(parts[0]);
                 break;
             }
             case 4: {
@@ -6025,6 +6026,233 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    /**
+     * Keys of display properties that need to be made available to Services
+     * i.e. must be accessible even if CN1 is not initialized.
+     * 
+     * This is accomplished by setting them inside init().  Then they
+     * are written to file so that they can be accessed inside a service
+     * like push notification service.
+     */
+    private static final String[] servicePropertyKeys = new String[]{
+        "android.NotificationChannel.id",
+        "android.NotificationChannel.name",
+        "android.NotificationChannel.description",
+        "android.NotificationChannel.importance",
+        "android.NotificationChannel.enableLights",
+        "android.NotificationChannel.lightColor",
+        "android.NotificationChannel.enableVibration",
+        "android.NotificationChannel.vibrationPattern"
+    };
+    
+    /**
+     * Flag to indicate if any of the service properties have been changed.
+     */
+    private static boolean servicePropertiesDirty() {
+        for (String key : servicePropertyKeys) {
+            if (Display.getInstance().getProperty(key, null) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Stores properties that need to be accessible to services.   
+     * i.e. must be accessible even if CN1 is not initialized.
+     * 
+     * This is accomplished by setting them inside init().  Then they
+     * are written to file so that they can be accessed inside a service
+     * like push notification service.
+     */
+    private static Map<String,String> serviceProperties;
+    
+    /**
+     * Gets the service properties.  Will read properties from file so that
+     * they are available even if CN1 is not initialized.
+     * @param a
+     * @return 
+     */
+    public static Map<String,String> getServiceProperties(Context a) {
+        if (serviceProperties == null) {
+            InputStream i = null;
+            try {
+                serviceProperties = new HashMap<String,String>();
+                i = a.openFileInput("CN1$AndroidServiceProperties");
+                if(i == null) {
+                    return serviceProperties;
+                }
+                DataInputStream is = new DataInputStream(i);
+                int count = is.readInt();
+                for (int idx=0; idx<count; idx++) {
+                    String key = is.readUTF();
+                    String value = is.readUTF();
+                    serviceProperties.put(key, value);
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } finally {
+                try {
+                    if (i != null) i.close();
+                } catch (Throwable ex) {
+                    Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        return serviceProperties;
+    }
+    
+    public static void writeServiceProperties(Context a) {
+        if (servicePropertiesDirty()) {
+            Map<String,String> out = getServiceProperties(a);
+            
+            
+            for (String key : servicePropertyKeys) {
+                
+                String val = Display.getInstance().getProperty(key, null);
+                if (val != null) {
+                    out.put(key, val);
+                }
+                if ("true".equals(Display.getInstance().getProperty(key+"#delete", null))) {
+                    out.remove(key);
+                    
+                }
+            }
+            
+            OutputStream os = null;
+            try {
+                os = a.openFileOutput("CN1$AndroidServiceProperties", 0);
+                if (os == null) {
+                    System.out.println("Failed to save service properties null output stream");
+                    return;
+                }
+                DataOutputStream dos = new DataOutputStream(os);
+                dos.writeInt(out.size());
+                for (String key : out.keySet()) {
+                    dos.writeUTF(key);
+                    dos.writeUTF((String)out.get(key));
+                }
+                serviceProperties = null;
+            } catch (FileNotFoundException ex) {
+                System.out.println("Service properties file not found.  This is normal for the first run.   On subsequent runs, the file should exist.");
+            } catch (IOException ex) {
+                
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } finally {
+                try {
+                    if (os != null) os.close();
+                } catch (Throwable ex) {
+                    Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Gets a "service" display property.  This is a property that is available
+     * even if CN1 is not initialized.  They are written to file after init() so that 
+     * they are available thereafter to services like push notification services.
+     * @param key THe key
+     * @param defaultValue The default value
+     * @param context Context
+     * @return The value.
+     */
+    public static String getServiceProperty(String key, String defaultValue, Context context) {
+        if (Display.isInitialized()) {
+            return Display.getInstance().getProperty(key, defaultValue);
+        }
+        String val = getServiceProperties(context).get(key);
+        return val == null ? defaultValue : val;
+    }
+    
+    /**
+     * Sets the notification channel on a notification builder.  Uses service properties to 
+     * set properties of channel.
+     * @param nm The notification manager.
+     * @param mNotifyBuilder The notify builder
+     * @param context The context
+     */
+    public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            try {
+                NotificationManager mNotificationManager = nm;
+                
+                String id = getServiceProperty("android.NotificationChannel.id", "cn1-channel", context);
+                
+                CharSequence name = getServiceProperty("android.NotificationChannel.name", "Notifications", context);
+                
+                String description = getServiceProperty("android.NotificationChannel.description", "Remote notifications", context);
+                
+                // NotificationManager.IMPORTANCE_LOW = 2
+                int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "2", context));
+                
+                Class clsNotificationChannel = Class.forName("android.app.NotificationChannel");
+                //android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name, importance);
+                Constructor constructor = clsNotificationChannel.getConstructor(java.lang.String.class, java.lang.CharSequence.class, int.class);
+                Object mChannel = constructor.newInstance(new Object[]{id, name, importance});
+                
+                Method method = clsNotificationChannel.getMethod("setDescription", java.lang.String.class);
+                method.invoke(mChannel, new Object[]{description});
+                //mChannel.setDescription(description);
+                
+                method = clsNotificationChannel.getMethod("enableLights", boolean.class);
+                method.invoke(mChannel, new Object[]{Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableLights", "true", context))});
+                //mChannel.enableLights(Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableLights", "true", context)));
+                
+                method = clsNotificationChannel.getMethod("setLightColor", int.class);
+                method.invoke(mChannel, new Object[]{Integer.parseInt(getServiceProperty("android.NotificationChannel.lightColor", "" + android.graphics.Color.RED, context))});
+                //mChannel.setLightColor(Integer.parseInt(getServiceProperty("android.NotificationChannel.lightColor", "" + android.graphics.Color.RED, context)));
+                
+                method = clsNotificationChannel.getMethod("enableVibration", boolean.class);
+                method.invoke(mChannel, new Object[]{Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableVibration", "false", context))});
+                //mChannel.enableVibration(Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableVibration", "false", context)));
+                String vibrationPatternStr = getServiceProperty("android.NotificationChannel.vibrationPattern", null, context);
+                if (vibrationPatternStr != null) {
+                    String[] parts = vibrationPatternStr.split(",");
+                    int len = parts.length;
+                    long[] pattern = new long[len];
+                    for (int i = 0; i < len; i++) {
+                        pattern[i] = Long.parseLong(parts[i].trim());
+                    }
+                    method = clsNotificationChannel.getMethod("setVibrationPattern", long[].class);
+                    method.invoke(mChannel, new Object[]{pattern});
+                    //mChannel.setVibrationPattern(pattern);
+                }
+                
+                method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);
+                method.invoke(mNotificationManager, new Object[]{mChannel});
+                //mNotificationManager.createNotificationChannel(mChannel);
+                try {
+                    // For some reason I can't find the app-support-v4.jar for
+                    // API 26 that includes this method so that I can compile in netbeans.
+                    // So we use reflection...  If someone coming after can find a newer version
+                    // that has setChannelId(), please rip out this ugly reflection hack and
+                    // replace it with a proper call to mNotifyBuilder.setChannelId(id)
+                    mNotifyBuilder.getClass().getMethod("setChannelId", new Class[]{String.class}).invoke(mNotifyBuilder, new Object[]{id});
+                } catch (Exception ex) {
+                    Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                //mNotifyBuilder.setChannelId(id);
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (NoSuchMethodException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (SecurityException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalArgumentException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InvocationTargetException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InstantiationException ex) {
+                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            //mNotifyBuilder.setChannelId(id);
+        }
+
+    }
+    
     public Object notifyStatusBar(String tickerText, String contentTitle,
                                   String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         int id = getContext().getResources().getIdentifier("icon", "drawable", getContext().getApplicationInfo().packageName);

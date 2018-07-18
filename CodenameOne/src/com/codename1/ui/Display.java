@@ -1486,6 +1486,9 @@ public final class Display extends CN1Constants {
         if (isTextEditing(cmp)) {
             return;
         }
+        if (cmp instanceof TextArea) {
+            ((TextArea)cmp).setSuppressActionEvent(false);
+        }
         Form f = cmp.getComponentForm();
         
         // this can happen in the spinner in the simulator where the key press should in theory start native 

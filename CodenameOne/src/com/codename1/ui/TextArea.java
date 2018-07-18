@@ -174,6 +174,14 @@ public class TextArea extends Component {
      */
     public static final int INITIAL_CAPS_SENTENCE = 0x200000;
     //private int modifierFlag = 0x00000;
+    
+    /**
+     * This flag is a hint to the implementation that this field contains
+     * a username.
+     */
+    public static final int USERNAME = 0x400000;
+    
+    
              
     /**
      * Input constraint which should be one of ANY, NUMERIC,
@@ -699,8 +707,10 @@ public class TextArea extends Component {
      * {@inheritDoc}
      */
     void focusGainedInternal() {
+        setSuppressActionEvent(false);
         super.focusGainedInternal();
         setHandlesInput(isScrollableY());
+        
     }
 
     /**
@@ -709,6 +719,10 @@ public class TextArea extends Component {
     void focusLostInternal() {
         super.focusLostInternal();
         setHandlesInput(false);
+        if (isEditing()) {
+            fireActionEvent();
+            setSuppressActionEvent(true);
+        }
     }
     
     /**
@@ -1206,9 +1220,41 @@ public class TextArea extends Component {
     }
     
     /**
+     * Flag to indicate whether the action event is suppressed.
+     * FocusLost will trigger an action event if editing is in progress, 
+     * and then set this flag.
+     * The flag should be unset on focus gained, and on start editing.
+     */
+    private boolean suppressActionEvent;
+    
+    /**
+     * Since the action event is triggered on the end of editing, and that may not
+     * happen until a couple of EDT cycles after the onFocus event, we want to be 
+     * able to fire the action event in focus lost, and then suppress the normal
+     * action event that would be fired on editing end.  We use this flag to
+     * suppress action events.
+     * @param suppress 
+     */
+    void setSuppressActionEvent(boolean suppress) {
+        suppressActionEvent = suppress;
+        
+    }
+    
+    /**
+     * Checks to see if the action event is suppressed.
+     * @return 
+     */
+    boolean isSuppressActionEvent() {
+        return suppressActionEvent;
+    }
+    
+    /**
      * Notifies listeners of a change to the text area
      */
     void fireActionEvent() {
+        if (suppressActionEvent) {
+            return;
+        }
         if(actionListeners != null) {
             ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
             actionListeners.fireActionEvent(evt);

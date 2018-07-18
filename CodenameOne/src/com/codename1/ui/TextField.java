@@ -1458,9 +1458,14 @@ public class TextField extends TextArea {
             }
             Display.getInstance().setShowVirtualKeyboard(false);
         }
+        if (isEditing()) {
+            fireActionEvent();
+            setSuppressActionEvent(true);
+        }
     }
 
     void focusGainedInternal() {
+        setSuppressActionEvent(false);
         startComponentLableTicker();
         releaseTime = System.currentTimeMillis();
         pressedAndNotReleased = false;
