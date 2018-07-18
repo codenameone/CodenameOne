@@ -26,9 +26,9 @@ namespace com.codename1.impl
 
             if (clip.getBounds().getWidth() > 0 && clip.getBounds().getHeight() > 0)
             {
-                underlying.setRawClip(clip.getBounds());
+                //underlying.setRawClip(clip.getBounds());
                 execute(underlying);
-                underlying.removeClip();
+                //underlying.removeClip();
             }
            
             

@@ -83,6 +83,7 @@ namespace com.codename1.impl
 
         internal virtual void setClipShape(ui.geom.Shape clip)
         {
+            removeClip();
             if (clip == null)
             {
                 return;
@@ -100,6 +101,7 @@ namespace com.codename1.impl
 
         internal virtual void setClip(ui.geom.Rectangle clip)
         {
+            removeClip();
             if (clip == null)
             {
                 return;
@@ -134,6 +136,7 @@ namespace com.codename1.impl
 
         public void setRawClip(ui.geom.Shape clip)
         {
+            removeClip();
             if (clip == null)
             {
                 return;
@@ -146,6 +149,16 @@ namespace com.codename1.impl
                     bounds.getY(),
                     1,
                     1
+                ));
+                return;
+            }
+            if (clip.isRectangle())
+            {
+                layer = graphics.CreateLayer(1f, new Rect(
+                    bounds.getX(),
+                    bounds.getY(),
+                    bounds.getWidth(),
+                    bounds.getHeight()
                 ));
                 return;
             }
