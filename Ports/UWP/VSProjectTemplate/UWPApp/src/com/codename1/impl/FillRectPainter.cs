@@ -4,7 +4,7 @@ namespace com.codename1.impl
 {
     class FillRectPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private int x;
         private int y;
         private int w;
@@ -12,7 +12,7 @@ namespace com.codename1.impl
         private int color;
         private int alpha;
 
-        public FillRectPainter(Rectangle clip, int x, int y, int w, int h, int color, int alpha)
+        public FillRectPainter(Shape clip, int x, int y, int w, int h, int color, int alpha)
             : base(clip)
         {
             this.clip = clip;
