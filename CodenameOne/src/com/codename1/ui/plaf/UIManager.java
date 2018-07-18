@@ -1070,28 +1070,17 @@ public class UIManager {
         if (installedTheme == null || !installedTheme.containsKey("PickerButton")) {
             // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
             themeProps.put("PickerButton.derive", "Button");
-            themeProps.put("PickerButton.sel#derive", "Button");
-            themeProps.put("PickerButton.press#derive", "Button");
+            themeProps.put("PickerButton.sel#derive", "Button.sel");
+            themeProps.put("PickerButton.press#derive", "Button.pres");
         }
         
-        if (installedTheme == null || !installedTheme.containsKey("PickerButtonTablet.derive")) {
-            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
-            if (installedTheme != null && installedTheme.containsKey("PickerButtonTabletNative")) {
-                themeProps.put("PickerButtonTablet.derive", "PickerButtonTabletNative");
-                themeProps.put("PickerButtonTablet.sel#derive", "PickerButtonTabletNative");
-                themeProps.put("PickerButtonTablet.press#derive", "PickerButtonTabletNative");
-            } else {
-                themeProps.put("PickerButtonTablet.derive", "Button");
-                themeProps.put("PickerButtonTablet.sel#derive", "Button");
-                themeProps.put("PickerButtonTablet.press#derive", "Button");
-            }
-        }
+        
         
         if (installedTheme == null || !installedTheme.containsKey("Picker.derive")) {
             themeProps.put("Picker.derive", "TextField");
-            themeProps.put("Picker.sel#derive", "TextField");
-            themeProps.put("Picker.press#derive", "TextField");
-            themeProps.put("Picker.dis#derive", "TextField");
+            themeProps.put("Picker.sel#derive", "TextField.sel");
+            themeProps.put("Picker.press#derive", "TextField.press");
+            themeProps.put("Picker.dis#derive", "TextField.dis");
             themeProps.put("Picker.sel#border", Border.createLineBorder(1, 0x206afb));
         }
         
@@ -1104,7 +1093,6 @@ public class UIManager {
      * @param themeProps the properties of the given theme
      */
     public void setThemeProps(Hashtable themeProps) {
-        System.out.println("Setting themeProps "+themeProps);
         if (accessible) {
             setThemePropsImpl(themeProps);
         }
@@ -1265,6 +1253,19 @@ public class UIManager {
                 this.themeProps.put("PickerButtonBar.border", Border.createCompoundBorder(Border.createLineBorder(1, ColorUtil.rgb(148, 150, 151)), Border.createEmpty(), Border.createEmpty(), Border.createEmpty()));
                 this.themeProps.put("PickerButtonBar.bgColor", "F0F1F3");
                 this.themeProps.put("PickerButtonBar.transparency", "255");
+            }
+        }
+        
+        if (!this.themeProps.containsKey("PickerButtonTablet.derive")) {
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+            if (this.themeProps.containsKey("PickerButtonTabletNative.derive")) {
+                this.themeProps.put("PickerButtonTablet.derive", "PickerButtonTabletNative");
+                this.themeProps.put("PickerButtonTablet.sel#derive", "PickerButtonTabletNative.sel");
+                this.themeProps.put("PickerButtonTablet.press#derive", "PickerButtonTabletNative.press");
+            } else {
+                this.themeProps.put("PickerButtonTablet.derive", "Button");
+                this.themeProps.put("PickerButtonTablet.sel#derive", "Button");
+                this.themeProps.put("PickerButtonTablet.press#derive", "Button");
             }
         }
         
