@@ -103,11 +103,13 @@ namespace com.codename1.impl
         public class AsyncGraphics : WindowsGraphics
         {
             private Rectangle clip;
+            private CanvasPathBuilder clipShape;
             private int alpha;
             private int color;
             private CanvasTextFormat font = new CanvasTextFormat();
             private WindowsGraphics internalGraphics;
             private com.codename1.ui.Transform transform = com.codename1.ui.Transform.makeTranslation(0, 0, 0);
+            private com.codename1.ui.Transform clipTransform;
 
             public AsyncGraphics(CanvasDrawingSession graphics)
                 : base(graphics)
@@ -120,9 +122,26 @@ namespace com.codename1.impl
                 return internalGraphics;
             }
 
+            internal override void setClipShape(Shape clip)
+            {
+                clipTransform = transform == null ? null : transform.copy();
+                if (clip.isRectangle())
+                {
+                    this.clip = clip.getBounds();
+                    this.clipShape = null;
+                } else
+                {
+                    this.clipShape = SilverlightImplementation.instance.cn1ShapeToAndroidPath(clip);
+                    this.clip = null;
+                }
+                
+            }
+
             internal override void setClip(Rectangle clip)
             {
                 this.clip = clip;
+                this.clipShape = null;
+                clipTransform = transform == null ? null : transform.copy();
             }
 
             internal override void setAlpha(int alpha)
@@ -166,9 +185,32 @@ namespace com.codename1.impl
                 return font;
             }
 
+            private Shape getProjectedClip()
+            {
+                if (clip == null)
+                {
+                    return null;
+                }
+                Shape s = new Rectangle(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight());
+                if (clipTransform != null && !clipTransform.isIdentity())
+                {
+                    GeneralPath p = new GeneralPath();
+                    p.setShape(s, clipTransform.getInverse());
+                    s = p;
+                }
+                if (transform != null && !transform.isIdentity())
+                {
+                    GeneralPath p = new GeneralPath();
+                    p.setShape(s, transform);
+                    s = p;
+                }
+
+                return s;
+            }
+
             internal override void drawRect(int x, int y, int w, int h, int stroke)
             {
-                pendingRenderingOperations.Add(new DrawRectPainter(clip, x, y, w, h, stroke, color, alpha));
+                pendingRenderingOperations.Add(new DrawRectPainter(getProjectedClip(), x, y, w, h, stroke, color, alpha));
             }
 
             internal override void fillRect(int x, int y, int w, int h)
@@ -177,87 +219,87 @@ namespace com.codename1.impl
                 {
                     return;
                 }
-                pendingRenderingOperations.Add(new FillRectPainter(clip, x, y, w, h, color, alpha));
+                pendingRenderingOperations.Add(new FillRectPainter(getProjectedClip(), x, y, w, h, color, alpha));
             }
 
             internal override void clearRect(int x, int y, int w, int h)
             {
-                pendingRenderingOperations.Add(new ClearRectPainter(clip, x, y, w, h));
+                pendingRenderingOperations.Add(new ClearRectPainter(getProjectedClip(), x, y, w, h));
             }
 
             internal override void drawRoundRect(int x, int y, int w, int h, int arcW, int arcH)
             {
-                pendingRenderingOperations.Add(new DrawRoundRectPainter(clip, x, y, w, h, color, alpha, arcW, arcH));
+                pendingRenderingOperations.Add(new DrawRoundRectPainter(getProjectedClip(), x, y, w, h, color, alpha, arcW, arcH));
             }
 
             internal override void fillRoundRect(int x, int y, int w, int h, int arcW, int arcH)
             {
-                pendingRenderingOperations.Add(new FillRoundRectPainter(clip, x, y, w, h, color, alpha, arcW, arcH));
+                pendingRenderingOperations.Add(new FillRoundRectPainter(getProjectedClip(), x, y, w, h, color, alpha, arcW, arcH));
             }
 
             internal override void fillPolygon(int[] p1, int[] p2)
             {
-                pendingRenderingOperations.Add(new FillPolygonPainter(clip, p1, p2, color, alpha));
+                pendingRenderingOperations.Add(new FillPolygonPainter(getProjectedClip(), p1, p2, color, alpha));
             }
 
             internal override void drawArc(int x, int y, int w, int h, int startAngle, int arcAngle)
             {
-                pendingRenderingOperations.Add(new DrawArcPainter(clip, x, y, w, h, color, alpha, startAngle, arcAngle));
+                pendingRenderingOperations.Add(new DrawArcPainter(getProjectedClip(), x, y, w, h, color, alpha, startAngle, arcAngle));
             }
 
             internal override void fillArc(int x, int y, int w, int h, int startAngle, int arcAngle)
             {
-                pendingRenderingOperations.Add(new FillArcPainter(clip, x, y, w, h, color, alpha, startAngle, arcAngle));
+                pendingRenderingOperations.Add(new FillArcPainter(getProjectedClip(), x, y, w, h, color, alpha, startAngle, arcAngle));
             }
 
             internal override void drawString(string str, int x, int y)
             {
-                pendingRenderingOperations.Add(new DrawStringPainter(clip, str, x, y, font, color, alpha));
+                pendingRenderingOperations.Add(new DrawStringPainter(getProjectedClip(), str, x, y, font, color, alpha));
             }
 
             internal override void drawImage(CanvasBitmap canvasBitmap, int x, int y)
             {
-                pendingRenderingOperations.Add(new DrawImagePainter(clip, canvasBitmap, x, y, alpha));
+                pendingRenderingOperations.Add(new DrawImagePainter(getProjectedClip(), canvasBitmap, x, y, alpha));
             }
 
             internal override void drawImage(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
             {
-                pendingRenderingOperations.Add(new DrawImagePainter(clip, canvasBitmap, x, y, w, h, alpha));
+                pendingRenderingOperations.Add(new DrawImagePainter(getProjectedClip(), canvasBitmap, x, y, w, h, alpha));
             }
 
             internal override void tileImage(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
             {
-                pendingRenderingOperations.Add(new TileImagePainter(clip, canvasBitmap, x, y, w, h, alpha));
+                pendingRenderingOperations.Add(new TileImagePainter(getProjectedClip(), canvasBitmap, x, y, w, h, alpha));
             }
 
             internal override void drawLine(int x1, int y1, int x2, int y2)
             {
-                pendingRenderingOperations.Add(new DrawLinePainter(clip, x1, y1, x2, y2, color, alpha));
+                pendingRenderingOperations.Add(new DrawLinePainter(getProjectedClip(), x1, y1, x2, y2, color, alpha));
             }
 
             internal override void clear()
             {
-                pendingRenderingOperations.Add(new ClearColorPainter(clip, color, alpha));
+                pendingRenderingOperations.Add(new ClearColorPainter(getProjectedClip(), color, alpha));
             }
 
             internal override void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, bool horizontal)
             {
-                pendingRenderingOperations.Add(new FillLinearGradientPainter(clip, startColor, endColor, x, y, width, height, horizontal));
+                pendingRenderingOperations.Add(new FillLinearGradientPainter(getProjectedClip(), startColor, endColor, x, y, width, height, horizontal));
             }
 
             internal override void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height)
             {
-                pendingRenderingOperations.Add(new FillRadialGradientPainter(clip, startColor, endColor, x, y, width, height));
+                pendingRenderingOperations.Add(new FillRadialGradientPainter(getProjectedClip(), startColor, endColor, x, y, width, height));
             }
 
             internal override void drawPath(CanvasPathBuilder p, Stroke stroke)
             {
-                pendingRenderingOperations.Add(new DrawPathPainter(clip, color, alpha, p, stroke));
+                pendingRenderingOperations.Add(new DrawPathPainter(getProjectedClip(), color, alpha, p, stroke));
             }
 
             internal override void fillPath(CanvasPathBuilder p)
             {
-                pendingRenderingOperations.Add(new FillPathPainter(clip, color, alpha, p));
+                pendingRenderingOperations.Add(new FillPathPainter(getProjectedClip(), color, alpha, p));
             }
         }
     }

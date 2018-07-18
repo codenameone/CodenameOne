@@ -4,7 +4,7 @@ namespace com.codename1.impl
 {
     class DrawImagePainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap;
         private int x;
         private int y;
@@ -12,7 +12,7 @@ namespace com.codename1.impl
         private int w = -1;
         private int h = -1;
 
-        public DrawImagePainter(Rectangle clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int alpha)
+        public DrawImagePainter(Shape clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int alpha)
             : base(clip)
         {
             this.clip = clip;
@@ -22,7 +22,7 @@ namespace com.codename1.impl
             this.alpha = alpha;
         }
 
-        public DrawImagePainter(Rectangle clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int w, int h, int alpha)
+        public DrawImagePainter(Shape clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int w, int h, int alpha)
             : base(clip)
         {
             this.clip = clip;
