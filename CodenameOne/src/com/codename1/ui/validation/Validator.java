@@ -632,7 +632,10 @@ public class Validator {
      */
     protected void validate(Component cmp) {
         Object val = getComponentValue(cmp);
-        setValid(cmp, constraintList.get(cmp).isValid(val));
+        Constraint c = constraintList.get(cmp);
+        if(c != null) {
+            setValid(cmp, c.isValid(val));
+        }
     }
     
     boolean isValid(Component cmp) {
@@ -641,7 +644,11 @@ public class Validator {
             return b.booleanValue();
         }
         Object val = getComponentValue(cmp);
-        return constraintList.get(cmp).isValid(val);
+        Constraint c = constraintList.get(cmp);
+        if(c != null) {
+            return c.isValid(val);
+        }
+        return true;
     }
     
     /**
