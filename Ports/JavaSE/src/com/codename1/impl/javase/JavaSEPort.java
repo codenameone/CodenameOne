@@ -3222,6 +3222,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         JMenuItem dSkin = new JMenuItem("Desktop.skin");
+        
         dSkin.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent ae) {
@@ -3243,8 +3244,33 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } 
             }
         });
+        JMenuItem uwpSkin = new JMenuItem("UWP Desktop.skin");
+        uwpSkin.setToolTipText("Windows 10 Desktop Skin");
+        uwpSkin.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                if (netMonitor != null) {
+                    netMonitor.dispose();
+                    netMonitor = null;
+                }
+                if (perfMonitor != null) {
+                    perfMonitor.dispose();
+                    perfMonitor = null;
+                }
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("desktopSkin", true);
+                pref.putBoolean("uwpDesktopSkin", true);
+                String mainClass = System.getProperty("MainClass");
+                if (mainClass != null) {
+                    deinitializeSync();
+                    frm.dispose();
+                    System.setProperty("reload.simulator", "true");
+                } 
+            }
+        });
         skinMenu.addSeparator();
         skinMenu.add(dSkin);
+        skinMenu.add(uwpSkin);
         
         skinMenu.addSeparator();
         JMenuItem more = new JMenuItem("More...");
@@ -3734,7 +3760,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             frame.add(panel, BorderLayout.CENTER);
             frame.setSize(new Dimension(300, 400));
             m = panel;
-            window = frame;            
+            window = frame;
+            if (pref.getBoolean("uwpDesktopSkin", false)) {
+                setNativeTheme("/winTheme.res");
+            }
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
         
@@ -7193,7 +7222,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return tablet;
+        return tablet || isDesktop();
     }
 
     public boolean isDesktop() {

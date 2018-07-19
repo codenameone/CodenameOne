@@ -4,7 +4,7 @@ namespace com.codename1.impl
 {
     class DrawStringPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private string str;
         private int x;
         private int y;
@@ -12,7 +12,7 @@ namespace com.codename1.impl
         private int color;
         private int alpha;
 
-        public DrawStringPainter(Rectangle clip, string str, int x, int y, Microsoft.Graphics.Canvas.Text.CanvasTextFormat font, int color, int alpha)
+        public DrawStringPainter(Shape clip, string str, int x, int y, Microsoft.Graphics.Canvas.Text.CanvasTextFormat font, int color, int alpha)
             : base(clip)
         {
             this.clip = clip;

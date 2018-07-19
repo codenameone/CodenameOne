@@ -4,14 +4,14 @@ namespace com.codename1.impl
 {
     class ClearRectPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private int x;
         private int y;
         private int w;
         private int h;
 
 
-        public ClearRectPainter(Rectangle clip, int x, int y, int w, int h)
+        public ClearRectPainter(Shape clip, int x, int y, int w, int h)
             : base(clip)
         {
             this.clip = clip;
