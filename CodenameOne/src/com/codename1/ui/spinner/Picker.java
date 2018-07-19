@@ -1076,7 +1076,11 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
+                    int cookedHour = hour <= 12 ? hour : hour - 12;
+                    if (cookedHour == 0) {
+                        cookedHour = 12;
+                    }
+                    setText(twoDigits(cookedHour) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }
