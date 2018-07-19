@@ -207,6 +207,8 @@ public class Toolbar extends Container {
      */
     private Component sidemenuSouthComponent;
     private Component rightSidemenuSouthComponent;
+    
+    private float searchIconSize;
 
     /**
      * Empty Constructor
@@ -615,24 +617,12 @@ public class Toolbar extends Container {
      * in millimeters
      */
     public void addSearchCommand(final ActionListener callback, final float iconSize) {
+        searchIconSize = iconSize;
         searchCommand = new Command("") {
 
             @Override
             public void actionPerformed(ActionEvent evt) {
-                SearchBar s = new SearchBar(Toolbar.this, iconSize) {
-
-                    @Override
-                    public void onSearch(String text) {
-                        callback.actionPerformed(new ActionEvent(text));
-                    }
-
-                };
-                Form f = (Form) Toolbar.this.getComponentForm();
-                setHidden(true);
-                f.removeComponentFromForm(Toolbar.this);
-                f.setToolbar(s);
-                s.initSearchBar();
-                f.animateLayout(100);
+                showSearchBar(callback);
             }
 
         };
@@ -641,6 +631,31 @@ public class Toolbar extends Container {
         addCommandToRightBar(searchCommand);
     }
 
+    /**
+     * Shows the search bar manually which is useful for use cases of popping 
+     * up search from code
+     * 
+     * @param callback gets the search string callbacks
+     */
+    public void showSearchBar(final ActionListener callback) {        
+        SearchBar s = new SearchBar(Toolbar.this, searchIconSize) {
+
+            @Override
+            public void onSearch(String text) {
+                callback.actionPerformed(new ActionEvent(text));
+            }
+
+        };
+        Form f = (Form) Toolbar.this.getComponentForm();
+        setHidden(true);
+        f.removeComponentFromForm(Toolbar.this);
+        f.setToolbar(s);
+        s.initSearchBar();
+        if(f == Display.INSTANCE.getCurrent()) {
+            f.animateLayout(100);
+        }
+    }
+    
     /**
      * Removes a previously installed search command
      */
