@@ -1301,17 +1301,14 @@ public class TextArea extends Component {
      */
     void fireActionEvent() {
         if (suppressActionEvent) {
-            System.out.println("Action event suppressed");
             return;
         }
         if(actionListeners != null) {
-            System.out.println("We have action listeners");
             ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
             actionListeners.fireActionEvent(evt);
         }
         if(bindListeners != null) {
             String t = getText();
-            System.out.println("We have bind listeners "+t);
             bindListeners.fireBindTargetChange(this, "text", lastTextValue, t);
             lastTextValue = t;
         }
