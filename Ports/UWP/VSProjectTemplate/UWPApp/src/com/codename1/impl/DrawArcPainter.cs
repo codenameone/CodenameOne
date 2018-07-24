@@ -4,7 +4,7 @@ namespace com.codename1.impl
 {
     class DrawArcPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private int x;
         private int y;
         private int w;
@@ -14,7 +14,7 @@ namespace com.codename1.impl
         private int startAngle;
         private int arcAngle;
 
-        public DrawArcPainter(Rectangle clip, int x, int y, int w, int h, int color, int alpha, int startAngle, int arcAngle)
+        public DrawArcPainter(Shape clip, int x, int y, int w, int h, int color, int alpha, int startAngle, int arcAngle)
             : base(clip)
         {
             this.clip = clip;

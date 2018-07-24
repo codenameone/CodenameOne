@@ -868,6 +868,16 @@ public class Picker extends Button {
             style.setMarginBottom(tmpContentPaneBottomMargin);
             tmpContentPaneMarginUnit=null;
             f.revalidate();
+            // If we remove the margin, it sometimes leaves the content pane
+            // in a negative scroll position - which leaves a gap at the top.
+            // Simulating a drag will trigger tensile drag to push the content
+            // back up to the top.
+            // See https://github.com/codenameone/CodenameOne/issues/2476
+            if (f != null && f.getContentPane() != null && f.getContentPane().getScrollY() < 0) {
+                f.getContentPane().pointerPressed(100, 100);
+                f.getContentPane().pointerDragged(100, 100);
+                f.getContentPane().pointerReleased(100, 100);
+            }
         }
     }
 
@@ -1076,7 +1086,11 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
+                    int cookedHour = hour <= 12 ? hour : hour - 12;
+                    if (cookedHour == 0) {
+                        cookedHour = 12;
+                    }
+                    setText(twoDigits(cookedHour) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }

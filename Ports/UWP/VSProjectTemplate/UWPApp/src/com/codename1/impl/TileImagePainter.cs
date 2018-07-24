@@ -8,7 +8,7 @@ namespace com.codename1.impl
 {
     class TileImagePainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap;
         private int x;
         private int y;
@@ -16,7 +16,7 @@ namespace com.codename1.impl
         private int h;
         private int alpha;
 
-        public TileImagePainter(Rectangle clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int w, int h, int alpha) : base(clip)
+        public TileImagePainter(Shape clip, Microsoft.Graphics.Canvas.CanvasBitmap canvasBitmap, int x, int y, int w, int h, int alpha) : base(clip)
         {
             this.clip = clip;
             this.canvasBitmap = canvasBitmap;

@@ -3120,24 +3120,30 @@ namespace com.codename1.impl
 
         public override int getClipX(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipX();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getX();
         }
 
         public override int getClipY(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipY();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getY();
         }
 
         public override int getClipWidth(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipW();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getWidth();
         }
 
         public override int getClipHeight(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipH();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getHeight();
         }
-        
+
+        public override void setClip(object graphics, Shape shape)
+        {
+            java.lang.System.@out.println("Setting clip shape");
+            base.setClip(graphics, shape);
+        }
+
         public override void setClip(object graphics, int clipX, int clipY, int clipW, int clipH)
         {
             Rectangle clip = new Rectangle(clipX, clipY, clipW, clipH);
@@ -4662,7 +4668,7 @@ namespace com.codename1.impl
             
                 
         }
-        private CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
+        public CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
         {
             CanvasPathBuilder canvasPath = new CanvasPathBuilder(screen);
             

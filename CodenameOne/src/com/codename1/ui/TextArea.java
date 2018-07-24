@@ -324,6 +324,49 @@ public class TextArea extends Component {
         this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
     }
 
+    /**
+     * To work around race conditions in UI bindings (on Android at least), we want to 
+     * send action events early.  Even the focusLost() event isn't early enough to ensure
+     * that the action event is sent before an action event in a button that would trigger
+     * focus lost.  We add this form press listener to the form when we add the textarea
+     * and remove it when we remove the textarea.
+     * 
+     * Reference bug https://github.com/codenameone/CodenameOne/issues/2472
+     */
+    private final ActionListener formPressListener = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
+            Form f = getComponentForm();
+            if (f != null) {
+                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) {
+                    fireActionEvent();
+                    setSuppressActionEvent(true);
+                }
+            }
+        }
+    };
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        Form f = getComponentForm();
+        if (f != null) {
+            // To be able to send action events early.
+            // https://github.com/codenameone/CodenameOne/issues/2472
+            f.addPointerPressedListener(formPressListener);
+        }
+    }
+
+    @Override
+    protected void deinitialize() {
+        Form f = getComponentForm();
+        if (f != null) {
+            // For sending action events early
+            // https://github.com/codenameone/CodenameOne/issues/2472
+            f.removePointerPressedListener(formPressListener);
+        }
+        super.deinitialize();
+    }
+
     private static int numCols(String t) {
         if(t == null) {
             return 3;
@@ -435,6 +478,11 @@ public class TextArea extends Component {
      */
     public void setText(String t) {
         String old = this.text;
+        if (t != null ? !t.equals(old) : old != null) {
+            // If we've previously suppressed action events,
+            // we need to unsuppress them upon the text changing again.
+            setSuppressActionEvent(false);
+        }
         this.text = (t != null) ? t : "";
         setShouldCalcPreferredSize(true);
         if(maxSize < text.length()) {
@@ -530,7 +578,7 @@ public class TextArea extends Component {
      */
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
-        
+        setSuppressActionEvent(false);
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
 
         // this works around a bug where fire is also a softkey on devices such as newer Nokia

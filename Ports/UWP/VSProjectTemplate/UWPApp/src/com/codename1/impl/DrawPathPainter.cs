@@ -3,13 +3,13 @@ namespace com.codename1.impl
 {
     class DrawPathPainter : AsyncOp
     {
-        private ui.geom.Rectangle clip;
+        private ui.geom.Shape clip;
         private int color;
         private int alpha;
         private com.codename1.ui.Stroke stroke;
         private Microsoft.Graphics.Canvas.Geometry.CanvasPathBuilder path;
 
-        public DrawPathPainter(ui.geom.Rectangle clip, int color, int alpha, Microsoft.Graphics.Canvas.Geometry.CanvasPathBuilder path, com.codename1.ui.Stroke stroke)
+        public DrawPathPainter(ui.geom.Shape clip, int color, int alpha, Microsoft.Graphics.Canvas.Geometry.CanvasPathBuilder path, com.codename1.ui.Stroke stroke)
             : base(clip)
         {
             this.clip = clip;

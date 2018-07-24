@@ -1256,6 +1256,7 @@ public class TextField extends TextArea {
      * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
+        setSuppressActionEvent(false);
         if(useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.keyPressed(keyCode);
             return;
@@ -1447,6 +1448,10 @@ public class TextField extends TextArea {
             pressedAndNotReleased = false;
             longClick = false;
         }
+        if (isEditing()) {
+            fireActionEvent();
+            setSuppressActionEvent(true);
+        }
         Form f = getComponentForm();
         if(f != null) {
             // prevent the VKB folding in case we are moving from one text component to another
@@ -1458,10 +1463,7 @@ public class TextField extends TextArea {
             }
             Display.getInstance().setShowVirtualKeyboard(false);
         }
-        if (isEditing()) {
-            fireActionEvent();
-            setSuppressActionEvent(true);
-        }
+
     }
 
     void focusGainedInternal() {

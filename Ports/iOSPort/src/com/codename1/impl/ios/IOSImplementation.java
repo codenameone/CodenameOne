@@ -412,8 +412,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance.repaintTextEditor(true);
     }
     
+    // A flag to override the invisible area under VKB.  This
+    // is used when hiding the keyboard, but the keyboard may still
+    // be visible so that we can perform revalidation of the form
+    // using a supposed state.
+    private int areaUnderVKBOverride=-1;
+    
     @Override
     public int getInvisibleAreaUnderVKB() {
+        if (areaUnderVKBOverride >= 0) {
+            return areaUnderVKBOverride;
+        }
         if(isAsyncEditMode() && isEditingText()) {
             return nativeInstance.getVKBHeight();
         }
@@ -553,7 +562,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 Form current = Display.getInstance().getCurrent();
                 if (current != null) {
-                    current.revalidate();
+                    instance.areaUnderVKBOverride = 0;
+                    try {
+                        current.revalidate();
+                        //Now that screen size is changed, the scroll positions may
+                        // be caught in a negative state, leaving a gap at the
+                        // top.
+                        //https://github.com/codenameone/CodenameOne/issues/2476
+                        Accessor.fixNegativeScrolls(current);
+                    } finally {
+                        instance.areaUnderVKBOverride = -1;
+                    }
                 }
             }
             

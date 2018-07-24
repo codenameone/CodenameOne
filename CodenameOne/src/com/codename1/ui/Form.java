@@ -3831,7 +3831,24 @@ public class Form extends Container {
 
         return true;
     }
-
+    
+    /**
+     * Initiates a quick drag event on all containers of this form that have a negative scroll position.
+     * Sometimes, after editing, or on a screen-size change, scroll positions can get caught in a 
+     * negative position, and need to be reset.  This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476
+     */
+    void fixNegativeScrolls() {
+        java.util.Set<Component> negativeScrolls = getContentPane().findNegativeScrolls(new java.util.HashSet<Component>());
+        System.out.println("NegativeScrolls: "+negativeScrolls);
+        for (Component cmp : negativeScrolls) {
+            int x = cmp.getAbsoluteX()+cmp.getWidth()/2;
+            int y = cmp.getAbsoluteY()+cmp.getHeight()/2;
+            cmp.pointerPressed(x, y);
+            cmp.pointerDragged(x, y);
+            cmp.pointerReleased(x, y);
+        }
+    }
+    
     /**
      * Makes sure the component is visible in the scroll if this container 
      * is scrollable
