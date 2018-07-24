@@ -189,27 +189,55 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     static JMenuItem pause;
     
+    /**
+     * Returns the Java version as an int value.
+     *
+     * @return the Java version as an int value (8, 9, etc.)
+     * @since 12130
+     */
+    private static int getJavaVersion() {
+        String version = System.getProperty("java.version");
+        if (version.startsWith("1.")) {
+            version = version.substring(2);
+        }
+        // Allow these formats:
+        // 1.8.0_72-ea
+        // 9-ea
+        // 9
+        // 9.0.1
+        int dotPos = version.indexOf('.');
+        int dashPos = version.indexOf('-');
+        return Integer.parseInt(version.substring(0,
+                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+    }
+
     public static boolean isRetina() {
-        //if (true) return false;
         boolean isRetina = false;
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
-            // TODO: In JDK9 this throws a warning
-            // WARNING: An illegal reflective access operation has occurred
-            // WARNING: Illegal reflective access by com.codename1.impl.javase.JavaSEPort to field sun.awt.CGraphicsDevice.scale
-            // WARNING: Please consider reporting this to the maintainers of com.codename1.impl.javase.JavaSEPort
-            // WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
-            // WARNING: All illegal access operations will be denied in a future release
-            // A workaround is sugtested in this bug report.  Will require some testing.
-            // https://bugs.openjdk.java.net/browse/JDK-8172962
-            // 
-            Field field = graphicsDevice.getClass().getDeclaredField("scale");
-            if (field != null) {
-                field.setAccessible(true);
-                Object scale = field.get(graphicsDevice);
-                if (scale instanceof Integer && ((Integer) scale).intValue() == 2) {
+            if (getJavaVersion() >= 9) {
+                // JDK9 Doesn't like the old hack for getting the scale via reflection.
+                // https://bugs.openjdk.java.net/browse/JDK-8172962
+                GraphicsConfiguration graphicsConfig = graphicsDevice 
+                        .getDefaultConfiguration(); 
+
+                AffineTransform tx = graphicsConfig.getDefaultTransform(); 
+                double scaleX = tx.getScaleX(); 
+                double scaleY = tx.getScaleY(); 
+                
+                if (Math.round(scaleX) == 2 && Math.round(scaleY) == 2) {
                     isRetina = true;
+                }
+            } else {
+
+                Field field = graphicsDevice.getClass().getDeclaredField("scale");
+                if (field != null) {
+                    field.setAccessible(true);
+                    Object scale = field.get(graphicsDevice);
+                    if (scale instanceof Integer && ((Integer) scale).intValue() == 2) {
+                        isRetina = true;
+                    }
                 }
             }
         } catch (Throwable e) {
