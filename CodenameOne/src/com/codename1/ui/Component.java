@@ -4964,6 +4964,28 @@ public class Component implements Animation, StyleListener {
             Component.setDisableSmoothScrolling(false);
         }
     }
+    
+    
+    /**
+     * Finds all children (and self) that have negative scroll positions.
+     * 
+     * <p>This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476</p>
+     * @param out A set to add found components to.
+     * @return The set of found components (reference to the same set that is passed as an arg).
+     */
+    java.util.Set<Component> findNegativeScrolls(java.util.Set<Component> out) {
+        if (scrollableYFlag() && getScrollY() < 0) {
+            out.add(this);
+        }
+        if (this instanceof Container) {
+            System.out.println("Container: "+this+", scrollY="+getScrollY());
+            for (Component child : (Container)this) {
+                child.findNegativeScrolls(out);
+            }
+        }
+        return out;
+    }
+    
 
     /**
      * Overriden to return a useful value for debugging purposes
