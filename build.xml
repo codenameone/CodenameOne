@@ -161,6 +161,21 @@
         <arg value="-Dcn1.iphone.target=${cn1.iphone.target}"/>
       </exec>
     </target>
+    
+    <target name="core-src" depends="core" description="Build the CodenameOne_SRC.zip file">
+        <delete dir="CodenameOne/dist/tempsource" />
+        <mkdir dir="CodenameOne/dist"/>
+        <!-- this will get overriden the main value is keeping the package.html files -->
+        <copydir src="CodenameOne/src" dest="CodenameOne/dist/tempsource" />
+        <java fork="true" jar="../cn1-binaries/JavaDocSourceEmbed.jar">
+            <arg file="CodenameOne/src" />
+            <arg file="CodenameOne/dist/tempsource" />
+        </java>        
+        <zip basedir="CodenameOne/dist/tempsource" destfile="CodenameOne/dist/CodenameOne_SRC.zip" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <delete dir="CodenameOne/dist/tempsource" />
+    </target>
 
     <target name="all" depends="core,ios,android,javase,cldc11" description="Build all targets">
 
