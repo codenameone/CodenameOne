@@ -35,6 +35,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
@@ -56,7 +58,9 @@ public class Executor {
     
     
     public static void main(final String[] argv) throws Exception {
-        
+        if (JavaFXLoader.main(Executor.class, argv)) {
+            return;
+        }
         setProxySettings();
         if (CSSWatcher.isSupported()) {
             CSSWatcher cssWatcher = new CSSWatcher();
