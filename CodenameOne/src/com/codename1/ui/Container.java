@@ -1269,7 +1269,8 @@ public class Container extends Component implements Iterable<Component>{
     /**
      * remove all Components from container, notice that removed component might still have
      * a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
-     * such an issue.
+     * such an issue. Notice that this method doesn't recurse and only removes from
+     * the current container.
      */
    public void removeAll() {
         Form parentForm = getComponentForm();
