@@ -155,6 +155,7 @@ public class JavaFXLoader {
             if (javafxDir.exists()) {
                 delTree(javafxDir);
             }
+            javafxDir.getParentFile().mkdirs();
             File javafxZip = new File(javafxDir.getParentFile(), "javafx.zip");
             downloadToFile(url, javafxZip);
             File tmpDir = new File(javafxZip.getParentFile(), "javafx.tmp."+System.currentTimeMillis());
