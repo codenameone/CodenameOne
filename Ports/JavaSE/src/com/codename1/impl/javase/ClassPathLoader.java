@@ -47,7 +47,7 @@ class ClassPathLoader extends ClassLoader {
     }
 
     public Class loadClass(String className) throws ClassNotFoundException {
-        if (className.startsWith("java") || className.startsWith("com.sun")) {
+        if (className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
             return super.loadClass(className);
         }
         return findClass(className);
