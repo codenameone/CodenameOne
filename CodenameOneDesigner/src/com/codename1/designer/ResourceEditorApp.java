@@ -31,6 +31,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
 import com.codename1.designer.css.CN1CSSCLI;
+import com.codename1.impl.javase.JavaFXLoader;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
@@ -253,6 +254,11 @@ public class ResourceEditorApp extends SingleFrameApplication {
      * Main method launching the application.
      */
     public static void main(String[] args) throws Exception {
+        // For JDK11 and newer, JavaFX isn't part of the JDK, so we need to 
+        // add it to the classpath at runtime.
+        if (JavaFXLoader.main(ResourceEditorApp.class, args)) {
+            return;
+        }
         JavaSEPortWithSVGSupport.blockMonitors();
         JavaSEPortWithSVGSupport.setDesignMode(true);
         JavaSEPortWithSVGSupport.setShowEDTWarnings(false);

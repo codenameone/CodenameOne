@@ -53,7 +53,7 @@ public class SimpleDateFormatTests extends AbstractTest {
 
                     };
                     for (int i=0; i<data.length; i+=4) {
-                        java.text.DateFormat messageDateFormat0 = new java.text.SimpleDateFormat(data[i]);
+                        java.text.DateFormat messageDateFormat0 = new java.text.SimpleDateFormat(data[i], java.util.Locale.US);
                         SimpleDateFormat messageDateFormat = new SimpleDateFormat(data[i]);
                         messageDateFormat.getDateFormatSymbols().addZoneMapping("America/Vancouver", "Pacific Standard Time", "Pacific Daylight Time", "PST", "PDT");
                         messageDateFormat.getDateFormatSymbols().addZoneMapping("America/New_York", "Eastern Standard Time", "Eastern Daylight Time", "EST", "EDT");
@@ -65,7 +65,7 @@ public class SimpleDateFormatTests extends AbstractTest {
                         //}
                         // What is date that is associated with when?
                         DateFormat displayTimeFormat = new SimpleDateFormat(data[i+2]);
-                        java.text.DateFormat displayTimeFormat0 = new java.text.SimpleDateFormat(data[i+2]);
+                        java.text.DateFormat displayTimeFormat0 = new java.text.SimpleDateFormat(data[i+2], java.util.Locale.US);
                         String output0 = displayTimeFormat0.format(when);
                         String output = displayTimeFormat.format(when);
                         assertEqual(output0, output, "In timezone "+tzName+" SimpleDateFormat format deviated from java.text version.  Formatting "+data[i+1]+" with format "+data[i+2]);
