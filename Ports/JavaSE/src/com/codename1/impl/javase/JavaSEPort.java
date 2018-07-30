@@ -5260,6 +5260,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Composite c = nativeGraphics.getComposite();
+        nativeGraphics.setComposite(AlphaComposite.Clear);
+        nativeGraphics.fillRect(x, y, width, height);
+        if (perfMonitor != null) {
+            perfMonitor.clearRect(x, y, width, height);
+        }
+        nativeGraphics.setComposite(c);
+    }
+    
+    
+
     /**
      * @inheritDoc
      */
