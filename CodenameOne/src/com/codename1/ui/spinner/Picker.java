@@ -778,7 +778,7 @@ public class Picker extends Button {
                 }
                 break;
             case Display.PICKER_TYPE_STRINGS:
-                if(!Util.instanceofObjArray(value)) {
+                if(!Util.instanceofObjArray(value) && !(value instanceof String[])) {
                     setStrings(new String[] {" "});
                 }
                 break;

@@ -85,7 +85,7 @@ public class NSDataOutputStream extends OutputStream {
 
     @Override
     public void close() throws IOException {
-        if(!written) {
+        if(!written && !IOSImplementation.nativeInstance.fileExists(file)) {
             IOSImplementation.nativeInstance.writeToFile(new byte[0], file);
         }
         super.close();
