@@ -492,6 +492,7 @@ public class SignatureComponent extends Container {
 
             @Override
             public void pointerReleased(int x, int y) {
+                path.lineTo(x(x), y(y));
                 value = null;
                 repaint();
             }
