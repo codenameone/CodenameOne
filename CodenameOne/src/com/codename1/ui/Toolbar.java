@@ -2225,7 +2225,7 @@ public class Toolbar extends Container {
             if (!layered) {
                 actualPane.setY(actualPaneInitialY + val);
                 if (showing) {
-                    actualPane.setHeight(actualPaneInitialH + getHeight() - val);
+                    actualPane.setHeight(actualPaneInitialH - val);
                 } else {
                     actualPane.setHeight(actualPaneInitialH - val);
                 }
@@ -2247,7 +2247,8 @@ public class Toolbar extends Container {
         actualPaneInitialY = actualPane.getY();
         actualPaneInitialH = actualPane.getHeight();
     }
-
+    
+    private int lastNonZeroScrollDiff;
     private void bindScrollListener(boolean bind) {
         final Form f = getComponentForm();
         if (f != null) {
@@ -2259,6 +2260,10 @@ public class Toolbar extends Container {
 
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                         int diff = scrollY - oldscrollY;
+                        if (diff != 0) {
+                            lastNonZeroScrollDiff = diff;
+                        }
+                              
                         int toolbarNewY = getY() - diff;
                         if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
                             return;
@@ -2282,9 +2287,13 @@ public class Toolbar extends Container {
 
                     public void actionPerformed(ActionEvent evt) {
                         if (getY() + getHeight() / 2 > 0) {
-                            showToolbar();
+                            if (!showing && lastNonZeroScrollDiff < 0) {
+                                showToolbar();
+                            }
                         } else {
-                            hideToolbar();
+                            if (showing && lastNonZeroScrollDiff > 0) {
+                                hideToolbar();
+                            }
                         }
                         f.repaint();
                     }
