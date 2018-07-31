@@ -219,7 +219,11 @@ public class Log {
             instance.logDirty = false;
             String devId = getUniqueDeviceKey();
             if(devId == null) {
-                Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
+                if(Display.getInstance().isSimulator()) {
+                    Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
+                } else {
+                    Log.p("Device Not Registered: Sending a log from an unregistered device is impossible");
+                }
                 return;
             }
             ConnectionRequest r = new ConnectionRequest();
