@@ -9160,6 +9160,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 // No explanation needed, we can request the permission.
                 ((CodenameOneActivity)getActivity()).setRequestForPermission(true);
+                ((CodenameOneActivity)getActivity()).setWaitingForPermissionResult(true);
                 android.support.v4.app.ActivityCompat.requestPermissions(getActivity(),
                         new String[]{permission},
                         1);
