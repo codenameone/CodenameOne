@@ -294,8 +294,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     //private javafx.embed.swing.JFXPanel mediaContainer;
 
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS
-            = "/iphone3gs.skin;";
+    private static final String DEFAULT_SKIN = "/iPhoneX.skin";
+    private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
     private static String appHomeDir = ".cn1";
     
     /**
@@ -451,7 +451,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean alwaysOnTop = false;
     private static boolean useNativeInput = true;
     private static boolean simulateAndroidKeyboard = false;
-    private static boolean scrollableSkin = true;
+    private static boolean scrollableSkin = false;
     private JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
     private JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
     static final int GAME_KEY_CODE_FIRE = -90;
@@ -3088,7 +3088,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     zoomLevel = Math.min(h1, w1);
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale*zoomLevel), (int)(getSkin().getHeight()/retinaScale*zoomLevel)));
                     parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
 
@@ -3130,9 +3130,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    if (scrollableSkin) {
+                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    } else {
+                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                        float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                        if (window != null) {
+                            window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                        }
+                    }
                     parent.add(BorderLayout.CENTER, canvas);
-
+                    
                     canvas.x = 0;
                     canvas.y = 0;
                     zoomLevel = 1;
@@ -3214,7 +3223,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } else {
                     // remove the old builtin skins from the menu
-                    if(current.startsWith("/") && !current.equals("/iphone3gs.skin")) {
+                    if(current.startsWith("/") && !current.equals(DEFAULT_SKIN)) {
                         continue;
                     }
                 }
@@ -3567,12 +3576,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
-                            pref.put("skin", "/iphone3gs.skin");
+                            pref.put("skin", DEFAULT_SKIN);
                             deinitializeSync();
                             frm.dispose();
                             System.setProperty("reload.simulator", "true");
                         } else {
-                            loadSkinFile("/iphone3gs.skin", frm);
+                            loadSkinFile(DEFAULT_SKIN, frm);
                             refreshSkin(frm);
                         }
                         
@@ -3667,13 +3676,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private float zoomLevel() {
+        float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+        float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
+        return Math.min(h1, w1);
+    }
+    
     private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
 
             public void run() {
-                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
-                zoomLevel = Math.min(h1, w1);
+
+                zoomLevel = zoomLevel();
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
                 deepRevaliate(Display.getInstance().getCurrent());
 
@@ -3684,7 +3698,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 deepRevaliate(Display.getInstance().getCurrent());
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 Display.getInstance().getCurrent().revalidate();
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
                 zoomLevel = 1;
                 frm.pack();
             }
@@ -3727,7 +3741,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     loadSkinFile(d, frm);
                     return;
                 } catch (MalformedURLException ex) {
-                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    loadSkinFile(getResourceAsStream(getClass(), DEFAULT_SKIN), frm);
                     
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -3737,7 +3751,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(is != null) {
                     loadSkinFile(is, frm);
                 } else {
-                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    loadSkinFile(getResourceAsStream(getClass(), DEFAULT_SKIN), frm);
                 }
             }
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -3852,11 +3866,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             vSelector = new JScrollBar(Scrollbar.VERTICAL);
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
-            scrollableSkin = pref.getBoolean("Scrollable", true);
+            scrollableSkin = pref.getBoolean("Scrollable", scrollableSkin);
             if (scrollableSkin) {
                 window.add(java.awt.BorderLayout.SOUTH, hSelector);
                 window.add(java.awt.BorderLayout.EAST, vSelector);
             }
+            
             window.add(java.awt.BorderLayout.CENTER, canvas);
         }
         if(window != null){
@@ -3931,15 +3946,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             window.pack();
             if (getSkin() != null && !scrollableSkin) {
-                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
-                zoomLevel = Math.min(h1, w1);
+                zoomLevel = zoomLevel();
             }
 
             portrait = pref.getBoolean("Portrait", true);
             if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
+            } else if (portrait && getSkin() != null) {
+                int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
             }
             
             window.setVisible(true);
