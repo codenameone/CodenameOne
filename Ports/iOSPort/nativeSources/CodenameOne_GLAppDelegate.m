@@ -340,6 +340,7 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 #endif
 
 #ifdef INCLUDE_CN1_PUSH
+UNNotificationResponse* currentNotificationResponse = nil;
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
     NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
                 stringByReplacingOccurrencesOfString:@" " withString:@""];
@@ -389,6 +390,12 @@ int pushReceivedCount=0;
     }
     if (actionId != nil) {
         com_codename1_push_PushContent_setActionId___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG actionId));
+        if (currentNotificationResponse != nil && [currentNotificationResponse isKindOfClass:[UNTextInputNotificationResponse class]]) {
+            UNTextInputNotificationResponse* textResponse = (UNTextInputNotificationResponse*)currentNotificationResponse;
+            if (textResponse.userText != nil) {
+                com_codename1_push_PushContent_setTextResponse___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG textResponse.userText));
+            }
+        }
     }
     pushReceivedCount=0;
     if( [apsInfo valueForKey:@"alert"] != NULL)
@@ -472,7 +479,7 @@ int pushReceivedCount=0;
     NSLog( @"Handle push from background or closed" );
     // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background
     NSLog(@"%@", response.notification.request.content.userInfo);
-    
+    currentNotificationResponse = response;
     [self cn1RoutePush:response.notification.request.content.userInfo withAction:response.actionIdentifier withCompletionHandler:completionHandler];
     
     // TODO:  Need to pass the completion handler somehow to the push callback to be called after that

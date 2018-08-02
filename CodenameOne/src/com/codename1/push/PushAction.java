@@ -28,7 +28,7 @@ package com.codename1.push;
  * @author Steve Hannah
  */
 public class PushAction {
-    private final String id, title, icon;
+    private final String id, title, icon, textInputPlaceholder, textInputButtonText;
     
     /**
      * Creates a new push action
@@ -38,9 +38,25 @@ public class PushAction {
      * @param icon Icon for the action.  Not supported currently on most platforms.
      */
     public PushAction(String id, String title, String icon) {
+        this(id, title, icon, null, null);
+        
+    }
+    
+    /**
+     * Creates a new push action
+     * @param id The ID of the action.  This is the id that will be available in {@link PushContent#getActionId() } if the user
+     * selected this action on the push notification.
+     * @param title The title of the action.  This is the button label in the push notification.
+     * @param icon Icon for the action.  Not supported currently on most platforms.
+     * @param textInputPlaceholder Placeholder text to use for the text input field.
+     * @param textInputButtonText Text to be used for the "reply" button in the text input field.
+     */
+    public PushAction(String id, String title, String icon, String textInputPlaceholder, String textInputButtonText) {
         this.id = id;
         this.title = title;
         this.icon = icon;
+        this.textInputPlaceholder = textInputPlaceholder;
+        this.textInputButtonText = textInputButtonText;
         
     }
     
@@ -86,5 +102,23 @@ public class PushAction {
      */
     public String getIcon() {
         return icon;
+    }
+
+    /**
+     * The placeholder text to use for text input on this action.  Either {@link #textInputButtonText} or {@link #textInputPlaceholder}
+     * must be non-null for the action to include a text input.
+     * @return the textInputPlaceholder
+     */
+    public String getTextInputPlaceholder() {
+        return textInputPlaceholder;
+    }
+
+    /**
+     * The button label for the "reply" button on the text input field.  Either {@link #textInputButtonText} or {@link #textInputPlaceholder}
+     * must be non-null for the action to include a text input.
+     * @return the textInputButtonText
+     */
+    public String getTextInputButtonText() {
+        return textInputButtonText;
     }
 }

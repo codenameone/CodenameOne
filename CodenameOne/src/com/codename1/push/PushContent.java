@@ -32,7 +32,7 @@ import com.codename1.ui.Display;
 public class PushContent {
     private static String PROP_PREFIX = "com.codename1.push.prop.";
 
-    private String title, body, imageUrl, category, metaData, actionId;
+    private String title, body, imageUrl, category, metaData, actionId, textResponse;
     private int type;
     
     private PushContent() {
@@ -42,10 +42,11 @@ public class PushContent {
         category = p("category", null);
         metaData = p("metaData", null);
         actionId = p("actionId", null);
+        textResponse = p("textResponse", null);
     }
     
     private static String[] keys() {
-        return new String[] {"title", "body", "imageUrl", "category", "metaData", "actionId"};
+        return new String[] {"title", "body", "imageUrl", "category", "metaData", "actionId", "textResponse"};
     }
     
     /**
@@ -227,6 +228,20 @@ public class PushContent {
         return actionId;
     }
     
+    /**
+     * If the push notification action included a text field for the user to enter a response, then that response
+     * will be returned here.  For notifications that don't include a response, this will return {@literal null}.
+     * @return The action ID that was selected by the user.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @see PushAction#getTextInputButtonText() 
+     * @see PushAction#getTextInputPlaceholder() 
+     */
+    public String getTextResponse() {
+        return textResponse;
+    }
+    
     
     /**
      * Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
@@ -239,5 +254,19 @@ public class PushContent {
      */
     public static void setActionId(String actionId) {
         setProperty("actionId", actionId);
+    }
+    
+    /**
+     * Sets the text response for the notification.  Only applies to notifications where the user has entered 
+     * a text response.
+     * @deprecated For internal use only.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @see PushAction#getTextInputButtonText() 
+     * @see PushAction#getTextInputPlaceholder() 
+     */
+    public static void setTextResponse(String textResponse) {
+        setProperty("textResponse", textResponse);
     }
 }

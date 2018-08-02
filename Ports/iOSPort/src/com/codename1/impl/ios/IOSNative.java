@@ -669,7 +669,7 @@ public final class IOSNative {
     
     native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
 
-    native void registerPushAction(String id, String title);
+    native void registerPushAction(String id, String title, String textInputPlaceholder, String replyButtonText);
 
     native void startPushActionCategory(String id);
 

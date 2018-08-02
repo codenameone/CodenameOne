@@ -7276,7 +7276,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (categories != null) {
                 PushAction[] actions = PushActionCategory.getAllActions(categories);
                 for (PushAction action : actions) {
-                    nativeInstance.registerPushAction(action.getId(), action.getTitle());
+                    nativeInstance.registerPushAction(action.getId(), action.getTitle(), action.getTextInputPlaceholder(), action.getTextInputButtonText());
                 }
                 for (PushActionCategory category : categories) {
                     nativeInstance.startPushActionCategory(category.getId());
