@@ -8129,7 +8129,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 time = new java.util.Date().getTime();
             }
-            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight, 5);
+            int minuteStep = 5;
+            if (data instanceof String) {
+                String strData = (String)data;
+                String[] parts = Util.split(strData, "\n");
+                for (String part : parts) {
+                    if (part.indexOf("minuteStep=") != -1) {
+                        minuteStep = Integer.parseInt(part.substring(part.indexOf("=")+1));
+                    }
+                }
+            }
+            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight, minuteStep);
         }
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
