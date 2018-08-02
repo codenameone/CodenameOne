@@ -348,6 +348,25 @@ public final class Graphics {
      * @param width The width of the box to clear.
      * @param height The height of the box to clear.
      */
+    public void clearRect(int x, int y, int width, int height) {
+        clearRectImpl(xTranslate + x, yTranslate + y, width, height);;
+    }
+    
+    /**
+     * Clears rectangular area of the graphics context.  This will remove any color
+     * information that has already been drawn to the graphics context making it transparent.
+     * <p>The difference between this method and say {@link #fillRect(int, int, int, int) } with alpha=0 is
+     * that fillRect() will just blend with the colors underneath (and thus {@link #fillRect(int, int, int, int) }
+     * with an alpha of 0 actually does nothing.</p>
+     * NOTE: In contrast to other drawing methods, coordinates input here
+     * are absolute and will not be adjusted by the xTranslate and yTranslate values
+     * 
+     * <p>This method is designed to be used by {@link #drawPeerComponent(com.codename1.ui.PeerComponent) } only.</p>
+     * @param x The x-coordinate of the box to clear.  In screen coordinates.
+     * @param y The y-coordinate of the box to clear.  In screen coordinates.
+     * @param width The width of the box to clear.
+     * @param height The height of the box to clear.
+     */
     private void clearRectImpl(int x, int y, int width, int height) {
         impl.clearRect(nativeGraphics, x, y, width, height);
     }

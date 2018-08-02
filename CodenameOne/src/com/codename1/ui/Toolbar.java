@@ -2225,7 +2225,7 @@ public class Toolbar extends Container {
             if (!layered) {
                 actualPane.setY(actualPaneInitialY + val);
                 if (showing) {
-                    actualPane.setHeight(actualPaneInitialH + getHeight() - val);
+                    actualPane.setHeight(actualPaneInitialH - val);
                 } else {
                     actualPane.setHeight(actualPaneInitialH - val);
                 }
@@ -2248,6 +2248,9 @@ public class Toolbar extends Container {
         actualPaneInitialH = actualPane.getHeight();
     }
 
+    // Flag for the scrollChanged listener to prevent it from being re-entered.
+    private boolean entered;
+    private int lastNonZeroScrollDiff;
     private void bindScrollListener(boolean bind) {
         final Form f = getComponentForm();
         if (f != null) {
@@ -2256,23 +2259,44 @@ public class Toolbar extends Container {
             if (bind) {
                 initVars(actualPane);
                 scrollListener = new ScrollListener() {
-
+                    
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                        int diff = scrollY - oldscrollY;
-                        int toolbarNewY = getY() - diff;
-                        if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
-                            return;
-                        }
-                        toolbarNewY = Math.max(toolbarNewY, -getHeight());
-                        toolbarNewY = Math.min(toolbarNewY, initialY);
-                        if (toolbarNewY != getY()) {
-                            setY(toolbarNewY);
-                            if (!layered) {
-                                actualPane.setY(actualPaneInitialY + toolbarNewY);
-                                actualPane.setHeight(actualPaneInitialH + getHeight() - toolbarNewY);
-                                actualPane.doLayout();
+                        if (entered || contentPane.isTensileMotionInProgress()) return;
+                        
+                        // When the content pane is resized, it may trigger a scroll event --
+                        // we need to make sure that *that* scroll event doesn't trigger
+                        // us - or we get unexpected results.
+                        entered = true;
+                        try {
+                            int diff = scrollY - oldscrollY;
+                            if (diff != 0) {
+                                lastNonZeroScrollDiff = diff;
                             }
-                            f.repaint();
+
+                            int toolbarNewY = getY() - diff;
+                            if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
+                                return;
+                            }
+                            toolbarNewY = Math.max(toolbarNewY, -getHeight());
+                            toolbarNewY = Math.min(toolbarNewY, initialY);
+                            if (toolbarNewY != getY()) {
+                                setY(toolbarNewY);
+                                if (!layered) {
+                                    int oldY = actualPane.getY();
+                                    
+                                    actualPane.setY(getHeight() + getY());
+                                    boolean smooth = actualPane.isSmoothScrolling();
+                                    actualPane.setSmoothScrolling(false);
+                                    actualPane.setScrollY(scrollY - oldY + actualPane.getY());
+                                    actualPane.setSmoothScrolling(smooth);
+                                    actualPane.setHeight(f.getHeight() - getHeight() - getY());
+                                    
+                                    actualPane.doLayout();
+                                }
+                                f.repaint();
+                            }
+                        } finally {
+                            entered = false;
                         }
                     }
                 };
@@ -2282,9 +2306,13 @@ public class Toolbar extends Container {
 
                     public void actionPerformed(ActionEvent evt) {
                         if (getY() + getHeight() / 2 > 0) {
-                            showToolbar();
+                            if (!showing && lastNonZeroScrollDiff < 0) {
+                                showToolbar();
+                            }
                         } else {
-                            hideToolbar();
+                            if (showing && lastNonZeroScrollDiff > 0) {
+                                hideToolbar();
+                            }
                         }
                         f.repaint();
                     }

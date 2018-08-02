@@ -5157,6 +5157,10 @@ public class Component implements Animation, StyleListener {
         return getScrollX();
     }
 
+    boolean isTensileMotionInProgress() {
+        return draggedMotionY != null && !draggedMotionY.isFinished();
+    }
+    
     /**
      * {@inheritDoc}
      */

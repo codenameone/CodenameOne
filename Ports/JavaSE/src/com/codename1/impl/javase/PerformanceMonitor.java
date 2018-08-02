@@ -550,6 +550,18 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         }
     }
     
+    void clearRect(int x, int y, int width, int height) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "clearRect(" + x + ", " + y + ", " + width + ", " + height + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
     public void drawRect(int x, int y, int width, int height) {
         if(trackDrawing && trackedDrawing != null) {
             trackedDrawing.addRow(new Object[] {
@@ -717,6 +729,8 @@ public class PerformanceMonitor extends javax.swing.JFrame {
             });
         }
     }
+
+    
     
     static class Stats {
         private String name;
