@@ -4254,7 +4254,7 @@ static NSMutableArray<UNNotificationAction *>* currentCategoryActions;
 static NSSet<UNNotificationCategory *>* pushCategories;
 static NSString* currentCategoryId;
 #endif
-void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title) {
+void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT placeholderText, JAVA_OBJECT replyButtonText) {
 #ifdef INCLUDE_CN1_PUSH2    
     if (@available(iOS 10, *)) {
         if (pushActions == nil) {
@@ -4262,7 +4262,15 @@ void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java
         }
         NSString *nsId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
         NSString *nsTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG title);
-        [pushActions addObject:[UNNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone]];
+        NSString *nsPlaceholderText = placeholderText == NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG placeholderText);
+        NSString *nsReplyButtonText = replyButtonText == NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG replyButtonText);
+        nsPlaceholderText = (nsPlaceholderText == nil && nsReplyButtonText != nil) ? @"" : nsPlaceholderText;
+        nsReplyButtonText = (nsReplyButtonText == nil && nsPlaceholderText != nil) ? @"Reply" : nsReplyButtonText;
+        if (nsPlaceholderText != nil && nsReplyButtonText != nil) {
+            [pushActions addObject:[UNTextInputNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone textInputButtonTitle:nsReplyButtonText textInputPlaceholder:nsPlaceholderText]];
+        } else {
+            [pushActions addObject:[UNNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone]];
+        }
     }
 #endif
 }
