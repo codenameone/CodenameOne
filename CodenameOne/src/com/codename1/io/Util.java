@@ -1438,6 +1438,9 @@ public class Util {
      * @return an int value or an exception
      */
     public static int toIntValue(Object number) {
+        if(number == null) {
+            return 0;
+        }
         // we should convert this to use Number
         if(number instanceof Integer) {
             return ((Integer)number).intValue();
