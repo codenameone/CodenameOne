@@ -831,7 +831,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
-                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+                if(desktopSkin) {
+                    h.remove("@paintsTitleBarBool");
+                }
+                UIManager.getInstance().setThemeProps(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -3805,6 +3811,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             window = frame;
             if (pref.getBoolean("uwpDesktopSkin", false)) {
                 setNativeTheme("/winTheme.res");
+            } else {
+                setNativeTheme("/iOS7Theme.res");
             }
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);

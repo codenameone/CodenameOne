@@ -150,6 +150,10 @@
         <copy file="../../../codenameone-skins/nexus.skin" todir="src" / -->
         <copy file="../../../codenameone-skins/OTA/iPhoneX.skin" tofile="src/iPhoneX.skin" />
         <copy file="../../../codenameone-skins/OTA/iPhoneX.skin" tofile="build/classes/iPhoneX.skin" />
+        <copy file="../../Themes/winTheme.res" tofile="src/winTheme.res" />
+        <copy file="../../Themes/winTheme.res" tofile="build/classes/winTheme.res" />
+        <copy file="../../Themes/iOS7Theme.res" tofile="src/iOS7Theme.res" />
+        <copy file="../../Themes/iOS7Theme.res" tofile="build/classes/iOS7Theme.res" />
         <!--copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" / -->
