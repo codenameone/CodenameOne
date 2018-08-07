@@ -192,6 +192,7 @@ public abstract class InputComponent extends Container {
                 InputComponent t = (InputComponent)c;
                 if(!t.isOnTopMode()) {
                     al.add(t.lbl);
+                    t.lbl.setPreferredSize(null);
                 }
             } else {
                 al.add(c);
