@@ -464,6 +464,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 return true;
             }
         }
+        if(o instanceof PropertyBusinessObject) {
+            return equals(((PropertyBusinessObject)o).getPropertyIndex());
+        }
         return false;
     }
 
