@@ -831,7 +831,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
-                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+                if(desktopSkin) {
+                    h.remove("@paintsTitleBarBool");
+                }
+                UIManager.getInstance().setThemeProps(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -3088,7 +3094,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     zoomLevel = Math.min(h1, w1);
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale*zoomLevel), (int)(getSkin().getHeight()/retinaScale*zoomLevel)));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
+                    if (window != null) {
+                        window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
+                    }
                     parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
 
@@ -3135,9 +3144,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     } else {
                         int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
                         float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
-                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
                         if (window != null) {
-                            window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                            window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoom), (int)(getSkin().getHeight() * zoom)));
                         }
                     }
                     parent.add(BorderLayout.CENTER, canvas);
@@ -3698,7 +3707,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 deepRevaliate(Display.getInstance().getCurrent());
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 Display.getInstance().getCurrent().revalidate();
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
                 zoomLevel = 1;
                 frm.pack();
             }
@@ -3805,6 +3814,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             window = frame;
             if (pref.getBoolean("uwpDesktopSkin", false)) {
                 setNativeTheme("/winTheme.res");
+            } else {
+                setNativeTheme("/iOS7Theme.res");
             }
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
@@ -3951,13 +3962,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             portrait = pref.getBoolean("Portrait", true);
             if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoomLevel), (int)(getSkin().getHeight() / retinaScale * zoomLevel)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
             } else if (portrait && getSkin() != null) {
                 int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
                 float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale * zoom), (int)(getSkin().getHeight() / retinaScale * zoom)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
             }
             
             window.setVisible(true);
