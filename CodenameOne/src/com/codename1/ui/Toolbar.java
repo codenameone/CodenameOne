@@ -2195,6 +2195,11 @@ public class Toolbar extends Container {
      */
     public void hideToolbar() {
         showing = false;
+        if(Display.INSTANCE.getCurrent() != getComponentForm()) {
+            setVisible(false);
+            setHidden(true);
+            return;
+        }
         if (actualPaneInitialH == 0) {
             Form f = getComponentForm();
             if (f != null) {
@@ -2211,6 +2216,12 @@ public class Toolbar extends Container {
      */
     public void showToolbar() {
         showing = true;
+        if(!isVisible()) {
+            setVisible(true);
+            setHidden(false);
+            getComponentForm().animateLayout(200);
+            return;
+        }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
         getComponentForm().registerAnimated(this);
         hideShowMotion.start();
