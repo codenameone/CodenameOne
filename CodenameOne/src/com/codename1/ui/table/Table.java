@@ -448,7 +448,6 @@ public class Table extends Container {
      */
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
-        ascending = false;
         Comparator cmp = createColumnSortComparator(column);
         setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));          
     }
