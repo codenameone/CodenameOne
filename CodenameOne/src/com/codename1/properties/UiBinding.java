@@ -24,7 +24,6 @@
 package com.codename1.properties;
 
 import com.codename1.io.Util;
-import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
@@ -42,6 +41,7 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -790,6 +790,7 @@ public class UiBinding {
      */
     public static class BoundTableModel implements TableModel {
         private List<PropertyBusinessObject> objects;
+        private CollectionProperty objectProperty;
         private PropertyBusinessObject prototype;
         private Set<String> exclude = new HashSet<String>();
         private PropertyBase[] columnOrder;
@@ -804,8 +805,20 @@ public class UiBinding {
         public BoundTableModel(List<PropertyBusinessObject> objects, 
             PropertyBusinessObject prototype) {
             this.objects = objects;
+            this.prototype = prototype;
         }
-            
+
+        /**
+         * Creates a table model with the business objects
+         * @param objectProperty the objects of the model
+         * @param prototype the type by which we determine the structure of the table
+         */
+        public BoundTableModel(CollectionProperty objectProperty, 
+            PropertyBusinessObject prototype) {
+            this.objectProperty = objectProperty;
+            this.prototype = prototype;
+        }
+        
         /**
          * The properties that are ignored
          * @param b the property to ignore
@@ -840,7 +853,10 @@ public class UiBinding {
          */
         @Override
         public int getRowCount() {
-            return objects.size();
+            if(objects != null) {
+                return objects.size();
+            }
+            return objectProperty.size();
         }
 
         /**
@@ -849,7 +865,11 @@ public class UiBinding {
          * @param b the business object
          */
         public void addRow(int index, PropertyBusinessObject b) {
-            objects.add(index, b);
+            if(objects != null) {
+                objects.add(index, b);
+            } else {
+                objectProperty.add(b);
+            }
             for(int col = 0 ; col < getColumnCount() ; col++) {
                 listeners.fireDataChangeEvent(col, index);
             }
@@ -860,8 +880,12 @@ public class UiBinding {
          * @param index the position in the table
          */
         public void removeRow(int index) {
-            objects.remove(index);
-           listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
+            if(objects != null) {
+                objects.remove(index);
+            } else {
+                objectProperty.remove(index);
+            }
+            listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
         }
         
         /**
@@ -887,10 +911,26 @@ public class UiBinding {
         public boolean isCellEditable(int row, int column) {
             return !uneditable.contains(prototype.getPropertyIndex().get(column).getName());
         }
+        
+        private PropertyBusinessObject getRow(int row) {
+            if(objects != null) {
+                return objects.get(row);
+            } else {
+                if(objectProperty instanceof ListProperty) {
+                    return (PropertyBusinessObject)((ListProperty)objectProperty).get(row);
+                } else {
+                    Iterator i = objectProperty.iterator();
+                    for(int iter = 0 ; iter < row - 1 ; iter++) {
+                        i.next();
+                    }
+                    return (PropertyBusinessObject)i.next();
+                }
+            }
+        }
 
         @Override
         public Object getValueAt(int row, int column) {
-            PropertyBusinessObject pb = objects.get(row);
+            PropertyBusinessObject pb = getRow(row);
             String n;
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
@@ -902,7 +942,7 @@ public class UiBinding {
 
         @Override
         public void setValueAt(int row, int column, Object o) {
-            PropertyBusinessObject pb = objects.get(row);
+            PropertyBusinessObject pb = getRow(row);
             String n;
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
@@ -931,6 +971,17 @@ public class UiBinding {
      * @return a bound table model that can be used in the {@code Table} class
      */
     public TableModel createTableModel(List<PropertyBusinessObject> objects, 
+        PropertyBusinessObject prototype) {
+        return new BoundTableModel(objects, prototype);
+    }
+
+    /**
+     * Creates a table model which is implicitly bound to the properties
+     * @param objects list of business objects
+     * @param prototype the type by which we determine the structure of the table
+     * @return a bound table model that can be used in the {@code Table} class
+     */
+    public TableModel createTableModel(CollectionProperty<? extends PropertyBusinessObject, ? extends Object> objects, 
         PropertyBusinessObject prototype) {
         return new BoundTableModel(objects, prototype);
     }
