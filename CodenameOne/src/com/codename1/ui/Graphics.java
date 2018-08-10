@@ -945,7 +945,7 @@ public final class Graphics {
      * @param alpha the alpha values specify semitransparency
      */
     public void fillRect(int x, int y, int w, int h, byte alpha) {
-        impl.fillRect(nativeGraphics, x, y, w, h, alpha);
+        impl.fillRect(nativeGraphics, x+xTranslate, y+yTranslate, w, h, alpha);
     }
     
     /**
