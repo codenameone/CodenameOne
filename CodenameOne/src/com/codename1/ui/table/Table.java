@@ -37,8 +37,6 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
-import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.CaseInsensitiveOrder;
 import java.util.Comparator;
@@ -937,7 +935,7 @@ public class Table extends Container {
             int column = getCellColumn(t);
             editingColumn = column;
             editingRow = row;
-            getModel().setValueAt(row, column, t.getText());
+            model.setValueAt(row, column, t.getText());
         }
     }
 }
