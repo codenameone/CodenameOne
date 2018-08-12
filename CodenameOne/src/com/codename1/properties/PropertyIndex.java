@@ -233,6 +233,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public void populateFromMap(Map<String, Object> m, Class<? extends PropertyBusinessObject>recursiveType) {
         try {
             for(PropertyBase p : this) {
+                MapAdapter ma = MapAdapter.checkInstance(p);
+                if(ma != null) {
+                    ma.setFromMap(p, m);
+                    continue;
+                }
                 Object val = m.get(p.getName());
                 if(val != null) {
                     if(val instanceof List) {
@@ -379,6 +384,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         HashMap<String, Object> m = new HashMap<String, Object>();
         for(PropertyBase p : this) {
             if(p.getClientProperty(excludeFlag) != null) {
+                continue;
+            }
+            MapAdapter ma = MapAdapter.checkInstance(p);
+            if(ma != null) {
+                ma.placeInMap(p, m);
                 continue;
             }
             if(p instanceof MapProperty) {
