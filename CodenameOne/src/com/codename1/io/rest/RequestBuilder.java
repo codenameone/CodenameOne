@@ -258,6 +258,18 @@ public class RequestBuilder {
         header("Authorization", "Basic " + Base64.encodeNoNewline((username + ":" + password).getBytes()));
         return this;
     }
+
+    /**
+     * Add an authorization bearer header, this is shorthand for 
+     * {@code header("Authorization", "Bearer " + token)}
+     * 
+     * @param token the authorization token
+     * @return RequestBuilder instance
+     */ 
+    public RequestBuilder bearer(String token) {
+        header("Authorization", "Bearer " + token);
+        return this;
+    }
     
     /**
      * Executes the request asynchronously and writes the response to the provided
