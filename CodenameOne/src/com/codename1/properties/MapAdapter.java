@@ -51,9 +51,11 @@ public abstract class MapAdapter {
     }
     
     static MapAdapter checkInstance(PropertyBase b) {
-        MapAdapter a = lookup.get(b.getGenericType().getName());
-        if(a != null && a.useAdapterFor(b)) {
-            return a;
+        if(b.getGenericType() != null) {
+            MapAdapter a = lookup.get(b.getGenericType().getName());
+            if(a != null && a.useAdapterFor(b)) {
+                return a;
+            }
         }
         return null;
     }
