@@ -909,6 +909,9 @@ public class UiBinding {
 
         @Override
         public boolean isCellEditable(int row, int column) {
+            if(columnOrder != null && columnOrder.length > 0) {
+                return uneditable.contains(columnOrder[column].getName());
+            }
             return !uneditable.contains(prototype.getPropertyIndex().get(column).getName());
         }
         
