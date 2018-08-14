@@ -36,7 +36,9 @@ Derivative Revision History:
  */
 package com.codename1.processing;
 
+import com.codename1.l10n.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.List;
@@ -230,6 +232,9 @@ class PrettyPrinter {
         }
         if (value instanceof List) {
             return print((List)value, indentFactor, indent);
+        }
+        if(value instanceof Date) {
+            return quote(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").format((Date)value));
         }
         return quote(value.toString());
     }
