@@ -791,7 +791,7 @@ public class UiBinding {
      * additional features such as adding/removing rows
      */
     public static class BoundTableModel extends AbstractTableModel {
-        private List<PropertyBusinessObject> objects;
+        private List<? extends PropertyBusinessObject> objects;
         private CollectionProperty objectProperty;
         private PropertyBusinessObject prototype;
         private Set<String> exclude = new HashSet<String>();
@@ -804,7 +804,7 @@ public class UiBinding {
          * @param objects the objects of the model
          * @param prototype the type by which we determine the structure of the table
          */
-        public BoundTableModel(List<PropertyBusinessObject> objects, 
+        public BoundTableModel(List<? extends PropertyBusinessObject> objects, 
             PropertyBusinessObject prototype) {
             this.objects = objects;
             this.prototype = prototype;
@@ -868,9 +868,13 @@ public class UiBinding {
          */
         public void addRow(int index, PropertyBusinessObject b) {
             if(objects != null) {
-                objects.add(index, b);
+                ((List)objects).add(index, b);
             } else {
-                objectProperty.add(b);
+                if(objectProperty instanceof ListProperty) {
+                    ((ListProperty)objectProperty).add(index, b);
+                } else {
+                    objectProperty.add(b);
+                }
             }
             for(int col = 0 ; col < getColumnCount() ; col++) {
                 listeners.fireDataChangeEvent(col, index);
@@ -885,7 +889,15 @@ public class UiBinding {
             if(objects != null) {
                 objects.remove(index);
             } else {
-                objectProperty.remove(index);
+                if(objectProperty instanceof ListProperty) {
+                    ((ListProperty)objectProperty).remove(index);
+                } else {
+                    Iterator i = objectProperty.iterator();
+                    for(int iter = 0 ; iter < index - 1 ; iter++) {
+                        i.next();
+                    }
+                    i.remove();
+                }
             }
             listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
         }
@@ -906,7 +918,7 @@ public class UiBinding {
             if(columnOrder != null) {
                 return columnOrder[i].getLabel();
             }
-            return prototype.getPropertyIndex().get(i).getName();
+            return prototype.getPropertyIndex().get(i).getLabel();
         }
 
         @Override
@@ -1038,7 +1050,7 @@ public class UiBinding {
      * @param prototype the type by which we determine the structure of the table
      * @return a bound table model that can be used in the {@code Table} class
      */
-    public TableModel createTableModel(List<PropertyBusinessObject> objects, 
+    public BoundTableModel createTableModel(List<? extends PropertyBusinessObject> objects, 
         PropertyBusinessObject prototype) {
         return new BoundTableModel(objects, prototype);
     }
@@ -1049,7 +1061,7 @@ public class UiBinding {
      * @param prototype the type by which we determine the structure of the table
      * @return a bound table model that can be used in the {@code Table} class
      */
-    public TableModel createTableModel(CollectionProperty<? extends PropertyBusinessObject, ? extends Object> objects, 
+    public BoundTableModel createTableModel(CollectionProperty<? extends PropertyBusinessObject, ? extends Object> objects, 
         PropertyBusinessObject prototype) {
         return new BoundTableModel(objects, prototype);
     }
