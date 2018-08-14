@@ -528,6 +528,34 @@ public class TextArea extends Component {
     }
     
     /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't a long this number will be returned
+     * @return the long value of the text field
+     */
+    public long getAsLong(long invalid) {
+        try {
+            return Long.parseLong(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
+    }
+
+    /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't an double this number will be returned
+     * @return the double value of the text field
+     */
+    public double getAsDouble(double invalid) {
+        try {
+            return Double.parseDouble(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
+    }
+    
+    /**
      * Returns true if this area is editable
      * 
      * @return true if this area is editable

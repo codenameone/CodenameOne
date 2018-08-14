@@ -24,6 +24,8 @@
 package com.codename1.ui.table;
 
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.validation.Constraint;
+import com.codename1.ui.validation.Validator;
 import java.util.Arrays;
 import java.util.Comparator;
 
@@ -32,7 +34,7 @@ import java.util.Comparator;
  *
  * @author Shai Almog
  */
-public class SortableTableModel implements TableModel {
+public class SortableTableModel extends AbstractTableModel {
     private TableModel model;
     private int[] sorted;
 
@@ -139,5 +141,55 @@ public class SortableTableModel implements TableModel {
     @Override
     public void removeDataChangeListener(DataChangedListener d) {
         model.removeDataChangeListener(d);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Constraint getValidationConstraint(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getValidationConstraint(row, column);
+        }
+        return super.getValidationConstraint(row, column);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Class getCellType(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getCellType(row, column);
+        }
+        return super.getCellType(row, column);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String[] getMultipleChoiceOptions(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
+        }
+        return super.getMultipleChoiceOptions(row, column);
+    }    
+
+    @Override
+    public void setValidator(Validator validator) {
+        if(model instanceof AbstractTableModel) {
+            ((AbstractTableModel)model).setValidator(validator);
+            return;
+        }
+        super.setValidator(validator);
+    }
+
+    @Override
+    public Validator getValidator() {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getValidator();
+        }
+        return super.getValidator();
     }
 }

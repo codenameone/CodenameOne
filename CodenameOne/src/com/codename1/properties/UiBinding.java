@@ -36,6 +36,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.table.AbstractTableModel;
 import com.codename1.ui.table.TableModel;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
@@ -788,7 +789,7 @@ public class UiBinding {
      * Implements table model binding, this is implemented as a class to allow
      * additional features such as adding/removing rows
      */
-    public static class BoundTableModel implements TableModel {
+    public static class BoundTableModel extends AbstractTableModel {
         private List<PropertyBusinessObject> objects;
         private CollectionProperty objectProperty;
         private PropertyBusinessObject prototype;
@@ -910,7 +911,7 @@ public class UiBinding {
         @Override
         public boolean isCellEditable(int row, int column) {
             if(columnOrder != null && columnOrder.length > 0) {
-                return uneditable.contains(columnOrder[column].getName());
+                return !uneditable.contains(columnOrder[column].getName());
             }
             return !uneditable.contains(prototype.getPropertyIndex().get(column).getName());
         }
@@ -943,6 +944,18 @@ public class UiBinding {
             return pb.getPropertyIndex().get(n).get();
         }
 
+        @Override
+        public Class getCellType(int row, int column) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = pb.getPropertyIndex().get(column).getName();
+            }
+            return pb.getPropertyIndex().get(n).getGenericType();
+        }
+        
         @Override
         public void setValueAt(int row, int column, Object o) {
             PropertyBusinessObject pb = getRow(row);

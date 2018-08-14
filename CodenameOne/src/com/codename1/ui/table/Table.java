@@ -25,6 +25,7 @@ package com.codename1.ui.table;
 
 import com.codename1.io.Util;
 import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -38,8 +39,12 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.validation.Constraint;
+import com.codename1.ui.validation.Validator;
 import com.codename1.util.CaseInsensitiveOrder;
 import java.util.Comparator;
+import java.util.Date;
 
 /**
  * <p>The {@code Table} class represents a grid of data that can be used for rendering a grid
@@ -394,7 +399,11 @@ public class Table extends Container {
         // we do this here to allow subclasses to return a text area or its subclass
         if(c instanceof TextArea) {
             ((TextArea)c).addActionListener(listener);
-        } 
+        } else {
+            if(c instanceof Button) {
+                ((Button)c).addActionListener(listener);
+            } 
+        }
 
         Style s = c.getSelectedStyle();
         //s.setMargin(0, 0, 0, 0);
@@ -490,10 +499,59 @@ public class Table extends Container {
             }
             return header;
         }
+        int constraint = TextArea.ANY;
+        Constraint validation = null;
+        if(isAbstractTableModel()) {
+            Class type = ((AbstractTableModel)model).getCellType(row, column);
+            if(type == Boolean.class) {
+                CheckBox cell = new CheckBox();
+                cell.setSelected(Util.toBooleanValue(value));
+                cell.setUIID(getUIID() + "Cell");
+                cell.setEnabled(editable);
+                return cell;
+            }
+            if(editable && type == String.class) {
+                String[] multiChoice = ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
+                if(multiChoice != null) {
+                    Picker cell = new Picker();
+                    cell.setStrings(multiChoice);
+                    if(value != null) {
+                        cell.setSelectedString((String)value);
+                    }
+                    cell.setUIID(getUIID() + "Cell");
+                    return cell;
+                }
+            }
+            if(type == Date.class) {
+                Picker cell = new Picker();
+                cell.setType(Display.PICKER_TYPE_DATE);
+                if(value != null) {
+                    cell.setDate((Date)value);
+                }
+                cell.setUIID(getUIID() + "Cell");
+                return cell;
+            }
+            if(type == Integer.class || type == Long.class || type == Short.class ||
+                type == Byte.class) {
+                constraint = TextArea.NUMERIC;
+            } else {
+                if(type == Float.class || type == Double.class) {
+                    constraint = TextArea.DECIMAL;
+                }
+            }
+            if(((AbstractTableModel)model).getValidator() != null) {
+                validation = ((AbstractTableModel)model).getValidationConstraint(row, column);
+            }
+        }
         if(editable) {
             TextField cell = new TextField("" + value, -1);
+            cell.setConstraint(constraint);
             cell.setLeftAndRightEditingTrigger(false);
             cell.setUIID(getUIID() + "Cell");
+            if(validation != null) {
+                Validator v = ((AbstractTableModel)model).getValidator();
+                v.addConstraint(cell, validation);
+            }
             return cell;
         }
         Label cell = new Label("" + value);
@@ -930,12 +988,71 @@ public class Table extends Container {
         }
 
         public void actionPerformed(ActionEvent evt) {
-            TextArea t = (TextArea)evt.getSource();
-            int row = getCellRow(t);
-            int column = getCellColumn(t);
-            editingColumn = column;
-            editingRow = row;
-            model.setValueAt(row, column, t.getText());
+            Component c = (Component)evt.getSource();
+            int row = getCellRow(c);
+            int column = getCellColumn(c);
+            if(c instanceof TextArea) {
+                TextArea t = (TextArea)c;
+                editingColumn = column;
+                editingRow = row;
+                if(isAbstractTableModel()) {
+                    Class type = ((AbstractTableModel)model).getCellType(row, column);
+                    if(type == Integer.class) {
+                        model.setValueAt(row, column, t.getAsInt(0));
+                        return;
+                    }
+                    if(type == Long.class) {
+                        model.setValueAt(row, column, t.getAsLong(0));
+                        return;
+                    }
+                    if(type == Short.class) {
+                        model.setValueAt(row, column, (short)t.getAsInt(0));
+                        return;
+                    }
+                    if(type == Byte.class) {
+                        model.setValueAt(row, column, (byte)t.getAsInt(0));
+                        return;
+                    }
+                    if(type == Float.class) {
+                        model.setValueAt(row, column, (float)t.getAsDouble(0));
+                        return;
+                    }
+                    if(type == Double.class) {
+                        model.setValueAt(row, column, t.getAsDouble(0));
+                        return;
+                    }
+                    if(type == Character.class) {
+                        if(t.getText().length() > 0) {
+                            model.setValueAt(row, column, t.getText().charAt(0));
+                        }
+                        return;
+                    }
+                }
+                model.setValueAt(row, column, t.getText());
+            } else {
+                if(c instanceof Picker) {
+                    switch(((Picker)c).getType()) {
+                        case Display.PICKER_TYPE_DATE:
+                            model.setValueAt(row, column, ((Picker)c).getDate());              
+                            break;
+                            
+                        case Display.PICKER_TYPE_STRINGS:
+                            model.setValueAt(row, column, ((Picker)c).getSelectedString());
+                            break;
+                    }
+                } else {
+                    if(c instanceof CheckBox) {
+                        model.setValueAt(row, column, ((CheckBox)c).isSelected());
+                    }
+                }
+            }
         }
+    }
+    
+    private boolean isAbstractTableModel() {
+        if(model instanceof SortableTableModel) {
+            return ((SortableTableModel)model).getUnderlying() instanceof AbstractTableModel;
+        }
+        return model instanceof AbstractTableModel;
     }
 }
