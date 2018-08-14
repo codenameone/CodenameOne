@@ -39,6 +39,7 @@ import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.table.AbstractTableModel;
 import com.codename1.ui.table.TableModel;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.validation.Constraint;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -954,6 +955,57 @@ public class UiBinding {
                 n = pb.getPropertyIndex().get(column).getName();
             }
             return pb.getPropertyIndex().get(n).getGenericType();
+        }
+
+        private PropertyBase getPropertyAt(int row, int column) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = pb.getPropertyIndex().get(column).getName();
+            }
+            return pb.getPropertyIndex().get(n);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String[] getMultipleChoiceOptions(int row, int column) {
+            return (String[])getPropertyAt(row, column).
+                getClientProperty("multipleChoiceOptions");
+        }
+        
+        /**
+         * Sets the multiple choice option for a string entry, this is useful 
+         * if a string property can have one of several values. It will be 
+         * rendered as a picker in the table
+         * 
+         * @param prop the property
+         * @param values the supported values
+         */
+        public void setMultipleChoiceOptions(PropertyBase prop, String... values) {
+            prop.putClientProperty("multipleChoiceOptions", values);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Constraint getValidationConstraint(int row, int column) {
+            return (Constraint)getPropertyAt(row, column).
+                getClientProperty("validationConstraint");
+        }
+        
+        /**
+         * Sets a validator constraint on the table
+         * 
+         * @param prop the property matching the constraint
+         * @param c the constraint value
+         */
+        public void setValidationConstraint(PropertyBase prop, Constraint c) {
+            prop.putClientProperty("validationConstraint", c);
         }
         
         @Override
