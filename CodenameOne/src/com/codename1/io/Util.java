@@ -28,6 +28,10 @@ import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
 import com.codename1.io.IOProgressListener;
+import com.codename1.l10n.DateFormat;
+import com.codename1.l10n.L10NManager;
+import com.codename1.l10n.ParseException;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -1588,6 +1592,28 @@ public class Util {
             return 0;
         }
         throw new IllegalArgumentException("Not a number: " + number);
+    }
+    
+    /**
+     * Tries to convert an arbitrary object to a date
+     * @param o an object that can be a string, number or date
+     * @return a Date object
+     */
+    public static Date toDateValue(Object o) {
+        if(o == null) {
+            return null;
+        }
+        if(o instanceof Date) {
+            return (Date)o;
+        }
+        if(o instanceof String) {
+            try {
+                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String)o);
+            } catch(ParseException e) {
+                throw new IllegalArgumentException("Not a supported date, we use this format 'yyyy-MM-dd'T'HH:mm:ss.SSS': " + o);
+            }
+        }
+        return new Date(toLongValue(o));
     }
     
     /**
