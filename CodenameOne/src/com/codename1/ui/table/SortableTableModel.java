@@ -37,6 +37,9 @@ import java.util.Comparator;
 public class SortableTableModel extends AbstractTableModel {
     private TableModel model;
     private int[] sorted;
+    private boolean asc;
+    private Comparator cmp;
+    private int sortColumn;
 
     /**
      * Returns the underlying table model
@@ -53,25 +56,33 @@ public class SortableTableModel extends AbstractTableModel {
      * @param model the underlying model that will be sorted
      * @param cmp a comparator used for comparing the cells in the column 
      */
-    public SortableTableModel(final int column, final boolean asc, final TableModel model, final Comparator cmp) {
+    public SortableTableModel(int column, boolean asc, TableModel model, Comparator cmp) {
         this.model = model;
+        this.asc = asc;
+        this.cmp = cmp;
+        this.sortColumn = column;
+        initTable(model, asc, cmp, column);
+    } 
 
-        sorted = new int[model.getRowCount()];
-        Integer[] sortedTemp = new Integer[sorted.length]; 
-
+    private void initTable(final TableModel model1, final boolean asc,
+        final Comparator cmp, final int column) {
+        sorted = new int[model1.getRowCount()];
+        Integer[] sortedTemp = new Integer[sorted.length];
         for(int iter = 0 ; iter < sorted.length ; iter++) {
             sortedTemp[iter] = iter;
         }
-
         // sort(int[]) doesn't accept a comparator how stupid is that...
-        Arrays.sort(sortedTemp, new Comparator<Object>()  {
+        Arrays.sort(sortedTemp,
+            new Comparator<Object>() {
             public int compare(Object o1, Object o2) {
                 int i1 = (Integer)o1;
                 int i2 = (Integer)o2;
                 if(asc) {
-                    return cmp.compare(model.getValueAt(i1, column), model.getValueAt(i2, column)) * -1;
+                    return cmp.compare(model1.getValueAt(i1, column),
+                        model1.getValueAt(i2, column)) * -1;
                 }
-                return cmp.compare(model.getValueAt(i1, column), model.getValueAt(i2, column));
+                return cmp.compare(model1.getValueAt(i1, column),
+                    model1.getValueAt(i2, column));
             }
         });
         for(int iter = 0 ; iter < sorted.length ; iter++) {
@@ -116,6 +127,9 @@ public class SortableTableModel extends AbstractTableModel {
      */
     @Override
     public Object getValueAt(int row, int column) {
+        if(model.getRowCount() != sorted.length) {
+            initTable(model, asc, cmp, sortColumn);
+        }
         return model.getValueAt(sorted[row], column);
     }
 

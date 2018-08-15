@@ -433,15 +433,30 @@ public class Table extends Container {
         final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
         return new Comparator() {
             public int compare(Object o1, Object o2) {
+                if(o1 == null) {
+                    if(o2 == null) {
+                        return 0;
+                    }
+                    return -1;
+                } else {
+                    if(o2 == null) {
+                        return 1;
+                    }
+                }
                 if(o1 instanceof String && o2 instanceof String) {
                     return ccmp.compare((String)o1, (String)o2);
                 }
-                double d = Util.toDoubleValue(o1) - Util.toDoubleValue(o2);
-                if(d > 0) {
-                    return 1;
-                }
-                if(d < 0) {
-                    return -1;
+                try {
+                    double d = Util.toDoubleValue(o1) - Util.toDoubleValue(o2);
+                    if(d > 0) {
+                        return 1;
+                    }
+                    if(d < 0) {
+                        return -1;
+                    }
+                } catch(IllegalArgumentException err) {
+                    long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
+                    return (int)dd;
                 }
                 return 0;
             }
@@ -510,7 +525,7 @@ public class Table extends Container {
                 cell.setEnabled(editable);
                 return cell;
             }
-            if(editable && type == String.class) {
+            if(editable && type == null || type == String.class) {
                 String[] multiChoice = ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
                 if(multiChoice != null) {
                     Picker cell = new Picker();
@@ -544,7 +559,7 @@ public class Table extends Container {
             }
         }
         if(editable) {
-            TextField cell = new TextField("" + value, -1);
+            TextField cell = new TextField(value == null ? "" : "" + value, -1);
             cell.setConstraint(constraint);
             cell.setLeftAndRightEditingTrigger(false);
             cell.setUIID(getUIID() + "Cell");
@@ -554,7 +569,7 @@ public class Table extends Container {
             }
             return cell;
         }
-        Label cell = new Label("" + value);
+        Label cell = new Label(value == null ? "" : "" + value);
         cell.setUIID(getUIID() + "Cell");
         cell.getUnselectedStyle().setAlignment(cellAlignment);
         cell.getSelectedStyle().setAlignment(cellAlignment);
