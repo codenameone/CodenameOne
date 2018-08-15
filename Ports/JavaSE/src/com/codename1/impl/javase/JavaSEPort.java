@@ -104,6 +104,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN1Constants;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -8369,12 +8370,41 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     @Override
+    public boolean isGalleryTypeSupported(int type) {
+        if (super.isGalleryTypeSupported(type)) {
+            return true;
+        }
+        switch (type) {
+            case -9999:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+            case Display.GALLERY_ALL_MULTI:
+                return true;
+        }
+        
+        return false;
+    }
+    
+    @Override
     public void openGallery(final com.codename1.ui.events.ActionListener response, int type){
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
         }
-        
-        if(type == Display.GALLERY_VIDEO){
+        if (type == Display.GALLERY_IMAGE_MULTI) {
+            checkPhotoLibraryUsageDescription();
+            captureMulti(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
+        }else if(type == Display.GALLERY_VIDEO_MULTI){
+            checkAppleMusicUsageDescription();
+            captureMulti(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
+        }else if(type == Display.GALLERY_ALL_MULTI) {
+            checkPhotoLibraryUsageDescription();
+            checkAppleMusicUsageDescription();
+            String[] exts = new String[videoExtensions.length+imageExtensions.length];
+            System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
+            System.arraycopy(imageExtensions, 0, exts, videoExtensions.length, imageExtensions.length);
+            captureMulti(response, exts, getGlobsForExtensions(exts, ";"));
+        }
+        else if(type == Display.GALLERY_VIDEO){
             checkAppleMusicUsageDescription();
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
@@ -8529,6 +8559,57 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         checkCameraUsageDescription();
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+    }
+    
+    private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
+        SwingUtilities.invokeLater(new Runnable() {
+
+            public void run() {
+                File[] selectedFiles = pickFiles(imageTypes, desc, true);
+                ArrayList<String> resultList = new ArrayList<String>();
+                com.codename1.ui.events.ActionEvent result = null;
+                if(!exposeFilesystem) { 
+                    if (selectedFiles != null) {
+                        for (File selected : selectedFiles) {
+                            try {
+                                String ext = selected.getName();
+                                int idx = ext.lastIndexOf(".");
+                                if(idx > 0) {
+                                    ext = ext.substring(idx);
+                                } else {
+                                    ext= imageTypes[0];
+                                }
+                                File tmp = selected;
+                                if (!"true".equals(Display.getInstance().getProperty("openGallery.openFilesInPlace", "false"))) {
+                                    tmp = File.createTempFile("temp", "." + ext);
+                                    tmp.deleteOnExit();
+                                    copyFile(selected, tmp);
+                                }
+                                resultList.add("file://" + tmp.getAbsolutePath().replace('\\', '/'));
+                                //result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
+                            } catch(IOException err) {
+                                err.printStackTrace();
+                            }
+                        }
+                    } 
+                } else {
+                    if(selectedFiles != null) {
+                        for (File selected : selectedFiles) {
+                            resultList.add("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                            //result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                        }
+                    }
+                }
+                result = new com.codename1.ui.events.ActionEvent(resultList.toArray(new String[resultList.size()]));
+                final com.codename1.ui.events.ActionEvent finalResult = result;
+                Display.getInstance().callSerially(new Runnable() {
+
+                    public void run() {
+                        response.actionPerformed(finalResult);
+                    }
+                });
+            }
+        });
     }
     
     private void capture(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
@@ -9425,7 +9506,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return f;
     }
     
-    @Override
+    //@Override
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
@@ -9879,7 +9960,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         return pickFile(new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
 
-    private File pickFile(final String[] types, String name) {
+    private File pickFile(String[] types, String name) {
+        File[] out = pickFiles(types, name, false);
+        if (out == null || out.length < 1) {
+            return null;
+        }
+        return out[0];
+        
+    }
+    
+    private File[] pickFiles(final String[] types, String name, boolean multipleMode) {
         FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
         fd.setFilenameFilter(new FilenameFilter() {
 
@@ -9894,24 +9984,46 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         fd.setFile(name);
+        if (multipleMode) {
+            fd.setMultipleMode(true);
+        }
         fd.pack();
         fd.setLocationByPlatform(true);
         fd.setVisible(true);
 
-        if (fd.getFile() != null) {
-            name = fd.getFile().toLowerCase();
-            for(String t : types) {
-                if(name.endsWith(t)) {
-                    File f = new File(fd.getDirectory(), fd.getFile());
-                    if(!f.exists()){
-                        return new File(fd.getDirectory());
-                    }else{
-                        return f;
+        if (multipleMode) {
+            File[] files = fd.getFiles();
+            ArrayList<File> out = new ArrayList<File>();
+            for (File f : files) {
+                name = f.getName().toLowerCase();
+                for (String t : types) {
+                    if (name.endsWith(t)) {
+                        if (!f.exists()) {
+                            out.add(f.getParentFile());
+                        } else {
+                            out.add(f);
+                        }
+                        break;
                     }
                 }
             }
+            return out.toArray(new File[out.size()]);
+        } else {
+            if (fd.getFile() != null) {
+                name = fd.getFile().toLowerCase();
+                for(String t : types) {
+                    if(name.endsWith(t)) {
+                        File f = new File(fd.getDirectory(), fd.getFile());
+                        if(!f.exists()){
+                            return new File[]{new File(fd.getDirectory())};
+                        }else{
+                            return new File[]{f};
+                        }
+                    }
+                }
+            }
+            return new File[0];
         }
-        return null;
     }
 
     @Override

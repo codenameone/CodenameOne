@@ -6794,6 +6794,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+
+    private String getImageFilePath(Uri uri) {
+
+        File file = new File(uri.getPath());
+        String scheme = uri.getScheme();
+        //String[] filePaths = file.getPath().split(":");
+        //String image_id = filePath[filePath.length - 1];
+        String[] filePathColumn = {MediaStore.Images.Media.DATA};
+        Cursor cursor = getContext().getContentResolver().query(
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                new String[]{ MediaStore.Images.Media.DATA},
+                null,
+                null,
+                null
+        );
+        cursor.moveToFirst();
+        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+        String filePath = cursor.getString(columnIndex);
+        cursor.close();
+
+        if (filePath == null || "content".equals(scheme)) {
+            //if the file is not on the filesystem download it and save it
+            //locally
+            try {
+                InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
+                if (inputStream != null) {
+                    String name = new File(uri.toString()).getName();//getContentName(getContext().getContentResolver(), uri);
+                    if (name != null) {
+                        String homePath = getAppHomePath();
+                        if (homePath.endsWith("/")) {
+                            homePath = homePath.substring(0, homePath.length()-1);
+                        }
+                        filePath = homePath
+                                + getFileSystemSeparator() + name;
+                        File f = new File(removeFilePrefix(filePath));
+                        OutputStream tmp = createFileOuputStream(f);
+                        byte[] buffer = new byte[1024];
+                        int read = -1;
+                        while ((read = inputStream.read(buffer)) > -1) {
+                            tmp.write(buffer, 0, read);
+                        }
+                        tmp.close();
+                        inputStream.close();
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        //long len = new com.codename1.io.File(filePath).length();
+        return filePath;
+    }
+    
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 
@@ -6826,7 +6879,76 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String path = convertImageUriToFilePath(data, getContext());
                 callback.fireActionEvent(new ActionEvent(path));
                 return;
+                
+            } else if (requestCode == OPEN_GALLERY_MULTI) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    if(intent.getClipData() != null){
+                        // If it was a multi-request
+                        ArrayList<String> selectedPaths = new ArrayList<String>();
+                        int count = intent.getClipData().getItemCount();
+                        for (int i=0; i<count; i++){
+
+                            Uri uri = intent.getClipData().getItemAt(i).getUri();
+                            String p = getImageFilePath(uri);
+                            if (p != null) {
+                                selectedPaths.add(p);
+                            }
+                        }
+                        callback.fireActionEvent(new ActionEvent(selectedPaths.toArray(new String[selectedPaths.size()])));
+                        return;
+                    }
+                } else {
+                    com.codename1.io.Log.e(new RuntimeException("OPEN_GALLERY_MULTI requires android sdk 16 (jelly bean) or higher"));
+                    callback.fireActionEvent(null);
+                }
+
+                Uri selectedImage = intent.getData();
+                String scheme = intent.getScheme();
+
+                String[] filePathColumn = {MediaStore.Images.Media.DATA};
+                Cursor cursor = getContext().getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+
+                // this happens on Android devices, not exactly sure what the use case is
+                if(cursor == null) {
+                    callback.fireActionEvent(null);
+                    return;
+                }
+
+                cursor.moveToFirst();
+                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                String filePath = cursor.getString(columnIndex);
+                cursor.close();
+
+                if (filePath == null && "content".equals(scheme)) {
+                    //if the file is not on the filesystem download it and save it
+                    //locally
+                    try {
+                        InputStream inputStream = getContext().getContentResolver().openInputStream(selectedImage);
+                        if (inputStream != null) {
+                            String name = getContentName(getContext().getContentResolver(), selectedImage);
+                            if (name != null) {
+                                filePath = getAppHomePath()
+                                        + getFileSystemSeparator() + name;
+                                File f = new File(removeFilePrefix(filePath));
+                                OutputStream tmp = createFileOuputStream(f);
+                                byte[] buffer = new byte[1024];
+                                int read = -1;
+                                while ((read = inputStream.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
+                                }
+                                tmp.close();
+                                inputStream.close();
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                callback.fireActionEvent(new ActionEvent(new String[]{filePath}));
+                return;
             } else if (requestCode == OPEN_GALLERY) {
+                
                 Uri selectedImage = intent.getData();
                 String scheme = intent.getScheme();
 
@@ -7087,7 +7209,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * Opens the device image gallery
      *
      * @param response callback for the resulting image
-     */
+     *
+     * 
+     * DISABLING:  openGallery() should take care of this
     public void openImageGallery(ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open image gallery in background mode");
@@ -7105,17 +7229,67 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
         this.getActivity().startActivityForResult(galleryIntent, OPEN_GALLERY);
     }
+    * */
 
+    @Override
+    public boolean isGalleryTypeSupported(int type) {
+        if (super.isGalleryTypeSupported(type)) {
+            return true;
+        }
+        if (type == -9999) {
+            return true;
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 16) {
+            switch (type) {
+
+                case Display.GALLERY_ALL_MULTI:
+                case Display.GALLERY_VIDEO_MULTI:
+                case Display.GALLERY_IMAGE_MULTI:
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    
+    
     public void openGallery(final ActionListener response, int type){
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open galery in background mode");
         }
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
             return;
         }
+        if(editInProgress()) {
+            stopEditing(true);
+        }
+        final boolean multi;
+        switch (type) {
+            case Display.GALLERY_ALL_MULTI:
+                multi=true;
+                type = Display.GALLERY_ALL;
+                break;
+            case Display.GALLERY_VIDEO_MULTI:
+                multi=true;
+                type = Display.GALLERY_VIDEO;
+                break;
+            case Display.GALLERY_IMAGE_MULTI:
+                multi = true;
+                type = Display.GALLERY_IMAGE;
+                break;
+            default:
+                multi = false;
+        }
+        
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+        if (multi) {
+            galleryIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
         if(type == Display.GALLERY_VIDEO){
             galleryIntent.setType("video/*");
         }else if(type == Display.GALLERY_IMAGE){
@@ -7135,7 +7309,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }else{
             galleryIntent.setType("*/*");
         }
-        this.getActivity().startActivityForResult(galleryIntent, OPEN_GALLERY);
+        this.getActivity().startActivityForResult(galleryIntent, multi ? OPEN_GALLERY_MULTI: OPEN_GALLERY);
     }
 
     class NativeImage extends Image {

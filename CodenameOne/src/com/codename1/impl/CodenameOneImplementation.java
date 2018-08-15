@@ -5164,6 +5164,21 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Checks if the given gallery type is supported on this platform.
+     * @param type A gallery type constant.  E.g. {@link CN1Constants#GALLERY_IMAGE}, {@link CN1Constants#GALLERY_VIDEO}, {@link CN1Constants#GALLERY_ALL}, {@link CN1Constants#GALLERY_IMAGE_MULTI}, {@link CN1Constants#GALLERY_VIDEO_MULTI}, {@link CN1Constants#GALLERY_ALL_MULTI}
+     * @return True if the gallery type is supported on this platform.
+     */
+    public boolean isGalleryTypeSupported(int type) {
+        switch (type) {
+            case Display.GALLERY_IMAGE:
+            case Display.GALLERY_VIDEO:
+            case Display.GALLERY_ALL:
+                return true;
+        }
+        return false;
+    }
+    
+    /**
      * Opens the device gallery
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
@@ -5176,6 +5191,9 @@ public abstract class CodenameOneImplementation {
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void openGallery(final ActionListener response, int type){
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         final Dialog d = new Dialog("Select a picture");
         d.setLayout(new BorderLayout());
         FileTreeModel model = new FileTreeModel(true);
