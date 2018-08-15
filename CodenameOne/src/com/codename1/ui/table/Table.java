@@ -932,6 +932,21 @@ public class Table extends Container {
     }
 
     /**
+     * If the table is sorted returns the position of the row in the actual
+     * underlying model
+     * @param row the row as it visually appears in the table or in the 
+     * {@code createCell} method
+     * @return the position of the row in the physical model, this will be 
+     * the same value if the table isn't sorted
+     */
+    public int translateSortedRowToModelRow(int row) {
+        if(model instanceof SortableTableModel) {
+            ((SortableTableModel)model).getSortedPosition(row);
+        }
+        return row;
+    }
+    
+    /**
      * Sort support can be toggled with this flag
      * @return the sortSupported
      */
