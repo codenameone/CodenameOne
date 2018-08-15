@@ -40,7 +40,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -532,6 +534,31 @@ public class RequestBuilder {
         }
     }
 
+    /**
+     * Executes the request synchronously
+     * 
+     * @param type the type of the business object to create
+     * @return Response Object
+     */ 
+    public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
+        ConnectionRequest request = createRequest(true);
+        CN.addToQueueAndWait(request);
+        Map response = ((Connection)request).json;
+        try {
+            List<Map> lst = (List<Map>)response.get("root");
+            List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+            for(Map m : lst) {
+                PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                pb.getPropertyIndex().populateFromMap(m);
+                result.add(pb);
+            }
+            return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());
+        } catch(Exception err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+    
     class Connection extends GZConnectionRequest {
         private boolean parseJSON;
         private boolean errorCode;
