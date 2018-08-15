@@ -450,8 +450,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             os.write("[".getBytes());
             boolean first = true;
             for(PropertyBusinessObject pb : objs) {
-                if(!first) {
+                if(first) {
                     first = false;
+                } else {
                     os.write(",\n".getBytes());
                 }
                 os.write(pb.getPropertyIndex().toJSON().getBytes("UTF-8"));
