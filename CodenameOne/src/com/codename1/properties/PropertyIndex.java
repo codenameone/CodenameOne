@@ -447,22 +447,32 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
         try {
             OutputStream os = Storage.getInstance().createOutputStream(name);
-            os.write("[".getBytes());
-            boolean first = true;
-            for(PropertyBusinessObject pb : objs) {
-                if(first) {
-                    first = false;
-                } else {
-                    os.write(",\n".getBytes());
-                }
-                os.write(pb.getPropertyIndex().toJSON().getBytes("UTF-8"));
-            }
-            os.write("]".getBytes());
+            os.write(toJSONList(objs).getBytes());
             os.close();
         } catch(IOException err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
+    }
+
+    /**
+     * Creates a JSON string, containing the list of property business objects
+     * @param objs a list of business objects
+     * @return the JSON string
+     */
+    public static String toJSONList(List<? extends PropertyBusinessObject> objs) {
+        StringBuilder b = new StringBuilder("[");
+        b.append("[");
+        boolean first = true;
+        for(PropertyBusinessObject pb : objs) {
+            if(first) {
+                first = false;
+            } else {
+                b.append(",\n");
+            }
+            b.append(pb.getPropertyIndex().toJSON());
+        }
+        return b.toString();
     }
 
     /**

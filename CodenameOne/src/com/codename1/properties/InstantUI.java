@@ -39,6 +39,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,7 +52,8 @@ import java.util.Map;
  * @author Shai Almog
  */
 public class InstantUI {
-    
+    private PropertyBase[] order;
+        
     /**
      * Excludes the property from the generated UI
      * @param exclude the property to exclude
@@ -167,6 +169,23 @@ public class InstantUI {
     }
     
     /**
+     * Sets the order of the properties, notice that this can also replace exclude
+     * @param order the order of the properties
+     */
+    public void setOrder(PropertyBase... order) {
+        this.order = order;
+    }
+    
+    /**
+     * Returns the order of the properties or null if they should use their 
+     * natural order as they were submitted to the index object
+     * @return the property order
+     */
+    public PropertyBase[] getOrder() {
+        return order;
+    }
+    
+    /**
      * Creates editing UI for the given business object
      * @param bo the business object
      * @param autoCommit true if the bindings used should be auto-committed
@@ -183,84 +202,96 @@ public class InstantUI {
         }
         UiBinding uib = new UiBinding();
         ArrayList<UiBinding.Binding> allBindings = new ArrayList<UiBinding.Binding>();
-        for(PropertyBase b : bo.getPropertyIndex()) {
-            if(isExcludedProperty(b)) {
-                continue;
+        if(order != null && order.length > 0) {
+            for(PropertyBase b : order) {
+                createEntryForProperty(b, cnt, allBindings, uib);
             }
-            Class cls = (Class)b.getClientProperty("cn1$cmpCls");
-            if(cls != null) {
-                try {
-                    Component cmp = (Component)cls.newInstance();
-                    cmp.setName(b.getName());
-                    cnt.add(b.getLabel()).
-                            add(cmp);
-                    allBindings.add(uib.bind(b, cmp));
-                } catch(Exception err) {
-                    Log.e(err);
-                    throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
-                }
-                continue;
+        } else {
+            for(PropertyBase b : bo.getPropertyIndex()) {
+                createEntryForProperty(b, cnt, allBindings, uib);
             }
-            String[] multiLabels = (String[])b.getClientProperty("cn1$multiChceLbl");
-            if(multiLabels != null) {
-                // multi choice component
-                final Object[] multiValues = (Object[])b.getClientProperty("cn1$multiChceVal");
-                if(multiLabels.length < 5) {
-                    // toggle buttons
-                    ButtonGroup bg = new ButtonGroup();
-                    RadioButton[] rbs = new RadioButton[multiLabels.length];
-                    cnt.add(b.getLabel());
-                    Container radioBox = new Container(new GridLayout(multiLabels.length));
-                    for(int iter = 0 ; iter < multiLabels.length ; iter++) {
-                        rbs[iter] = RadioButton.createToggle(multiLabels[iter], bg);
-                        radioBox.add(rbs[iter]);
-                    }
-                    cnt.add(radioBox);
-                    allBindings.add(uib.bindGroup(b, multiValues, rbs));
-                } else {
-                    Picker stringPicker = new Picker();
-                    stringPicker.setStrings(multiLabels);
-                    Map<Object, Object> m1 = new HashMap<Object, Object>();
-                    Map<Object, Object> m2 = new HashMap<Object, Object>();
-                    for(int iter = 0 ; iter < multiLabels.length ; iter++) {
-                        m1.put(multiLabels[iter], multiValues[iter]);
-                        m2.put(multiValues[iter], multiLabels[iter]);
-                    }
-                    cnt.add(b.getLabel()).
-                            add(stringPicker);
-                    allBindings.add(uib.bind(b, stringPicker, 
-                            new UiBinding.PickerAdapter<Object>(
-                                    new UiBinding.MappingConverter(m1), new UiBinding.MappingConverter(m2))));
-                }
-                continue;
-            }
-            Class t = b.getGenericType();
-            if(t != null) {
-                if(t == Boolean.class) {
-                    CheckBox cb = new CheckBox();
-                    uib.bind(b, cb);
-                    cnt.add(b.getLabel()).
-                            add(cb);
-                    continue;
-                }
-                if(t == Date.class) {
-                    Picker dp = new Picker();
-                    dp.setType(Display.PICKER_TYPE_DATE);
-                    uib.bind(b, dp);
-                    cnt.add(b.getLabel()).
-                            add(dp);
-                    continue;
-                }
-            } 
-            TextField tf = new TextField();
-            tf.setConstraint(getTextFieldConstraint(b));
-            uib.bind(b, tf);
-            cnt.add(b.getLabel()).
-                    add(tf);
         }
         
         cnt.putClientProperty("cn1$iui-binding", uib.createGroupBinding(allBindings));
         return cnt;
+    }
+
+    private void createEntryForProperty(PropertyBase b, Container cnt,
+        ArrayList<UiBinding.Binding> allBindings, UiBinding uib) throws
+        RuntimeException {
+        if(isExcludedProperty(b)) {
+            return;
+        }
+        Class cls = (Class)b.getClientProperty("cn1$cmpCls");
+        if(cls != null) {
+            try {
+                Component cmp = (Component)cls.newInstance();
+                cmp.setName(b.getName());
+                cnt.add(b.getLabel()).
+                    add(cmp);
+                allBindings.add(uib.bind(b, cmp));
+            } catch(Exception err) {
+                Log.e(err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+            }
+            return;
+        }
+        String[] multiLabels = (String[])b.getClientProperty("cn1$multiChceLbl");
+        if(multiLabels != null) {
+            // multi choice component
+            final Object[] multiValues = (Object[])b.getClientProperty("cn1$multiChceVal");
+            if(multiLabels.length < 5) {
+                // toggle buttons
+                ButtonGroup bg = new ButtonGroup();
+                RadioButton[] rbs = new RadioButton[multiLabels.length];
+                cnt.add(b.getLabel());
+                Container radioBox = new Container(new GridLayout(multiLabels.length));
+                for(int iter = 0 ; iter < multiLabels.length ; iter++) {
+                    rbs[iter] = RadioButton.createToggle(multiLabels[iter], bg);
+                    radioBox.add(rbs[iter]);
+                }
+                cnt.add(radioBox);
+                allBindings.add(uib.bindGroup(b, multiValues, rbs));
+            } else {
+                Picker stringPicker = new Picker();
+                stringPicker.setStrings(multiLabels);
+                Map<Object, Object> m1 = new HashMap<Object, Object>();
+                Map<Object, Object> m2 = new HashMap<Object, Object>();
+                for(int iter = 0 ; iter < multiLabels.length ; iter++) {
+                    m1.put(multiLabels[iter], multiValues[iter]);
+                    m2.put(multiValues[iter], multiLabels[iter]);
+                }
+                cnt.add(b.getLabel()).
+                    add(stringPicker);
+                allBindings.add(uib.bind(b, stringPicker,
+                    new UiBinding.PickerAdapter<Object>(
+                        new UiBinding.MappingConverter(m1), new UiBinding.MappingConverter(m2))));
+            }
+            return;
+        }
+        Class t = b.getGenericType();
+        if(t != null) {
+            if(t == Boolean.class) {
+                CheckBox cb = new CheckBox();
+                uib.bind(b, cb);
+                cnt.add(b.getLabel()).
+                            add(cb);
+                return;
+            }
+            if(t == Date.class) {
+                Picker dp = new Picker();
+                dp.setType(Display.PICKER_TYPE_DATE);
+                uib.bind(b, dp);
+                cnt.add(b.getLabel()).
+                    add(dp);
+                return;
+            }
+        }
+        TextField tf = new TextField();
+        tf.setConstraint(getTextFieldConstraint(b));
+        uib.bind(b, tf);
+        cnt.add(b.getLabel()).
+                    add(tf);
     }
     
     /**
