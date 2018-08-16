@@ -373,7 +373,7 @@ public class Picker extends Button {
             }
             
             private Spinner3D createStringPicker3D() {
-                Spinner3D out = new Spinner3D(new DefaultListModel((String[])metaData));
+                Spinner3D out = new Spinner3D(new DefaultListModel<String>((String[])metaData));
                 if (value != null) {
                     out.setValue(value);
                 }
