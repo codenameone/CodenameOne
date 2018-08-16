@@ -941,7 +941,7 @@ public class Table extends Container {
      */
     public int translateSortedRowToModelRow(int row) {
         if(model instanceof SortableTableModel) {
-            ((SortableTableModel)model).getSortedPosition(row);
+            return ((SortableTableModel)model).getSortedPosition(row);
         }
         return row;
     }
