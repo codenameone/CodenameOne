@@ -3768,6 +3768,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             pref.put("skin", f);
             addSkinName(f);
         } catch (Throwable t) {
+            System.out.println("Failed loading the skin file: " + f);
             t.printStackTrace();
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             pref.remove("skin");

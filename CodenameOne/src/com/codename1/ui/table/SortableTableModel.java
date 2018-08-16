@@ -35,11 +35,11 @@ import java.util.Comparator;
  * @author Shai Almog
  */
 public class SortableTableModel extends AbstractTableModel {
-    private TableModel model;
+    private final TableModel model;
     private int[] sorted;
-    private boolean asc;
+    private final boolean asc;
     private Comparator cmp;
-    private int sortColumn;
+    private final int sortColumn;
 
     /**
      * Returns the underlying table model
@@ -64,6 +64,15 @@ public class SortableTableModel extends AbstractTableModel {
         initTable(model, asc, cmp, column);
     } 
 
+    /**
+     * Returns the position of the row when sorted
+     * @param row the row in the visual table
+     * @return the position in the underlying model
+     */
+    public int getSortedPosition(int row) {
+        return sorted[row];
+    }
+     
     private void initTable(final TableModel model1, final boolean asc,
         final Comparator cmp, final int column) {
         sorted = new int[model1.getRowCount()];
