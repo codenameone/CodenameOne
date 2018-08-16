@@ -471,7 +471,10 @@ public class Table extends Container {
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
         Comparator cmp = createColumnSortComparator(column);
-        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));          
+        if(model instanceof SortableTableModel) {
+            model = ((SortableTableModel)model).getUnderlying();
+        }
+        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));
     }
     
     /**
