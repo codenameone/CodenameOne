@@ -2375,14 +2375,14 @@ namespace com.codename1.impl
                 }
                 openPicker.ViewMode = PickerViewMode.Thumbnail;
                 openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-                if (type == Display.GALLERY_IMAGE)
+                if (type == Display.GALLERY_IMAGE || type == Display.GALLERY_IMAGE_MULTI)
                 {
                     openPicker.ViewMode = PickerViewMode.Thumbnail;
                     openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
                     openPicker.FileTypeFilter.Add(".jpg");
                     openPicker.FileTypeFilter.Add(".jpeg");
                     openPicker.FileTypeFilter.Add(".png");
-                } else if (type == Display.GALLERY_VIDEO)
+                } else if (type == Display.GALLERY_VIDEO || type == Display.GALLERY_VIDEO_MULTI) 
                 {
                     openPicker.FileTypeFilter.Add(".mp4");
                     openPicker.FileTypeFilter.Add(".avi");
