@@ -2278,6 +2278,37 @@ namespace com.codename1.impl
             }
         }
 
+        public async void toSendFile(IReadOnlyList<StorageFile> files)
+        {
+            string[] paths = new string[files.Count];
+            int idx = 0;
+            foreach (var file in files)
+            {
+                try
+                {
+                    fileName = file.Name;
+#if WINDOWS_PHONE_APP
+              
+                ActionEvent ac = new ActionEvent("cameraroll:/" + fileName);
+                fireCapture(ac);
+#else
+                    string tmpPath = addTempFile(file);
+                    paths[idx++] = tmpPath;
+                    
+#endif
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            ActionEvent ac = new ActionEvent(paths);
+            fireCapture(ac);
+
+
+        }
+
         public async void toSendFile(StorageFile file)
         {
             try
@@ -2305,23 +2336,53 @@ namespace com.codename1.impl
         }
 
 
+        public override bool isGalleryTypeSupported(int type)
+        {
+            if (base.isGalleryTypeSupported(type))
+            {
+                return true;
+            }
+            switch (type)
+            {
+                case Display.GALLERY_ALL_MULTI:
+                case Display.GALLERY_VIDEO_MULTI:
+                case Display.GALLERY_IMAGE_MULTI:
+                case -9999:
+                    return true;
+            }
+            return false;
+        }
+
         public override void openGallery(ActionListener response, int type)
         {
+            if (!isGalleryTypeSupported(type))
+            {
+                throw new java.lang.IllegalArgumentException("Gallery type not supported on this platform: " + type);
+            }
             exitLock = true;
             pendingCaptureCallback = response;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 FileOpenPicker openPicker = new FileOpenPicker();
+                bool multiple = false;
+                switch (type)
+                {
+                    case Display.GALLERY_ALL_MULTI:
+                    case Display.GALLERY_IMAGE_MULTI:
+                    case Display.GALLERY_VIDEO_MULTI:
+                        multiple = true;
+                        break;
+                }
                 openPicker.ViewMode = PickerViewMode.Thumbnail;
                 openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-                if (type == Display.GALLERY_IMAGE)
+                if (type == Display.GALLERY_IMAGE || type == Display.GALLERY_IMAGE_MULTI)
                 {
                     openPicker.ViewMode = PickerViewMode.Thumbnail;
                     openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
                     openPicker.FileTypeFilter.Add(".jpg");
                     openPicker.FileTypeFilter.Add(".jpeg");
                     openPicker.FileTypeFilter.Add(".png");
-                } else if (type == Display.GALLERY_VIDEO)
+                } else if (type == Display.GALLERY_VIDEO || type == Display.GALLERY_VIDEO_MULTI) 
                 {
                     openPicker.FileTypeFilter.Add(".mp4");
                     openPicker.FileTypeFilter.Add(".avi");
@@ -2348,11 +2409,29 @@ namespace com.codename1.impl
                 openPicker.PickSingleFileAndContinue();
                 view.Activated += view_Activated;
 #else
-                StorageFile file = await openPicker.PickSingleFileAsync();
-                if (file != null)
+                if (multiple)
                 {
-                    toSendFile(file);
+                    IReadOnlyList<StorageFile> files = await openPicker.PickMultipleFilesAsync();
+                    if (files != null)
+                    {
+                        toSendFile(files);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
+                    }
+
+                } else
+                {
+                    StorageFile file = await openPicker.PickSingleFileAsync();
+                    if (file != null)
+                    {
+                        toSendFile(file);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
+                    }
                 }
+                
 #endif
             }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
             //base.openGallery(response, type);
