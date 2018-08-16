@@ -504,6 +504,9 @@ public class Table extends Container {
                             sortedColumn = column;
                             ascending = false;
                         }
+                        if(model instanceof SortableTableModel) {
+                            model = ((SortableTableModel)model).getUnderlying();
+                        }
                         setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));  
                     }
                 });
