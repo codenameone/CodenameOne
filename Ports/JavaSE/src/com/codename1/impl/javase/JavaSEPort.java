@@ -8970,6 +8970,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return buf;
         }
+
+        
+        
+        
         
         /**
          * Paints the native component to the buffer
@@ -9143,7 +9147,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(vid.getWidth()), (int)(vid.getHeight()));
+            com.codename1.ui.geom.Dimension out = new com.codename1.ui.geom.Dimension((int)(vid.getPreferredSize().width), (int)(vid.getPreferredSize().height));
+            return out;
         }
 
         @Override
