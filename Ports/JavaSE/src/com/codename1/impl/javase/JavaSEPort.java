@@ -8676,7 +8676,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkMicrophoneUsageDescription();
         capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
     }
-
+    private static boolean isPlayable(String filename) {
+        try {
+            javafx.scene.media.Media media = new javafx.scene.media.Media(filename);
+        } catch (javafx.scene.media.MediaException e) {
+            if (e.getType() == javafx.scene.media.MediaException.Type.MEDIA_UNSUPPORTED) {
+                return false;
+            }
+        }
+        return true;
+    }
     
     class CodenameOneMediaPlayer implements Media {
 
@@ -8689,6 +8698,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private javafx.embed.swing.JFXPanel videoPanel;
         private JFrame frm;
         private boolean playing = false;
+        private boolean nativePlayerMode;
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             if (onCompletion != null) {
@@ -8706,9 +8716,29 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.isVideo = isVideo;
             this.frm = f;
             try {
+                if (uri.startsWith("file:")) {
+                    uri = unfile(uri);
+                }
                 File fff = new File(uri);
                 if(fff.exists()) {
                     uri = fff.toURI().toURL().toExternalForm();
+                }
+                if (isVideo && !isPlayable(uri)) {
+                    // JavaFX doesn't seem to support .mov files.  But if you simply rename it
+                    // to .mp4, then it will play it  (if it is mpeg4).
+                    // So this will improve .mov files from failing to 100% of the time
+                    // to only half of the time (when it isn't an mp4)
+                    File temp = File.createTempFile("mtmp", ".mp4");
+                    temp.deleteOnExit();
+                    FileOutputStream out = new FileOutputStream(temp);
+                    byte buf[] = new byte[1024];
+                    int len = 0;
+                    InputStream stream = new URL(uri).openStream();
+                    while ((len = stream.read(buf, 0, buf.length)) > -1) {
+                        out.write(buf, 0, len);
+                    }
+                    stream.close();
+                    uri = temp.toURI().toURL().toExternalForm();
                 }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
                 player.setOnEndOfMedia(this.onCompletion);
@@ -8836,6 +8866,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         public void play() {
+            if (isVideo && nativePlayerMode) {
+                // To simulate native player mode, we will show a form with the player.
+                final Form currForm = Display.getInstance().getCurrent();
+                Form playerForm = new Form("Video Player", new com.codename1.ui.layouts.BorderLayout()) {
+
+                    @Override
+                    protected void onShow() {
+                        player.play();
+                        playing = true;
+                    }
+                    
+                };
+                com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
+                playerForm.setToolbar(tb);
+                tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                        currForm.showBack();
+                    }
+                });
+                
+                Component videoComponent = getVideoComponent();
+                if (videoComponent.getComponentForm() != null) {
+                    videoComponent.remove();
+                }
+                playerForm.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, videoComponent);
+                playerForm.show();
+                return;
+                
+            }
             player.play();
             playing = true;
         }
@@ -8921,11 +8980,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void setNativePlayerMode(boolean nativePlayer) {
+            nativePlayerMode = nativePlayer;
         }
 
         @Override
         public boolean isNativePlayerMode() {
-            return false;
+            return nativePlayerMode;
         }
 
         public void setVariable(String key, Object value) {
