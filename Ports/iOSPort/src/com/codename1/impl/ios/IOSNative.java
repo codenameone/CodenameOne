@@ -681,6 +681,8 @@ public final class IOSNative {
     
     native void firePushCompletionHandler();
 
+    native boolean isMultiGallerySelectSupported();
+
 
 
    

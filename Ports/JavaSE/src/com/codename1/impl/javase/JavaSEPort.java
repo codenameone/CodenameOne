@@ -8391,13 +8391,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
         }
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         if (type == Display.GALLERY_IMAGE_MULTI) {
+            checkGalleryMultiselect();
             checkPhotoLibraryUsageDescription();
             captureMulti(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
         }else if(type == Display.GALLERY_VIDEO_MULTI){
+            checkGalleryMultiselect();
             checkAppleMusicUsageDescription();
             captureMulti(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_ALL_MULTI) {
+            checkGalleryMultiselect();
             checkPhotoLibraryUsageDescription();
             checkAppleMusicUsageDescription();
             String[] exts = new String[videoExtensions.length+imageExtensions.length];
@@ -8455,6 +8461,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private boolean enableGalleryMultiselectChecked;
+    private void checkGalleryMultiselect() {
+        if (!enableGalleryMultiselectChecked) {
+            enableGalleryMultiselectChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.enableGalleryMultiselect")) {
+                    Display.getInstance().setProjectBuildHint("ios.enableGalleryMultiselect", "true");
+                }
+            }
+        }
+    }
+    
     
     private boolean contactsUsageDescriptionChecked;
     
