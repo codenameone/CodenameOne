@@ -113,6 +113,8 @@ import java.util.Collections;
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
+    // Flag to indicate if the current openGallery process is selecting multiple files
+    private static boolean gallerySelectMultiple;
     public static IOSNative nativeInstance = new IOSNative();
     private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
@@ -2826,13 +2828,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
-                if(r.startsWith("file:")) {
-                    captureCallback.fireActionEvent(new ActionEvent(r));
+                if (gallerySelectMultiple) {
+                    String[] paths = Util.split(r, "\n");
+                    int len = paths.length;
+                    for (int i=0; i<len; i++) {
+                        if (!paths[i].startsWith("file:")) {
+                            paths[i] = "file:"+paths[i];
+                        }
+                    }
+                    captureCallback.fireActionEvent(new ActionEvent(paths));
                 } else {
-                    captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                    if(r.startsWith("file:")) {
+                        captureCallback.fireActionEvent(new ActionEvent(r));
+                    } else {
+                        captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                    }
                 }
             } else {
-                captureCallback.fireActionEvent(null);
+                captureCallback.fireActionEvent(new ActionEvent(null));
             }
             captureCallback = null;
         }
@@ -3026,14 +3039,47 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isGalleryTypeSupported(int type) {
+        if (super.isGalleryTypeSupported(type)) {
+            return true;
+        }
+        if (type == -9999) {
+            return true;
+        }
+        switch (type) {
+            case Display.GALLERY_ALL_MULTI:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+                return nativeInstance.isMultiGallerySelectSupported();
+        }
+        return false;
+    }
+    
+    
+
+    @Override
     public void openGallery(ActionListener response, int type) {
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         if (!nativeInstance.checkPhotoLibraryUsage()) {
             throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
+        }
+        switch (type) {
+            case Display.GALLERY_ALL_MULTI:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+                gallerySelectMultiple = true;
+                break;
+            default:
+                gallerySelectMultiple = false;
+                
         }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
     }
+    
     
     
     static class IOSMediaCallback {

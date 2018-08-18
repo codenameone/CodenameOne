@@ -3216,8 +3216,74 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
 #endif
 }
 
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+void openGalleryMultiple(JAVA_INT type) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        QBImagePickerController *pickerController = [QBImagePickerController new];
+        pickerController.allowsMultipleSelection = YES;
+        pickerController.maximumNumberOfSelection = 0;
+        pickerController.showsNumberOfSelectedAssets = YES;
+        pickerController.delegate = [CodenameOne_GLViewController instance];
+        if (type==0 || type == 3){
+            
+        } else if (type==0 || type == 3){
+            pickerController.mediaType = QBImagePickerMediaTypeImage;
+        } else if (type==1 || type == 4){
+            pickerController.mediaType = QBImagePickerMediaTypeVideo;
+            
+        } else {
+            pickerController.mediaType = QBImagePickerMediaTypeAny;
+        }
+        
+        if(popoverSupported()) {
+            if (popoverController != nil) {
+#ifndef CN1_USE_ARC
+                [popoverController release];
+#endif
+                popoverController = nil;
+            }
+            popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
+                                 initWithContentViewController:pickerController];
+            
+            popoverController.delegate = [CodenameOne_GLViewController instance];
+            [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                               inView:[[CodenameOne_GLViewController instance] view]
+                             permittedArrowDirections:UIPopoverArrowDirectionAny
+                                             animated:YES];
+        } else {
+            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+        }
+        POOL_END();
+    });
+}
+#endif
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMultiGallerySelectSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef ENABLE_GALLERY_MULTISELECT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
+    BOOL multiple = false;
+    if (type == 3 || type == 4 || type == 5) {  // GALLERY_TYPE_IMAGE_MULTI, GALLERY_TYPE_VIDEO_MULTI, GALLERY_TYPE_ALL_MULTI
+        multiple = true;
+    }
+    if (multiple) {
+#ifdef ENABLE_GALLERY_MULTISELECT
+        openGalleryMultiple(type);
+#else
+        NSLog(@"Gallery multiselect is disabled");
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_RuntimeException(getThreadLocalData()));
+#endif
+        return;
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
