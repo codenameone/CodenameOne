@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
+[![Join the chat at https://gitter.im/codenameone/Lobby](https://badges.gitter.im/codenameone/Lobby.svg)](https://gitter.im/codenameone/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ## Write Once Run Anywhere Native Mobile Apps for Java & Kotlin Developers
 
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
