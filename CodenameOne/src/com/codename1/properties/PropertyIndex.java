@@ -457,21 +457,22 @@ public class PropertyIndex implements Iterable<PropertyBase> {
 
     /**
      * Creates a JSON string, containing the list of property business objects
+     *
      * @param objs a list of business objects
      * @return the JSON string
      */
     public static String toJSONList(List<? extends PropertyBusinessObject> objs) {
         StringBuilder b = new StringBuilder("[");
-        b.append("[");
         boolean first = true;
-        for(PropertyBusinessObject pb : objs) {
-            if(first) {
+        for (PropertyBusinessObject pb : objs) {
+            if (first) {
                 first = false;
             } else {
                 b.append(",\n");
             }
             b.append(pb.getPropertyIndex().toJSON());
         }
+        b.append("]");
         return b.toString();
     }
 
