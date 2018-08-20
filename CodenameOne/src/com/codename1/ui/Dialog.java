@@ -1364,14 +1364,20 @@ public class Dialog extends Form {
             refreshTheme();
         }
         Component contentPane = super.getContentPane();
-        Component title = super.getTitleComponent();
+        Component title = dialogTitle;
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
         // preferred size logic of the dialog won't work with large title borders
+        int titleHeight = 0;
         if(dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = getTitle().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
+        }
+        if (title != null) {
+            titleHeight = title.getPreferredH() + title.getPreferredH();
+            Style tStyle = title.getStyle();
+            titleHeight += tStyle.getVerticalMargins();
         }
         
         Style contentPaneStyle = getDialogStyle();
@@ -1380,14 +1386,13 @@ public class Dialog extends Form {
 
         // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
-        int prefHeight = contentPane.getPreferredH();
+        int prefHeight = contentPane.getPreferredH() + contentPaneStyle.getVerticalMargins() + titleHeight + getStyle().getVerticalPadding() + menuHeight;
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
         if(contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
-        height = height - menuHeight - title.getPreferredH();
         int topBottom = Math.max(0, (height - prefHeight) / 2);
         int leftRight = Math.max(0, (width - prefWidth) / 2);
         
