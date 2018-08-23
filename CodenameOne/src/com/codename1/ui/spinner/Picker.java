@@ -1371,7 +1371,9 @@ public class Picker extends Button {
     
     @Override
     public void paint(Graphics g) {
-        super.paint(g); //To change body of generated methods, choose Tools | Templates.
+        if (!suppressPaint) {
+            super.paint(g);
+        }
     }
     
     @Override
@@ -1382,4 +1384,10 @@ public class Picker extends Button {
         return super.getStyle(); 
     }
  
+    private boolean suppressPaint;
+    void setSuppressPaint(boolean suppress) {
+        suppressPaint = suppress;
+    }
+    
+    
 }
