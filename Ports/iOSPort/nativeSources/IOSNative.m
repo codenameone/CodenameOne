@@ -42,6 +42,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
+#include "java_lang_RuntimeException.h"
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
