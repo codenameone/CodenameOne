@@ -3283,6 +3283,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 pref.putBoolean("desktopSkin", true);
+                pref.putBoolean("uwpDesktopSkin", false);
                 String mainClass = System.getProperty("MainClass");
                 if (mainClass != null) {
                     deinitializeSync();
