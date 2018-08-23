@@ -410,6 +410,7 @@ public class MediaPlayer extends Container {
         if(video != null && video.getVideoComponent() != null){
             Component videoComponent = video.getVideoComponent();
             if (videoComponent != null) {
+                videoComponent.setUIID("Container");
                 if(onTopMode) {
                     addComponent(videoComponent);        
                 } else {
