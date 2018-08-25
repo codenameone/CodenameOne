@@ -795,6 +795,7 @@ public class UiBinding {
         private CollectionProperty objectProperty;
         private PropertyBusinessObject prototype;
         private Set<String> exclude = new HashSet<String>();
+        private List<String> included;
         private PropertyBase[] columnOrder;
         private Set<String> uneditable = new HashSet<String>();
         private EventDispatcher listeners = new EventDispatcher();
@@ -827,6 +828,13 @@ public class UiBinding {
          */
         public void excludeProperty(PropertyBase b) {
             exclude.add(b.getName());
+            if(included == null) {
+                included = new ArrayList<String>();
+                for(PropertyBase pb : prototype.getPropertyIndex()) {
+                    included.add(pb.getName());
+                }
+            }
+            included.remove(b.getName());
         }
         
         /**
@@ -912,13 +920,20 @@ public class UiBinding {
             }
             return prototype.getPropertyIndex().getSize() - exclude.size();
         }
-
+        
+        private PropertyBase getProperty(int index) {
+            if(included != null) {
+                return prototype.getPropertyIndex().get(included.get(index));
+            }
+            return prototype.getPropertyIndex().get(index);
+        }
+        
         @Override
         public String getColumnName(int i) {
             if(columnOrder != null) {
                 return columnOrder[i].getLabel();
             }
-            return prototype.getPropertyIndex().get(i).getLabel();
+            return getProperty(i).getLabel();
         }
 
         @Override
@@ -926,7 +941,7 @@ public class UiBinding {
             if(columnOrder != null && columnOrder.length > 0) {
                 return !uneditable.contains(columnOrder[column].getName());
             }
-            return !uneditable.contains(prototype.getPropertyIndex().get(column).getName());
+            return !uneditable.contains(getProperty(column).getName());
         }
         
         private PropertyBusinessObject getRow(int row) {
@@ -952,7 +967,7 @@ public class UiBinding {
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
             } else {
-                n = pb.getPropertyIndex().get(column).getName();
+                n = getProperty(column).getName();
             }
             return pb.getPropertyIndex().get(n).get();
         }
@@ -964,7 +979,7 @@ public class UiBinding {
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
             } else {
-                n = pb.getPropertyIndex().get(column).getName();
+                n = getProperty(column).getName();
             }
             return pb.getPropertyIndex().get(n).getGenericType();
         }
@@ -975,7 +990,7 @@ public class UiBinding {
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
             } else {
-                n = pb.getPropertyIndex().get(column).getName();
+                n = getProperty(column).getName();
             }
             return pb.getPropertyIndex().get(n);
         }
@@ -1027,7 +1042,7 @@ public class UiBinding {
             if(columnOrder != null) {
                 n = columnOrder[column].getName();
             } else {
-                n = pb.getPropertyIndex().get(column).getName();
+                n = getProperty(column).getName();
             }
             pb.getPropertyIndex().get(n).setImpl(o);
             listeners.fireDataChangeEvent(column, row);
