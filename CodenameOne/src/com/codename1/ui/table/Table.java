@@ -531,7 +531,7 @@ public class Table extends Container {
                 cell.setEnabled(editable);
                 return cell;
             }
-            if(editable && type == null || type == String.class) {
+            if(editable && (type == null || type == String.class)) {
                 String[] multiChoice = ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
                 if(multiChoice != null) {
                     Picker cell = new Picker();
@@ -543,7 +543,7 @@ public class Table extends Container {
                     return cell;
                 }
             }
-            if(type == Date.class) {
+            if(editable && type == Date.class) {
                 Picker cell = new Picker();
                 cell.setType(Display.PICKER_TYPE_DATE);
                 if(value != null) {
