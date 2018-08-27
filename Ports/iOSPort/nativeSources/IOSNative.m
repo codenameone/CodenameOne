@@ -2514,6 +2514,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         moviePlayerInstance.controlStyle = MPMovieControlStyleEmbedded;
         POOL_END();
@@ -2575,6 +2577,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_in
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         POOL_END();
     });
@@ -2637,6 +2641,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
         [moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         POOL_END();
     });
