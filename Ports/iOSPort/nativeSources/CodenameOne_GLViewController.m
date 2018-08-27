@@ -73,6 +73,8 @@
 #endif
 #import "com_codename1_payment_Purchase.h"
 
+//#define CN1_USE_SPLASH_SCREEN
+
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
 // needs a source rect that the java API doesn't pass through.
 int CN1lastTouchX=0;
@@ -1822,70 +1824,7 @@ extern int CN1transformMatrixVersion;
 extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 
-- (void)awakeFromNib
-{
-#ifdef USE_ES2
-    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
-        CN1transformMatrix = GLKMatrix4Identity;
-        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
-    }
-#endif
-    retinaBug = isRetinaBug();
-    if(retinaBug) {
-        scaleValue = 1;
-    } else {
-        scaleValue = [UIScreen mainScreen].scale;
-    }
-    sharedSingleton = self;
-    [self initVars];
-#ifdef USE_ES2
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-#else
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    
-    if (!aContext) {
-        aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    }
-#endif
-    if (!aContext)
-        CN1Log(@"Failed to create ES context");
-    else if (![EAGLContext setCurrentContext:aContext])
-        CN1Log(@"Failed to set ES context current");
-    
-	self.context = aContext;
-#ifndef CN1_USE_ARC
-    [aContext release];
-#endif
-	
-    [(EAGLView *)self.view setContext:context];
-    [(EAGLView *)self.view setFramebuffer];
-    //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    //self.view.autoresizesSubviews = YES;
-    
-    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
-    //        [self loadShaders];
-    
-    
-    animating = FALSE;
-    animationFrameInterval = 1;
-    self.displayLink = nil;
-    
-    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
-    //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
-    
-    // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillShow:)
-                                                 name:UIKeyboardWillShowNotification
-                                               object:self.view.window];
-    // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillHide:)
-                                                 name:UIKeyboardWillHideNotification
-                                               object:self.view.window];
-    
-    //detect orientation by statusBarOrientation
+-(UIImage*)createSplashImage {
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
     
@@ -1952,6 +1891,81 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
             img = [UIImage imageNamed:@"Default.png"];
         }
     }
+    return img;
+}
+
+- (void)awakeFromNib
+{
+#ifdef USE_ES2
+    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
+        CN1transformMatrix = GLKMatrix4Identity;
+        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
+    }
+#endif
+    retinaBug = isRetinaBug();
+    if(retinaBug) {
+        scaleValue = 1;
+    } else {
+        scaleValue = [UIScreen mainScreen].scale;
+    }
+    sharedSingleton = self;
+    [self initVars];
+#ifdef USE_ES2
+    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+#else
+    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
+    
+    if (!aContext) {
+        aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
+    }
+#endif
+    if (!aContext)
+        CN1Log(@"Failed to create ES context");
+    else if (![EAGLContext setCurrentContext:aContext])
+        CN1Log(@"Failed to set ES context current");
+    
+	self.context = aContext;
+#ifndef CN1_USE_ARC
+    [aContext release];
+#endif
+	
+    [(EAGLView *)self.view setContext:context];
+    [(EAGLView *)self.view setFramebuffer];
+    //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    //self.view.autoresizesSubviews = YES;
+    
+    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
+    //        [self loadShaders];
+    
+    
+    animating = FALSE;
+    animationFrameInterval = 1;
+    self.displayLink = nil;
+    
+    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
+    //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
+    
+    // register for keyboard notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillShow:)
+                                                 name:UIKeyboardWillShowNotification
+                                               object:self.view.window];
+    // register for keyboard notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillHide:)
+                                                 name:UIKeyboardWillHideNotification
+                                               object:self.view.window];
+    
+    //detect orientation by statusBarOrientation
+    UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+#ifdef CN1_USE_SPLASH_SCREEN
+    UIImage *img = [self createSplashImage];
+#else
+    UIImage* img = nil;
+#endif
+    
     [self.view setMultipleTouchEnabled:YES];
     if(img != nil) {
         float scale = scaleValue;
