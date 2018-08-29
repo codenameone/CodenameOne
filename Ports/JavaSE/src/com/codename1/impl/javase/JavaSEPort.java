@@ -178,6 +178,14 @@ import org.w3c.dom.NodeList;
  */
 public class JavaSEPort extends CodenameOneImplementation {
 
+    private static int getDefaultInt(String systemProperty, String envVar, int defaultVal) {
+        try {
+            return Integer.getInteger(systemProperty, System.getenv(envVar) == null ? defaultVal : Integer.parseInt(System.getenv(envVar)));
+        } catch (Throwable t) {
+            return defaultVal;
+        }
+    }
+    
     public final static boolean IS_MAC;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
@@ -466,9 +474,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean touchDevice = true;
     private boolean rotateTouchKeysOnLandscape;
     private int keyboardType = Display.KEYBOARD_TYPE_UNKNOWN;
-    private static int medianFontSize = 15;
-    private static int smallFontSize = 11;
-    private static int largeFontSize = 19;
+    private static int medianFontSize = getDefaultInt("cn1.fontSizeMedium", "CN1_FONT_SIZE_MEDIUM", 15);
+    private static int smallFontSize = getDefaultInt("cn1.fontSizeSmall", "CN1_FONT_SIZE_SMALL", 11);
+    private static int largeFontSize = getDefaultInt("cn1.fontSizeLarge", "CN1_FONT_SIZE_LARGE", 19);
     static {
         retinaScale = calcRetinaScale();
         if (System.getProperty("cn1.retinaScale", null) != null) {
@@ -5935,6 +5943,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         throw new RuntimeException("The file wasn't found: " + fontName);
     }
 
+    private double fontScale=0;
+    
+    public double getFontScale() {
+        if (fontScale == 0) {
+            fontScale = Double.parseDouble(System.getProperty("cn1.fontScale", System.getenv("CN1_FONT_SCALE") != null ? System.getenv("CN1_FONT_SCALE") : "1.0"));
+        }
+        return fontScale;
+    }
+    
+    
+    public void setFontScale(double scale) {
+        fontScale = scale;
+    }
+    
+    
+    
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         java.awt.Font fnt;
@@ -5950,10 +5974,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
             style = style | java.awt.Font.ITALIC;
         }
-        java.awt.Font fff = fnt.deriveFont(style, size);
+        java.awt.Font fff = fnt.deriveFont(style, (float)(size * getFontScale()));
         if(Math.abs(size / 2 - fff.getSize())  < 3) {
             // retina display bug!
-            return fnt.deriveFont(style, size * 2);
+            return fnt.deriveFont(style, (float)(size * 2 * getFontScale()));
         }
         return fff;
     }
@@ -10178,6 +10202,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         return "file://home/";
     }
 
+    
+    
     public int convertToPixels(int dipCount, boolean horizontal) {
         if (pixelMilliRatio != null) {
             return (int) Math.round(dipCount * pixelMilliRatio.doubleValue());
