@@ -1364,29 +1364,16 @@ public class Dialog extends Form {
             refreshTheme();
         }
         Component contentPane = super.getContentPane();
-        Component title = dialogTitle;
-
-        // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
-        // preferred size logic of the dialog won't work with large title borders
-        int titleHeight = 0;
         if(dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = getTitle().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
-        }
-        if (title != null) {
-            titleHeight = title.getPreferredH() + title.getPreferredH();
-            Style tStyle = title.getStyle();
-            titleHeight += tStyle.getVerticalMargins();
-        }
+        } 
+        Style contentPaneStyle = contentPane.getStyle();
         
-        Style contentPaneStyle = getDialogStyle();
-        
-        int menuHeight = calcMenuHeight();
-
-        // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
-        int prefHeight = contentPane.getPreferredH() + contentPaneStyle.getVerticalMargins() + titleHeight + getStyle().getVerticalPadding() + menuHeight;
+
+        int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
         if(contentPaneStyle.getBorder() != null) {

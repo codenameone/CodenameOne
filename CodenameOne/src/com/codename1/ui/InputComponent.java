@@ -23,6 +23,7 @@
 
 package com.codename1.ui;
 
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
@@ -110,6 +111,36 @@ public abstract class InputComponent extends Container {
     Label getErrorMessage() {
         return errorMessage;
     }
+
+    private static int max(int... vals) {
+        int out = 0;
+        for (int val : vals) {
+            out = Math.max(val, out);
+        }
+        return out;
+    }
+    
+    @Override
+    protected Dimension calcPreferredSize() {
+        
+        if(getComponentCount() == 0) {
+            if(isOnTopMode()) {
+                lbl.setUIID("FloatingHint");
+                return new Dimension(
+                        max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(), 
+                        getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + errorMessage.getOuterPreferredH() + getStyle().getVerticalPadding()
+                );
+            } else {
+                return new Dimension(
+                        max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
+                        errorMessage.getOuterPreferredH() + max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
+                );
+            }
+        }
+        return super.calcPreferredSize();
+    }
+    
+    
     
     void constructUI() {
         if(getComponentCount() == 0) {
