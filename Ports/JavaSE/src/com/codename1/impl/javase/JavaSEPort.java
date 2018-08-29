@@ -227,7 +227,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 double scaleX = tx.getScaleX(); 
                 double scaleY = tx.getScaleY(); 
                 
-                if (Math.round(scaleX) == 2 && Math.round(scaleY) == 2) {
+                if (scaleX >= 2 && scaleY >= 2) {
                     isRetina = true;
                 }
             } else {
@@ -236,7 +236,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (field != null) {
                     field.setAccessible(true);
                     Object scale = field.get(graphicsDevice);
-                    if (scale instanceof Integer && ((Integer) scale).intValue() == 2) {
+                    if (scale instanceof Integer && ((Integer) scale).intValue() >= 2) {
                         isRetina = true;
                     }
                 }
@@ -245,6 +245,37 @@ public class JavaSEPort extends CodenameOneImplementation {
             //e.printStackTrace();
         }
         return isRetina;
+    }
+    
+    public static double calcRetinaScale() {
+        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+
+        try {
+            if (getJavaVersion() >= 9) {
+                // JDK9 Doesn't like the old hack for getting the scale via reflection.
+                // https://bugs.openjdk.java.net/browse/JDK-8172962
+                GraphicsConfiguration graphicsConfig = graphicsDevice 
+                        .getDefaultConfiguration(); 
+
+                AffineTransform tx = graphicsConfig.getDefaultTransform(); 
+                double scaleX = tx.getScaleX(); 
+                double scaleY = tx.getScaleY(); 
+                return Math.max(1.0, Math.min(scaleX, scaleY));
+            } else {
+
+                Field field = graphicsDevice.getClass().getDeclaredField("scale");
+                if (field != null) {
+                    field.setAccessible(true);
+                    Object scale = field.get(graphicsDevice);
+                    if (scale instanceof Integer && ((Integer) scale).intValue() >= 2) {
+                        return ((Integer)scale).doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            //e.printStackTrace();
+        }
+        return 1.0;
     }
     
     public static double getRetinaScale() {
@@ -439,7 +470,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int smallFontSize = 11;
     private static int largeFontSize = 19;
     static {
-        retinaScale = isRetina() ? 2.0 : 1.0;
+        retinaScale = calcRetinaScale();
+        if (System.getProperty("cn1.retinaScale", null) != null) {
+            try {
+                retinaScale = Double.parseDouble(System.getProperty("cn1.retinaScale"));
+            } catch (Throwable t){}
+        } else if (System.getenv("CN1_RETINA_SCALE") != null) {
+            try {
+                retinaScale = Double.parseDouble(System.getenv("CN1_RETINA_SCALE"));
+            } catch (Throwable t) {}
+        }
+        System.out.println("Retina Scale: "+retinaScale);
+    
         if (retinaScale > 1.5) {
             medianFontSize = (int)(medianFontSize * retinaScale);
             smallFontSize = (int)(smallFontSize * retinaScale);
