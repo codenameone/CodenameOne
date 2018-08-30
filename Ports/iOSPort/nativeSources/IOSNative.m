@@ -2398,12 +2398,19 @@ void com_codename1_impl_ios_IOSNative_browserClearHistory___long(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    if ([NSThread isMainThread]) {
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
         POOL_END();
-    });
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+            POOL_END();
+        });
+    }
 }
 
 void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -5556,14 +5563,22 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript){
-    __block JAVA_OBJECT out;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    if ([NSThread isMainThread]) {
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+        JAVA_OBJECT out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
         POOL_END();
-    });
-    return out;
+        return out;
+    } else {
+        __block JAVA_OBJECT out;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+            POOL_END();
+        });
+        return out;
+    }
 }
 
 JAVA_OBJECT java_util_TimeZone_getTimezoneId__(CN1_THREAD_STATE_SINGLE_ARG) {
