@@ -79,6 +79,7 @@ public class BrowserComponent extends Container {
     private boolean pinchToZoom = true;
     private boolean nativeScrolling = true;
     private boolean ready = false;
+    private boolean fireCallbacksOnEdt=true;
     
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
@@ -101,6 +102,25 @@ public class BrowserComponent extends Container {
         }
     };
 
+    /**
+     * Sets whether javascript callbacks should be run on the EDT.  Default is {@literal true}.
+     * @param edt True if callbacks should be run on EDT.  False if they should be run on the platform's main thread.
+     * @since 5.0
+     */
+    public void setFireCallbacksOnEdt(boolean edt) {
+        this.fireCallbacksOnEdt = edt;
+    }
+    
+    /**
+     * Checks if javascript callbacks are run on the EDT.
+     * @return True if javascript callbacks are run on the EDT.
+     * @since 5.0
+     * @see #setFireCallbacksOnEdt(boolean) 
+     */
+    public boolean isFireCallbacksOnEdt() {
+        return fireCallbacksOnEdt;
+    }
+    
     /**
      * Set the browser navigation callback which allows handling a case where 
      * a URL invocation can be delegated to Java code. This allows binding 
@@ -305,25 +325,36 @@ public class BrowserComponent extends Container {
             }
             if (callback != null) {
                 if (errorMessage != null) {
-                    Display.getInstance().callSerially(new Runnable() {
+                    if (fireCallbacksOnEdt) {
+                        Display.getInstance().callSerially(new Runnable() {
 
-                        public void run() {
-                            if (callback instanceof Callback) {
-                                ((Callback)callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
-                        
+                            public void run() {
+                                if (callback instanceof Callback) {
+                                    ((Callback)callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
+
+                                }
                             }
+
+                        });
+                    } else {
+                        if (callback instanceof Callback) {
+                            ((Callback)callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
+
                         }
-                        
-                    });
+                    }
                     
                 } else {
-                    Display.getInstance().callSerially(new Runnable() {
+                    if (fireCallbacksOnEdt) {
+                        Display.getInstance().callSerially(new Runnable() {
 
-                        public void run() {
-                            callback.onSucess(new JSRef(value, type));
-                        }
-                        
-                    });
+                            public void run() {
+                                callback.onSucess(new JSRef(value, type));
+                            }
+
+                        });
+                    } else {
+                         callback.onSucess(new JSRef(value, type));
+                    }
                     
                 }
             } else {
@@ -634,12 +665,27 @@ public class BrowserComponent extends Container {
 
     /**
      * Executes the given JavaScript and returns a result string from the underlying platform
-     * where applicable
+     * where applicable.
+     * <p><strong>Note</strong>: Some platforms use {@link Display#invokeAndBlock(java.lang.Runnable) } inside this method which is very costly. Try to avoid this synchronous method, and 
+     * prefer to use one of the asynchronous versions.  E.g. {@link #execute(java.lang.String, com.codename1.util.SuccessCallback) }</p>
      * @param javaScript the JavaScript code to execute
      * @return the string returned from the Javascript call
      */
     public String executeAndReturnString(String javaScript){
         return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+    }
+    
+    /**
+     * Executes the given javascript and returns the result string from the underlying platform.
+     * <p><strong>Note</strong>: Some platforms use {@link Display#invokeAndBlock(java.lang.Runnable) } inside this method which is very costly. Try to avoid this synchronous method, and 
+     * prefer to use one of the asynchronous versions.  E.g. {@link #execute(java.lang.String, com.codename1.util.SuccessCallback) }</p>
+     * @param javaScript The javascript to execute.
+     * @param params Parameters to inject into the javascript expression.  The expression should contain placeholders of the form {@literal ${0} }, {@literal ${1} }, etc... to be replaced.  See {@link #injectParameters(java.lang.String, java.lang.Object...) } for more information about injected parameters.
+     * @return The result as a string.
+     * @since 5.0
+     */
+    public String executeAndReturnString(String javaScript, Object[] params) {
+        return executeAndReturnString(injectParameters(javaScript, params));
     }
     
     /**

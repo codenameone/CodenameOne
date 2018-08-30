@@ -9875,12 +9875,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    private void browserExposeInJavaScriptImpl(final PeerComponent browserPeer, final Object o, final String name) {
+        ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+    }
     public void browserExposeInJavaScript(final PeerComponent browserPeer, final Object o, final String name) {
+        if (Platform.isFxApplicationThread()) {
+            browserExposeInJavaScriptImpl(browserPeer, o, name);
+            return;
+        }
         Platform.runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+                browserExposeInJavaScriptImpl(browserPeer, o, name);
             }
         });
     }
