@@ -2511,7 +2511,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
         }
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        [moviePlayerInstance prepareToPlay];
+        moviePlayerInstance.useApplicationAudioSession = NO;
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
 #else
@@ -2574,7 +2578,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_in
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
         moviePlayerInstance.useApplicationAudioSession = NO;
-        [moviePlayerInstance prepareToPlay];
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
 #else
@@ -2638,7 +2645,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
 //#ifndef CN1_USE_ARC
 //        [moviePlayerInstance retain];
 //#endif
-        [moviePlayerInstance prepareToPlay];
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
 #else
