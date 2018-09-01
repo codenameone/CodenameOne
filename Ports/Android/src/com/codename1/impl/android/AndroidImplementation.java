@@ -181,6 +181,10 @@ import java.text.ParseException;
 import java.util.*;
 import javax.net.ssl.HttpsURLConnection;
 import javax.xml.parsers.ParserConfigurationException;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONStringer;
 import org.xml.sax.SAXException;
 //import android.webkit.JavascriptInterface;
 
@@ -4309,6 +4313,171 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private int jsCallbackIndex=0;
 
+    private void execJSUnsafe(WebView web, String js) {
+        if (android.os.Build.VERSION.SDK_INT >= 19) {
+            web.evaluateJavascript(js, null);
+        } else {
+            web.loadUrl("javascript:(function(){"+js+"})()");
+        }
+    }
+
+    private void execJSSafe(final WebView web, final String js) {
+        if (useJSDispatchThread()) {
+            runOnJSDispatchThread(new Runnable() {
+                public void run() {
+                    web.post(new Runnable() {
+                        public void run() {
+                            execJSUnsafe(web, js);
+                        }
+                    });
+                }
+            });
+        } else {
+            web.post(new Runnable() {
+                public void run() {
+                    execJSUnsafe(web, js);
+                }
+            });
+        }
+    }
+
+    private void execJSUnsafe(final AndroidBrowserComponent bc, final String javaScript, final ValueCallback<String> resultCallback) {
+        if (Build.VERSION.SDK_INT >= 19) {
+            try {
+                bc.web.evaluateJavascript(javaScript, resultCallback);
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+                resultCallback.onReceiveValue(null);
+            }
+        } else {
+            jsCallbackIndex = (++jsCallbackIndex) % 1024;
+            int index = jsCallbackIndex;
+
+            // The jsCallback is a special java object exposed to javascript that we use
+            // to return values from javascript to java.
+            synchronized (bc.jsCallback){
+                // Initialize the return value to null
+                while (!bc.jsCallback.isIndexAvailable(index)) {
+                    index++;
+                }
+                jsCallbackIndex = index+1;
+            }
+            final int fIndex = index;
+            // We are placing the javascript inside eval() so we need to escape
+            // the input.
+            String escaped = StringUtil.replaceAll(javaScript, "\\", "\\\\");
+            escaped = StringUtil.replaceAll(escaped, "'", "\\'");
+
+            final String js = "javascript:(function(){"
+
+                    + "try{"
+                    +bc.jsCallback.jsInit()
+                    +bc.jsCallback.jsCleanup()
+                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
+                    + "=eval('"+escaped +"');} catch (e){console.log(e)};"
+                    + AndroidBrowserComponentCallback.JS_VAR_NAME+".addReturnValue(" + index+", ''+"
+
+                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
+                    + ");})()";
+
+            // Send the Javascript string via SetURL.
+            // NOTE!! This is sent asynchronously so we will need to wait for
+            // the result to come in.
+            bc.setURL(js, null);
+            if (resultCallback == null) {
+                return;
+            }
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    int maxTries = 500;
+                    int tryCounter = 0;
+
+                    // If we are not on the EDT, then it is safe to just loop and wait.
+                    while (!bc.jsCallback.isValueSet(fIndex) && tryCounter++ < maxTries) {
+                        synchronized(bc.jsCallback){
+                            Util.wait(bc.jsCallback, 20);
+                        }
+                    }
+
+                    if (bc.jsCallback.isValueSet(fIndex)) {
+                        String retval = bc.jsCallback.getReturnValue(fIndex);
+                        bc.jsCallback.remove(fIndex);
+                        resultCallback.onReceiveValue(retval != null ? JSONObject.quote(retval) : null);
+
+                    } else {
+                        com.codename1.io.Log.e(new RuntimeException("Failed to execute javascript "+js+" after maximum wait time."));
+                        resultCallback.onReceiveValue(null);
+                    }
+                }
+            });
+            t.start();
+
+        }
+    }
+
+    private void execJSSafe(final AndroidBrowserComponent bc, final String javaScript, final ValueCallback<String> resultCallback) {
+        if (useJSDispatchThread()) {
+            runOnJSDispatchThread(new Runnable() {
+                public void run() {
+                    bc.web.post(new Runnable() {
+                        public void run() {
+                            execJSUnsafe(bc, javaScript, resultCallback);
+                        }
+                    });
+                }
+            });
+        } else {
+            bc.web.post(new Runnable() {
+                public void run() {
+                    execJSUnsafe(bc, javaScript, resultCallback);
+                }
+            });
+        }
+    }
+
+
+
+    @Override
+    public void browserExecute(final PeerComponent browserPeer, final String javaScript) {
+        final AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
+        execJSSafe(bc.web, javaScript);
+    }
+
+    private com.codename1.util.EasyThread jsDispatchThread;
+    private com.codename1.util.EasyThread jsDispatchThread() {
+        if (jsDispatchThread == null) {
+            jsDispatchThread = com.codename1.util.EasyThread.start("JS Dispatch Thread");
+        }
+        return jsDispatchThread;
+    }
+
+    private boolean useJSDispatchThread() {
+
+        // Before version 24, we need a separate JS dispatch thread to prevent deadlocks
+        return true;//Build.VERSION.SDK_INT < 24;
+    }
+
+    public boolean isJSDispatchThread() {
+        if (useJSDispatchThread()) {
+            return jsDispatchThread().isThisIt();
+        } else {
+            return (Looper.getMainLooper().getThread() == Thread.currentThread());
+        }
+    }
+
+    public boolean runOnJSDispatchThread(Runnable r) {
+        if (isJSDispatchThread()) {
+            r.run();
+            return true;
+        }
+        if (useJSDispatchThread()) {
+            jsDispatchThread().run(r);
+        } else {
+            getActivity().runOnUiThread(r);
+        }
+        return false;
+    }
+    
     /**
      * Executes javascript and returns a string result where appropriate.
      * @param browserPeer
@@ -4318,79 +4487,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
         final AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
-        jsCallbackIndex = (++jsCallbackIndex) % 1024;
-        int index = jsCallbackIndex;
+        final String[] result = new String[1];
+        final boolean[] complete = new boolean[1];
 
-        // The jsCallback is a special java object exposed to javascript that we use
-        // to return values from javascript to java.
-        synchronized (bc.jsCallback){
-            // Initialize the return value to null
-            while (!bc.jsCallback.isIndexAvailable(index)) {
-                index++;
-            }
-            jsCallbackIndex = index+1;
-        }
-
-        // We are placing the javascript inside eval() so we need to escape
-        // the input.
-        String escaped = StringUtil.replaceAll(javaScript, "\\", "\\\\");
-        escaped = StringUtil.replaceAll(escaped, "'", "\\'");
-
-        final String js = "javascript:(function(){"
-
-                + "try{"
-                +bc.jsCallback.jsInit()
-                +bc.jsCallback.jsCleanup()
-                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
-                + "=eval('"+escaped +"');} catch (e){console.log(e)};"
-                + AndroidBrowserComponentCallback.JS_VAR_NAME+".addReturnValue(" + index+", ''+"
-
-                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
-                + ");})()";
-
-        // Send the Javascript string via SetURL.
-        // NOTE!! This is sent asynchronously so we will need to wait for
-        // the result to come in.
-        bc.setURL(js, null);
-        int maxTries = 500;
-        int tryCounter = 0;
-        if(Display.getInstance().isEdt()) {
-            // If we are on the EDT then we need to invokeAndBlock
-            // so that we wait for the javascript result, but we don't
-            // prevent the EDT from executing the rest of the pipeline.
-
-            while (!bc.jsCallback.isValueSet(index) && tryCounter++ < maxTries) {
-                Display.getInstance().invokeAndBlock(new Runnable() {
-                    public void run() {
-                        // Loop/wait until the callback value has been set.
-                        // The callback.setReturnValue() method, which will
-                        // be called from Javascript issues a notify() to
-                        // let us know it is done.
-
-                        synchronized (bc.jsCallback) {
-                            Util.wait(bc.jsCallback, 20);
-                        }
-
-                    }
-                });
-            }
-
-        } else {
-            // If we are not on the EDT, then it is safe to just loop and wait.
-            while (!bc.jsCallback.isValueSet(index) && tryCounter++ < maxTries) {
-                synchronized(bc.jsCallback){
-                    Util.wait(bc.jsCallback, 20);
+        execJSSafe(bc, javaScript, new ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String value) {
+                synchronized(result) {
+                    complete[0] = true;
+                    result[0] = value;
+                    result.notify();
                 }
             }
+        });
+        synchronized(result) {
+            if (!complete[0]) {
+                Util.wait(result, 10000);
+            }
         }
-        if (bc.jsCallback.isValueSet(index)) {
-            String retval = bc.jsCallback.getReturnValue(index);
-            bc.jsCallback.remove(index);
-            return retval;
-        } else {
-            com.codename1.io.Log.e(new RuntimeException("Failed to execute javascript "+js+" after maximum wait time."));
+        if (result[0] == null) {
             return null;
+        } else {
+            org.json.JSONTokener tok = new org.json.JSONTokener("{\"result\":"+result[0]+"}");
+            try {
+                JSONObject jso = new JSONObject(tok);
+                return jso.getString("result");
+            } catch (Throwable ex) {
+                com.codename1.io.Log.e(ex);
+                return null;
+            }
+
         }
+
+
     }
 
 
