@@ -4310,11 +4310,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidImplementation.AndroidBrowserComponent) browserPeer).exposeInJavaScript(o, name);
     }
 
+    private boolean useEvaluateJavascript() {
+        return android.os.Build.VERSION.SDK_INT >= 19;
+    }
+    
 
     private int jsCallbackIndex=0;
 
     private void execJSUnsafe(WebView web, String js) {
-        if (android.os.Build.VERSION.SDK_INT >= 19) {
+        if (useEvaluateJavascript()) {
             web.evaluateJavascript(js, null);
         } else {
             web.loadUrl("javascript:(function(){"+js+"})()");
@@ -4325,7 +4329,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (useJSDispatchThread()) {
             runOnJSDispatchThread(new Runnable() {
                 public void run() {
-                    web.post(new Runnable() {
+                    getActivity().runOnUiThread(new Runnable() {
                         public void run() {
                             execJSUnsafe(web, js);
                         }
@@ -4333,7 +4337,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         } else {
-            web.post(new Runnable() {
+            getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     execJSUnsafe(web, js);
                 }
@@ -4342,7 +4346,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private void execJSUnsafe(final AndroidBrowserComponent bc, final String javaScript, final ValueCallback<String> resultCallback) {
-        if (Build.VERSION.SDK_INT >= 19) {
+        if (useEvaluateJavascript()) {
             try {
                 bc.web.evaluateJavascript(javaScript, resultCallback);
             } catch (Throwable t) {
@@ -4419,7 +4423,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (useJSDispatchThread()) {
             runOnJSDispatchThread(new Runnable() {
                 public void run() {
-                    bc.web.post(new Runnable() {
+                    getActivity().runOnUiThread(new Runnable() {
                         public void run() {
                             execJSUnsafe(bc, javaScript, resultCallback);
                         }
@@ -4427,7 +4431,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         } else {
-            bc.web.post(new Runnable() {
+            getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     execJSUnsafe(bc, javaScript, resultCallback);
                 }
