@@ -410,8 +410,11 @@ public class PerformanceMonitor extends javax.swing.JFrame {
     
     private void componentHierarchyValueChanged(javax.swing.event.TreeSelectionEvent evt) {//GEN-FIRST:event_componentHierarchyValueChanged
         if(evt.getPath() != null) {
-            Component c = (Component)evt.getPath().getLastPathComponent();
-            refreshComponentStatsTable(c);
+            Object o = evt.getPath().getLastPathComponent();
+            if(o instanceof Component) {
+                Component c = (Component)o;
+                refreshComponentStatsTable(c);
+            }
         }
     }//GEN-LAST:event_componentHierarchyValueChanged
 

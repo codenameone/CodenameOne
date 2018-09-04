@@ -2761,6 +2761,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new ComponentTreeInspector();
                 }
             });
+            JMenuItem appArg = new JMenuItem("Send App Argument");
+            appArg.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    Executor.stopApp();
+                    JPanel pnl = new JPanel();
+                    JTextField tf = new JTextField(20);
+                    pnl.add(new JLabel("Argument to The App"));
+                    pnl.add(tf);
+                    int val = JOptionPane.showConfirmDialog(canvas, pnl, "Please Enter The Argument", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                    if (val != JOptionPane.OK_OPTION) {
+                        Executor.startApp();
+                        return;
+                    }
+                    String arg = tf.getText();
+                    Display.getInstance().setProperty("AppArg", arg);
+                    Executor.startApp();
+                }
+            });
+            simulatorMenu.add(appArg);
             
             JMenuItem locactionSim = new JMenuItem("Location Simulation");
             locactionSim.addActionListener(new ActionListener() {
