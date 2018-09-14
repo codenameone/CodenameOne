@@ -3176,6 +3176,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean fullScreen;
         private boolean embedNativeControls=true;
         private List<Runnable> completionHandlers;
+        private boolean prepareToPlay;
         
         
         
@@ -3331,6 +3332,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void prepare() {
+            prepareToPlay = true;
+            if(moviePlayerPeer != 0) {
+                if(isVideo) {
+                    nativeInstance.prepareVideoComponent(moviePlayerPeer);
+                }
+            }
         }
         
         @Override
@@ -3433,6 +3440,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         return new Label("Error loading video " + ex);
                     }
                 }
+            }
+            if (prepareToPlay && isVideo && !isPlaying()) {
+                prepare();
             }
             return component;
         }

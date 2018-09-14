@@ -2836,6 +2836,24 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
         POOL_END();
     });
 }
+void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
+        [m prepareToPlay];
+        POOL_END();
+    });
+}
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
