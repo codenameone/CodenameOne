@@ -4688,6 +4688,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return super.getCookiesForURL(url);
     }
 
+    public class WebAppInterface {
+        BrowserComponent bc;
+        /** Instantiate the interface and set the context */
+        WebAppInterface(BrowserComponent bc) {
+            this.bc = bc;
+        }
+
+        @JavascriptInterface   // must be added for API 17 or higher
+        public boolean shouldNavigate(String url) {
+            return bc.fireBrowserNavigationCallbacks(url);
+        }
+    }
+    
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
@@ -4716,6 +4729,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             hideProgress = Display.getInstance().getProperty("WebLoadingHidden", "false").equals("true");
 
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
+            web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
 
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {

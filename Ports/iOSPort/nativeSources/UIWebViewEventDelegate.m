@@ -28,6 +28,9 @@
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
 
+#ifdef CN1_USE_JAVASCRIPTCORE
+#import <JavaScriptCore/JSContext.h>
+#endif
 extern int connections;
 
 @implementation UIWebViewEventDelegate
@@ -59,8 +62,9 @@ extern int connections;
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
     JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
     if(result) {
-       com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
-    }
+        
+        com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
+    } 
     return result;
 }
 
@@ -69,7 +73,17 @@ extern int connections;
      if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
      }
-     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.request.URL.absoluteString.UTF8String));
+#ifdef CN1_USE_JAVASCRIPTCORE
+    JSContext *context =  [webView valueForKeyPath:@"documentView.webView.mainFrame.javaScriptContext"];
+    
+    context[@"cn1ShouldNavigate"] = ^(NSString *url) {
+        JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG url.UTF8String));
+        
+        return (BOOL)result;
+    };
+    [context evaluateScript:@"window.cn1application=window.cn1application||{};window.cn1application.shouldNavigate=cn1ShouldNavigate;"];
+#endif
+    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.request.URL.absoluteString.UTF8String));
 }
 
 @end
