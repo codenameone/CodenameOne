@@ -115,6 +115,12 @@ static GLuint getOGLProgram(){
     GLfloat actualImageHeight = [img getImage].size.height;
     GLfloat actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
     GLfloat actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    if (actualImageWidthP2 > GL_MAX_TEXTURE_SIZE || actualImageHeightP2 > GL_MAX_TEXTURE_SIZE) {
+        actualImageWidth = width;
+        actualImageHeight = height;
+        actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+        actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    }
     GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;

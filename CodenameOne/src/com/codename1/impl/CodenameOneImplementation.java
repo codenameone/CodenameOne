@@ -778,9 +778,9 @@ public abstract class CodenameOneImplementation {
     public abstract Object createImage(int[] rgb, int width, int height);
 
     /**
-     * Creates a native image from a file in the system jar
+     * Creates a native image from a file in the system jar or file system storage.
      * 
-     * @param path within the jar
+     * @param path If path begins with {@literal file:} this will load a file from FileSystemStorage.  Otherwise it will load from jar.
      * @return native system image
      * @throws java.io.IOException if thrown by loading
      */

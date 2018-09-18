@@ -1048,7 +1048,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object createImage(String path) throws IOException {
         long ns;
         if(path.startsWith("file:")) {
-            ns = IOSImplementation.nativeInstance.createNSData(path);
+            ns = IOSImplementation.nativeInstance.createNSData(unfile(path));
         } else {
             ns = getResourceNSData(path);
         }
