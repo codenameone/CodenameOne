@@ -3252,8 +3252,11 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             {
                 [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
             }
-            POOL_END();
+            
+        } else {
+            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
         }
+        POOL_END();
     });
 #endif
 }

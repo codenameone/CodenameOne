@@ -2901,6 +2901,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!nativeInstance.checkCameraUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription build hint");
         }
+        gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
@@ -3027,6 +3028,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
         }
+        gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
