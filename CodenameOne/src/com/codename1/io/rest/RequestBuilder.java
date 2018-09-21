@@ -559,6 +559,10 @@ public class RequestBuilder {
         }
     }
     
+    public String getRequestUrl() {
+        return this.url;
+    }
+    
     class Connection extends GZConnectionRequest {
         private boolean parseJSON;
         private boolean errorCode;
