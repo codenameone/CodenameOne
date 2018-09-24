@@ -1069,7 +1069,7 @@ public class BrowserComponent extends Container {
          * @param value The string value of the javascript variable.
          * @param type The string type of the variable as returned by the typeof operator.
          */
-        private JSRef(String value, String type) {
+        public JSRef(String value, String type) {
             this.value = value;
             this.type = type;
             
