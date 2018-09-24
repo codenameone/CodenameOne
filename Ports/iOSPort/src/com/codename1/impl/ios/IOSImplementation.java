@@ -6111,6 +6111,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * https://github.com/codenameone/CodenameOne/issues/2551
+     * 
+     * @param path The path to fix.  This should not include the file:// prefix
+     * @return The fixed path.  Does not include file:// prefix
+     */
+    private String fixAppRoot(String path) {
+        String base = "/var/mobile/Containers/Data/Application/";
+        String containerRoot = getContainerRoot();
+        if (path.startsWith(base) && !path.startsWith(containerRoot)) {
+            String theRest = path.substring(base.length(), path.length());
+            int slashPos = theRest.indexOf("/");
+            if (slashPos <= 0) {
+                return path;
+            }
+            
+            return containerRoot + theRest.substring(slashPos+1, theRest.length());
+        }
+        return path;
+    }
+    
+    // Gets the container root -- does not include file:// prefix
+    private String getContainerRoot() {
+        String appRoot = nativeInstance.getDocumentsDir();
+        if (appRoot.endsWith("/")) {
+            appRoot = appRoot.substring(0, appRoot.length()-1);
+        }
+        return appRoot.substring(0, appRoot.lastIndexOf("/")+1);
+        
+    }
+    
     @Override
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         url = unfile(url);
@@ -7126,15 +7157,15 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private String unfile(String file) {
         if (file.startsWith("file:///")) {
-            return file.substring(7);
+            return fixAppRoot(file.substring(7));
         }
         if (file.startsWith("file://")) {
-            return file.substring(6);
+            return fixAppRoot(file.substring(6));
         }
         if (file.startsWith("file:/")) {
-            return file.substring(5);
+            return fixAppRoot(file.substring(5));
         }
-        return file;
+        return fixAppRoot(file);
     }
     
     /**
