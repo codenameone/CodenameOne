@@ -590,6 +590,7 @@ public abstract class CodenameOneImplementation {
                 }
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                wrapper.resetAffine();
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
