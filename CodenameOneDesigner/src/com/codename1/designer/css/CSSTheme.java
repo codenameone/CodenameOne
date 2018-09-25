@@ -2373,7 +2373,6 @@ public class CSSTheme {
             
             
             
-            
             String prefix = "cn1-border";
             String[] corners = new String[]{"top-left", "top-right", "bottom-left", "bottom-right"};
             String[] xy = new String[]{"x", "y"};
@@ -2387,9 +2386,25 @@ public class CSSTheme {
             }
             
             ScaledUnit val = null;
+            boolean topLeft=false;
+            boolean topRight = false;
+            boolean bottomLeft = false;
+            boolean bottomRight = false;
             for (String cornerStyle : radiusAtts) {
                 ScaledUnit u = (ScaledUnit)styles.get(cornerStyle);
                 if (u != null && u.getPixelValue() != 0) {
+                    if (cornerStyle.indexOf("top-left") != -1) {
+                        topLeft = true;
+                    }
+                    if (cornerStyle.indexOf("top-right") != -1) {
+                        topRight = true;
+                    }
+                    if (cornerStyle.indexOf("bottom-left") != -1) {
+                        bottomLeft = true;
+                    }
+                    if (cornerStyle.indexOf("bottom-right") != -1) {
+                        bottomRight = true;
+                    }
                     if (val != null && val.getPixelValue() != u.getPixelValue()) {
                         // We have more than one non-zero corner radius
                         //System.out.println("Failed corner test");
@@ -2398,6 +2413,13 @@ public class CSSTheme {
                     }
                     val = u;
                 }
+            }
+            
+            
+            if (topLeft != topRight || bottomLeft != bottomRight) {
+                // Resource files don't currently support topLeftMode, topRightMode, bottomLeftMode, and bottomRightMode
+                // so we need to fall back to image borders if the left and right have different radii
+                return false;
             }
             
             // All corners are the same, so we can proceed to the next step.
@@ -4437,10 +4459,12 @@ public class CSSTheme {
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             //System.out.println("TopLeftRadius is : "+topLeftRadius+" isZero? "+isZero(topLeftRadius));
             //System.out.println("BottomRight Radius is : "+bottomRightRadius+" isZero? "+isZero(bottomRightRadius));
-            out.bottomLeftMode(!isZero(bottomLeftRadius));
-            out.bottomRightMode(!isZero(bottomRightRadius));
-            out.topLeftMode(!isZero(topLeftRadius));
-            out.topRightMode(!isZero(topRightRadius));
+            if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
+                out.bottomOnlyMode(true);
+            } else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
+                out.topOnlyMode(true);
+            }
+            
             
             
             if (borderWidth != null) {
