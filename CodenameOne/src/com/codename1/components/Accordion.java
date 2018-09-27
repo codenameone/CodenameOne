@@ -171,6 +171,25 @@ public class Accordion extends Container {
     }
 
     /**
+     * Sets the header UIID for the given accordion uiid
+     * 
+     * @param body the component within the accordion
+     * @param uiid the uiid for the header
+     */
+    public void setHeaderUIID(Component body, String uiid) {
+        AccordionContent ac = (AccordionContent) body.getParent();
+        if(ac == null) {
+            body.putClientProperty("cn1$setHeaderUIID", uiid);
+        } else {
+            if(ac.top != null) {
+                ac.top.setUIID(uiid);
+            } else {
+                ac.topUiid = uiid;
+            }
+        }
+    }
+    
+    /**
      * Returns the body component of the currently expanded accordion element or null if none is expanded
      * @return a component
      */
@@ -301,6 +320,8 @@ public class Accordion extends Container {
         private final Button arrow = new Button();
         private Component body;
         private Component header;
+        private Container top;
+        private String topUiid = uiidHeader;
             
         public AccordionContent(Component header, final Component body) {
             setUIID(uiidBackGroundItem);
@@ -309,9 +330,13 @@ public class Accordion extends Container {
             this.header = header;
             header.setSelectedStyle(header.getUnselectedStyle());
             header.setPressedStyle(header.getUnselectedStyle());
-            Container top = new Container(new BorderLayout());
+            String t = (String)body.getClientProperty("cn1$setHeaderUIID");
+            if(t != null) {
+                topUiid = t;
+            }
+
+            top = new Container(new BorderLayout(), topUiid);
             top.add(BorderLayout.CENTER, header);
-            top.setUIID(uiidHeader);
             arrow.setUIID(uiidOpenCloseIcon);
             arrow.setIcon(closeIcon);
             arrow.addActionListener(new ActionListener() {
