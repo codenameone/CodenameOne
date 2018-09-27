@@ -590,6 +590,7 @@ public abstract class CodenameOneImplementation {
                 }
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                wrapper.resetAffine();
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
@@ -778,9 +779,9 @@ public abstract class CodenameOneImplementation {
     public abstract Object createImage(int[] rgb, int width, int height);
 
     /**
-     * Creates a native image from a file in the system jar
+     * Creates a native image from a file in the system jar or file system storage.
      * 
-     * @param path within the jar
+     * @param path If path begins with {@literal file:} this will load a file from FileSystemStorage.  Otherwise it will load from jar.
      * @return native system image
      * @throws java.io.IOException if thrown by loading
      */
@@ -4165,6 +4166,9 @@ public abstract class CodenameOneImplementation {
      * @param browserPeer browser instance
      * @param o the object to invoke, notice all public fields and methods would be exposed to JavaScript
      * @param name the name to expose within JavaScript
+     * @deprecated This method was never well-supported across platforms other than Android - and it will no longer work
+     * even in Android for SDK &gt;= 17, unless {@literal o}'s class has the {@literal @JavascriptInterface} annotation which
+     * would only be available if implemented inside a Native Interface.  Don't use this.
      */
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
     }

@@ -2505,6 +2505,23 @@ void com_codename1_impl_ios_IOSNative_blockCopyPaste___boolean(CN1_THREAD_STATE_
 
 }
 
+BOOL cn1UseApplicationAudioSessionForMedia(CN1_THREAD_STATE_SINGLE_ARG) {
+    enteringNativeAllocations();
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"ios.useApplicationAudioSession");
+    
+    JAVA_OBJECT defaultVal = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"true");
+    
+    JAVA_OBJECT res = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG d, key, defaultVal);
+    finishedNativeAllocations();
+    
+    NSString *nsres = toNSString(CN1_THREAD_GET_STATE_PASS_ARG res);
+    if ([nsres isEqualToString:@"false"]) {
+        return NO;
+    }
+    return YES;
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -2518,7 +2535,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
         }
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = NO;
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         // prepareToPlay will cause other av sessions to be interrupted at the time that the video
         // component is created - which is disruptive.  Better to just let it prepare to play
         // at the time that the video is played - even if there is a delay.
@@ -2584,7 +2601,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_in
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = NO;
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         // prepareToPlay will cause other av sessions to be interrupted at the time that the video
         // component is created - which is disruptive.  Better to just let it prepare to play
         // at the time that the video is played - even if there is a delay.
@@ -2648,7 +2665,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = NO;
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 //#ifndef CN1_USE_ARC
 //        [moviePlayerInstance retain];
 //#endif
@@ -2833,6 +2850,24 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
         }
 
         [m pause];
+        POOL_END();
+    });
+}
+void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
+        [m prepareToPlay];
         POOL_END();
     });
 }
@@ -3234,8 +3269,11 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             {
                 [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
             }
-            POOL_END();
+            
+        } else {
+            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
         }
+        POOL_END();
     });
 #endif
 }

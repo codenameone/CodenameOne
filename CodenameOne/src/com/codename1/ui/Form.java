@@ -1370,6 +1370,9 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
+        if (menuBar != null && menuBar.contains(x, y)) {
+            return menuBar;
+        }
         return getActualPane();
     }
     

@@ -2331,6 +2331,35 @@ public class CSSTheme {
             return styleTop == null || "none".equals(styleTop) || "line".equals(styleTop) || "solid".equals(styleTop);
         }
         
+        public boolean canBeAchievedWithUnderlineBorder(Map<String,LexicalUnit> styles) {
+            if (this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
+                return false;
+            }
+            ScaledUnit topThickness = (ScaledUnit)styles.get("border-top-width");
+            ScaledUnit leftThickness = (ScaledUnit)styles.get("border-left-width");
+            ScaledUnit rightThickness = (ScaledUnit)styles.get("border-right-width");
+            ScaledUnit bottomThickness = (ScaledUnit)styles.get("border-bottom-width");
+            ScaledUnit[] sideUnits = new ScaledUnit[]{topThickness, leftThickness, rightThickness};
+            String[] sideStyles = new String[]{styleTop, styleLeft, styleRight};
+            
+            for (int i=0; i<3; i++) {
+                ScaledUnit u = sideUnits[i];
+                String s = sideStyles[i];
+                if (u != null && u.getPixelValue() != 0 && !(s == null || "none".equals(s))) {
+                    return false;
+                }
+            }
+            
+            if (bottomThickness != null && bottomThickness.getPixelValue() != 0 && ("line".equals(styleBottom) || "solid".equals(styleBottom))) {
+                LexicalUnit color = styles.get("border-bottom-color");
+                if (color != null && getColorAlphaInt(color) != 255) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+        
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
             //System.out.println("Checking if we can achieve with background image generation "+styles);
             if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
@@ -2357,9 +2386,25 @@ public class CSSTheme {
             }
             
             ScaledUnit val = null;
+            boolean topLeft=false;
+            boolean topRight = false;
+            boolean bottomLeft = false;
+            boolean bottomRight = false;
             for (String cornerStyle : radiusAtts) {
                 ScaledUnit u = (ScaledUnit)styles.get(cornerStyle);
                 if (u != null && u.getPixelValue() != 0) {
+                    if (cornerStyle.indexOf("top-left") != -1) {
+                        topLeft = true;
+                    }
+                    if (cornerStyle.indexOf("top-right") != -1) {
+                        topRight = true;
+                    }
+                    if (cornerStyle.indexOf("bottom-left") != -1) {
+                        bottomLeft = true;
+                    }
+                    if (cornerStyle.indexOf("bottom-right") != -1) {
+                        bottomRight = true;
+                    }
                     if (val != null && val.getPixelValue() != u.getPixelValue()) {
                         // We have more than one non-zero corner radius
                         //System.out.println("Failed corner test");
@@ -2368,6 +2413,13 @@ public class CSSTheme {
                     }
                     val = u;
                 }
+            }
+            
+            
+            if (topLeft != topRight || bottomLeft != bottomRight) {
+                // Resource files don't currently support topLeftMode, topRightMode, bottomLeftMode, and bottomRightMode
+                // so we need to fall back to image borders if the left and right have different radii
+                return false;
             }
             
             // All corners are the same, so we can proceed to the next step.
@@ -3384,7 +3436,7 @@ public class CSSTheme {
             ScaledUnit background  = (ScaledUnit) style.get("background");
             boolean isCN1Gradient = background != null && background.isCN1Gradient();
             Border b = createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
                 // If we can do this with a roundrect border
                 // then we don't need background image
                 return false;
@@ -3464,7 +3516,7 @@ public class CSSTheme {
             }
             
             Border b = this.createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
                 // If we can do it with a RoundRectBorder, then we don't need to generate an imageborder
                 return false;
             }
@@ -4336,6 +4388,54 @@ public class CSSTheme {
             return null;
         }
         
+        private com.codename1.ui.plaf.Border createUnderlineBorder(Map<String,LexicalUnit> styles) {
+            LexicalUnit borderColor = styles.get("border-bottom-color");
+            ScaledUnit borderWidth = (ScaledUnit)styles.get("border-bottom-width");
+            float borderWidthF=-1;
+            int borderWidthI=-1;
+            if (borderWidth != null) {
+                switch (borderWidth.getLexicalUnitType()) {
+                    case LexicalUnit.SAC_MILLIMETER:
+                        borderWidthF = (float)borderWidth.getNumericValue();
+                        break;
+                    case LexicalUnit.SAC_INTEGER:
+                    case LexicalUnit.SAC_REAL:
+                    case LexicalUnit.SAC_POINT:
+                        borderWidthF = (float)borderWidth.getNumericValue() * 25.4f / 72f;
+                        break;
+                    case LexicalUnit.SAC_PIXEL:
+                        borderWidthI = (int)borderWidth.getNumericValue();
+                        break;
+                    case LexicalUnit.SAC_CENTIMETER:
+                        borderWidthF = (float)borderWidth.getNumericValue() * 10;
+                        break;
+                    case LexicalUnit.SAC_INCH:
+                        borderWidthF = (float)borderWidth.getNumericValue() * 25.4f;
+                        break;
+                    default:
+                        borderWidthI = 1;
+
+                }
+                
+            } else {
+                borderWidthI = 1;
+            }
+            if (borderColor != null) {
+                int borderColorI = getColorInt(borderColor);
+                if (borderWidthI > 0) {
+                    return com.codename1.ui.plaf.Border.createUnderlineBorder(borderWidthI, borderColorI);
+                } else {
+                    return com.codename1.ui.plaf.Border.createUnderlineBorder(borderWidthF, borderColorI);
+                }
+            } else {
+                if (borderWidthI > 0) {
+                    return com.codename1.ui.plaf.Border.createUnderlineBorder(borderWidthI);
+                } else {
+                    return com.codename1.ui.plaf.Border.createUnderlineBorder(borderWidthF);
+                }
+            }
+        }
+        
         private com.codename1.ui.plaf.Border createRoundRectBorder(Map<String,LexicalUnit> styles) {
             // We create a round border
             //LexicalUnit backgroundColor = styles.get("background-color");
@@ -4354,15 +4454,15 @@ public class CSSTheme {
             }
             
             ScaledUnit topLeftRadius = getBorderRadius(styles, "top-left");
+            ScaledUnit topRightRadius = getBorderRadius(styles, "top-right");
+            ScaledUnit bottomLeftRadius = getBorderRadius(styles, "bottom-left");
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             //System.out.println("TopLeftRadius is : "+topLeftRadius+" isZero? "+isZero(topLeftRadius));
             //System.out.println("BottomRight Radius is : "+bottomRightRadius+" isZero? "+isZero(bottomRightRadius));
-            if (!isZero(topLeftRadius) && isZero(bottomRightRadius)) {
-                //System.out.println("Setting top only mode");
-                out.topOnlyMode(true);
-            } else if (isZero(topLeftRadius) && !isZero(bottomRightRadius)) {
-                
+            if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
                 out.bottomOnlyMode(true);
+            } else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
+                out.topOnlyMode(true);
             }
             
             
@@ -4499,6 +4599,9 @@ public class CSSTheme {
             }
             if (b.hasBorderRadius()) {
                 return createRoundRectBorder(styles);
+            }
+            if (b.canBeAchievedWithUnderlineBorder(styles)) {
+                return createUnderlineBorder(styles);
             }
             if (b.hasUnequalBorders()) {
                 //System.out.println("We have unequal borders");

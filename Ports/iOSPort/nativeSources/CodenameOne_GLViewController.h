@@ -52,6 +52,8 @@
 #else
 #import <GoogleSignIn/GoogleSignIn.h>
 #endif
+//#define GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
+//#define CN1_USE_JAVASCRIPTCORE
 //#define ENABLE_GALLERY_MULTISELECT
 //#define INCLUDE_CONTACTS_USAGE
 //#define INCLUDE_CALENDARS_USAGE

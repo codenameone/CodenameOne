@@ -1186,10 +1186,15 @@ public class InPlaceEditView extends FrameLayout{
         }
         if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
             //in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
-            TextArea theNext = nextTextArea;
+            final TextArea theNext = nextTextArea;
             nextTextArea = null;
             mLastEditText = mEditText;
-            edit(sInstance.impl, theNext, theNext.getConstraint());
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    edit(sInstance.impl, theNext, theNext.getConstraint());
+                }
+            });
             return null;
         
         } else {

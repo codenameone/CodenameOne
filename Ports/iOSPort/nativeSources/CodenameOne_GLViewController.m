@@ -3100,14 +3100,19 @@ void cn1_addSelectedImagePath(NSString* path) {
     }
     cn1_waitingForImagesCount = [assets count];
     __block int idx=0;
+    PHImageRequestOptions *options = [PHImageRequestOptions new];
+    options.networkAccessAllowed = YES;
     for (PHAsset *asset in assets) {
         if (asset.mediaType == PHAssetMediaTypeImage) {
             [[PHImageManager defaultManager] requestImageForAsset:asset 
                               targetSize:PHImageManagerMaximumSize
                              contentMode:PHImageContentModeDefault
-                                 options:nil 
+                                 options:options
                            resultHandler:^(UIImage *originalImage, NSDictionary *info) {
                 UIImage* image = originalImage;
+                               if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
+                                   return;
+                               }
 
 #ifndef LOW_MEM_CAMERA
                 if (image.imageOrientation != UIImageOrientationUp) {
@@ -3129,6 +3134,7 @@ void cn1_addSelectedImagePath(NSString* path) {
         } else {
             PHVideoRequestOptions *options = [PHVideoRequestOptions new];
             options.version = PHVideoRequestOptionsVersionOriginal;
+            options.networkAccessAllowed = YES;
 
             [[PHImageManager defaultManager] requestAVAssetForVideo:asset
                                                             options:options

@@ -4688,6 +4688,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return super.getCookiesForURL(url);
     }
 
+    public class WebAppInterface {
+        BrowserComponent bc;
+        /** Instantiate the interface and set the context */
+        WebAppInterface(BrowserComponent bc) {
+            this.bc = bc;
+        }
+
+        @JavascriptInterface   // must be added for API 17 or higher
+        public boolean shouldNavigate(String url) {
+            return bc.fireBrowserNavigationCallbacks(url);
+        }
+    }
+    
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
@@ -4716,6 +4729,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             hideProgress = Display.getInstance().getProperty("WebLoadingHidden", "false").equals("true");
 
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
+            web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
 
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
@@ -5961,54 +5975,43 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String fixAttachmentPath(String attachment) {
-        if (attachment.contains(getAppHomePath())) {
-            FileSystemStorage fs = FileSystemStorage.getInstance();
-            final char sep = fs.getFileSystemSeparator();
-            String fileName = attachment.substring(attachment.lastIndexOf(sep) + 1);
-            String[] roots = FileSystemStorage.getInstance().getRoots();
-            // iOS doesn't have an SD card
-            String root = roots[0];
-            for (int i = 0; i < roots.length; i++) {
-                //media_rw is a protected system lib
-                if (FileSystemStorage.getInstance().getRootType(roots[i]) == FileSystemStorage.ROOT_TYPE_SDCARD && !roots[i].contains("media_rw")) {
-                    root = roots[i];
-                    break;
-                }
-            }
-            //might happen if only the media_rw is of type ROOT_TYPE_SDCARD
-            if(root.contains("media_rw")){
-                //try again without checking the root type
-                for (int i = 0; i < roots.length; i++) {
-                    //media_rw is a protected system lib
-                    if (!roots[i].contains("media_rw")) {
-                        root = roots[i];
-                        break;
-                    }
-                }
-            }
+        com.codename1.io.File cn1File = new com.codename1.io.File(attachment);
+        File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), "Attachment");
 
-            String fileUri = root + sep + "tmp" + sep + fileName;
-            FileSystemStorage.getInstance().mkdir(root + sep + "tmp");
-            try {
-                InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
-                OutputStream os = FileSystemStorage.getInstance().openOutputStream(fileUri);
-                byte [] buf = new byte[1024];
-                int len;
-                while((len = is.read(buf)) > -1){
-                    os.write(buf, 0, len);
-                }
-                is.close();
-                os.close();
-            } catch (IOException ex) {
-                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+        // Create the storage directory if it does not exist
+        if (!mediaStorageDir.exists()) {
+            if (!mediaStorageDir.mkdirs()) {
+                Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "failed to create directory");
+                return null;
             }
+        }
 
-            attachment = fileUri;
+        // Create a media file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        File newFile = new File(mediaStorageDir.getPath() + File.separator
+                + "IMG_" + timeStamp + "_" + cn1File.getName());
+
+
+        //Uri fileUri = Uri.fromFile(newFile);
+        newFile.getParentFile().mkdirs();
+        //Uri imageUri = Uri.fromFile(newFile);
+        Uri fileUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
+
+        try {
+            InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
+            OutputStream os = new FileOutputStream(newFile);
+            byte [] buf = new byte[1024];
+            int len;
+            while((len = is.read(buf)) > -1){
+                os.write(buf, 0, len);
+            }
+            is.close();
+            os.close();
+        } catch (IOException ex) {
+            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (attachment.indexOf(":") < 0) {
-            attachment = "file://" + attachment;
-        }
-        return attachment;
+
+        return fileUri.toString();
     }
 
     /**
