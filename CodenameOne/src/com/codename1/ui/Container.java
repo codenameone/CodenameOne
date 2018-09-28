@@ -1630,7 +1630,6 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above) {
-
         if (layout.isOverlapSupported() && components.contains(cmp)) {
             int indexOfComponent = components.indexOf(cmp);
             
@@ -1644,7 +1643,6 @@ public class Container extends Component implements Iterable<Component>{
                 endIndex = indexOfComponent;
             }
 
-            int size = components.size();
             for (int i = startIndex; i < endIndex; i++) {
                 Component cmp2 = (Component) components.get(i);
                 if(Rectangle.intersects(x, y, w, h,

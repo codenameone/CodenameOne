@@ -2359,9 +2359,8 @@ public class Component implements Animation, StyleListener {
         int transY = par.getAbsoluteY() + par.getScrollY();
 
         g.translate(transX, transY);
-
-        ((Container) par).paintIntersecting(g, c, x, y, w, h, false);
-
+        
+        
         if (par.isBorderPainted()) {
             Border b = par.getBorder();
             if (b.isBackgroundPainter()) {
@@ -2386,6 +2385,7 @@ public class Component implements Animation, StyleListener {
             p.paint(g, rect);
         }
         par.paintBackground(g);
+        ((Container) par).paintIntersecting(g, c, x, y, w, h, false);
         g.translate(-transX, -transY);
     }
 
@@ -4978,7 +4978,6 @@ public class Component implements Animation, StyleListener {
             out.add(this);
         }
         if (this instanceof Container) {
-            System.out.println("Container: "+this+", scrollY="+getScrollY());
             for (Component child : (Container)this) {
                 child.findNegativeScrolls(out);
             }

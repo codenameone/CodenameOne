@@ -577,6 +577,14 @@ public class BorderLayout extends Layout {
     public Component getWest() {
         return getComponentImpl(portraitWest, WEST);
     }
+    
+    /**
+     * Returns overlay component.
+     * @return The overlay component.
+     */
+    public Component getOverlay() {
+        return overlay;
+    }
 
     /**
      * {@inheritDoc}
