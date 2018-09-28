@@ -8841,6 +8841,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     uri = temp.toURI().toURL().toExternalForm();
                 }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                player.setOnPaused(new Runnable() {
+                    public void run() {
+                        playing = false;
+                    }
+                });
+                player.setOnPlaying(new Runnable() {
+                    public void run() {
+                        playing = true;
+                    }
+                });
+                
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
@@ -8899,6 +8910,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    playing = false;
                     fireCompletionHandlers();
                 }
             };
@@ -8906,6 +8918,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
+                player.setOnPaused(new Runnable() {
+                    public void run() {
+                        playing = false;
+                    }
+                });
+                player.setOnPlaying(new Runnable() {
+                    public void run() {
+                        playing = true;
+                    }
+                });
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
