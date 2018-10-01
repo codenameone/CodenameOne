@@ -37,6 +37,8 @@ import java.util.StringTokenizer;
  * @author Shai Almog
  */
 public class Simulator {
+    
+    private static final String DEFAULT_SKIN="/iPhoneX.skin";
 
     /**
      * Accepts the classname to launch
@@ -51,14 +53,14 @@ public class Simulator {
         System.setProperty("NSHighResolutionCapable", "true");
         String skin = System.getProperty("dskin");
         if (skin == null) {
-            System.setProperty("dskin", "/iphone3gs.skin");
+            System.setProperty("dskin", DEFAULT_SKIN);
         }
         for (int i = 0; i < argv.length; i++) {
             String argv1 = argv[i];
             if(argv1.equals("resetSkins")){
                 System.setProperty("resetSkins", "true");
-                System.setProperty("skin", "/iphone3gs.skin");
-                System.setProperty("dskin", "/iphone3gs.skin");            
+                System.setProperty("skin", DEFAULT_SKIN);
+                System.setProperty("dskin", DEFAULT_SKIN);            
             }
         }
         StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);

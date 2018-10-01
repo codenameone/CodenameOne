@@ -57,6 +57,33 @@ public abstract class Calendar{
      * See Also:Constant Field Values
      */
     public static final int AUGUST=7;
+    
+    /**
+     * Field number for {@code get} and {@code set} indicating the
+     * week number within the current year. The first week of the year, as
+     * defined by {@code getFirstDayOfWeek()} and
+     * {@code getMinimalDaysInFirstWeek()}, has value 1. Subclasses
+     * define the value of {@code WEEK_OF_YEAR} for days before the first
+     * week of the year.
+     *
+     * @see #getFirstDayOfWeek
+     * @see #getMinimalDaysInFirstWeek
+     */
+    public static final int WEEK_OF_YEAR = 3;
+    
+    /**
+     * Field number for {@code get} and {@code set} indicating the
+     * week number within the current month. The first week of the month, as
+     * defined by {@code getFirstDayOfWeek()} and
+     * {@code getMinimalDaysInFirstWeek()}, has value 1. Subclasses
+     * define the value of {@code WEEK_OF_MONTH} for days before the
+     * first week of the month.
+     *
+     * @see #getFirstDayOfWeek
+     * @see #getMinimalDaysInFirstWeek
+     */
+    public static final int WEEK_OF_MONTH = 4;
+    
 
     /**
      * Field number for get and set indicating the day of the month. This is a synonym for DAY_OF_MONTH.
@@ -69,12 +96,45 @@ public abstract class Calendar{
      * See Also:DATE, Constant Field Values
      */
     public static final int DAY_OF_MONTH=5;
+    
+    /**
+     * Field number for {@code get} and {@code set} indicating the
+     * day number within the current year. The first day of the year has value
+     * 1.
+     */
+    static final int DAY_OF_YEAR = 6;
 
     /**
      * Field number for get and set indicating the day of the week.
      * See Also:Constant Field Values
      */
     public static final int DAY_OF_WEEK=7;
+    
+    /**
+     * Field number for {@code get} and {@code set} indicating the
+     * ordinal number of the day of the week within the current month. Together
+     * with the {@code DAY_OF_WEEK} field, this uniquely specifies a day
+     * within a month. Unlike {@code WEEK_OF_MONTH} and
+     * {@code WEEK_OF_YEAR}, this field's value does <em>not</em>
+     * depend on {@code getFirstDayOfWeek()} or
+     * {@code getMinimalDaysInFirstWeek()}. {@code DAY_OF_MONTH 1}
+     * through {@code 7} always correspond to <code>DAY_OF_WEEK_IN_MONTH
+     * 1</code>;
+     * {@code 8} through {@code 15} correspond to
+     * {@code DAY_OF_WEEK_IN_MONTH 2}, and so on.
+     * {@code DAY_OF_WEEK_IN_MONTH 0} indicates the week before
+     * {@code DAY_OF_WEEK_IN_MONTH 1}. Negative values count back from
+     * the end of the month, so the last Sunday of a month is specified as
+     * {@code DAY_OF_WEEK = SUNDAY, DAY_OF_WEEK_IN_MONTH = -1}. Because
+     * negative values count backward they will usually be aligned differently
+     * within the month than positive values. For example, if a month has 31
+     * days, {@code DAY_OF_WEEK_IN_MONTH -1} will overlap
+     * {@code DAY_OF_WEEK_IN_MONTH 5} and the end of {@code 4}.
+     *
+     * @see #DAY_OF_WEEK
+     * @see #WEEK_OF_MONTH
+     */
+    public static final int DAY_OF_WEEK_IN_MONTH = 8;
 
     /**
      * Value of the MONTH field indicating the twelfth month of the year.

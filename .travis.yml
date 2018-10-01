@@ -1,5 +1,35 @@
 matrix:
   include:
+#    - language: java
+#      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+#      jdk: openjdk11
+#      before_script:
+#        - "export DISPLAY=:99.0"
+#        - "sh -e /etc/init.d/xvfb start"
+#    - language: java
+#      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+#      jdk: oraclejdk11
+#      before_script:
+#        - "export DISPLAY=:99.0"
+#        - "sh -e /etc/init.d/xvfb start"
+    - language: java
+      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+      jdk: openjdk10
+      before_script:
+        - "export DISPLAY=:99.0"
+        - "sh -e /etc/init.d/xvfb start"
+    - language: java
+      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+      jdk: oraclejdk10
+      before_script:
+        - "export DISPLAY=:99.0"
+        - "sh -e /etc/init.d/xvfb start"
+    - language: java
+      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+      jdk: oraclejdk9
+      before_script:
+        - "export DISPLAY=:99.0"
+        - "sh -e /etc/init.d/xvfb start"
     - language: java
       env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
       jdk: oraclejdk8
@@ -24,73 +54,73 @@ matrix:
 #           - addon-google_apis-google-15
 #           - sys-img-armeabi-v7a-google_apis-15
 # ##</CN1:android-15>##
-##<CN1:android-16>##
-    - language: android
-      if: type IN (push, cron)
-      jdk: oraclejdk8
-      env: CN1_PLATFORM=android API=16 CN1_RUNTESTS_ANDROID_EMULATOR=1
-      addons:
-        apt:
-          packages:
-            - ant
-            - maven
-      android:
-        components:
-          - platform-tools
-          - android-16
-          - sys-img-armeabi-v7a-android-16
-##</CN1:android-16>##
-##<CN1:android-17>##
-    - language: android
-      if: type IN (push, cron)
-      jdk: oraclejdk8
-      env: CN1_PLATFORM=android API=17 CN1_RUNTESTS_ANDROID_EMULATOR=1
-      addons:
-        apt:
-          packages:
-            - ant
-            - maven
-      android:
-        components:
-          - platform-tools
-          - android-17
-          - addon-google_apis-google-17
-          - sys-img-armeabi-v7a-google_apis-17
-##</CN1:android-17>##
-##<CN1:android-18>##
-    - language: android
-      if: type IN (push, cron)
-      jdk: oraclejdk8
-      env: CN1_PLATFORM=android API=18 CN1_RUNTESTS_ANDROID_EMULATOR=1
-      addons:
-        apt:
-          packages:
-            - ant
-            - maven
-      android:
-        components:
-          - platform-tools
-          - android-18
-          - addon-google_apis-google-18
-          - sys-img-armeabi-v7a-google_apis-18
-##</CN1:android-18>##
-##<CN1:android-19>##
-    - language: android
-      if: type IN (push, cron)
-      jdk: oraclejdk8
-      env: CN1_PLATFORM=android API=19 CN1_RUNTESTS_ANDROID_EMULATOR=1
-      addons:
-        apt:
-          packages:
-            - ant
-            - maven
-      android:
-        components:
-          - platform-tools
-          - android-19
-          - sys-img-armeabi-v7a-android-19
-          - sys-img-armeabi-v7a-addon-google_apis-google-19
-##</CN1:android-19>##
+# ##<CN1:android-16>##
+#     - language: android
+#       if: type IN (push, cron)
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=16 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-16
+#           - sys-img-armeabi-v7a-android-16
+# ##</CN1:android-16>##
+# ##<CN1:android-17>##
+#     - language: android
+#       if: type IN (push, cron)
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=17 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-17
+#           - addon-google_apis-google-17
+#           - sys-img-armeabi-v7a-google_apis-17
+# ##</CN1:android-17>##
+# ##<CN1:android-18>##
+#     - language: android
+#       if: type IN (push, cron)
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=18 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-18
+#           - addon-google_apis-google-18
+#           - sys-img-armeabi-v7a-google_apis-18
+# ##</CN1:android-18>##
+# ##<CN1:android-19>##
+#     - language: android
+#       if: type IN (push, cron)
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=19 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-19
+#           - sys-img-armeabi-v7a-android-19
+#           - sys-img-armeabi-v7a-addon-google_apis-google-19
+# ##</CN1:android-19>##
 ##<CN1:android-21>##
     - language: android
       if: type IN (push, cron)
@@ -108,22 +138,22 @@ matrix:
           - sys-img-armeabi-v7a-android-21
           - sys-img-armeabi-v7a-addon-google_apis-google-21
 ##</CN1:android-21>##
-##<CN1:android-22>##
-    - language: android
-      if: type IN (push, cron)
-      jdk: oraclejdk8
-      env: CN1_PLATFORM=android API=22 CN1_RUNTESTS_ANDROID_EMULATOR=1
-      addons:
-        apt:
-          packages:
-            - ant
-            - maven
-      android:
-        components:
-          - platform-tools
-          - android-22
-          - sys-img-armeabi-v7a-android-22
-##</CN1:android-22>##
+# ##<CN1:android-22>##
+#     - language: android
+#       if: type IN (push, cron)
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=22 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-22
+#           - sys-img-armeabi-v7a-android-22
+# ##</CN1:android-22>##
 # Need to wait for iOS build server update before  iOS automated tests
 # will work, so we comment them out for now.
 # TODO: Uncomment when build server is updated.

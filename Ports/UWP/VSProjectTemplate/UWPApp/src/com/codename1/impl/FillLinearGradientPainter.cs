@@ -3,7 +3,7 @@ namespace com.codename1.impl
 {
     class FillLinearGradientPainter : AsyncOp
     {
-        private ui.geom.Rectangle clip;
+        private ui.geom.Shape clip;
         private int startColor;
         private int endColor;
         private int x;
@@ -12,7 +12,7 @@ namespace com.codename1.impl
         private int height;
         private bool horizontal;
 
-        public FillLinearGradientPainter(ui.geom.Rectangle clip, int startColor, int endColor, int x, int y, int width, int height, bool horizontal)
+        public FillLinearGradientPainter(ui.geom.Shape clip, int startColor, int endColor, int x, int y, int width, int height, bool horizontal)
             : base(clip)
         {
             this.clip = clip;

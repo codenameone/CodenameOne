@@ -917,7 +917,7 @@ public class LayeredLayout extends Layout {
                 Component bottomRef = constraint.bottom().getReferenceComponent();
                 currConstraint = constraint;
                 iter = 0;
-                while (topRef != null) {
+                while (bottomRef != null) {
                     if (iter++ >= maxIterations) break;
                     vInsets += Math.max(0, bottomRef.getOuterPreferredH() * currConstraint.bottom().getReferencePosition());
                     currConstraint = getOrCreateConstraint(bottomRef);

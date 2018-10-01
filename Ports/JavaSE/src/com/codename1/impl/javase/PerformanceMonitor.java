@@ -410,8 +410,11 @@ public class PerformanceMonitor extends javax.swing.JFrame {
     
     private void componentHierarchyValueChanged(javax.swing.event.TreeSelectionEvent evt) {//GEN-FIRST:event_componentHierarchyValueChanged
         if(evt.getPath() != null) {
-            Component c = (Component)evt.getPath().getLastPathComponent();
-            refreshComponentStatsTable(c);
+            Object o = evt.getPath().getLastPathComponent();
+            if(o instanceof Component) {
+                Component c = (Component)o;
+                refreshComponentStatsTable(c);
+            }
         }
     }//GEN-LAST:event_componentHierarchyValueChanged
 
@@ -542,6 +545,18 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         if(trackDrawing && trackedDrawing != null) {
             trackedDrawing.addRow(new Object[] {
                 "fillRect(" + x + ", " + y + ", " + w + ", " + h + ")",
+                "",
+                "",
+                getStackTrace(new Throwable()),
+                null
+            });
+        }
+    }
+    
+    void clearRect(int x, int y, int width, int height) {
+        if(trackDrawing && trackedDrawing != null) {
+            trackedDrawing.addRow(new Object[] {
+                "clearRect(" + x + ", " + y + ", " + width + ", " + height + ")",
                 "",
                 "",
                 getStackTrace(new Throwable()),
@@ -717,6 +732,8 @@ public class PerformanceMonitor extends javax.swing.JFrame {
             });
         }
     }
+
+    
     
     static class Stats {
         private String name;

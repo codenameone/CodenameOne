@@ -2359,9 +2359,8 @@ public class Component implements Animation, StyleListener {
         int transY = par.getAbsoluteY() + par.getScrollY();
 
         g.translate(transX, transY);
-
-        ((Container) par).paintIntersecting(g, c, x, y, w, h, false);
-
+        
+        
         if (par.isBorderPainted()) {
             Border b = par.getBorder();
             if (b.isBackgroundPainter()) {
@@ -2386,6 +2385,7 @@ public class Component implements Animation, StyleListener {
             p.paint(g, rect);
         }
         par.paintBackground(g);
+        ((Container) par).paintIntersecting(g, c, x, y, w, h, false);
         g.translate(-transX, -transY);
     }
 
@@ -4964,6 +4964,27 @@ public class Component implements Animation, StyleListener {
             Component.setDisableSmoothScrolling(false);
         }
     }
+    
+    
+    /**
+     * Finds all children (and self) that have negative scroll positions.
+     * 
+     * <p>This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476</p>
+     * @param out A set to add found components to.
+     * @return The set of found components (reference to the same set that is passed as an arg).
+     */
+    java.util.Set<Component> findNegativeScrolls(java.util.Set<Component> out) {
+        if (scrollableYFlag() && getScrollY() < 0) {
+            out.add(this);
+        }
+        if (this instanceof Container) {
+            for (Component child : (Container)this) {
+                child.findNegativeScrolls(out);
+            }
+        }
+        return out;
+    }
+    
 
     /**
      * Overriden to return a useful value for debugging purposes
@@ -5135,6 +5156,10 @@ public class Component implements Animation, StyleListener {
         return getScrollX();
     }
 
+    boolean isTensileMotionInProgress() {
+        return draggedMotionY != null && !draggedMotionY.isFinished();
+    }
+    
     /**
      * {@inheritDoc}
      */

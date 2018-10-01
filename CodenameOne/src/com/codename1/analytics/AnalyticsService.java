@@ -46,7 +46,7 @@ import java.io.InputStream;
 public class AnalyticsService {
     private static AnalyticsService instance;
 
-    private static boolean appsMode = false;
+    private static boolean appsMode = true;
     
     /**
      * Indicates whether analytics server failures should brodcast an error event

@@ -5,10 +5,10 @@ namespace com.codename1.impl
 {
     class SetTransformOp : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private com.codename1.ui.Transform transform;
 
-        public SetTransformOp(Rectangle clip, com.codename1.ui.Transform transform) : base(clip)
+        public SetTransformOp(Shape clip, com.codename1.ui.Transform transform) : base(null)
         {
             this.clip = clip;
             this.transform = transform.copy();
@@ -18,5 +18,7 @@ namespace com.codename1.impl
             underlying.setTransform(transform);
 
         }
+
+        
     }
 }

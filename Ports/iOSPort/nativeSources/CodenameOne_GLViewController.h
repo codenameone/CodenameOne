@@ -52,7 +52,9 @@
 #else
 #import <GoogleSignIn/GoogleSignIn.h>
 #endif
-
+//#define GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
+//#define CN1_USE_JAVASCRIPTCORE
+//#define ENABLE_GALLERY_MULTISELECT
 //#define INCLUDE_CONTACTS_USAGE
 //#define INCLUDE_CALENDARS_USAGE
 //#define INCLUDE_CAMERA_USAGE
@@ -77,6 +79,12 @@
 #else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
+#endif
+#endif
+
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+#import "QBImagePickerController.h"
 #endif
 #endif
 
@@ -156,6 +164,11 @@
 #endif
 #ifdef INCLUDE_FACEBOOK_CONNECT
         ,FBSDKAppInviteDialogDelegate
+#endif
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+        ,QBImagePickerControllerDelegate
+#endif
 #endif
 > {
 @private

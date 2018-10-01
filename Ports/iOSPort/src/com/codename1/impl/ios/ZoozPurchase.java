@@ -134,7 +134,7 @@ class ZoozPurchase extends Purchase implements Runnable {
 
    
     public boolean isSubscriptionSupported() {
-        return false;
+        return true;
     }
 
     public boolean isUnsubscribeSupported() {

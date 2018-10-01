@@ -66,7 +66,7 @@ public class CodenameOneActivity extends Activity {
     private boolean nativeMenu = false;
     private IntentResultListener intentResultListener;
     private IntentResultListener defaultResultListener;
-    private boolean waitingForResult;
+    private boolean waitingForResult, waitingForPermissionResult;
     private boolean background;
     private Vector intentResult = new Vector();
     boolean requestForPermission = false;
@@ -700,6 +700,14 @@ public class CodenameOneActivity extends Activity {
 
     public void setRequestForPermission(boolean requestForPermission) {
         this.requestForPermission = requestForPermission;
+    }
+
+    public void setWaitingForPermissionResult(boolean waitingForPermissionResult) {
+        this.waitingForPermissionResult = waitingForPermissionResult;
+    }
+
+    public boolean isWaitingForPermissionResult() {
+        return waitingForPermissionResult;
     }
 
     public boolean isRequestForPermission() {

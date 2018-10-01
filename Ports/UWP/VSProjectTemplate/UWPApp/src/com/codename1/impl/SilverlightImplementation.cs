@@ -65,6 +65,8 @@ namespace com.codename1.impl
 
     public class SilverlightImplementation : CodenameOneImplementation
     {
+
+        public static bool RENDER_WEBVIEWS_IN_FRONT = false;
         private LocationManager locationManager;
         private static object PAINT_LOCK = new object();
         public static SilverlightImplementation instance;
@@ -514,7 +516,7 @@ namespace com.codename1.impl
               cl.ManipulationMode = ManipulationModes.All;
 
               cl.PointerPressed += new PointerEventHandler(LayoutRoot_PointerPressed);
-              screen.IsHitTestVisible = false;
+              screen.IsHitTestVisible = RENDER_WEBVIEWS_IN_FRONT;
               cl.IsHitTestVisible = true;
               cl.Tapped += new TappedEventHandler(LayoutRoot_Tapped);
               cl.PointerWheelChanged += new PointerEventHandler(LayoutRoot_PointerWheelChanged);
@@ -535,6 +537,7 @@ namespace com.codename1.impl
 
         private void LayoutRoot_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
+            if (RENDER_WEBVIEWS_IN_FRONT) return;
             point = e.GetCurrentPoint(screen).Position;
 
 
@@ -558,6 +561,11 @@ namespace com.codename1.impl
 
         private void LayoutRoot_Tapped(object sender, TappedRoutedEventArgs e)
         {
+
+            if (RENDER_WEBVIEWS_IN_FRONT)
+            {
+                return;
+            }
             point = e.GetPosition(screen);//.Position;
 
 
@@ -1100,6 +1108,7 @@ namespace com.codename1.impl
 
         private void LayoutRoot_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
+
             var pointerId = e.Pointer;
             point = e.GetCurrentPoint(cl).Position;
             
@@ -1109,17 +1118,21 @@ namespace com.codename1.impl
                 
             } else
             {
-                screen.IsHitTestVisible = false;
-                foreach (object child in cl.Children)
+                screen.IsHitTestVisible = RENDER_WEBVIEWS_IN_FRONT;
+                if (!RENDER_WEBVIEWS_IN_FRONT)
                 {
-                    if (child is WebView)
+                    foreach (object child in cl.Children)
                     {
-                        WebView wv = (WebView)child;
-                        wv.Focus(FocusState.Pointer);
-                        //wv.InvokeScriptAsync("document.focus", new string[] { });
-                        routePointerEventToWebview(wv, e, "mousemove");
+                        if (child is WebView)
+                        {
+                            WebView wv = (WebView)child;
+                            wv.Focus(FocusState.Pointer);
+                            //wv.InvokeScriptAsync("document.focus", new string[] { });
+                            routePointerEventToWebview(wv, e, "mousemove");
+                        }
                     }
                 }
+                
 
             }
             var BB = e.GetIntermediatePoints(cl);
@@ -1175,17 +1188,22 @@ namespace com.codename1.impl
             }
             else
             {
-                screen.IsHitTestVisible = false;
-                foreach (object child in cl.Children)
+                screen.IsHitTestVisible = RENDER_WEBVIEWS_IN_FRONT;
+                if (!RENDER_WEBVIEWS_IN_FRONT)
                 {
-                    if (child is WebView)
+                    foreach (object child in cl.Children)
                     {
-                        WebView wv = (WebView)child;
-                        wv.Focus(FocusState.Pointer);
-                        //wv.InvokeScriptAsync("document.focus", new string[] { });
-                        routePointerEventToWebview(wv, e, "mousedown");
+                        if (child is WebView)
+                        {
+                            WebView wv = (WebView)child;
+
+                            wv.Focus(FocusState.Pointer);
+                            //wv.InvokeScriptAsync("document.focus", new string[] { });
+                            routePointerEventToWebview(wv, e, "mousedown");
+                        }
                     }
                 }
+                
 
             }
             
@@ -1209,17 +1227,21 @@ namespace com.codename1.impl
             }
             else
             {
-                screen.IsHitTestVisible = false;
-                foreach(object child in cl.Children)
+                screen.IsHitTestVisible = RENDER_WEBVIEWS_IN_FRONT;
+                if (!RENDER_WEBVIEWS_IN_FRONT)
                 {
-                    if (child is WebView)
+                    foreach (object child in cl.Children)
                     {
-                        WebView wv = (WebView)child;
-                        wv.Focus(FocusState.Pointer);
-                        //wv.InvokeScriptAsync("document.focus", new string[] { });
-                        routePointerEventToWebview(wv, e, "mouseup");
+                        if (child is WebView)
+                        {
+                            WebView wv = (WebView)child;
+                            wv.Focus(FocusState.Pointer);
+                            //wv.InvokeScriptAsync("document.focus", new string[] { });
+                            routePointerEventToWebview(wv, e, "mouseup");
+                        }
                     }
                 }
+                
 
             }
             
@@ -1548,7 +1570,7 @@ namespace com.codename1.impl
                 {
                     bool renderInFront = bc.isShouldRenderInFront();
                     
-                    if (renderInFront && Rectangle.intersects(bc.getAbsoluteX(), bc.getAbsoluteY(), bc.getWidth(), bc.getHeight(),
+                    if (!RENDER_WEBVIEWS_IN_FRONT && renderInFront && Rectangle.intersects(bc.getAbsoluteX(), bc.getAbsoluteY(), bc.getWidth(), bc.getHeight(),
                         absX, absY, w, h))
                     {
                         //java.lang.System.@out.println("Should render in front NO");
@@ -2278,6 +2300,37 @@ namespace com.codename1.impl
             }
         }
 
+        public async void toSendFile(IReadOnlyList<StorageFile> files)
+        {
+            string[] paths = new string[files.Count];
+            int idx = 0;
+            foreach (var file in files)
+            {
+                try
+                {
+                    fileName = file.Name;
+#if WINDOWS_PHONE_APP
+              
+                ActionEvent ac = new ActionEvent("cameraroll:/" + fileName);
+                fireCapture(ac);
+#else
+                    string tmpPath = addTempFile(file);
+                    paths[idx++] = tmpPath;
+                    
+#endif
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            ActionEvent ac = new ActionEvent(paths);
+            fireCapture(ac);
+
+
+        }
+
         public async void toSendFile(StorageFile file)
         {
             try
@@ -2305,23 +2358,53 @@ namespace com.codename1.impl
         }
 
 
+        public override bool isGalleryTypeSupported(int type)
+        {
+            if (base.isGalleryTypeSupported(type))
+            {
+                return true;
+            }
+            switch (type)
+            {
+                case Display.GALLERY_ALL_MULTI:
+                case Display.GALLERY_VIDEO_MULTI:
+                case Display.GALLERY_IMAGE_MULTI:
+                case -9999:
+                    return true;
+            }
+            return false;
+        }
+
         public override void openGallery(ActionListener response, int type)
         {
+            if (!isGalleryTypeSupported(type))
+            {
+                throw new java.lang.IllegalArgumentException("Gallery type not supported on this platform: " + type);
+            }
             exitLock = true;
             pendingCaptureCallback = response;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 FileOpenPicker openPicker = new FileOpenPicker();
+                bool multiple = false;
+                switch (type)
+                {
+                    case Display.GALLERY_ALL_MULTI:
+                    case Display.GALLERY_IMAGE_MULTI:
+                    case Display.GALLERY_VIDEO_MULTI:
+                        multiple = true;
+                        break;
+                }
                 openPicker.ViewMode = PickerViewMode.Thumbnail;
                 openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-                if (type == Display.GALLERY_IMAGE)
+                if (type == Display.GALLERY_IMAGE || type == Display.GALLERY_IMAGE_MULTI)
                 {
                     openPicker.ViewMode = PickerViewMode.Thumbnail;
                     openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
                     openPicker.FileTypeFilter.Add(".jpg");
                     openPicker.FileTypeFilter.Add(".jpeg");
                     openPicker.FileTypeFilter.Add(".png");
-                } else if (type == Display.GALLERY_VIDEO)
+                } else if (type == Display.GALLERY_VIDEO || type == Display.GALLERY_VIDEO_MULTI) 
                 {
                     openPicker.FileTypeFilter.Add(".mp4");
                     openPicker.FileTypeFilter.Add(".avi");
@@ -2348,11 +2431,29 @@ namespace com.codename1.impl
                 openPicker.PickSingleFileAndContinue();
                 view.Activated += view_Activated;
 #else
-                StorageFile file = await openPicker.PickSingleFileAsync();
-                if (file != null)
+                if (multiple)
                 {
-                    toSendFile(file);
+                    IReadOnlyList<StorageFile> files = await openPicker.PickMultipleFilesAsync();
+                    if (files != null)
+                    {
+                        toSendFile(files);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
+                    }
+
+                } else
+                {
+                    StorageFile file = await openPicker.PickSingleFileAsync();
+                    if (file != null)
+                    {
+                        toSendFile(file);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
+                    }
                 }
+                
 #endif
             }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
             //base.openGallery(response, type);
@@ -2460,11 +2561,16 @@ namespace com.codename1.impl
 
             public bool isShouldRenderInFront()
             {
+                if (RENDER_WEBVIEWS_IN_FRONT) return true;
                 return shouldRenderInFront;
             }
 
             public void setShouldRenderInFront(bool b)
             {
+                if (RENDER_WEBVIEWS_IN_FRONT)
+                {
+                    return;
+                }
                 this.shouldRenderInFront = b;
             }
 
@@ -2478,7 +2584,7 @@ namespace com.codename1.impl
                 if (shouldRenderInFront != isRenderedInFront)
                 {
                     isRenderedInFront = shouldRenderInFront;
-                    int zIndex = isRenderedInFront ? 1 : -1;
+                    int zIndex = isRenderedInFront || RENDER_WEBVIEWS_IN_FRONT ? 1 : -1;
                     setZIndex(zIndex);
                     dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                     {
@@ -2532,7 +2638,7 @@ namespace com.codename1.impl
             void webview_DOMContentLoaded(WebView sender, WebViewDOMContentLoadedEventArgs e)
             {
                 ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
-                bc.fireWebEvent("onLoadResource", ev);
+                bc.fireWebEvent("onLoad", ev);
 
             }
 
@@ -2547,12 +2653,13 @@ namespace com.codename1.impl
 
             void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
             {
-                ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
-                sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerdown', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerPressed='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
-                sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerup', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerReleased='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
-                //sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointermove', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerMoved='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
-
-                bc.fireWebEvent("onLoad", ev);
+                //ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
+                if (!RENDER_WEBVIEWS_IN_FRONT) {
+                    sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerdown', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerPressed='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                    sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerup', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerReleased='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                    sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointermove', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerMoved='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                }
+                //bc.fireWebEvent("onLoad", ev);
             }
 
             void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
@@ -2666,6 +2773,11 @@ namespace com.codename1.impl
             WebView webView = null; ;
             //url = "https://maps.google.com";
             //url = "https://www.google.com";
+            if (url.StartsWith("file:///Local:"))
+            {
+                url = url.Replace("file:///Local:", "ms-appdata:///local/");
+            }
+            //url = "ms-appdata:///local/cn1html/cn1-htmltk-harness/index.html";
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)browserPeer).element;
@@ -2882,10 +2994,10 @@ namespace com.codename1.impl
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
                     webView = (WebView)((SilverlightPeer)n1).element;
-                    st = await webView.InvokeScriptAsync(n2, new string[] { "document.title.toString()" });
+                    st = await webView.InvokeScriptAsync("eval", new string[] { n2});
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
-                are.WaitOne();
+               are.WaitOne();
             }
             return st;
         }
@@ -3120,24 +3232,30 @@ namespace com.codename1.impl
 
         public override int getClipX(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipX();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getX();
         }
 
         public override int getClipY(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipY();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getY();
         }
 
         public override int getClipWidth(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipW();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getWidth();
         }
 
         public override int getClipHeight(object graphics)
         {
-            return ((NativeGraphics)graphics).getClipH();
+            return ((NativeGraphics)graphics).getClipProjection().getBounds().getHeight();
         }
-        
+
+        public override void setClip(object graphics, Shape shape)
+        {
+            java.lang.System.@out.println("Setting clip shape");
+            base.setClip(graphics, shape);
+        }
+
         public override void setClip(object graphics, int clipX, int clipY, int clipW, int clipH)
         {
             Rectangle clip = new Rectangle(clipX, clipY, clipW, clipH);
@@ -4313,7 +4431,11 @@ namespace com.codename1.impl
         {
             StorageFolder store = getStore(directory);
             string f = nativePathStore(directory);
-            store.CreateFolderAsync(f).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+            try
+            {
+                store.CreateFolderAsync(f).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+            catch (Exception ex) { }
         }
 
         public override void deleteFile(string file1) //or Folder
@@ -4662,7 +4784,7 @@ namespace com.codename1.impl
             
                 
         }
-        private CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
+        public CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
         {
             CanvasPathBuilder canvasPath = new CanvasPathBuilder(screen);
             

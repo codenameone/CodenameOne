@@ -1207,7 +1207,7 @@ public class Container extends Component implements Iterable<Component>{
         cmp.setParent(null);
         if (parentForm != null) {
             if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) {
-                parentForm.setFocused(null);
+                parentForm.setFocusedInternal(null);
             }
             Component dragged = parentForm.getDraggedComponent();
             if(dragged == cmp){
@@ -1269,7 +1269,8 @@ public class Container extends Component implements Iterable<Component>{
     /**
      * remove all Components from container, notice that removed component might still have
      * a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
-     * such an issue.
+     * such an issue. Notice that this method doesn't recurse and only removes from
+     * the current container.
      */
    public void removeAll() {
         Form parentForm = getComponentForm();
@@ -1629,7 +1630,6 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above) {
-
         if (layout.isOverlapSupported() && components.contains(cmp)) {
             int indexOfComponent = components.indexOf(cmp);
             
@@ -1643,7 +1643,6 @@ public class Container extends Component implements Iterable<Component>{
                 endIndex = indexOfComponent;
             }
 
-            int size = components.size();
             for (int i = startIndex; i < endIndex; i++) {
                 Component cmp2 = (Component) components.get(i);
                 if(Rectangle.intersects(x, y, w, h,

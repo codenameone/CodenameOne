@@ -38,7 +38,7 @@ import java.util.ArrayList;
  * 
  * @author Shai Almog
  */
-public class DefaultTableModel implements TableModel {
+public class DefaultTableModel extends AbstractTableModel {
     ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
     private EventDispatcher dispatcher = new EventDispatcher();

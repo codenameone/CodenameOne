@@ -80,6 +80,26 @@ public class FloatingActionButton extends Button {
         fabDefaultSize = aFabDefaultSize;
     }
 
+    /**
+     * The FloatingActionButton tries to size/pad itself automatically but
+     * this means that manual padding is ignored. Setting this to false
+     * disables that behavior
+     * @return the autoSizing
+     */
+    public static boolean isAutoSizing() {
+        return autoSizing;
+    }
+
+    /**
+     * The FloatingActionButton tries to size/pad itself automatically but
+     * this means that manual padding is ignored. Setting this to false
+     * disables that behavior
+     * @param aAutoSizing the autoSizing to set
+     */
+    public static void setAutoSizing(boolean aAutoSizing) {
+        autoSizing = aAutoSizing;
+    }
+
     private List<FloatingActionButton> subMenu;
 
     private String text;
@@ -87,6 +107,13 @@ public class FloatingActionButton extends Button {
     private Dialog current;
     private boolean rectangle;
     private boolean isBadge;
+
+    /**
+     * The FloatingActionButton tries to size/pad itself automatically but
+     * this means that manual padding is ignored. Setting this to false 
+     * disables that behavior
+     */
+    private static boolean autoSizing = true;
     
     /**
      * The default icon size for the fab
@@ -238,7 +265,7 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected Dimension calcPreferredSize() {
-        if(getIcon() != null) {
+        if(autoSizing && getIcon() != null) {
             return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
         } 
         return super.calcPreferredSize();

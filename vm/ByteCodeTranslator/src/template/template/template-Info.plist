@@ -8,17 +8,30 @@
 	<false/>
 	<key>CFBundleIconFiles</key>
 	<array>
-		<string>Icon.png</string>
-		<string>Icon@2x.png</string>
-		<string>Icon-72.png</string>
-		<string>Icon-Small-50.png</string>
-		<string>Icon-Small.png</string>
-		<string>Icon-Small@2x.png</string>
-		<string>Icon7.png</string>
-		<string>Icon7@2x.png</string>
-		<string>Icon-76.png</string>
-		<string>Icon-152.png</string>
-		<string>Icon-167.png</string>
+            <string>iPhoneNotification@2x.png</string>
+            <string>iPhoneNotification@3x.png</string>
+            <string>iPhoneSpotlight.png</string>
+            <string>iPhoneSpotlight@2x.png</string>
+            <string>iPhoneSpotlight@3x.png</string>
+            <string>iPhone7Spotlight@2x.png</string>
+            <string>iPhone7Spotlight@3x.png</string>
+            <string>iPhoneApp.png</string>
+            <string>iPhoneApp@2x.png</string>
+            <string>iPhone7App@2x.png</string>
+            <string>iPhone7App@3x.png</string>
+            <string>iPadNotifications.png</string>
+            <string>iPadNotification@2x.png</string>
+            <string>iPadSettings.png</string>
+            <string>iPadSettings@2x.png</string>
+            <string>iPadSpotlight7.png</string>
+            <string>iPadSpotlight7@2x.png</string>
+            <string>iPadSpotlight.png</string>
+            <string>iPadSpotlight@2x.png</string>
+            <string>iPadApp.png</string>
+            <string>iPadApp@2x.png</string>
+            <string>iPadApp7.png</string>
+            <string>iPadApp7@2x.png</string>
+            <string>iPadPro@2x.png</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>

@@ -1486,6 +1486,10 @@ public final class Display extends CN1Constants {
         if (isTextEditing(cmp)) {
             return;
         }
+        cmp.requestFocus();
+        if (cmp instanceof TextArea) {
+            ((TextArea)cmp).setSuppressActionEvent(false);
+        }
         Form f = cmp.getComponentForm();
         
         // this can happen in the spinner in the simulator where the key press should in theory start native 
@@ -3289,12 +3293,33 @@ hi.show();}</pre></noscript>
      * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
      * 
-     * @param response a callback Object to retrieve the file path
-     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}
-     * @throws RuntimeException if this feature failed or unsupported on the platform
+     * <p>Version 5.0 and higher support multi-selection (i.e. the types {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, and {@link #GALLERY_ALL_MULTI}).  When using one of the multiselection
+     * types, the {@literal source} of the ActionEvent will be a {@code String[]}, containing the paths of the selected elements, or {@literal null} if the user cancelled the dialog.</p>
+     * 
+     * <h4>Platform support</h4>
+     * <p>Currently (version 5.0 and higher), all platforms support the types {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.  On iOS, 
+     * multi-selection requires a deployment target of iOS 8.0 or higher, so it is disabled by default.   You can enable multi-selection on iOS, by adding the {@literal ios.enableGalleryMultiselect=true} build hint.  This
+     * build hint will be added automatically for you if you run your app in the simulator, and it calls {@literal openGallery()} with one of the multiselect gallery types.</p>
+     * 
+     * @param response a callback Object to retrieve the file path For multiselection types ({@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, and {@link #GALLERY_ALL_MULTI}), the {@literal source}
+     * of the ActionEvent sent this callback will be a {@literal String[]}.  For other types, it will be a {@literal String}.  If the dialog was cancelled, it will be {@literal null}.
+     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.
+     * @throws RuntimeException if this feature failed or unsupported on the platform.  Use {@link #isGalleryTypeSupported(int) } to check if the type is supported before calling this method.
+     * @see #isGalleryTypeSupported(int) To see if a type is supported on the current platform.
      */
     public void openGallery(ActionListener response, int type){
         impl.openGallery(response, type);
+    }
+    
+    /**
+     * Checks to see if the given gallery type is supported on the current platform.
+     * 
+     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.
+     * @return True if the type is supported
+     * @see #openGallery(com.codename1.ui.events.ActionListener, int) 
+     */
+    public boolean isGalleryTypeSupported(int type) {
+        return impl.isGalleryTypeSupported(type);
     }
 
     /**

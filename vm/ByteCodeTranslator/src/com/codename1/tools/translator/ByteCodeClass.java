@@ -336,6 +336,7 @@ public class ByteCodeClass {
         StringBuilder b = new StringBuilder();
         b.append("#include \"");
         b.append(clsName);
+        
         b.append(".h\"\n");
         
         for(String s : dependsClassesInterfaces) {
@@ -480,10 +481,13 @@ public class ByteCodeClass {
 
         staticFieldList = new ArrayList<ByteCodeField>();
         buildStaticFieldList(staticFieldList);
-
+        String enumValuesField = null;
         // static fields for the class
         for(ByteCodeField bf : staticFieldList) {
             if(bf.isStaticField() && bf.getClsName().equals(clsName)) {
+                if (isEnum && ("_VALUES".equals(bf.getFieldName().replace('$','_')) || "ENUM_VALUES".equals(bf.getFieldName().replace('$','_')))) {
+                    enumValuesField = bf.getFieldName();
+                }
                 if(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName())) {
                     // static getter 
                     b.append(bf.getCDefinition());
@@ -830,15 +834,21 @@ public class ByteCodeClass {
         }
         
         if (isEnum) {
+            
             b.append("JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {\n    ");
-            b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("__VALUES(threadStateData);\n");
-            b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
-            b.append("    int len = values->length;\n");
-            b.append("    for (int i=0; i<len; i++) {\n");
-            b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
-            b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
-            b.append("    }\n");
-            b.append("    return JAVA_NULL;\n");
+            if (enumValuesField != null) {
+                b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("_").append(enumValuesField.replace('$', '_')).append("(threadStateData);\n");
+                b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
+                b.append("    int len = values->length;\n");
+                b.append("    for (int i=0; i<len; i++) {\n");
+                b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
+                b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
+                b.append("    }\n");
+                b.append("    return JAVA_NULL;\n");
+            } else {
+                System.err.println("Unable to find enum VALUES static ield for "+clsName+", this may cause unexpected results when using the "+clsName+" enum.");
+                b.append("    return JAVA_NULL;\n");
+            }
             b.append("}\n\n");
         }
         

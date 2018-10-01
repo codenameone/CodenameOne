@@ -25,16 +25,26 @@ package com.codename1.impl.javase;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 /**
  *
@@ -45,8 +55,12 @@ public class Executor {
     private static Class c;
     private static Object app;
     
+    
+    
     public static void main(final String[] argv) throws Exception {
-        
+        if (JavaFXLoader.main(Executor.class, argv)) {
+            return;
+        }
         setProxySettings();
         if (CSSWatcher.isSupported()) {
             CSSWatcher cssWatcher = new CSSWatcher();
@@ -222,22 +236,285 @@ public class Executor {
     
 
 
-    public static void push(final String message){
+    public static void push(final String message, final int type){
         if(c != null && app != null){
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        String messageBody = message;
+                        Element messageBodyEl = null;
+                        String messageType = "" + type;
+                        byte messageTypeByte = (byte) type;
+                        if (type == 99) {
+                            
+                            try {
+                                DocumentBuilderFactory factory
+                                        = DocumentBuilderFactory.newInstance();
+                                DocumentBuilder builder = factory.newDocumentBuilder();
+                                if (!messageBody.startsWith("<?xml")) {
+                                    messageBody = "<?xml version=\"1.0\"?>" + messageBody;
+                                }
+                                ByteArrayInputStream input = new ByteArrayInputStream(
+                                        messageBody.getBytes("UTF-8"));
+                                Document doc = builder.parse(input);
+                                Element root = doc.getDocumentElement();
+                                messageType = "1";
+                                messageTypeByte = 1;
+                                if (root.hasAttribute("type")) {
+                                    messageTypeByte = (byte) Integer.parseInt(root.getAttribute("type"));
+                                    messageType = "" + messageTypeByte;
+                                }
+                                messageBody = "";
+                                if (root.hasAttribute("body")) {
+                                    messageBody = root.getAttribute("body");
+                                }
+                                messageBodyEl = root;
+                            } catch (Exception x) {
+                                System.err.println("Failed to parse XML messagse body");
+                                x.printStackTrace();
+                                return;
+
+                            }
+
+                        }
+
                         Method push = c.getDeclaredMethod("push", String.class);
-                        push.invoke(app, message);
+                        String[] actionIds = null;
+                        String[] actionLabels = null;
+                        java.awt.Image image;
+                        javax.swing.ImageIcon imageIcon = null;
+                        PushContent.reset();
+                        if (messageBodyEl != null) {
+                            // This was an XML request
+                            NodeList images = messageBodyEl.getElementsByTagName("img");
+                            if (images.getLength() > 0) {
+                                Element img = (Element) images.item(0);
+
+                                PushContent.setImageUrl(img.getAttribute("src"));
+                                if (!img.getAttribute("src").startsWith("https://")) {
+                                    System.err.println("Push message includes image attachment at non-secure URL.  Image will not be displayed on iOS.  Make sure all image attachments use https://");
+                                }
+                                image = javax.imageio.ImageIO.read(new java.net.URL(img.getAttribute("src")));
+                                imageIcon = new javax.swing.ImageIcon(fitImage(image, 512, 512));
+                                JavaSEPort.instance.checkRichPushBuildHints();
+                            }
+                            if (messageBodyEl.hasAttribute("category")) {
+                                PushContent.setCategory(messageBodyEl.getAttribute("category"));
+                                JavaSEPort.instance.checkRichPushBuildHints();
+                                try {
+                                    Method getPushActionCategories = c.getDeclaredMethod("getPushActionCategories", new Class[0]);
+                                    Class pushActionCategoryCls = c.getClassLoader().loadClass("com.codename1.push.PushActionCategory");
+                                    Method getCategoryId = pushActionCategoryCls.getDeclaredMethod("getId", new Class[0]);
+                                    Object foundCategory = null;
+                                    if (getPushActionCategories != null) {
+                                        Object[] categories = (Object[])getPushActionCategories.invoke(app, new Object[0]);
+                                        if (categories != null) {
+                                            for (Object category : categories) {
+                                                if (messageBodyEl.getAttribute("category").equals(getCategoryId.invoke(category, new Object[0]))) {
+                                                    foundCategory = category;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (foundCategory != null) {
+                                        Method getActions = pushActionCategoryCls.getDeclaredMethod("getActions", new Class[0]);
+                                        Object[] actions = (Object[])getActions.invoke(foundCategory, new Object[0]);
+                                        actionIds = new String[actions.length];
+                                        actionLabels = new String[actions.length];
+                                        Class pushActionCls = c.getClassLoader().loadClass("com.codename1.push.PushAction");
+                                        Method getActionId = pushActionCls.getDeclaredMethod("getId", new Class[0]);
+                                        Method getActionTitle = pushActionCls.getDeclaredMethod("getTitle", new Class[0]);
+                                        Method getActionIcon = pushActionCls.getDeclaredMethod("getIcon", new Class[0]);
+                                        for (int i=0; i<actions.length; i++) {
+                                            actionIds[i] = (String)getActionId.invoke(actions[i], new Object[0]);
+                                            actionLabels[i] = (String)getActionTitle.invoke(actions[i], new Object[0]);
+                                        }
+                                    }
+                                    
+                                } catch (Exception ex) {
+                                    ex.printStackTrace();
+                                }
+                                
+                                
+                            }
+
+                        }
+                        
+                        
+                        
+
+                        String[] parts = null;
+                        int result = 0;
+                        Display.getInstance().setProperty("pushType", ""+messageTypeByte);
+                        switch (messageTypeByte) {
+                            case 0:
+                            case 1:
+                                PushContent.setBody(messageBody);
+                                PushContent.setType(1);
+                                
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody);
+                                }
+                                
+                                break;
+                            case 2:
+                                PushContent.setMetaData(messageBody);
+                                PushContent.setType(2);
+                                push.invoke(app, messageBody);
+                                break;
+                            case 3:
+                                parts = messageBody.split(";");
+                                PushContent.setMetaData(parts[1]);
+                                PushContent.setBody(parts[0]);
+                                PushContent.setType(3);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[0], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[0], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    Display.getInstance().setProperty("pushType", "1");
+                                    push.invoke(app, parts[0]);
+                                    Display.getInstance().setProperty("pushType", "2");
+                                    push.invoke(app, parts[1]);
+                                }
+                                break;
+                            case 4:
+                                parts = messageBody.split(";");
+                                PushContent.setTitle(parts[0]);
+                                PushContent.setBody(parts[1]);
+                                PushContent.setType(4);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[1], parts[0], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    Display.getInstance().setProperty("pushType", "4");
+                                    push.invoke(app, parts[0]+";"+parts[1]);
+                                }
+                                break;
+                            case 5:
+                                PushContent.setBody(messageBody);
+                                PushContent.setType(1);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody, messageBody, 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    Display.getInstance().setProperty("pushType", "1");
+                                    push.invoke(app, messageBody);
+                                }
+                                break;
+                            case 101:
+                                PushContent.setBody(messageBody.substring(messageBody.indexOf(" ") + 1));
+                                PushContent.setType(1);
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody.substring(messageBody.indexOf(" ") + 1), messageBody.substring(messageBody.indexOf(" ") + 1), 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, messageBody.substring(messageBody.indexOf(" ") + 1), messageBody.substring(messageBody.indexOf(" ") + 1), 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, messageBody.substring(messageBody.indexOf(" ") + 1));
+                                }
+                                break;
+                            case 102:
+                                parts = messageBody.split(";");
+                                PushContent.setTitle(parts[1]);
+                                PushContent.setBody(parts[2]);
+                                PushContent.setType(2);
+                                
+                                if (Display.getInstance().isMinimized()) {
+                                    
+                                    if (actionIds != null) {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[2], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, actionLabels, null);
+                                        if (result >= 0) {
+                                            PushContent.setActionId(actionIds[result]);
+                                        }
+                                    } else {
+                                        result = javax.swing.JOptionPane.showOptionDialog(null, parts[2], parts[1], 0, javax.swing.JOptionPane.INFORMATION_MESSAGE, imageIcon, new String[]{"OK"}, null);
+                                        
+                                    }
+                                    if (result >= 0) {
+                                        JavaSEPort.resumeApp();
+                                    }
+                                }
+                                if (result >= 0) {
+                                    push.invoke(app, parts[1] + ";" + parts[2]);
+                                }
+                                break;
+                            default:
+                                throw new RuntimeException("Unsupported push type: " + messageTypeByte);
+
+                        }
+
+                        //push.invoke(app, message);
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                    } 
+                    }
                 }
             });
         }
     }
-    
+
     private static void setProxySettings() {
         Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
         int proxySel = proxyPref.getInt("proxySel", 2);
@@ -270,6 +547,15 @@ public class Executor {
     
     static Object getApp() {
         return app;
+    }
+    
+    private static java.awt.Image fitImage(java.awt.Image img, int w, int h) {
+        java.awt.image.BufferedImage resizedimage = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g2 = resizedimage.createGraphics();
+        g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(img, 0, 0, w, h, null);
+        g2.dispose();
+        return resizedimage;
     }
     
 }

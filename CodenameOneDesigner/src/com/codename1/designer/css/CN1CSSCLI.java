@@ -42,6 +42,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.Scene;
@@ -60,6 +61,13 @@ public class CN1CSSCLI extends Application {
     static WebView web;
     @Override
     public void start(Stage stage) throws Exception {
+        Platform.setImplicitExit(false);
+        startImpl(stage);
+        //stage.hide();
+        
+    }
+    
+    private static void startImpl(Stage stage) throws Exception {
         System.out.println("Opening JavaFX Webview to render some CSS styles");
         web = new WebView();
         web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
@@ -68,14 +76,18 @@ public class CN1CSSCLI extends Application {
                 System.out.println("Received exception: "+t1.getMessage());
             }
         });
+        
         Scene scene = new Scene(web, 400, 800, Color.web("#666670"));
         stage.setScene(scene);
         stage.show();
         synchronized(lock) {
             lock.notify();
         }
-        //stage.hide();
-        
+    }
+    
+    private static void relaunch() throws Exception {
+        Stage stage = new Stage();
+        startImpl(stage);
     }
     
     public static boolean watchmode;
@@ -280,7 +292,7 @@ public class CN1CSSCLI extends Application {
                             new Thread(()->{
                                 launch(CN1CSSCLI.class, new String[0]);
                             }).start();
-                        }
+                        } 
                         while (web == null) {
                             System.out.println("Waiting for web browser");
                             synchronized(lock) {
@@ -290,6 +302,49 @@ public class CN1CSSCLI extends Application {
                                     Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
                                 }
                             }
+                        }
+                        final boolean[] showing = new boolean[1];
+                        final boolean[] complete = new boolean[1];
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                if (!web.getScene().getWindow().isShowing()) {
+                                    try {
+                                        relaunch();
+                                        synchronized(complete) {
+                                            showing[0] = true;
+                                            complete[0] = true;
+                                            complete.notify();
+                                        }
+                                    } catch (Throwable t) {
+                                        t.printStackTrace();
+                                    } finally {
+                                        synchronized(complete) {
+                                            complete[0] = true;
+                                            complete.notify();
+                                        }
+                                    }
+                                    
+                                } else {
+                                    synchronized(complete) {
+                                        showing[0] = true;
+                                        complete[0] = true;
+                                        complete.notify();
+                                    }
+                                }
+                            }
+                        });
+                        
+                        while (!complete[0]) {
+                            synchronized(complete) {
+                                try {
+                                    complete.wait();
+                                } catch (Throwable t) {
+                                    throw new RuntimeException(t);
+                                }
+                            }
+                        }
+                        if (!showing[0]) {
+                            throw new RuntimeException("Failed to open WebView for generating 9-piece images");
                         }
                         System.out.println("Web browser is available");
                         return web;
@@ -325,6 +380,17 @@ public class CN1CSSCLI extends Application {
             if (channel != null) {
                 channel.close();
             }
+            if (web != null) {
+                Platform.runLater(new Runnable() {
+                    public void run() {
+                        if (web != null) {
+                            web.getScene().getWindow().hide();
+                        }
+                    }
+                });
+                
+            }
+            
         }
     }
     

@@ -1,8 +1,8 @@
-<img src="https://www.codenameone.com/img/blog/codenameone-4-0-release-image-taxi.jpg"> 
+<img src="https://www.codenameone.com/img/blog/codenameone-5-release-banner.jpg"> 
 
 [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
-## Write Once Run Anywhere Native Mobile Apps for Java & Kotlin Developers
+## Write Once Run Anywhere Native Mobile Apps for Java and Kotlin Developers
 
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
 

@@ -77,14 +77,15 @@ public final class CN1Matrix4f {
     public static class Factory {
 
         private float[] sTemp = new float[32];
-        private static Factory defaultFactory = null;
+        private static ThreadLocal<Factory> defaultFactory = new ThreadLocal<Factory>() {
+            @Override
+            protected Factory initialValue() {
+                return new Factory();
+            }
+        };
 
         public static Factory getDefault() {
-            if (defaultFactory == null) {
-                defaultFactory = new Factory();
-
-            }
-            return defaultFactory;
+            return defaultFactory.get();
         }
 
         public CN1Matrix4f makeMatrix(float[] data) {

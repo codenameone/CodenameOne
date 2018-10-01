@@ -40,4 +40,8 @@ public class Accessor {
     public static boolean scrollableYFlag(Container cnt) {
         return cnt.scrollableYFlag();
     }
+    
+    public static void fixNegativeScrolls(Form f) {
+        f.fixNegativeScrolls();
+    }
 }

@@ -171,6 +171,7 @@ public class Message {
      * @param subject e-mail subject
      * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
      * this is redundant if the email is a plain text message to begin with
+     * @deprecated this functionality is retired, if necessary we'll introduce a new API
      */
     public void sendMessageViaCloud(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
         NetworkManager.getInstance().addToQueue(createMessage(sender, recipient, recipientName, subject, plainTextBody));
@@ -188,6 +189,7 @@ public class Message {
      * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
      * this is redundant if the email is a plain text message to begin with
      * @return true if sending succeeded
+     * @deprecated this functionality is retired, if necessary we'll introduce a new API
      */
     public boolean sendMessageViaCloudSync(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
         ConnectionRequest r = createMessage(sender, recipient, recipientName, subject, plainTextBody);

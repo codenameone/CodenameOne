@@ -73,6 +73,8 @@
 #endif
 #import "com_codename1_payment_Purchase.h"
 
+//#define CN1_USE_SPLASH_SCREEN
+
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
 // needs a source rect that the java API doesn't pass through.
 int CN1lastTouchX=0;
@@ -218,6 +220,13 @@ int isIPad() {
 
 int cn1IsIOS8 = -1;
 int cn1IsIOS8_2 = -1;
+int cn1IsIOS10 = -1;
+BOOL isIOS10() {
+    if (cn1IsIOS10 < 0) {
+        cn1IsIOS10 = !SYSTEM_VERSION_LESS_THAN(@"10.0") ? 1:0;
+    }
+    return cn1IsIOS10 > 0;
+}
 
 BOOL isIOS8() {
     if (cn1IsIOS8 < 0) {
@@ -243,6 +252,20 @@ BOOL isVKBAlwaysOpen() {
         return YES;
     }
     return NO;
+}
+
+
+void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
+    enteringNativeAllocations();
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__();
+    JAVA_OBJECT pkey = fromNSString(threadStateData, @"ios.doneButtonColor");
+    JAVA_OBJECT pvalue = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(threadStateData, d, pkey, JAVA_NULL);
+    
+    if (pvalue != JAVA_NULL) {
+        NSString* nstr = toNSString(threadStateData, pvalue);
+        btn.tintColor = UIColorFromRGB([nstr intValue], 255);
+    }
+    finishedNativeAllocations();
 }
 
 
@@ -318,6 +341,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             // PASSWORD
             if((constraint & 0x10000) == 0x10000) {
                 utf.secureTextEntry = YES;
+                if (@available(iOS 11, *)) {
+                    utf.textContentType = UITextContentTypePassword;
+                }
+            }
+            
+            if ((constraint & 0x400000) == 0x400000) {
+                if (@available(iOS 11, *)) {
+                    utf.textContentType = UITextContentTypeUsername;
+                }
             }
             
             // EMAILADDR
@@ -325,6 +357,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if(cccc == 1) {
                 utf.keyboardType = UIKeyboardTypeEmailAddress;
                 utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                if (@available(iOS 10, *)) {
+                    utf.textContentType = UITextContentTypeEmailAddress;
+                }
             } else {
                 // NUMERIC
                 if(cccc == 2) {
@@ -333,11 +368,17 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     // PHONENUMBER
                     if(cccc == 3) {
                         utf.keyboardType = UIKeyboardTypePhonePad;
+                        if (@available(iOS 10, *)) {
+                            utf.textContentType = UITextContentTypeTelephoneNumber;
+                        }
                     } else {
                         // URL
                         if(cccc == 4) {
                             utf.keyboardType = UIKeyboardTypeURL;
                             utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                            if (@available(iOS 10, *)) {
+                                utf.textContentType = UITextContentTypeURL;
+                            }
                         } else {
                             // DECIMAL
                             if(cccc == 5) {
@@ -418,6 +459,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
+                        cn1_setStyleDoneButton(threadStateData, doneButton);
                     } else {
 #ifndef NEW_CODENAME_ONE_VM
                         str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -426,6 +468,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
+                        cn1_setStyleDoneButton(threadStateData, doneButton);
                         if(isVKBAlwaysOpen() && (utf.keyboardType == UIKeyboardTypeDecimalPad
                                              || utf.keyboardType == UIKeyboardTypePhonePad
                                              || utf.keyboardType == UIKeyboardTypeNumberPad)) {
@@ -437,6 +480,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                             buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                             UIBarButtonItem *anotherButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
+                            cn1_setStyleDoneButton(threadStateData, anotherButton);
                             itemsArray = [NSArray arrayWithObjects: flexButton, anotherButton, doneButton, nil];
 #ifndef CN1_USE_ARC
                             [anotherButton release];
@@ -508,6 +552,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneClicked)];
+                    cn1_setStyleDoneButton(threadStateData, doneButton);
                 } else {
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -516,6 +561,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardNextClicked)];
+                    cn1_setStyleDoneButton(threadStateData, doneButton);
                 }
                 NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
                 
@@ -1778,70 +1824,7 @@ extern int CN1transformMatrixVersion;
 extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 
-- (void)awakeFromNib
-{
-#ifdef USE_ES2
-    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
-        CN1transformMatrix = GLKMatrix4Identity;
-        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
-    }
-#endif
-    retinaBug = isRetinaBug();
-    if(retinaBug) {
-        scaleValue = 1;
-    } else {
-        scaleValue = [UIScreen mainScreen].scale;
-    }
-    sharedSingleton = self;
-    [self initVars];
-#ifdef USE_ES2
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-#else
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    
-    if (!aContext) {
-        aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    }
-#endif
-    if (!aContext)
-        CN1Log(@"Failed to create ES context");
-    else if (![EAGLContext setCurrentContext:aContext])
-        CN1Log(@"Failed to set ES context current");
-    
-	self.context = aContext;
-#ifndef CN1_USE_ARC
-    [aContext release];
-#endif
-	
-    [(EAGLView *)self.view setContext:context];
-    [(EAGLView *)self.view setFramebuffer];
-    //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    //self.view.autoresizesSubviews = YES;
-    
-    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
-    //        [self loadShaders];
-    
-    
-    animating = FALSE;
-    animationFrameInterval = 1;
-    self.displayLink = nil;
-    
-    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
-    //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
-    
-    // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillShow:)
-                                                 name:UIKeyboardWillShowNotification
-                                               object:self.view.window];
-    // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillHide:)
-                                                 name:UIKeyboardWillHideNotification
-                                               object:self.view.window];
-    
-    //detect orientation by statusBarOrientation
+-(UIImage*)createSplashImage {
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
     
@@ -1908,6 +1891,81 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
             img = [UIImage imageNamed:@"Default.png"];
         }
     }
+    return img;
+}
+
+- (void)awakeFromNib
+{
+#ifdef USE_ES2
+    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
+        CN1transformMatrix = GLKMatrix4Identity;
+        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
+    }
+#endif
+    retinaBug = isRetinaBug();
+    if(retinaBug) {
+        scaleValue = 1;
+    } else {
+        scaleValue = [UIScreen mainScreen].scale;
+    }
+    sharedSingleton = self;
+    [self initVars];
+#ifdef USE_ES2
+    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+#else
+    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
+    
+    if (!aContext) {
+        aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
+    }
+#endif
+    if (!aContext)
+        CN1Log(@"Failed to create ES context");
+    else if (![EAGLContext setCurrentContext:aContext])
+        CN1Log(@"Failed to set ES context current");
+    
+	self.context = aContext;
+#ifndef CN1_USE_ARC
+    [aContext release];
+#endif
+	
+    [(EAGLView *)self.view setContext:context];
+    [(EAGLView *)self.view setFramebuffer];
+    //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    //self.view.autoresizesSubviews = YES;
+    
+    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
+    //        [self loadShaders];
+    
+    
+    animating = FALSE;
+    animationFrameInterval = 1;
+    self.displayLink = nil;
+    
+    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
+    //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
+    
+    // register for keyboard notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillShow:)
+                                                 name:UIKeyboardWillShowNotification
+                                               object:self.view.window];
+    // register for keyboard notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillHide:)
+                                                 name:UIKeyboardWillHideNotification
+                                               object:self.view.window];
+    
+    //detect orientation by statusBarOrientation
+    UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+#ifdef CN1_USE_SPLASH_SCREEN
+    UIImage *img = [self createSplashImage];
+#else
+    UIImage* img = nil;
+#endif
+    
     [self.view setMultipleTouchEnabled:YES];
     if(img != nil) {
         float scale = scaleValue;
@@ -3019,6 +3077,109 @@ BOOL prefersStatusBarHidden = NO;
 extern UIPopoverController* popoverController;
 extern int popoverSupported();
 
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+int cn1_waitingForImagesCount=0;
+NSMutableString *cn1_waitingForImages=NULL;
+void cn1_addSelectedImagePath(NSString* path) {
+    if (cn1_waitingForImages.length != 0) {
+        [cn1_waitingForImages appendString:@"\n"];
+    }
+    [cn1_waitingForImages appendString:path];
+    cn1_waitingForImagesCount--;
+    if (cn1_waitingForImagesCount <= 0) {
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithString:cn1_waitingForImages]));
+    }
+}
+
+- (void)qb_imagePickerController:(QBImagePickerController *)picker didFinishPickingAssets:(NSArray *)assets {
+    if (cn1_waitingForImages == NULL) {
+        cn1_waitingForImages = [[NSMutableString alloc] init];
+    } else {
+        [cn1_waitingForImages setString:@""];
+    }
+    cn1_waitingForImagesCount = [assets count];
+    __block int idx=0;
+    PHImageRequestOptions *options = [PHImageRequestOptions new];
+    options.networkAccessAllowed = YES;
+    for (PHAsset *asset in assets) {
+        if (asset.mediaType == PHAssetMediaTypeImage) {
+            [[PHImageManager defaultManager] requestImageForAsset:asset 
+                              targetSize:PHImageManagerMaximumSize
+                             contentMode:PHImageContentModeDefault
+                                 options:options
+                           resultHandler:^(UIImage *originalImage, NSDictionary *info) {
+                UIImage* image = originalImage;
+                               if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
+                                   return;
+                               }
+
+#ifndef LOW_MEM_CAMERA
+                if (image.imageOrientation != UIImageOrientationUp) {
+                    UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                    [image drawInRect:(CGRect){0, 0, image.size}];
+                    image = UIGraphicsGetImageFromCurrentImageContext();
+                    UIGraphicsEndImageContext();
+                }
+#endif
+
+                NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+
+                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                NSString *documentsDirectory = [paths objectAtIndex:0];
+                NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_image_%d.jpg", idx++]];
+                [data writeToFile:path atomically:YES];
+                cn1_addSelectedImagePath(path);
+            }];
+        } else {
+            PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+            options.version = PHVideoRequestOptionsVersionOriginal;
+            options.networkAccessAllowed = YES;
+
+            [[PHImageManager defaultManager] requestAVAssetForVideo:asset
+                                                            options:options
+                                                      resultHandler:
+             ^(AVAsset * _Nullable avasset,
+               AVAudioMix * _Nullable audioMix,
+               NSDictionary * _Nullable info)
+            {
+                NSError *error;
+                AVURLAsset *avurlasset = (AVURLAsset*) avasset;
+                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                NSString *documentsDirectory = [paths objectAtIndex:0];
+                NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_video_%d.%@", idx++, avurlasset.URL.pathExtension]];
+                // Write to documents folder
+                NSURL *fileURL = [NSURL fileURLWithPath:path];
+                [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+                if ([[NSFileManager defaultManager] copyItemAtURL:avurlasset.URL
+                                                             toURL:fileURL
+                                                             error:&error]) {
+                    cn1_addSelectedImagePath(path);
+                } else {
+                    cn1_addSelectedImagePath([NSString stringWithFormat:@"!{Error: %@}", [error localizedDescription]]);
+                }
+             }];
+        }
+
+        
+    }
+
+#ifdef LOW_MEM_CAMERA
+    [picker dismissModalViewControllerAnimated:NO];
+#else
+    [picker dismissModalViewControllerAnimated:YES];
+#endif
+}
+
+- (void)qb_imagePickerControllerDidCancel:(QBImagePickerController *)picker
+{
+    com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+    [picker dismissModalViewControllerAnimated:YES];
+}
+
+#endif
+#endif
+
 -(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
     //[self dismissModalViewControllerAnimated:YES];
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
@@ -3481,7 +3642,6 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
 {
     return self;
 }
-
 
 
 @end

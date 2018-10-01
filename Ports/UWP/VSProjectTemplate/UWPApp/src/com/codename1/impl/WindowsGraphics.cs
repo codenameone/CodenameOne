@@ -27,6 +27,7 @@ namespace com.codename1.impl
         private bool disposed = false;
         private int alpha = 0xff;
         private com.codename1.ui.Transform transform = com.codename1.ui.Transform.makeTranslation(0,0,0);
+       
 
         public WindowsGraphics(CanvasDrawingSession graphics)
         {
@@ -80,8 +81,27 @@ namespace com.codename1.impl
             return disposed;
         }
 
+        internal virtual void setClipShape(ui.geom.Shape clip)
+        {
+            removeClip();
+            if (clip == null)
+            {
+                return;
+            }
+            com.codename1.ui.geom.Rectangle bounds = clip.getBounds();
+            if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0)
+            {
+                setClip(bounds);
+                return;
+            }
+
+            CanvasPathBuilder nativeShape = SilverlightImplementation.instance.cn1ShapeToAndroidPath(clip);
+            layer = graphics.CreateLayer(1f, CanvasGeometry.CreatePath(nativeShape));
+        }
+
         internal virtual void setClip(ui.geom.Rectangle clip)
         {
+            removeClip();
             if (clip == null)
             {
                 return;
@@ -96,14 +116,54 @@ namespace com.codename1.impl
                // System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa height");
                 clip.setHeight(1);
             }
+            if (transform != null && !transform.isIdentity())
+            {
+                GeneralPath gp = new GeneralPath();
+                gp.setShape(clip, transform);
+                layer = graphics.CreateLayer(1f, CanvasGeometry.CreatePath(SilverlightImplementation.instance.cn1ShapeToAndroidPath(gp)));
+            } else
+            {
+                layer = graphics.CreateLayer(1f, new Rect(
+                    clip.getX(),
+                    clip.getY(),
+                    clip.getWidth(),
+                    clip.getHeight()
+                ));
+            }
             
-            layer = graphics.CreateLayer(1f, new Rect(
-                clip.getX(),
-                clip.getY(),
-                clip.getWidth(),
-                clip.getHeight()
-            ));
             
+        }
+
+        public void setRawClip(ui.geom.Shape clip)
+        {
+            removeClip();
+            if (clip == null)
+            {
+                return;
+            }
+            com.codename1.ui.geom.Rectangle bounds = clip.getBounds();
+            if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0)
+            {
+                layer = graphics.CreateLayer(1f, new Rect(
+                    bounds.getX(),
+                    bounds.getY(),
+                    1,
+                    1
+                ));
+                return;
+            }
+            if (clip.isRectangle())
+            {
+                layer = graphics.CreateLayer(1f, new Rect(
+                    bounds.getX(),
+                    bounds.getY(),
+                    bounds.getWidth(),
+                    bounds.getHeight()
+                ));
+                return;
+            }
+            layer = graphics.CreateLayer(1f, CanvasGeometry.CreatePath(SilverlightImplementation.instance.cn1ShapeToAndroidPath(clip)));
+
         }
 
         private CanvasActiveLayer createAlphaLayer()

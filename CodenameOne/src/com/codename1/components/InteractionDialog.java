@@ -299,6 +299,7 @@ public class InteractionDialog extends Container {
      * @param right space in pixels between the right of the screen and the form
      */
     public void show(int top, int bottom, int left, int right) {
+        getUnselectedStyle().setOpacity(255);
         disposed = false;
         Form f = Display.getInstance().getCurrent();
         Style unselectedStyle = getUnselectedStyle();
@@ -524,6 +525,7 @@ public class InteractionDialog extends Container {
      */
     public void showPopupDialog(Component c) {
         disposed = false;
+        getUnselectedStyle().setOpacity(255);
         Rectangle componentPos = c.getSelectedRect();
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
@@ -540,6 +542,7 @@ public class InteractionDialog extends Container {
      */
     public void showPopupDialog(Rectangle rect) {
         disposed = false;
+        getUnselectedStyle().setOpacity(255);
         if(getUIID().equals("Dialog")) {
             setUIID("PopupDialog");
             if(getTitleComponent().getUIID().equals("DialogTitle")) {

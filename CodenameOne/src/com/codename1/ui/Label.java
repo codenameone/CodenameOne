@@ -87,6 +87,7 @@ public class Label extends Component {
     private int stringWidthUnselected = -1;
     
     private boolean autoSizeMode;
+    private float maxAutoSize = -1;
     private Font originalFont;
     private int widthAtLastCheck = -1;
     private char materialIcon;
@@ -586,6 +587,23 @@ public class Label extends Component {
                 endsWith3Points, valign);
     }
     
+    /**
+     * Allows us to limit the maximum size for the autosize mode
+     * @param maxSize the maximum font size in millimeters
+     */
+    public void setMaxAutoSize(float maxSize) {
+        maxAutoSize = maxSize;
+    }
+
+    /**
+     * Allows us to limit the maximum size for the autosize mode
+     * 
+     * @return the maximum font size in millimeters
+     */
+    public float getMaxAutoSize() {
+        return maxAutoSize;
+    }
+    
     void initAutoResize() {
         if(autoSizeMode) {
             Style s = getUnselectedStyle();
@@ -610,8 +628,16 @@ public class Label extends Component {
                 widthAtLastCheck = w;
                 autoSizeMode = false;
                 int currentWidth = calcPreferredSize().getWidth();
+                int maxSizePixel = Display.getInstance().convertToPixels(maxAutoSize);
                 while(currentWidth < w) {
                     fontSize++;
+                    if(fontSize >= maxSizePixel) {
+                        fontSize = maxSizePixel;
+                        currentFont = currentFont.derive(maxSizePixel, currentFont.getStyle());
+                        getAllStyles().setFont(currentFont);
+                        currentWidth = calcPreferredSize().getWidth();
+                        break;
+                    }
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
                     getAllStyles().setFont(currentFont);
                     currentWidth = calcPreferredSize().getWidth();

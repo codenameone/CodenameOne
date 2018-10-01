@@ -24,7 +24,6 @@
 package com.codename1.properties;
 
 import com.codename1.io.Util;
-import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
@@ -35,11 +34,19 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.TextComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.table.AbstractTableModel;
+import com.codename1.ui.table.TableModel;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.validation.Constraint;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>The binding framework can implicitly bind UI elements to properties, this allow seamless 
@@ -778,6 +785,301 @@ public class UiBinding {
         return bindImpl(prop, cmp, adapt);
     } 
     
+    
+    /**
+     * Implements table model binding, this is implemented as a class to allow
+     * additional features such as adding/removing rows
+     */
+    public static class BoundTableModel extends AbstractTableModel {
+        private List<? extends PropertyBusinessObject> objects;
+        private CollectionProperty objectProperty;
+        private PropertyBusinessObject prototype;
+        private Set<String> exclude = new HashSet<String>();
+        private List<String> included;
+        private PropertyBase[] columnOrder;
+        private Set<String> uneditable = new HashSet<String>();
+        private EventDispatcher listeners = new EventDispatcher();
+        
+        /**
+         * Creates a table model with the business objects
+         * @param objects the objects of the model
+         * @param prototype the type by which we determine the structure of the table
+         */
+        public BoundTableModel(List<? extends PropertyBusinessObject> objects, 
+            PropertyBusinessObject prototype) {
+            this.objects = objects;
+            this.prototype = prototype;
+        }
+
+        /**
+         * Creates a table model with the business objects
+         * @param objectProperty the objects of the model
+         * @param prototype the type by which we determine the structure of the table
+         */
+        public BoundTableModel(CollectionProperty objectProperty, 
+            PropertyBusinessObject prototype) {
+            this.objectProperty = objectProperty;
+            this.prototype = prototype;
+        }
+        
+        /**
+         * The properties that are ignored
+         * @param b the property to ignore
+         */
+        public void excludeProperty(PropertyBase b) {
+            exclude.add(b.getName());
+            if(included == null) {
+                included = new ArrayList<String>();
+                for(PropertyBase pb : prototype.getPropertyIndex()) {
+                    included.add(pb.getName());
+                }
+            }
+            included.remove(b.getName());
+        }
+        
+        /**
+         * Sets the order of the columns explicitly
+         * @param columnOrder the order of the columns based on the prototype
+         */
+        public void setColumnOrder(PropertyBase... columnOrder) {
+            this.columnOrder = columnOrder;
+        }
+        
+        /**
+         * Makes the property editable or uneditable
+         * @param pb the property base
+         * @param editable true for editable (the default)
+         */
+        public void setEditable(PropertyBase pb, boolean editable) {
+            if(editable) {
+                uneditable.remove(pb.getName());
+            } else {
+                uneditable.add(pb.getName());
+            }
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getRowCount() {
+            if(objects != null) {
+                return objects.size();
+            }
+            return objectProperty.size();
+        }
+
+        /**
+         * Adds a new business object to the table
+         * @param index the index of the addition
+         * @param b the business object
+         */
+        public void addRow(int index, PropertyBusinessObject b) {
+            if(objects != null) {
+                ((List)objects).add(index, b);
+            } else {
+                if(objectProperty instanceof ListProperty) {
+                    ((ListProperty)objectProperty).add(index, b);
+                } else {
+                    objectProperty.add(b);
+                }
+            }
+            for(int col = 0 ; col < getColumnCount() ; col++) {
+                listeners.fireDataChangeEvent(col, index);
+            }
+        }
+        
+        /**
+         * Removes the row at the given index
+         * @param index the position in the table
+         */
+        public void removeRow(int index) {
+            if(objects != null) {
+                objects.remove(index);
+            } else {
+                if(objectProperty instanceof ListProperty) {
+                    ((ListProperty)objectProperty).remove(index);
+                } else {
+                    Iterator i = objectProperty.iterator();
+                    for(int iter = 0 ; iter < index - 1 ; iter++) {
+                        i.next();
+                    }
+                    i.remove();
+                }
+            }
+            listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getColumnCount() {
+            if(columnOrder != null) {
+                return columnOrder.length;
+            }
+            return prototype.getPropertyIndex().getSize() - exclude.size();
+        }
+        
+        private PropertyBase getProperty(int index) {
+            if(included != null) {
+                return prototype.getPropertyIndex().get(included.get(index));
+            }
+            return prototype.getPropertyIndex().get(index);
+        }
+        
+        @Override
+        public String getColumnName(int i) {
+            if(columnOrder != null) {
+                return columnOrder[i].getLabel();
+            }
+            return getProperty(i).getLabel();
+        }
+
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            if(columnOrder != null && columnOrder.length > 0) {
+                return !uneditable.contains(columnOrder[column].getName());
+            }
+            return !uneditable.contains(getProperty(column).getName());
+        }
+        
+        private PropertyBusinessObject getRow(int row) {
+            if(objects != null) {
+                return objects.get(row);
+            } else {
+                if(objectProperty instanceof ListProperty) {
+                    return (PropertyBusinessObject)((ListProperty)objectProperty).get(row);
+                } else {
+                    Iterator i = objectProperty.iterator();
+                    for(int iter = 0 ; iter < row - 1 ; iter++) {
+                        i.next();
+                    }
+                    return (PropertyBusinessObject)i.next();
+                }
+            }
+        }
+
+        @Override
+        public Object getValueAt(int row, int column) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = getProperty(column).getName();
+            }
+            return pb.getPropertyIndex().get(n).get();
+        }
+
+        @Override
+        public Class getCellType(int row, int column) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = getProperty(column).getName();
+            }
+            return pb.getPropertyIndex().get(n).getGenericType();
+        }
+
+        private PropertyBase getPropertyAt(int row, int column) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = getProperty(column).getName();
+            }
+            return pb.getPropertyIndex().get(n);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String[] getMultipleChoiceOptions(int row, int column) {
+            return (String[])getPropertyAt(row, column).
+                getClientProperty("multipleChoiceOptions");
+        }
+        
+        /**
+         * Sets the multiple choice option for a string entry, this is useful 
+         * if a string property can have one of several values. It will be 
+         * rendered as a picker in the table
+         * 
+         * @param prop the property
+         * @param values the supported values
+         */
+        public void setMultipleChoiceOptions(PropertyBase prop, String... values) {
+            prop.putClientProperty("multipleChoiceOptions", values);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Constraint getValidationConstraint(int row, int column) {
+            return (Constraint)getPropertyAt(row, column).
+                getClientProperty("validationConstraint");
+        }
+        
+        /**
+         * Sets a validator constraint on the table
+         * 
+         * @param prop the property matching the constraint
+         * @param c the constraint value
+         */
+        public void setValidationConstraint(PropertyBase prop, Constraint c) {
+            prop.putClientProperty("validationConstraint", c);
+        }
+        
+        @Override
+        public void setValueAt(int row, int column, Object o) {
+            PropertyBusinessObject pb = getRow(row);
+            String n;
+            if(columnOrder != null) {
+                n = columnOrder[column].getName();
+            } else {
+                n = getProperty(column).getName();
+            }
+            pb.getPropertyIndex().get(n).setImpl(o);
+            listeners.fireDataChangeEvent(column, row);
+        }
+
+        @Override
+        public void addDataChangeListener(DataChangedListener d) {
+            listeners.addListener(d);
+        }
+
+        @Override
+        public void removeDataChangeListener(DataChangedListener d) {
+            listeners.removeListener(d);
+        }
+    }
+    
+    /**
+     * Creates a table model which is implicitly bound to the properties
+     * @param objects list of business objects
+     * @param prototype the type by which we determine the structure of the table
+     * @return a bound table model that can be used in the {@code Table} class
+     */
+    public BoundTableModel createTableModel(List<? extends PropertyBusinessObject> objects, 
+        PropertyBusinessObject prototype) {
+        return new BoundTableModel(objects, prototype);
+    }
+
+    /**
+     * Creates a table model which is implicitly bound to the properties
+     * @param objects list of business objects
+     * @param prototype the type by which we determine the structure of the table
+     * @return a bound table model that can be used in the {@code Table} class
+     */
+    public BoundTableModel createTableModel(CollectionProperty<? extends PropertyBusinessObject, ? extends Object> objects, 
+        PropertyBusinessObject prototype) {
+        return new BoundTableModel(objects, prototype);
+    }
     
     private Binding bindImpl(final PropertyBase prop, final Object cmp, final ComponentAdapter adapt) {
         adapt.assignTo(prop.get(), cmp);

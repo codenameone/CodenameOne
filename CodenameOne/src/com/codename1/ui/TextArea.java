@@ -174,6 +174,14 @@ public class TextArea extends Component {
      */
     public static final int INITIAL_CAPS_SENTENCE = 0x200000;
     //private int modifierFlag = 0x00000;
+    
+    /**
+     * This flag is a hint to the implementation that this field contains
+     * a username.
+     */
+    public static final int USERNAME = 0x400000;
+    
+    
              
     /**
      * Input constraint which should be one of ANY, NUMERIC,
@@ -316,6 +324,49 @@ public class TextArea extends Component {
         this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
     }
 
+    /**
+     * To work around race conditions in UI bindings (on Android at least), we want to 
+     * send action events early.  Even the focusLost() event isn't early enough to ensure
+     * that the action event is sent before an action event in a button that would trigger
+     * focus lost.  We add this form press listener to the form when we add the textarea
+     * and remove it when we remove the textarea.
+     * 
+     * Reference bug https://github.com/codenameone/CodenameOne/issues/2472
+     */
+    private final ActionListener formPressListener = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
+            Form f = getComponentForm();
+            if (f != null) {
+                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) {
+                    fireActionEvent();
+                    setSuppressActionEvent(true);
+                }
+            }
+        }
+    };
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        Form f = getComponentForm();
+        if (f != null) {
+            // To be able to send action events early.
+            // https://github.com/codenameone/CodenameOne/issues/2472
+            f.addPointerPressedListener(formPressListener);
+        }
+    }
+
+    @Override
+    protected void deinitialize() {
+        Form f = getComponentForm();
+        if (f != null) {
+            // For sending action events early
+            // https://github.com/codenameone/CodenameOne/issues/2472
+            f.removePointerPressedListener(formPressListener);
+        }
+        super.deinitialize();
+    }
+
     private static int numCols(String t) {
         if(t == null) {
             return 3;
@@ -427,6 +478,11 @@ public class TextArea extends Component {
      */
     public void setText(String t) {
         String old = this.text;
+        if (t != null ? !t.equals(old) : old != null) {
+            // If we've previously suppressed action events,
+            // we need to unsuppress them upon the text changing again.
+            setSuppressActionEvent(false);
+        }
         this.text = (t != null) ? t : "";
         setShouldCalcPreferredSize(true);
         if(maxSize < text.length()) {
@@ -466,6 +522,34 @@ public class TextArea extends Component {
     public int getAsInt(int invalid) {
         try {
             return Integer.parseInt(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
+    }
+    
+    /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't a long this number will be returned
+     * @return the long value of the text field
+     */
+    public long getAsLong(long invalid) {
+        try {
+            return Long.parseLong(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
+    }
+
+    /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't an double this number will be returned
+     * @return the double value of the text field
+     */
+    public double getAsDouble(double invalid) {
+        try {
+            return Double.parseDouble(text);
         } catch(NumberFormatException e) {
             return invalid;
         }
@@ -522,7 +606,7 @@ public class TextArea extends Component {
      */
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
-        
+        setSuppressActionEvent(false);
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
 
         // this works around a bug where fire is also a softkey on devices such as newer Nokia
@@ -699,8 +783,10 @@ public class TextArea extends Component {
      * {@inheritDoc}
      */
     void focusGainedInternal() {
+        setSuppressActionEvent(false);
         super.focusGainedInternal();
         setHandlesInput(isScrollableY());
+        
     }
 
     /**
@@ -709,6 +795,10 @@ public class TextArea extends Component {
     void focusLostInternal() {
         super.focusLostInternal();
         setHandlesInput(false);
+        if (isEditing()) {
+            fireActionEvent();
+            setSuppressActionEvent(true);
+        }
     }
     
     /**
@@ -1206,9 +1296,41 @@ public class TextArea extends Component {
     }
     
     /**
+     * Flag to indicate whether the action event is suppressed.
+     * FocusLost will trigger an action event if editing is in progress, 
+     * and then set this flag.
+     * The flag should be unset on focus gained, and on start editing.
+     */
+    private boolean suppressActionEvent;
+    
+    /**
+     * Since the action event is triggered on the end of editing, and that may not
+     * happen until a couple of EDT cycles after the onFocus event, we want to be 
+     * able to fire the action event in focus lost, and then suppress the normal
+     * action event that would be fired on editing end.  We use this flag to
+     * suppress action events.
+     * @param suppress 
+     */
+    void setSuppressActionEvent(boolean suppress) {
+        suppressActionEvent = suppress;
+        
+    }
+    
+    /**
+     * Checks to see if the action event is suppressed.
+     * @return 
+     */
+    boolean isSuppressActionEvent() {
+        return suppressActionEvent;
+    }
+    
+    /**
      * Notifies listeners of a change to the text area
      */
     void fireActionEvent() {
+        if (suppressActionEvent) {
+            return;
+        }
         if(actionListeners != null) {
             ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
             actionListeners.fireActionEvent(evt);

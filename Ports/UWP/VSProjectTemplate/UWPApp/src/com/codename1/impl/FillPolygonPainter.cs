@@ -3,13 +3,13 @@ namespace com.codename1.impl
 {
     class FillPolygonPainter : AsyncOp
     {
-        private ui.geom.Rectangle clip;
+        private ui.geom.Shape clip;
         private int[] p1;
         private int[] p2;
         private int color;
         private int alpha;
 
-        public FillPolygonPainter(ui.geom.Rectangle clip, int[] p1, int[] p2, int color, int alpha) : base(clip)
+        public FillPolygonPainter(ui.geom.Shape clip, int[] p1, int[] p2, int color, int alpha) : base(clip)
         {
             // TODO: Complete member initialization
             this.clip = clip;

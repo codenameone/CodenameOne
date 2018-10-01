@@ -267,94 +267,10 @@ private void closeDialogActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     dispose();
 }//GEN-LAST:event_closeDialogActionPerformed
 
-public static void updateServer(final java.awt.Component parent) {
-    if(previewKey == null) {
-        return;
-    }
-
-    final String user = LoginDialog.getUser(parent);
-    if(user == null) {
-        return;
-    }
-    final String password = LoginDialog.getPassword(parent);
-    
-    ProgressMonitor pm = new ProgressMonitor(parent, "Enabling Preview", "Preview", 0, 100);
-    pm.setMillisToPopup(0);
-    new Thread() {
-        public void run() {
-            try {
-                if(view.getLoadedResources() != null) {
-                    String localServerURL = null;
-                    try {
-                        InetAddress addr = InetAddress.getLocalHost();
-                        byte[] ipAddr = addr.getAddress();
-                        if((ipAddr[0] & 0xff) == 127) {
-                            // workaround  for linux where loopback is returned
-                            Socket s = new Socket("codename-one.appspot.com", 80);
-                            String p = s.getLocalAddress().getHostAddress();
-                            s.close();
-                            localServerURL = p;
-                        } else {
-                            localServerURL = (ipAddr[0] & 0xff) + "." + (ipAddr[1] & 0xff) + 
-                                    "." + (ipAddr[2] & 0xff) + "." + (ipAddr[3] & 0xff);
-                        }
-                    } catch(Throwable t) {
-                    }
-                    
-                    URL u = new URL("https://codename-one.appspot.com/liveeditpreview/preview");
-                    HttpURLConnection con = (HttpURLConnection)u.openConnection();
-                    con.setDoOutput(true);
-                    con.setDoInput(true);
-                    con.setRequestMethod("POST");
-                    EditableResources res = view.getLoadedResources();
-                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                    DataOutputStream out = new DataOutputStream(bo);
-                    out.writeUTF(user.toLowerCase());
-                    out.writeUTF(password);
-                    out.writeUTF(getMainFormSelection());
-                    if(getThemeSelection() == null) {
-                        if(view.getLoadedResources().getThemeResourceNames().length > 0) {
-                            out.writeUTF(view.getLoadedResources().getThemeResourceNames()[0]);
-                        } else {
-                            out.writeUTF("");
-                        }
-                    } else {
-                        out.writeUTF(getThemeSelection());                        
-                    }
-                    if(localServerURL != null) {
-                        out.writeUTF("http://" + localServerURL +
-                                ":" + LocalServer.getPort() + "/");
-                    } else {
-                        out.writeUTF("");
-                    }
-                    view.getLoadedResources().save(out);
-                    out.close();
-
-                    OutputStream requestOut = con.getOutputStream();
-                    requestOut.write(bo.toByteArray());
-                    DataInputStream di = new DataInputStream(con.getInputStream());
-                    previewKey = di.readUTF();
-                    di.close();
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                //JOptionPane.showMessageDialog(parent, "Error: \n" + ex.toString(), "Error Connecting To Server", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }.start();
-    
+public static void updateServer(final java.awt.Component parent) {    
 }
 
 public static void setLivePreviewEnabled(boolean e, java.awt.Component parent, ResourceEditorView v) {
-    view = v;
-    if(e) {
-        if(previewKey == null) {
-            previewKey = "";
-            updateServer(parent);
-        }
-    } else {
-        previewKey = null;
-    }
 }
 
 private void enableLivePreviewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_enableLivePreviewActionPerformed

@@ -126,6 +126,27 @@ public class Toolbar extends Container {
         onTopSideMenu = aOnTopSideMenu;
     }
 
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     */
+    private static boolean enableSideMenuSwipe = true;
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     * @return the enableSideMenuSwipe
+     */
+    public static boolean isEnableSideMenuSwipe() {
+        return enableSideMenuSwipe;
+    }
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     * @param aEnableSideMenuSwipe the enableSideMenuSwipe to set
+     */
+    public static void setEnableSideMenuSwipe(boolean aEnableSideMenuSwipe) {
+        enableSideMenuSwipe = aEnableSideMenuSwipe;
+    }
+    
     private Component titleComponent;
 
     private ToolbarSideMenu sideMenu;
@@ -186,6 +207,8 @@ public class Toolbar extends Container {
      */
     private Component sidemenuSouthComponent;
     private Component rightSidemenuSouthComponent;
+    
+    private float searchIconSize;
 
     /**
      * Empty Constructor
@@ -594,24 +617,12 @@ public class Toolbar extends Container {
      * in millimeters
      */
     public void addSearchCommand(final ActionListener callback, final float iconSize) {
+        searchIconSize = iconSize;
         searchCommand = new Command("") {
 
             @Override
             public void actionPerformed(ActionEvent evt) {
-                SearchBar s = new SearchBar(Toolbar.this, iconSize) {
-
-                    @Override
-                    public void onSearch(String text) {
-                        callback.actionPerformed(new ActionEvent(text));
-                    }
-
-                };
-                Form f = (Form) Toolbar.this.getComponentForm();
-                setHidden(true);
-                f.removeComponentFromForm(Toolbar.this);
-                f.setToolbar(s);
-                s.initSearchBar();
-                f.animateLayout(100);
+                showSearchBar(callback);
             }
 
         };
@@ -620,6 +631,31 @@ public class Toolbar extends Container {
         addCommandToRightBar(searchCommand);
     }
 
+    /**
+     * Shows the search bar manually which is useful for use cases of popping 
+     * up search from code
+     * 
+     * @param callback gets the search string callbacks
+     */
+    public void showSearchBar(final ActionListener callback) {        
+        SearchBar s = new SearchBar(Toolbar.this, searchIconSize) {
+
+            @Override
+            public void onSearch(String text) {
+                callback.actionPerformed(new ActionEvent(text));
+            }
+
+        };
+        Form f = (Form) Toolbar.this.getComponentForm();
+        setHidden(true);
+        f.removeComponentFromForm(Toolbar.this);
+        f.setToolbar(s);
+        s.initSearchBar();
+        if(f == Display.INSTANCE.getCurrent()) {
+            f.animateLayout(100);
+        }
+    }
+    
     /**
      * Removes a previously installed search command
      */
@@ -1257,7 +1293,7 @@ public class Toolbar extends Container {
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
-                        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null) {
                             return;
                         }
                         if (sidemenuDialog != null) {
@@ -2159,6 +2195,11 @@ public class Toolbar extends Container {
      */
     public void hideToolbar() {
         showing = false;
+        if(Display.INSTANCE.getCurrent() != getComponentForm()) {
+            setVisible(false);
+            setHidden(true);
+            return;
+        }
         if (actualPaneInitialH == 0) {
             Form f = getComponentForm();
             if (f != null) {
@@ -2175,6 +2216,12 @@ public class Toolbar extends Container {
      */
     public void showToolbar() {
         showing = true;
+        if(!isVisible()) {
+            setVisible(true);
+            setHidden(false);
+            getComponentForm().animateLayout(200);
+            return;
+        }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
         getComponentForm().registerAnimated(this);
         hideShowMotion.start();
@@ -2189,7 +2236,7 @@ public class Toolbar extends Container {
             if (!layered) {
                 actualPane.setY(actualPaneInitialY + val);
                 if (showing) {
-                    actualPane.setHeight(actualPaneInitialH + getHeight() - val);
+                    actualPane.setHeight(actualPaneInitialH - val);
                 } else {
                     actualPane.setHeight(actualPaneInitialH - val);
                 }
@@ -2212,6 +2259,9 @@ public class Toolbar extends Container {
         actualPaneInitialH = actualPane.getHeight();
     }
 
+    // Flag for the scrollChanged listener to prevent it from being re-entered.
+    private boolean entered;
+    private int lastNonZeroScrollDiff;
     private void bindScrollListener(boolean bind) {
         final Form f = getComponentForm();
         if (f != null) {
@@ -2220,23 +2270,44 @@ public class Toolbar extends Container {
             if (bind) {
                 initVars(actualPane);
                 scrollListener = new ScrollListener() {
-
+                    
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                        int diff = scrollY - oldscrollY;
-                        int toolbarNewY = getY() - diff;
-                        if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
-                            return;
-                        }
-                        toolbarNewY = Math.max(toolbarNewY, -getHeight());
-                        toolbarNewY = Math.min(toolbarNewY, initialY);
-                        if (toolbarNewY != getY()) {
-                            setY(toolbarNewY);
-                            if (!layered) {
-                                actualPane.setY(actualPaneInitialY + toolbarNewY);
-                                actualPane.setHeight(actualPaneInitialH + getHeight() - toolbarNewY);
-                                actualPane.doLayout();
+                        if (entered || contentPane.isTensileMotionInProgress()) return;
+                        
+                        // When the content pane is resized, it may trigger a scroll event --
+                        // we need to make sure that *that* scroll event doesn't trigger
+                        // us - or we get unexpected results.
+                        entered = true;
+                        try {
+                            int diff = scrollY - oldscrollY;
+                            if (diff != 0) {
+                                lastNonZeroScrollDiff = diff;
                             }
-                            f.repaint();
+
+                            int toolbarNewY = getY() - diff;
+                            if (scrollY < 0 || Math.abs(toolbarNewY) < 2) {
+                                return;
+                            }
+                            toolbarNewY = Math.max(toolbarNewY, -getHeight());
+                            toolbarNewY = Math.min(toolbarNewY, initialY);
+                            if (toolbarNewY != getY()) {
+                                setY(toolbarNewY);
+                                if (!layered) {
+                                    int oldY = actualPane.getY();
+                                    
+                                    actualPane.setY(getHeight() + getY());
+                                    boolean smooth = actualPane.isSmoothScrolling();
+                                    actualPane.setSmoothScrolling(false);
+                                    actualPane.setScrollY(scrollY - oldY + actualPane.getY());
+                                    actualPane.setSmoothScrolling(smooth);
+                                    actualPane.setHeight(f.getHeight() - getHeight() - getY());
+                                    
+                                    actualPane.doLayout();
+                                }
+                                f.repaint();
+                            }
+                        } finally {
+                            entered = false;
                         }
                     }
                 };
@@ -2246,9 +2317,13 @@ public class Toolbar extends Container {
 
                     public void actionPerformed(ActionEvent evt) {
                         if (getY() + getHeight() / 2 > 0) {
-                            showToolbar();
+                            if (!showing && lastNonZeroScrollDiff < 0) {
+                                showToolbar();
+                            }
                         } else {
-                            hideToolbar();
+                            if (showing && lastNonZeroScrollDiff > 0) {
+                                hideToolbar();
+                            }
                         }
                         f.repaint();
                     }
