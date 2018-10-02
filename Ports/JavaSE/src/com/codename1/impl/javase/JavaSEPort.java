@@ -6557,14 +6557,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
 
-    @Override
-    public com.codename1.ui.Transform getTransform(Object graphics) {
+    private com.codename1.ui.Transform getTransformInternal(Object graphics) {
         checkEDT();
         com.codename1.ui.Transform t = getNativeScreenGraphicsTransform(graphics);
         if ( t == null ){
             return Transform.makeIdentity();
         }
-        return t.copy();
+        return t;
+    }
+    
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        return getTransformInternal(graphics).copy();
     }
 
     @Override
@@ -7343,29 +7347,43 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public void resetAffine(Object nativeGraphics) {
         checkEDT();
+        setTransform(nativeGraphics, com.codename1.ui.Transform.makeIdentity());
+        /*
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
         if (zoomLevel != 1 && g != nativeGraphics) {
             g.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
-        }
+        }*/
     }
 
     public void scale(Object nativeGraphics, float x, float y) {
         checkEDT();
-        Graphics2D g = getGraphics(nativeGraphics);
-        g.scale(x, y);
+        //Graphics2D g = getGraphics(nativeGraphics);
+        //g.scale(x, y);
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.scale(x, y);
+        setTransform(nativeGraphics, tf);
     }
 
     public void rotate(Object nativeGraphics, float angle) {
+        /*
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.rotate(angle);
+        */
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.rotate(angle, 0, 0);
+        setTransform(nativeGraphics, tf);
+        
     }
 
     public void rotate(Object nativeGraphics, float angle, int pX, int pY) {
         checkEDT();
-        Graphics2D g = getGraphics(nativeGraphics);
-        g.rotate(angle, pX, pY);
+        //Graphics2D g = getGraphics(nativeGraphics);
+        //g.rotate(angle, pX, pY);
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.rotate(angle, pX, pY);
+        setTransform(nativeGraphics, tf);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
