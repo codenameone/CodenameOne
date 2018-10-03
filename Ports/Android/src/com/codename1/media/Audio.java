@@ -58,7 +58,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
     private boolean buffering;
     private boolean disposeOnComplete = true;
     private int tempVolume = -1;
-    
+    private boolean pausedDueToExternal;
     private static Vector currentPlayingAudio = new Vector();
     private static PhoneStateListener phoneStateListener;
     
@@ -352,13 +352,14 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         switch (focusChange) {
             case AudioManager.AUDIOFOCUS_GAIN:
                 // resume playback
-                if (!isPlaying() && player != null) {
+                if (!isPlaying() && player != null && pausedDueToExternal) {
                     player.start();
                     if(tempVolume > -1) {
                         setVolume(tempVolume);
                         tempVolume = -1;
                     }
                 }
+                pausedDueToExternal = false;
                 break;
 
             case AudioManager.AUDIOFOCUS_LOSS:
@@ -373,6 +374,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                 // is likely to resume
                 if (isPlaying()) {
                     pause();
+                    pausedDueToExternal = true;
                 }
                 break;
 
