@@ -1960,6 +1960,10 @@ public class CSSTheme {
         return null;
     }
     
+    private boolean isFileURL(URL url) {
+        return "file".equals(url.getProtocol()) && (url.getHost() == null || "".equals(url.getHost()));
+    }
+    
     public Image getBackgroundImage(Map<String,LexicalUnit> styles, ScaledUnit bgImage)  {
         try {
             //ScaledUnit bgImage = (ScaledUnit)styles.get("background-image");
@@ -1995,12 +1999,33 @@ public class CSSTheme {
             URL imgURL = null;
             if (url.startsWith("http://") || url.startsWith("https://")) {
                 imgURL = new URL(url);
-                
             } else {
                 imgURL = new URL(baseURL, url);
             }
             
-            
+            if (false && isFileURL(imgURL)) {
+                // This section is switched off because loading multi-images via url() 
+                // will cause unexpected results in cases where image borders are generated.
+                // In order for this approach to work, we need take into account multi-images when
+                // producing snapshots in the webview so that the correct size of image is used.
+                // You can still load multi-images as theme constants.
+                // See https://github.com/codenameone/CodenameOne/issues/2569#issuecomment-426730539
+                File imgDir = new File(imgURL.toURI());
+                if (imgDir.isDirectory()) {
+                    try {
+                        Image im = getResourceImage(imgDir.getName(), imgDir.getParentFile());
+                        if (im != null) {
+                            loadedImages.put(url, im);
+                            return im;
+                        }
+                    } catch (Throwable t) {
+                        System.err.println("Failed to load Multi-image from "+imgURL);
+                        t.printStackTrace();
+                        throw t;
+                    }
+                    
+                }
+            }
             
             InputStream is = imgURL.openStream();
             EncodedImage encImg = EncodedImage.create(is);
@@ -4228,7 +4253,7 @@ public class CSSTheme {
             if (borderWidth != null) {
                 switch (borderWidth.getLexicalUnitType()) {
                     case LexicalUnit.SAC_MILLIMETER:
-                        out.stroke((int)borderWidth.getNumericValue(), true);
+                        out.stroke((float)borderWidth.getNumericValue(), true);
                         break;
                     case LexicalUnit.SAC_INTEGER:
                     case LexicalUnit.SAC_REAL:
