@@ -117,7 +117,23 @@ public class Receipt implements Externalizable {
     private static boolean externalizableRegistered;
 
     public Receipt() {
+    }
 
+    /**
+     * Convenience constructor 
+     */
+    public Receipt(String sku, Date expiryDate, Date cancellationDate,
+        Date purchaseDate, int quantity, String transactionId,
+        String orderData, String storeCode, String internalId) {
+        this.sku = sku;
+        this.expiryDate = expiryDate;
+        this.cancellationDate = cancellationDate;
+        this.purchaseDate = purchaseDate;
+        this.quantity = quantity;
+        this.transactionId = transactionId;
+        this.orderData = orderData;
+        this.storeCode = storeCode;
+        this.internalId = internalId;
     }
     
     /**

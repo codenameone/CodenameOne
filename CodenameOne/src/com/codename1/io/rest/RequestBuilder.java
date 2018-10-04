@@ -535,6 +535,40 @@ public class RequestBuilder {
     }
 
     /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback. This fetches JSON data and parses it into a properties business object
+     * @param callback writes the response to this callback
+     * @param type the class of the business object returned
+     * @return returns the Connection Request object so it can be killed if necessary
+     */ 
+    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
+        ConnectionRequest request = createRequest(true);
+        request.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                Response res = null;
+                Map response = (Map)evt.getMetaData();
+                List<Map> lst = (List<Map>)response.get("root");
+                try {
+                    List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+                    for(Map m : lst) {
+                        PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                        pb.getPropertyIndex().populateFromMap(m);
+                        result.add(pb);
+                    }
+                    res = new Response(evt.getResponseCode(), result, evt.getMessage());
+                    callback.completed(res);
+                } catch(Exception err) {
+                    Log.e(err);
+                    throw new RuntimeException(err.toString());
+                }
+            }
+        });
+        CN.addToQueue(request);       
+        return request;
+    }
+    
+    /**
      * Executes the request synchronously
      * 
      * @param type the type of the business object to create
