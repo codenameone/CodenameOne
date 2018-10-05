@@ -49,6 +49,7 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/components-onoffswitch.png" alt="The looks of the on-off switch">
  *
  * @author Shai Almog
+ * @deprecated Use new {@link Switch} class instead as it conforms to the latest platform looks and feels.
  */
 public class OnOffSwitch extends Container {
     private String on = "ON";
