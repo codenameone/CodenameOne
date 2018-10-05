@@ -3169,12 +3169,16 @@ void cn1_addSelectedImagePath(NSString* path) {
 #else
     [picker dismissModalViewControllerAnimated:YES];
 #endif
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 - (void)qb_imagePickerControllerDidCancel:(QBImagePickerController *)picker
 {
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 #endif
@@ -3184,6 +3188,8 @@ void cn1_addSelectedImagePath(NSString* path) {
     //[self dismissModalViewControllerAnimated:YES];
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 //#define LOW_MEM_CAMERA
@@ -3229,6 +3235,8 @@ void cn1_addSelectedImagePath(NSString* path) {
         [picker dismissModalViewControllerAnimated:YES];
 #endif
     }
+    popoverController = nil;
+    popoverControllerInstance = nil;
 
 }
 
