@@ -1419,6 +1419,24 @@ public class Form extends Container {
     }
 
     /**
+     * Stops any active editing on the form.  Closes keyboard if it is opened.
+     * @param onFinish Callback to run on finish.
+     */
+    @Override
+    public void stopEditing(Runnable onFinish) {
+        Display.getInstance().stopEditing(this, onFinish);
+        
+    }
+
+    @Override
+    public boolean isEditing() {
+        return Display.getInstance().isTextEditing(this);
+    }
+
+    
+    
+    
+    /**
      * Sets the Form title to the given text
      * 
      * @param title the form title
