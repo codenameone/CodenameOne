@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
@@ -966,6 +967,11 @@ public abstract class LookAndFeel {
         if(gap != null) {
             Label.setDefaultGap(Display.getInstance().convertToPixels(Util.toFloatValue(gap)));
         }
+        
+        InfiniteProgress.setDefaultMaterialDesignMode(
+            manager.isThemeConstant("infiniteProgressMaterialModeBool", false));
+        InfiniteProgress.setDefaultMaterialDesignColor(
+            manager.getThemeConstant("infiniteProgressMaterialColorInt", 0x6200ee));
         
         TextArea.setDefaultValign(manager.getThemeConstant("textCmpVAlignInt", TextArea.getDefaultValign()));
         defaultSnapToGrid = manager.isThemeConstant("snapGridBool", false);

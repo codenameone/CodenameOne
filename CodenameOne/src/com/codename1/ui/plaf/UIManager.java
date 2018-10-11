@@ -605,7 +605,7 @@ public class UIManager {
             themeProps.put("OnOffSwitch.sel#padding", "0,0,0,0");
             themeProps.put("OnOffSwitch.sel#font", lightFont);
         }
-        
+                
         if(installedTheme == null || !installedTheme.containsKey("ContentPane.derive")) {
             themeProps.put("ContentPane.transparency", "0");
             themeProps.put("ContentPane.margin", "0,0,0,0");
@@ -962,6 +962,15 @@ public class UIManager {
             themeProps.put("FloatingActionButton.sel#bgColor", "b71c1c");
             themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("RefreshLabel.derive")) {
+            themeProps.put("RefreshLabel.fgColor", "0");
+            themeProps.put("RefreshLabel.bgColor", "ffffff");
+            themeProps.put("RefreshLabel.transparency", "0");
+            themeProps.put("RefreshLabel.marUnit", new byte[]{Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+            themeProps.put("RefreshLabel.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("RefreshLabel.margin", "1,1,1,1");
+            themeProps.put("RefreshLabel.padding", "2,3,2,3");
         }
         if(installedTheme == null || !installedTheme.containsKey("Badge.derive")) {
             themeProps.put("Badge.fgColor", "ffffff");
