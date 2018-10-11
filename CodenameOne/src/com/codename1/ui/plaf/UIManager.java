@@ -593,6 +593,16 @@ public class UIManager {
         themeProps.put("Container.dis#derive", "Container");
         themeProps.put("Container.press#derive", "Container");
 
+        if(installedTheme == null || !installedTheme.containsKey("Switch.derive")) {
+            themeProps.put("Switch.transparency", "255");
+            themeProps.put("Switch.bgColor", "9F9E9E");
+            themeProps.put("Switch.fgColor", "EDEDED");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("Switch.sel#derive")) {
+            themeProps.put("Switch.sel#transparency", "255");
+            themeProps.put("Switch.sel#bgColor", "757E84");
+            themeProps.put("Switch.sel#fgColor", "222C32");
+        }
         if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.derive")) {
             themeProps.put("OnOffSwitch.transparency", "255");
             themeProps.put("OnOffSwitch.bgColor", "222222");
