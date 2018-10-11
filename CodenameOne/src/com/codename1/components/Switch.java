@@ -2,7 +2,6 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import static com.codename1.ui.Component.CENTER;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -116,7 +115,7 @@ Switch.selected {
 *   <li>{@literal switchDisabledTrackImage}</li>
 * </ul>
  */
-public class Switch extends Container {
+public class Switch extends Component {
 
     private boolean value;
     private Image thumbOnImage;
@@ -137,6 +136,7 @@ public class Switch extends Container {
      */
     public Switch() {
         setUIID("Switch");
+        setOpaque(false);
         initialize();
     }
 
@@ -282,7 +282,6 @@ public class Switch extends Container {
     }
 
     private void initialize() {
-        removeAll();
         setFocusable(true);
         initTheme();
     }
@@ -432,15 +431,6 @@ public class Switch extends Container {
         }
     }
 
-    @Override
-    public void paintComponentBackground(Graphics g) {
-        // We don't want to paint the component background since we will
-        // paint it all in the the paint() method.
-        //super.paintComponentBackground(g); //To change body of generated methods, choose Tools | Templates.
-    }
-
-   
-    
     /**
      * {@inheritDoc}
      */

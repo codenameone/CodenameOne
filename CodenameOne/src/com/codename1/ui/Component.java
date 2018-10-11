@@ -305,6 +305,10 @@ public class Component implements Animation, StyleListener {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
+    
+    // A flag to indicate whether to paint the component's background.
+    // Setting this to false will cause the component's background to not be painted.
+    private boolean opaque=true;
 
     private boolean hideInPortrait;
 
@@ -1019,7 +1023,23 @@ public class Component implements Animation, StyleListener {
     public void setVisible(boolean visible) {
         this.visible = visible;
     }
-
+    /**
+     * Sets whether or not to paint the component background.  Default is {@literal true}
+     * @param opaque False to not paint the component's background.
+     * @since 6.0
+     */
+    public void setOpaque(boolean opaque) {
+        this.opaque = opaque;
+    }
+    
+    /**
+     * Checks whether the component's background should be painted.
+     * @return {@literal true} if the component's background should be painted.
+     */
+    public boolean isOpaque() {
+        return opaque;
+    }
+    
     /**
      * Returns the component width
      * 
@@ -2412,7 +2432,7 @@ public class Component implements Animation, StyleListener {
      * @param g the component graphics
      */
     void paintComponentBackground(Graphics g) {
-        if(isFlatten()) {
+        if(isFlatten() || !opaque) {
             return;
         }
         paintBackgroundImpl(g);
