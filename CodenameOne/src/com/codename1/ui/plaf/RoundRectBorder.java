@@ -147,6 +147,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder stroke(Stroke stroke) {
+    	if (stroke != null) {
+    		strokeThickness = stroke.getLineWidth();
+    		strokeMM = false;
+    	}
         this.stroke = stroke;
         return this;
     }
