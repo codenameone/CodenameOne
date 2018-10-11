@@ -1293,7 +1293,7 @@ public class Toolbar extends Container {
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
-                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null || getComponentForm().isEditing()) {
                             return;
                         }
                         if (sidemenuDialog != null) {
@@ -1499,6 +1499,18 @@ public class Toolbar extends Container {
                     
                 });
                 return;
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This "hack" achieves that.  
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize 
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+                f.stopEditing(new Runnable() {public void run() {}});
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1621,6 +1633,18 @@ public class Toolbar extends Container {
                     
                 });
                 return;
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This "hack" achieves that.  
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize 
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+                f.stopEditing(new Runnable(){public void run(){}});
             }
         }
         AnimationManager a = getAnimationManager();
