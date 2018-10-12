@@ -4390,7 +4390,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerPressed(int x, int y) {
-        pullY = y;
         dragActivated = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
@@ -5693,13 +5692,18 @@ public class Component implements Animation, StyleListener {
                     refreshTaskDragListener = new ActionListener() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
-                            if(updateMaterialPullToRefresh(p, evt.getY() - getAbsoluteY())) {
-                                evt.consume();
+                            if(evt.getEventType() == ActionEvent.Type.PointerDrag) {
+                                if(updateMaterialPullToRefresh(p, evt.getY() - getAbsoluteY())) {
+                                    evt.consume();
+                                }
+                            } else {
+                                pullY = evt.getY() - getAbsoluteY();
                             }
                         }
                     };
                 }
                 p.addPointerDraggedListener(refreshTaskDragListener);
+                p.addPointerPressedListener(refreshTaskDragListener);
             }
         }
     }
@@ -5734,6 +5738,7 @@ public class Component implements Animation, StyleListener {
             if(refreshTaskDragListener != null) {
                 Form f = getComponentForm();
                 f.removePointerDraggedListener(refreshTaskDragListener);
+                f.removePointerPressedListener(refreshTaskDragListener);
             }
         }
     }
