@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
@@ -38,8 +39,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 
@@ -354,6 +357,7 @@ public class Component implements Animation, StyleListener {
     private int destScrollY = -1;
     private int lastScrollY;
     private int lastScrollX;
+    private int pullY;
     private boolean shouldGrabScrollEvents;
 
     /**
@@ -421,6 +425,8 @@ public class Component implements Animation, StyleListener {
     private String cloudDestinationProperty;
     boolean noBind;
     private Runnable refreshTask;
+    private ActionListener refreshTaskDragListener;
+    
     private double pinchDistance;
     static int restoreDragPercentage = -1;
 
@@ -2064,7 +2070,8 @@ public class Component implements Animation, StyleListener {
         paintComponentBackground(g);
 
         if (isScrollable()) {
-            if(refreshTask != null && (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
+            if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() && 
+                (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
                 paintPullToRefresh(g);
             }
             int scrollX = getScrollX();
@@ -4042,6 +4049,110 @@ public class Component implements Animation, StyleListener {
         return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents());
     }
     
+    private boolean pointerReleaseMaterialPullToRefresh() {
+        if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
+            Container c = getComponentForm().getLayeredPane(InfiniteProgress.class, true);
+            if(c.getComponentCount() > 0) {
+                Component cc = c.getComponentAt(0);
+                if(cc instanceof InfiniteProgress) {
+                    return false;
+                }
+                Motion opacityMotion = (Motion)cc.getClientProperty("cn1$opacityMotion");
+                c.removeAll();
+                if(opacityMotion.isFinished()) {
+                    final InfiniteProgress ip = new InfiniteProgress();
+                    ip.setUIID("RefreshLabel");
+                    ip.getUnselectedStyle().
+                        setBorder(RoundBorder.create().
+                            color(getUnselectedStyle().getBgColor()).
+                            shadowX(0).
+                            shadowY(0).
+                            shadowSpread(1, true).
+                            shadowOpacity(100));
+                    Style s = ip.getUnselectedStyle();
+                    s.setMarginUnit(Style.UNIT_TYPE_DIPS);
+                    s.setMarginTop(10);
+                    c.add(ip);
+                    Display.INSTANCE.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            refreshTask.run();
+                            ip.remove();
+                        }
+                    });
+                } 
+                c.revalidate();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private boolean updateMaterialPullToRefresh(final Form p, int y) {
+        if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
+            pullY < getHeight() / 4 &&
+            scrollableYFlag() && getScrollY() == 0) {
+            int mm = Display.INSTANCE.convertToPixels(1);
+            if(mm < y - pullY) {
+                if(p.buttonsAwatingRelease != null) {
+                    p.buttonsAwatingRelease.clear();
+                }
+                Container c = p.getLayeredPane(InfiniteProgress.class, true);
+                c.setLayout(new FlowLayout(CENTER));
+                Motion rotationMotion;
+                Motion opacityMotion;
+                Label refreshLabel;
+                if(c.getComponentCount() == 0) {
+                    refreshLabel = new Label("", "RefreshLabel");
+                    FontImage.setMaterialIcon(refreshLabel, FontImage.MATERIAL_REFRESH, 5);
+                    refreshLabel.
+                        getUnselectedStyle().setBorder(RoundBorder.create().
+                            color(getUnselectedStyle().getBgColor()).
+                            shadowX(0).
+                            shadowY(0).
+                            shadowSpread(1, true).
+                            shadowOpacity(100));
+                    opacityMotion = Motion.createLinearMotion(
+                        40, 255, getHeight() / 4);
+                    opacityMotion.setStartTime(pullY);
+
+                    rotationMotion = Motion.createLinearMotion(
+                        0, 360, getHeight() / 4);
+                    rotationMotion.setStartTime(pullY);
+                    refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
+                    refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
+                    c.add(refreshLabel);
+                    p.addPointerReleasedListener(new ActionListener() {
+                        public void actionPerformed(ActionEvent evt) {
+                            pointerReleaseMaterialPullToRefresh();
+                            p.removePointerReleasedListener(this);
+                            evt.consume();
+                        }
+                    });
+                } else {
+                    Component cc = c.getComponentAt(0);
+                    if(cc instanceof InfiniteProgress) {
+                        return false;
+                    }
+                    refreshLabel = (Label)cc;
+                    opacityMotion = (Motion)refreshLabel.getClientProperty("cn1$opacityMotion");
+                    rotationMotion = (Motion)refreshLabel.getClientProperty("cn1$rotationMotion");                    
+                }
+                rotationMotion.setCurrentMotionTime(y);
+                opacityMotion.setCurrentMotionTime(y);
+                Style s = refreshLabel.getAllStyles();
+                s.setOpacity(opacityMotion.getValue());
+                Image i = ((FontImage)refreshLabel.getIcon()).rotate(rotationMotion.getValue());
+                refreshLabel.setIcon(i);
+                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                s.setMarginTop(Math.min(getHeight() / 5, y - pullY));
+                c.revalidate();
+                return true;
+            }
+        }
+        return false;
+    }
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
@@ -4058,7 +4169,7 @@ public class Component implements Animation, StyleListener {
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
-        
+
         if(dragAndDropInitialized) {
             //keep call to pointerDragged to move the parent scroll if needed
             if (dragCallbacks < 2) {
@@ -4175,7 +4286,7 @@ public class Component implements Animation, StyleListener {
             // and pulling it in the reverse direction of the drag
             if (isScrollableY()) {
                 int tl;
-                if(getTensileLength() > -1 && refreshTask == null) {
+                if(getTensileLength() > -1 && (refreshTask == null || InfiniteProgress.isDefaultMaterialDesignMode())) {
                     tl = getTensileLength();
                 } else {
                     tl = getHeight() / 2;
@@ -4672,7 +4783,7 @@ public class Component implements Animation, StyleListener {
             }
             if(isScrollableY()){
                 if (scrollY < 0) {
-                    if(refreshTask != null){
+                    if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode()){
                         putClientProperty("$pullToRelease", "normal");
                         if(scrollY < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
                             putClientProperty("$pullToRelease", "update");                  
@@ -5575,6 +5686,25 @@ public class Component implements Animation, StyleListener {
             }
             initComponent();
             showNativeOverlay();
+            if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
+                final Form p = getComponentForm();
+                if(refreshTaskDragListener == null) {
+                    refreshTaskDragListener = new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            if(evt.getEventType() == ActionEvent.Type.PointerDrag) {
+                                if(updateMaterialPullToRefresh(p, evt.getY() - getAbsoluteY())) {
+                                    evt.consume();
+                                }
+                            } else {
+                                pullY = evt.getY() - getAbsoluteY();
+                            }
+                        }
+                    };
+                }
+                p.addPointerDraggedListener(refreshTaskDragListener);
+                p.addPointerPressedListener(refreshTaskDragListener);
+            }
         }
     }
 
@@ -5605,6 +5735,11 @@ public class Component implements Animation, StyleListener {
                 ((BGPainter)p).radialCache = null;
             }           
             deinitialize();
+            if(refreshTaskDragListener != null) {
+                Form f = getComponentForm();
+                f.removePointerDraggedListener(refreshTaskDragListener);
+                f.removePointerPressedListener(refreshTaskDragListener);
+            }
         }
     }
 
@@ -6272,7 +6407,7 @@ public class Component implements Animation, StyleListener {
      * @return the alwaysTensile
      */
     public boolean isAlwaysTensile() {
-        return alwaysTensile && !isScrollableX() || refreshTask != null;
+        return alwaysTensile && !isScrollableX() || (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode());
     }
 
     /**

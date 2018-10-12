@@ -2853,7 +2853,11 @@ public class Form extends Container {
         dragged = null;
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
+            pointerPressedListeners.fireActionEvent(e);
+            if(e.isConsumed()) {
+                return;
+            }
         }
         //check if the click is relevant to the menu bar.
         /*

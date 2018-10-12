@@ -1177,8 +1177,6 @@ public class Toolbar extends Container {
                         if (sidemenuDialog != null && !isRTL()) {
                             if (sidemenuDialog.isShowing()) {
                                 if (evt.getX() > sidemenuDialog.getWidth()) {
-                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                                    closeSideMenu();
                                     evt.consume();
                                 } else {
                                     if (evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
@@ -1195,7 +1193,7 @@ public class Toolbar extends Container {
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
-                                    evt.consume();
+                                    //evt.consume();
                                 } else {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
@@ -1336,6 +1334,12 @@ public class Toolbar extends Container {
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
                         }
+                        if (evt.getX() > sidemenuDialog.getWidth()) {
+                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                            evt.consume();
+                            closeSideMenu();
+                            return;
+                        } 
                         if (sidemenuDialog != null) {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {

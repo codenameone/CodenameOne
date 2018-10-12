@@ -126,7 +126,8 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder header(String key, String value) {
-        headers.put(key, value);
+        // .toString() is used to trigger an NPE early for null headers
+        headers.put(key.toString(), value.toString());
         return this;
     }
     
