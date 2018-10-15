@@ -997,9 +997,12 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopSidemenu(Component cmp) {
         if (cmp != null) {
+            if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
+                return true;
+            }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentSideMenuContainer || cmp == this) {
+                if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
                     return true;
                 }
             }
@@ -1009,9 +1012,14 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopRightSidemenu(Component cmp) {
         if (cmp != null) {
+            if (cmp == permanentRightSideMenuContainer || cmp == this
+                || cmp == rightSidemenuSouthComponent) {
+                return true;
+            }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentRightSideMenuContainer || cmp == this) {
+                if (cmp == permanentRightSideMenuContainer || cmp == this
+                    || cmp == rightSidemenuSouthComponent) {
                     return true;
                 }
             }
