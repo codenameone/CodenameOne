@@ -5897,7 +5897,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected InputStream createFileInputStream(String fileName) throws FileNotFoundException {
-        return new FileInputStream(fileName);
+        return new FileInputStream(removeFilePrefix(fileName));
     }
 
     protected InputStream createFileInputStream(File f) throws FileNotFoundException {
@@ -5905,7 +5905,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
-        return new FileOutputStream(fileName);
+        return new FileOutputStream(removeFilePrefix(fileName));
     }
 
     protected OutputStream createFileOuputStream(java.io.File f) throws FileNotFoundException {
