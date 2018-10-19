@@ -8,11 +8,11 @@ namespace com.codename1.impl
 {
     class ClearColorPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private int color;
         private int alpha;
 
-        public ClearColorPainter(Rectangle clip, int color, int alpha) : base(clip)
+        public ClearColorPainter(Shape clip, int color, int alpha) : base(null)
         {
             this.clip = clip;
             this.color = color;

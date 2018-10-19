@@ -42,6 +42,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
+#include "java_lang_RuntimeException.h"
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
@@ -83,6 +84,9 @@
 extern int popoverSupported();
 
 #define INCLUDE_CN1_PUSH2
+#ifdef INCLUDE_CN1_PUSH2
+#import <UserNotifications/UserNotifications.h>
+#endif
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
@@ -437,6 +441,27 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
     });
     
     POOL_END();
+}
+#ifdef INCLUDE_CN1_PUSH_2
+typedef void (^CN1PushCompletionHandlerType)();
+
+extern CN1PushCompletionHandlerType cn1PushCompletionHandler;
+int pushReceivedCount=0;
+#endif
+
+void com_codename1_impl_ios_IOSNative_firePushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH_2
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cn1PushCompletionHandler != nil) {
+            pushReceivedCount--;
+            if (pushReceivedCount <= 0) {
+                cn1PushCompletionHandler();
+                Block_release(cn1PushCompletionHandler);
+                cn1PushCompletionHandler = nil;
+            }
+        }
+    });
+#endif
 }
 
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH
@@ -1891,7 +1916,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
             }
         } else {
             if([v superview] == nil) {
-                [[CodenameOne_GLViewController instance].view addPeerComponent:v];
+                [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
             }
         }
         POOL_END();
@@ -1930,7 +1955,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
         if([v superview] == nil) {
-            [[CodenameOne_GLViewController instance].view addPeerComponent:v];
+            [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;
@@ -2373,12 +2398,19 @@ void com_codename1_impl_ios_IOSNative_browserClearHistory___long(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    if ([NSThread isMainThread]) {
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
         POOL_END();
-    });
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+            POOL_END();
+        });
+    }
 }
 
 void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -2473,6 +2505,23 @@ void com_codename1_impl_ios_IOSNative_blockCopyPaste___boolean(CN1_THREAD_STATE_
 
 }
 
+BOOL cn1UseApplicationAudioSessionForMedia(CN1_THREAD_STATE_SINGLE_ARG) {
+    enteringNativeAllocations();
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"ios.useApplicationAudioSession");
+    
+    JAVA_OBJECT defaultVal = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"true");
+    
+    JAVA_OBJECT res = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG d, key, defaultVal);
+    finishedNativeAllocations();
+    
+    NSString *nsres = toNSString(CN1_THREAD_GET_STATE_PASS_ARG res);
+    if ([nsres isEqualToString:@"false"]) {
+        return NO;
+    }
+    return YES;
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -2486,9 +2535,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_Stri
         }
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        [moviePlayerInstance prepareToPlay];
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         moviePlayerInstance.controlStyle = MPMovieControlStyleEmbedded;
         POOL_END();
@@ -2546,10 +2601,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_in
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = NO;
-        [moviePlayerInstance prepareToPlay];
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         POOL_END();
     });
@@ -2605,13 +2665,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
         
         moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = NO;
+        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 //#ifndef CN1_USE_ARC
 //        [moviePlayerInstance retain];
 //#endif
-        [moviePlayerInstance prepareToPlay];
+        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+        // component is created - which is disruptive.  Better to just let it prepare to play
+        // at the time that the video is played - even if there is a delay.
+        //[moviePlayerInstance prepareToPlay];
 #ifdef AUTO_PLAY_VIDEO
         [moviePlayerInstance play];
+#else
+        moviePlayerInstance.shouldAutoplay = NO;
 #endif
         POOL_END();
     });
@@ -2785,6 +2850,24 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
         }
 
         [m pause];
+        POOL_END();
+    });
+}
+void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
+        [m prepareToPlay];
         POOL_END();
     });
 }
@@ -3186,14 +3269,83 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             {
                 [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
             }
-            POOL_END();
+            
+        } else {
+            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
         }
+        POOL_END();
     });
+#endif
+}
+
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+void openGalleryMultiple(JAVA_INT type) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        QBImagePickerController *pickerController = [QBImagePickerController new];
+        pickerController.allowsMultipleSelection = YES;
+        pickerController.maximumNumberOfSelection = 0;
+        pickerController.showsNumberOfSelectedAssets = YES;
+        pickerController.delegate = [CodenameOne_GLViewController instance];
+        if (type==0 || type == 3){
+            
+        } else if (type==0 || type == 3){
+            pickerController.mediaType = QBImagePickerMediaTypeImage;
+        } else if (type==1 || type == 4){
+            pickerController.mediaType = QBImagePickerMediaTypeVideo;
+            
+        } else {
+            pickerController.mediaType = QBImagePickerMediaTypeAny;
+        }
+        
+        if(popoverSupported()) {
+            if (popoverController != nil) {
+#ifndef CN1_USE_ARC
+                [popoverController release];
+#endif
+                popoverController = nil;
+            }
+            popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
+                                 initWithContentViewController:pickerController];
+            
+            popoverController.delegate = [CodenameOne_GLViewController instance];
+            [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                               inView:[[CodenameOne_GLViewController instance] view]
+                             permittedArrowDirections:UIPopoverArrowDirectionAny
+                                             animated:YES];
+        } else {
+            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+        }
+        POOL_END();
+    });
+}
+#endif
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMultiGallerySelectSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef ENABLE_GALLERY_MULTISELECT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
 #endif
 }
 
 void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
+    BOOL multiple = false;
+    if (type == 3 || type == 4 || type == 5) {  // GALLERY_TYPE_IMAGE_MULTI, GALLERY_TYPE_VIDEO_MULTI, GALLERY_TYPE_ALL_MULTI
+        multiple = true;
+    }
+    if (multiple) {
+#ifdef ENABLE_GALLERY_MULTISELECT
+        openGalleryMultiple(type);
+#else
+        NSLog(@"Gallery multiselect is disabled");
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_RuntimeException(getThreadLocalData()));
+#endif
+        return;
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
@@ -4139,43 +4291,65 @@ extern int pendingRemoteNotificationRegistrations;
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
-            NSUInteger settingsParam = (/*UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound*/ 7);
-            id categoriesParam = nil;
-            Class settings = NSClassFromString(@"UIUserNotificationSettings");
-            if (settings) {
-                // Prepare class selector
-                SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
-                
-                // Obtain a method signature of selector on UIUserNotificationSettings class
-                NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
-                
-                // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
-                NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
-                invocation.selector = sel;
-                invocation.target = settings;
-                
-                // Set arguments
-                [invocation setArgument:&settingsParam atIndex:2];
-                [invocation setArgument:&categoriesParam atIndex:3];
-                
-                // Obtain an instance by firing an invocation
-                NSObject *settingsInstance;
-                [invocation invoke];
-                [invocation getReturnValue:&settingsInstance];
-                
-                // Retain an instance so it can live after quitting method and prevent crash :-)
-                CFRetain((__bridge CFTypeRef)(settingsInstance));
-                
-                // Finally call the desired method with proper settings
-                if (settingsInstance) {
-                    pendingRemoteNotificationRegistrations++;
-                    [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
-                }
-            }
+        if (@available(iOS 10, *)) {
+            // iOS 10 ObjC code
+            pendingRemoteNotificationRegistrations++;
+            UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+            [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+                completionHandler:^(BOOL granted, NSError * _Nullable error) {
+                    // Enable or disable features based on authorization.
+                if (granted) {
+                    [[UIApplication sharedApplication] registerForRemoteNotifications];
+                } else {
+                    pendingRemoteNotificationRegistrations--;
+                    NSString *msg = @"Permission to receive notifications is not granted";
+                    if (error != nil) {
+                        msg = [error localizedDescription];
+                    }
+                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
+                    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jmsg);
+                }   
+            }];
         } else {
-            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-             (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+            // iOS 9 and earlier
+            if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+                NSUInteger settingsParam = (/*UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound*/ 7);
+                id categoriesParam = nil;
+                Class settings = NSClassFromString(@"UIUserNotificationSettings");
+                if (settings) {
+                    // Prepare class selector
+                    SEL sel = NSSelectorFromString(@"settingsForTypes:categories:");
+
+                    // Obtain a method signature of selector on UIUserNotificationSettings class
+                    NSMethodSignature *signature = [settings methodSignatureForSelector:sel];
+
+                    // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
+                    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+                    invocation.selector = sel;
+                    invocation.target = settings;
+
+                    // Set arguments
+                    [invocation setArgument:&settingsParam atIndex:2];
+                    [invocation setArgument:&categoriesParam atIndex:3];
+
+                    // Obtain an instance by firing an invocation
+                    NSObject *settingsInstance;
+                    [invocation invoke];
+                    [invocation getReturnValue:&settingsInstance];
+
+                    // Retain an instance so it can live after quitting method and prevent crash :-)
+                    CFRetain((__bridge CFTypeRef)(settingsInstance));
+
+                    // Finally call the desired method with proper settings
+                    if (settingsInstance) {
+                        pendingRemoteNotificationRegistrations++;
+                        [[UIApplication sharedApplication] performSelector:NSSelectorFromString(@"registerUserNotificationSettings:") withObject:settingsInstance];
+                    }
+                }
+            } else {
+                [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+                 (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+            }
         }
     });
 #endif
@@ -4202,6 +4376,89 @@ void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULT
 //#endif
 }
 
+#ifdef INCLUDE_CN1_PUSH2
+static NSMutableArray<UNNotificationAction *>* pushActions;
+static NSMutableArray<UNNotificationAction *>* currentCategoryActions;
+static NSSet<UNNotificationCategory *>* pushCategories;
+static NSString* currentCategoryId;
+#endif
+void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT placeholderText, JAVA_OBJECT replyButtonText) {
+#ifdef INCLUDE_CN1_PUSH2    
+    if (@available(iOS 10, *)) {
+        if (pushActions == nil) {
+            pushActions = [[NSMutableArray alloc] init];
+        }
+        NSString *nsId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
+        NSString *nsTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG title);
+        NSString *nsPlaceholderText = placeholderText == NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG placeholderText);
+        NSString *nsReplyButtonText = replyButtonText == NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG replyButtonText);
+        nsPlaceholderText = (nsPlaceholderText == nil && nsReplyButtonText != nil) ? @"" : nsPlaceholderText;
+        nsReplyButtonText = (nsReplyButtonText == nil && nsPlaceholderText != nil) ? @"Reply" : nsReplyButtonText;
+        if (nsPlaceholderText != nil && nsReplyButtonText != nil) {
+            [pushActions addObject:[UNTextInputNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone textInputButtonTitle:nsReplyButtonText textInputPlaceholder:nsPlaceholderText]];
+        } else {
+            [pushActions addObject:[UNNotificationAction actionWithIdentifier:nsId title:nsTitle options:UNNotificationActionOptionNone]];
+        }
+    }
+#endif
+}
+
+
+void com_codename1_impl_ios_IOSNative_startPushActionCategory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier) {
+#ifdef INCLUDE_CN1_PUSH2
+    if (@available(iOS 10, *)) {
+        currentCategoryId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
+        if (currentCategoryActions != nil) {
+            [currentCategoryActions release];
+        }
+        currentCategoryActions = [[NSMutableArray alloc] init];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2    
+    if (@available(iOS 10, *)) {
+        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:currentCategoryId actions:currentCategoryActions intentIdentifiers:@[] options:UNNotificationCategoryOptionNone];
+        if (pushCategories == nil) {
+            pushCategories = [[NSMutableSet alloc] init];
+        }
+        [pushCategories addObject:category];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_addPushActionToCategory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier) {
+#ifdef INCLUDE_CN1_PUSH2    
+    if (@available(iOS 10, *)) {
+        UNNotificationAction *action = nil;
+        NSString *nsId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG identifier);
+        for (UNNotificationAction *a in pushActions) {
+            if ([a.identifier isEqualToString:nsId]) {
+                action = a;
+                break;
+            }
+        }
+        if (action == nil) {
+            NSLog(@"Could not find action with id %@ to add to category.  Skipping", nsId);
+            return;
+        }
+        [currentCategoryActions addObject:action];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_registerPushCategories__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_PUSH2    
+    if (@available(iOS 10, *)) {
+        if (pushCategories != nil) {
+            UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+            [center setNotificationCategories:pushCategories];
+        }
+    }
+#endif
+}
 
 UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
     UIImage* scaledInstance = nil;
@@ -5344,14 +5601,22 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript){
-    __block JAVA_OBJECT out;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    if ([NSThread isMainThread]) {
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+        JAVA_OBJECT out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
         POOL_END();
-    });
-    return out;
+        return out;
+    } else {
+        __block JAVA_OBJECT out;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+            POOL_END();
+        });
+        return out;
+    }
 }
 
 JAVA_OBJECT java_util_TimeZone_getTimezoneId__(CN1_THREAD_STATE_SINGLE_ARG) {

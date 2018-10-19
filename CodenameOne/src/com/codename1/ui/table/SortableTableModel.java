@@ -24,6 +24,8 @@
 package com.codename1.ui.table;
 
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.validation.Constraint;
+import com.codename1.ui.validation.Validator;
 import java.util.Arrays;
 import java.util.Comparator;
 
@@ -32,9 +34,12 @@ import java.util.Comparator;
  *
  * @author Shai Almog
  */
-public class SortableTableModel implements TableModel {
-    private TableModel model;
+public class SortableTableModel extends AbstractTableModel {
+    private final TableModel model;
     private int[] sorted;
+    private final boolean asc;
+    private Comparator cmp;
+    private final int sortColumn;
 
     /**
      * Returns the underlying table model
@@ -51,25 +56,42 @@ public class SortableTableModel implements TableModel {
      * @param model the underlying model that will be sorted
      * @param cmp a comparator used for comparing the cells in the column 
      */
-    public SortableTableModel(final int column, final boolean asc, final TableModel model, final Comparator cmp) {
+    public SortableTableModel(int column, boolean asc, TableModel model, Comparator cmp) {
         this.model = model;
+        this.asc = asc;
+        this.cmp = cmp;
+        this.sortColumn = column;
+        initTable(model, asc, cmp, column);
+    } 
 
-        sorted = new int[model.getRowCount()];
-        Integer[] sortedTemp = new Integer[sorted.length]; 
-
+    /**
+     * Returns the position of the row when sorted
+     * @param row the row in the visual table
+     * @return the position in the underlying model
+     */
+    public int getSortedPosition(int row) {
+        return sorted[row];
+    }
+     
+    private void initTable(final TableModel model1, final boolean asc,
+        final Comparator cmp, final int column) {
+        sorted = new int[model1.getRowCount()];
+        Integer[] sortedTemp = new Integer[sorted.length];
         for(int iter = 0 ; iter < sorted.length ; iter++) {
             sortedTemp[iter] = iter;
         }
-
         // sort(int[]) doesn't accept a comparator how stupid is that...
-        Arrays.sort(sortedTemp, new Comparator<Object>()  {
+        Arrays.sort(sortedTemp,
+            new Comparator<Object>() {
             public int compare(Object o1, Object o2) {
                 int i1 = (Integer)o1;
                 int i2 = (Integer)o2;
                 if(asc) {
-                    return cmp.compare(model.getValueAt(i1, column), model.getValueAt(i2, column)) * -1;
+                    return cmp.compare(model1.getValueAt(i1, column),
+                        model1.getValueAt(i2, column)) * -1;
                 }
-                return cmp.compare(model.getValueAt(i1, column), model.getValueAt(i2, column));
+                return cmp.compare(model1.getValueAt(i1, column),
+                    model1.getValueAt(i2, column));
             }
         });
         for(int iter = 0 ; iter < sorted.length ; iter++) {
@@ -114,6 +136,9 @@ public class SortableTableModel implements TableModel {
      */
     @Override
     public Object getValueAt(int row, int column) {
+        if(model.getRowCount() != sorted.length) {
+            initTable(model, asc, cmp, sortColumn);
+        }
         return model.getValueAt(sorted[row], column);
     }
 
@@ -139,5 +164,55 @@ public class SortableTableModel implements TableModel {
     @Override
     public void removeDataChangeListener(DataChangedListener d) {
         model.removeDataChangeListener(d);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Constraint getValidationConstraint(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getValidationConstraint(row, column);
+        }
+        return super.getValidationConstraint(row, column);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Class getCellType(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getCellType(row, column);
+        }
+        return super.getCellType(row, column);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String[] getMultipleChoiceOptions(int row, int column) {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
+        }
+        return super.getMultipleChoiceOptions(row, column);
+    }    
+
+    @Override
+    public void setValidator(Validator validator) {
+        if(model instanceof AbstractTableModel) {
+            ((AbstractTableModel)model).setValidator(validator);
+            return;
+        }
+        super.setValidator(validator);
+    }
+
+    @Override
+    public Validator getValidator() {
+        if(model instanceof AbstractTableModel) {
+            return ((AbstractTableModel)model).getValidator();
+        }
+        return super.getValidator();
     }
 }

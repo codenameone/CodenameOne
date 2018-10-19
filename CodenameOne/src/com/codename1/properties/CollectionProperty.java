@@ -79,6 +79,12 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
     public abstract K remove(T v);
     
     /**
+     * Removes the given item 
+     * @param offset the index
+     */
+    public abstract K remove(int offset);
+
+    /**
      * Removes from this collection all of its elements that are contained in the specified collection
      * and fires a change event if the collection has changed
      * @param v the collection of values to remove

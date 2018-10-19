@@ -34,6 +34,11 @@ import com.codename1.ui.geom.Rectangle;
 /**
  * <p>A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
  * This border can optionally have a drop shadow associated with it.</p>
+ * <p>
+ * <strong>IMPORTANT:</strong> {@code RoundRectBorder} instances can't be reused
+ * you would need to create a separate instance for each style object!
+ * See <a href="https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441">this issue</a> for further details.
+ * </p>
  * <script src="https://gist.github.com/codenameone/3e91e5eab4e677e6b03962e78ae99e07.js"></script>
  * <img src="https://www.codenameone.com/img/blog/round-border.png" alt="Round Border" />
  * 

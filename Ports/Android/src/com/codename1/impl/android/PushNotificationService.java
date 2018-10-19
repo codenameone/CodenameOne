@@ -42,6 +42,8 @@ import com.codename1.ui.Display;
  */
 public abstract class PushNotificationService extends Service implements PushCallback {
 
+    private java.util.Map<String,String> properties = new java.util.HashMap<String,String>();
+    
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -49,6 +51,19 @@ public abstract class PushNotificationService extends Service implements PushCal
     
     @Override
     public void onCreate() {
+    }
+    
+    private String getProperty(String propertyName, String defaultValue) {
+        String val = properties.get(propertyName);
+        if (val == null) {
+            return defaultValue;
+        }
+        return val;
+    }
+    
+    public void setProperty(String propertyName, String val) {
+        properties.put(propertyName, val);
+        
     }
     
     public static void startServiceIfRequired(Class service, Context ctx) {
@@ -101,7 +116,9 @@ public abstract class PushNotificationService extends Service implements PushCal
             NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             Intent newIntent = new Intent(this, getStubClass());
             PendingIntent contentIntent = PendingIntent.getActivity(this, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-            
+
+
+
             Notification.Builder builder = new Notification.Builder(this)
                     .setContentIntent(contentIntent)
                     .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -109,7 +126,57 @@ public abstract class PushNotificationService extends Service implements PushCal
                     .setAutoCancel(true)
                     .setWhen(System.currentTimeMillis())
                     .setContentTitle(value)
+
                     .setDefaults(Notification.DEFAULT_ALL);
+
+
+
+
+            // The following section is commented out so that builds against SDKs below 26
+            // won't fail.
+            /*<SDK26>
+            if(android.os.Build.VERSION.SDK_INT >= 21){
+                builder.setCategory("Notification");
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+                String id = getProperty("android.NotificationChannel.id", "cn1-channel");
+
+                CharSequence name = getProperty("android.NotificationChannel.name", "Notifications");
+
+                String description = getProperty("android.NotificationChannel.description", "Remote notifications");
+
+                int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_LOW));
+
+                android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
+
+                mChannel.setDescription(description);
+
+                mChannel.enableLights(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableLights", "true")));
+
+                mChannel.setLightColor(Integer.parseInt(getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
+
+                mChannel.enableVibration(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableVibration", "false")));
+                String vibrationPatternStr = getProperty("android.NotificationChannel.vibrationPattern", null);
+                if (vibrationPatternStr != null) {
+                    String[] parts = vibrationPatternStr.split(",");
+                    int len = parts.length;
+                    long[] pattern = new long[len];
+                    for (int i=0; i<len; i++) {
+                        pattern[i] = Long.parseLong(parts[i].trim());
+                    }
+                    mChannel.setVibrationPattern(pattern);
+                }
+
+
+
+                mNotificationManager.createNotificationChannel(mChannel);
+                System.out.println("Setting push channel to "+id);
+                builder.setChannelId(id);
+            }
+            </SDK26>*/
+
             Notification notif = builder.build();
             nm.notify((int)System.currentTimeMillis(), notif);
         }

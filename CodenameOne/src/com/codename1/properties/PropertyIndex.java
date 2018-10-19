@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -233,6 +234,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public void populateFromMap(Map<String, Object> m, Class<? extends PropertyBusinessObject>recursiveType) {
         try {
             for(PropertyBase p : this) {
+                MapAdapter ma = MapAdapter.checkInstance(p);
+                if(ma != null) {
+                    ma.setFromMap(p, m);
+                    continue;
+                }
                 Object val = m.get(p.getName());
                 if(val != null) {
                     if(val instanceof List) {
@@ -351,6 +357,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         }
                         continue;
                     }
+                    if(p.getGenericType() == Date.class) {
+                        p.setImpl(Util.toDateValue(val));
+                        continue;
+                    }
                     p.setImpl(val);                
                 }
             }
@@ -379,6 +389,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         HashMap<String, Object> m = new HashMap<String, Object>();
         for(PropertyBase p : this) {
             if(p.getClientProperty(excludeFlag) != null) {
+                continue;
+            }
+            MapAdapter ma = MapAdapter.checkInstance(p);
+            if(ma != null) {
+                ma.placeInMap(p, m);
                 continue;
             }
             if(p instanceof MapProperty) {
@@ -425,6 +440,82 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     }
     
     /**
+     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+     * @param name the name of the storage file
+     * @param objs a list of business objects
+     */
+    public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
+        try {
+            OutputStream os = Storage.getInstance().createOutputStream(name);
+            os.write(toJSONList(objs).getBytes());
+            os.close();
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+
+    /**
+     * Creates a JSON string, containing the list of property business objects
+     *
+     * @param objs a list of business objects
+     * @return the JSON string
+     */
+    public static String toJSONList(List<? extends PropertyBusinessObject> objs) {
+        StringBuilder b = new StringBuilder("[");
+        boolean first = true;
+        for (PropertyBusinessObject pb : objs) {
+            if (first) {
+                first = false;
+            } else {
+                b.append(",\n");
+            }
+            b.append(pb.getPropertyIndex().toJSON());
+        }
+        b.append("]");
+        return b.toString();
+    }
+
+    /**
+     * Loads JSON containing a list of property objects of this type
+     * @param name the name of the storage
+     * @return list of property objects matching this type
+     */
+    public <X extends PropertyBusinessObject> List<X> loadJSONList(String name) {
+        try {
+            InputStream is = Storage.getInstance().createInputStream(name);
+            JSONParser jp = new JSONParser();
+            JSONParser.setUseBoolean(true);
+            JSONParser.setUseLongs(true);
+            List<X> response = new ArrayList<X>();
+            Map<String, Object> result = jp.parseJSON(new InputStreamReader(is, "UTF-8"));
+            List<Map> entries = (List<Map>)result.get("root");
+            for(Map m : entries) {
+                X pb = (X)newInstance();
+                pb.getPropertyIndex().populateFromMap(m, parent.getClass());
+                response.add(pb);
+            }
+            return response;
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+    
+    /**
+     * Creates a new instance of the parent class
+     * @return an instance of the parent class or null if this failed
+     */
+    public PropertyBusinessObject newInstance() {
+        try {
+            return (PropertyBusinessObject)parent.getClass().newInstance();
+        } catch(Exception err) {
+            Log.e(err);
+            return null;
+        }
+    }
+    
+    /**
      * Loads JSON for the object from storage with the given name
      * @param name the name of the storage
      */
@@ -463,6 +554,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 }
                 return true;
             }
+        }
+        if(o instanceof PropertyBusinessObject) {
+            return equals(((PropertyBusinessObject)o).getPropertyIndex());
         }
         return false;
     }

@@ -1302,11 +1302,11 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     static boolean isLSK(int keyCode) {
-        return keyCode == leftSK;
+        return keyCode != 0 && keyCode == leftSK;
     }
 
     static boolean isRSK(int keyCode) {
-        return keyCode == rightSK || keyCode == rightSK2;
+        return keyCode != 0 && (keyCode == rightSK || keyCode == rightSK2);
     }
 
     /**
@@ -1317,8 +1317,11 @@ public class MenuBar extends Container implements ActionListener {
      * back button, clear button, ...
      */
     public boolean handlesKeycode(int keyCode) {
+        if (keyCode == 0) {
+            return false;
+        }
         int game = Display.getInstance().getGameAction(keyCode);
-        if (keyCode == leftSK || (keyCode == rightSK || keyCode == rightSK2) || keyCode == backSK
+        if (isLSK(keyCode)|| isRSK(keyCode) || keyCode == backSK
                 || (keyCode == clearSK && clearCommand != null)
                 || (keyCode == backspaceSK && clearCommand != null)
                 || (thirdSoftButton && game == Display.GAME_FIRE)) {
@@ -1336,13 +1339,13 @@ public class MenuBar extends Container implements ActionListener {
             return;
         }
         if (getCommandCount() > 0) {
-            if (keyCode == leftSK) {
+            if (isLSK(keyCode)) {
                 if (left != null) {
                     left.pressed();
                 }
             } else {
                 // it might be a back command or the fire...
-                if ((keyCode == rightSK || keyCode == rightSK2)) {
+                if (isRSK(keyCode)) {
                     if (right != null) {
                         right.pressed();
                     }
@@ -1365,7 +1368,7 @@ public class MenuBar extends Container implements ActionListener {
         }
         if (getCommandCount() > 0) {
             int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();
-            if (softkeyCount < 2 && keyCode == leftSK) {
+            if (softkeyCount < 2 && isLSK(keyCode)) {
                 if (commandList != null) {
                     Container parent = commandList.getParent();
                     while (parent != null) {
@@ -1378,14 +1381,14 @@ public class MenuBar extends Container implements ActionListener {
                 showMenu();
                 return;
             } else {
-                if (keyCode == leftSK) {
+                if (isLSK(keyCode)) {
                     if (left != null) {
                         left.released();
                     }
                     return;
                 } else {
                     // it might be a back command...
-                    if ((keyCode == rightSK || keyCode == rightSK2)) {
+                    if (isRSK(keyCode)) {
                         if (right != null) {
                             right.released();
                         }

@@ -1370,6 +1370,9 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
+        if (menuBar != null && menuBar.contains(x, y)) {
+            return menuBar;
+        }
         return getActualPane();
     }
     
@@ -1415,6 +1418,24 @@ public class Form extends Container {
         }
     }
 
+    /**
+     * Stops any active editing on the form.  Closes keyboard if it is opened.
+     * @param onFinish Callback to run on finish.
+     */
+    @Override
+    public void stopEditing(Runnable onFinish) {
+        Display.getInstance().stopEditing(this, onFinish);
+        
+    }
+
+    @Override
+    public boolean isEditing() {
+        return Display.getInstance().isTextEditing(this);
+    }
+
+    
+    
+    
     /**
      * Sets the Form title to the given text
      * 
@@ -2832,7 +2853,11 @@ public class Form extends Container {
         dragged = null;
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
+            pointerPressedListeners.fireActionEvent(e);
+            if(e.isConsumed()) {
+                return;
+            }
         }
         //check if the click is relevant to the menu bar.
         /*
@@ -3831,7 +3856,23 @@ public class Form extends Container {
 
         return true;
     }
-
+    
+    /**
+     * Initiates a quick drag event on all containers of this form that have a negative scroll position.
+     * Sometimes, after editing, or on a screen-size change, scroll positions can get caught in a 
+     * negative position, and need to be reset.  This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476
+     */
+    void fixNegativeScrolls() {
+        java.util.Set<Component> negativeScrolls = getContentPane().findNegativeScrolls(new java.util.HashSet<Component>());
+        for (Component cmp : negativeScrolls) {
+            int x = cmp.getAbsoluteX()+cmp.getWidth()/2;
+            int y = cmp.getAbsoluteY()+cmp.getHeight()/2;
+            cmp.pointerPressed(x, y);
+            cmp.pointerDragged(x, y);
+            cmp.pointerReleased(x, y);
+        }
+    }
+    
     /**
      * Makes sure the component is visible in the scroll if this container 
      * is scrollable

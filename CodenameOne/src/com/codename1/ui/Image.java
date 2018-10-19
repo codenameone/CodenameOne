@@ -512,9 +512,10 @@ public class Image {
     }
     
     /**
-     * creates an image from the given path based on MIDP's createImage(path)
+     * Creates an image from a path.
      * 
-     * @param path 
+     * @param path If path begins with {@literal file:} then the image will be loaded from FileSystemStorage.  Otherwise
+     * it will load from the jar resources.
      * @throws java.io.IOException 
      * @return newly created image object
      */

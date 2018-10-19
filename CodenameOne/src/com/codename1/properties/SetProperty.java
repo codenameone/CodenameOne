@@ -113,12 +113,26 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
     }
         
     /**
-     * Removes the given item from the set and fires a change event if this item has been sucessfully removed 
-     * @param the item to remove
+     * Removes the given item from the set and fires a change event if this item has been successfully removed 
+     * @param v the item to remove
      */
     public K remove(T v) {
         if (value.remove(v)) {
         	firePropertyChanged();
+        }
+        return (K)parent.parent;
+    }
+    
+    /**
+     * Removes the given item from the set and fires a change event if this item has been successfully removed 
+     * @param v the item to remove
+     */
+    public K remove(int v) {
+        for(T o : value) {
+            if(v == 0) {
+                return remove(o);
+            }
+            v--;
         }
         return (K)parent.parent;
     }

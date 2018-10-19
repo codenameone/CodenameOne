@@ -232,30 +232,7 @@ public class Push {
 
     private static ConnectionRequest createPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
-        ConnectionRequest cr = new ConnectionRequest();
-        cr.setPost(true);
-        cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "sendPushMessage");
-        cr.addArgument("packageName", Display.getInstance().getProperty("package_name", ""));
-        cr.addArgument("email", Display.getInstance().getProperty("built_by_user", ""));
-        if(deviceKey != null) {
-            cr.addArgument("device", deviceKey);
-        }
-        cr.addArgument("type", "1");
-        cr.addArgument("auth", googleAuthKey);
-        cr.addArgument("certPassword", iosCertificatePassword);
-        cr.addArgument("cert", iosCertificateURL);
-        cr.addArgument("body", body);
-        cr.addArgument("burl", bbUrl);
-        cr.addArgument("bbAppId", bbApp);
-        cr.addArgument("bbPass", bbPass);
-        cr.addArgument("bbPort", bbPort);
-        if(production) {
-            cr.addArgument("production", "true");
-        } else {
-            cr.addArgument("production", "false");
-        }
-        cr.setFailSilently(true);
-        return cr;
+        throw new RuntimeException("The old push servers no longer work! Please migrate to the new Push servers!");
     }
 
     /**

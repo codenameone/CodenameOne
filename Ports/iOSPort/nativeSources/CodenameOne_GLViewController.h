@@ -24,7 +24,7 @@
 #import <UIKit/UIKit.h>
 
 #import <OpenGLES/EAGL.h>
-
+#import "EAGLView.h"
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
@@ -52,7 +52,9 @@
 #else
 #import <GoogleSignIn/GoogleSignIn.h>
 #endif
-
+//#define GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
+//#define CN1_USE_JAVASCRIPTCORE
+//#define ENABLE_GALLERY_MULTISELECT
 //#define INCLUDE_CONTACTS_USAGE
 //#define INCLUDE_CALENDARS_USAGE
 //#define INCLUDE_CAMERA_USAGE
@@ -77,6 +79,12 @@
 #else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
+#endif
+#endif
+
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+#import "QBImagePickerController.h"
 #endif
 #endif
 
@@ -138,6 +146,8 @@
 #define CN1_CAP_ROUND 1
 #define CN1_CAP_SQUARE 2
 
+#define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
+
 //ADD_INCLUDE
 
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
@@ -156,6 +166,11 @@
 #endif
 #ifdef INCLUDE_FACEBOOK_CONNECT
         ,FBSDKAppInviteDialogDelegate
+#endif
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+        ,QBImagePickerControllerDelegate
+#endif
 #endif
 > {
 @private
@@ -194,6 +209,8 @@
 - (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error;
 - (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
 #endif
+
+-(EAGLView*)eaglView;
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;

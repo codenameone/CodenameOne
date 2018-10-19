@@ -133,15 +133,27 @@ public class Log {
      * to be completely unique or -1 if unavailable (which can be due to a network error). Warning: this 
      * method might block while accessing the server!s
      * @return a unique device id
+     * @deprecated this will no longer work. Use {@link #getUniqueDeviceKey()}
      */
     public static long getUniqueDeviceId() {
-        long devId = Preferences.get("DeviceId__$", (long)-1);
-        if(devId > 0) {
+        return -1;
+    }
+
+    /**
+     * Returns a server generated unique device id that is cached locally and is only valid per application.
+     * Notice that this device id is specific to your application and to a specific install, it is guaranteed 
+     * to be completely unique or null if unavailable (which can be due to a network error). Warning: this 
+     * method might block while accessing the server!s
+     * @return a unique device id
+     */
+    public static String getUniqueDeviceKey() {
+        String devId = Preferences.get("DeviceKey__$", null);
+        if(devId != null) {
             return devId;
         }
         
-        devId = Preferences.get("UDeviceId__$", (long)-1);
-        if(devId > 0) {
+        devId = Preferences.get("UDeviceKey__$", null);
+        if(devId != null) {
             return devId;
         }
         
@@ -149,11 +161,11 @@ public class Log {
         if(buildKey == null) {
             buildKey = "";
         }
+        
         // request the device id from the server
         com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {
             protected void readResponse(java.io.InputStream input) throws java.io.IOException  {
-                java.io.DataInputStream di = new java.io.DataInputStream(input);
-                com.codename1.io.Preferences.set("UDeviceId__$", di.readLong());
+                com.codename1.io.Preferences.set("UDeviceKey__$", Util.readToString(input));
             }
             
             protected void handleErrorResponseCode(int code, String message) {
@@ -164,17 +176,17 @@ public class Log {
                 err.printStackTrace();
             }
         };
-        r.setPost(false);
-        r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "registerDeviceServlet");
-        r.addArgument("a", Display.getInstance().getProperty("AppName", ""));
-        r.addArgument("b", buildKey);
-        r.addArgument("by",Display.getInstance().getProperty("built_by_user", ""));
-        r.addArgument("p", Display.getInstance().getProperty("package_name", ""));
-        r.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
-        r.addArgument("pl", Display.getInstance().getPlatformName());
+        r.setPost(true);
+        r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://cloud.codenameone.com/register/device"));
+        r.addArgument("appName", Display.getInstance().getProperty("AppName", ""));
+        r.addArgument("buildKey", buildKey);
+        r.addArgument("builtByUser",Display.getInstance().getProperty("built_by_user", ""));
+        r.addArgument("packageName", Display.getInstance().getProperty("package_name", ""));
+        r.addArgument("appVersion", Display.getInstance().getProperty("AppVersion", "0.1"));
+        r.addArgument("platformName", Display.getInstance().getPlatformName());
         //r.addArgument("u", Display.getInstance().getProperty("udid", ""));
         com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);
-        return Preferences.get("UDeviceId__$", (long)-1);
+        return Preferences.get("UDeviceKey__$", null);
     }
     
     /**
@@ -196,10 +208,6 @@ public class Log {
      * Sends the current log to the cloud regardless of the reporting level
      */
     private static void sendLogImpl(boolean sync) {
-        if(Display.getInstance().getProperty("cloudServerURL", null) != null) {
-            sendLogLegacy();
-            return;
-        }
         try {
             // this can cause a crash
             if(!Display.isInitialized()) {
@@ -209,9 +217,13 @@ public class Log {
                 return;
             }
             instance.logDirty = false;
-            long devId = getUniqueDeviceId();
-            if(devId < 0) {
-                Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
+            String devId = getUniqueDeviceKey();
+            if(devId == null) {
+                if(Display.getInstance().isSimulator()) {
+                    Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
+                } else {
+                    Log.p("Device Not Registered: Sending a log from an unregistered device is impossible");
+                }
                 return;
             }
             ConnectionRequest r = new ConnectionRequest();
@@ -589,7 +601,9 @@ public class Log {
                     p("Before the first form!");
                 }
                 e((Throwable)evt.getSource());
-                sendLog();
+                if(getUniqueDeviceKey() != null) {
+                    sendLog();
+                }
             }
         });
         crashBound = true;

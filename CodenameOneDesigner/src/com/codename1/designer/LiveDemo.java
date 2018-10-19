@@ -23,6 +23,7 @@
 package com.codename1.designer;
 
 import com.codename1.components.MultiButton;
+import com.codename1.components.Switch;
 import com.codename1.components.ToastBar;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
@@ -44,6 +45,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 
 /**
  * Quick and dirty demo of the main components within the framework allowing 
@@ -89,6 +91,7 @@ public class LiveDemo {
         txt.setHint("This is a TextField");
         first.addComponent(txt);
         first.addComponent(new CheckBox("This is a CheckBox"));
+        first.addComponent(FlowLayout.encloseIn(new Label("This is a switch "), new Switch()));
         RadioButton rb1 = new RadioButton("This is a Radio Button 1");
         rb1.setGroup("group");
         first.addComponent(rb1);

@@ -150,4 +150,19 @@ public class CN1Constants {
      * Used by openGallery 
      */
     public static final int GALLERY_ALL = 2;
+    
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_IMAGE_MULTI = 3;
+    
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_VIDEO_MULTI = 4;
+
+    /**
+     * Used by openGallery 
+     */
+    public static final int GALLERY_ALL_MULTI = 5;
 }

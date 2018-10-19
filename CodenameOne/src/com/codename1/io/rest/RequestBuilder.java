@@ -25,20 +25,24 @@ package com.codename1.io.rest;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.gzip.GZConnectionRequest;
+import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
 import com.codename1.util.SuccessCallback;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -62,10 +66,15 @@ public class RequestBuilder {
     private Integer timeout;
     
     private String body;
-    
-    private boolean isGzip = false;
-    
+        
     private String contentType;
+    
+    private ErrorCodeHandler<byte[]> byteArrayErrorCallback;
+    private ErrorCodeHandler<Map> jsonErrorCallback;
+    private ErrorCodeHandler<String> stringErrorCallback;
+    private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
+    private Class errorHandlerPropertyType;
+    private ActionListener<NetworkEvent> errorCallback;
     
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -117,7 +126,8 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder header(String key, String value) {
-        headers.put(key, value);
+        // .toString() is used to trigger an NPE early for null headers
+        headers.put(key.toString(), value.toString());
         return this;
     }
     
@@ -129,6 +139,75 @@ public class RequestBuilder {
      */ 
     public RequestBuilder body(String body) {
         this.body = body;
+        return this;
+    }
+    
+    /**
+     * Sets the request body to the JSON matching the given object
+     * 
+     * @param body request body 
+     * @return RequestBuilder instance
+     */ 
+    public RequestBuilder body(PropertyBusinessObject body) {
+        this.body = body.getPropertyIndex().toJSON();
+        return this;
+    }
+        
+    /**
+     * In case of an error this method is invoked asynchronously to process
+     * the error content with the byte array data
+     * @param err the content of the error response
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder onErrorCodeBytes(ErrorCodeHandler<byte[]> err) {
+        byteArrayErrorCallback = err;
+        return this;
+    }
+    
+    /**
+     * In case of an error this method is invoked asynchronously to process
+     * the error content with the JSON data
+     * @param err the content of the error response
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder onErrorCodeJSON(ErrorCodeHandler<Map> err) {
+        jsonErrorCallback = err;
+        return this;
+    }
+
+    /**
+     * In case of an error this method is invoked asynchronously to process
+     * the error content with the JSON data and places it into a business
+     * object in the callback
+     * @param err the content of the error response
+     * @param errorClass the class of the business object into which the data is parsed
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder onErrorCode(ErrorCodeHandler<PropertyBusinessObject> err, Class errorClass) {
+        propertyErrorCallback = err;
+        errorHandlerPropertyType = errorClass;
+        return this;
+    }
+    
+    /**
+     * In case of an error this method is invoked asynchronously to process
+     * the error content with the JSON data
+     * @param err the content of the error response
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder onErrorCodeString(ErrorCodeHandler<String> err) {
+        stringErrorCallback = err;
+        return this;
+    }
+    
+    /**
+     * Invoked for exceptions or failures such as disconnect
+     * @param error callback for a networking error
+     * @return RequestBuilder instance
+     * 
+     */
+    public RequestBuilder onError(ActionListener<NetworkEvent> error) {
+        errorCallback = error;
         return this;
     }
     
@@ -150,7 +229,6 @@ public class RequestBuilder {
      * @deprecated this API was implemented incorrectly
      */ 
     public RequestBuilder gzip() {
-        isGzip = true;
         header("Accept-Encoding", "gzip");
         return this;
     }
@@ -183,13 +261,30 @@ public class RequestBuilder {
         header("Authorization", "Basic " + Base64.encodeNoNewline((username + ":" + password).getBytes()));
         return this;
     }
+
+    /**
+     * Add an authorization bearer header, this is shorthand for 
+     * {@code header("Authorization", "Bearer " + token)}
+     * 
+     * @param token the authorization token
+     * @return RequestBuilder instance
+     */ 
+    public RequestBuilder bearer(String token) {
+        header("Authorization", "Bearer " + token);
+        return this;
+    }
     
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
-     * @param callback writes the response to this callback
-     */ 
-    public void getAsStringAsync(final Callback<Response<String>> callback) {
+     * @param callback invoked with the result of the builder query
+     * @return the ConnectionRequest instance
+     */
+    public ConnectionRequest fetchAsString(final OnComplete<Response<String>> callback) {
+        return getAsStringAsyncImpl(callback);
+    }
+    
+    private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
         ConnectionRequest request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -197,13 +292,28 @@ public class RequestBuilder {
                 Response res = null;
                 try {
                     res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
-                    callback.onSucess(res);
+                    if(callback instanceof Callback) {
+                        ((Callback)callback).onSucess(res);
+                    } else {
+                        ((OnComplete<Response<String>>)callback).completed(res);
+                    }
                 } catch (UnsupportedEncodingException ex) {
                     ex.printStackTrace();
                 }
             }
         });
         CN.addToQueue(request);        
+        return request;
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback
+     * @param callback writes the response to this callback
+     * @deprecated please use {@link #fetchAsString(com.codename1.util.OnComplete)} instead
+     */ 
+    public void getAsStringAsync(final Callback<Response<String>> callback) {
+        getAsStringAsyncImpl(callback);
     }
 
     /**
@@ -223,22 +333,43 @@ public class RequestBuilder {
         return res;
     }
 
+    
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
+     * @return the connection request instance
      */ 
-    public void getAsBytesAsync(final Callback<Response<byte[]>> callback) {
+    public ConnectionRequest fetchAsBytes(final OnComplete<Response<byte[]>> callback) {
+        return getAsBytesAsyncImpl(callback);
+    }
+    
+    private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
         ConnectionRequest request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
                 Response res = null;
                 res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
-                callback.onSucess(res);
+                if(callback instanceof Callback) {
+                    ((Callback)callback).onSucess(res);
+                } else {
+                    ((OnComplete)callback).completed(res);
+                }
             }
         });
         CN.addToQueue(request);        
+        return request;
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback
+     * @param callback writes the response to this callback
+     * @deprecated use {@link #fetchAsBytes(com.codename1.util.OnComplete)} instead
+     */ 
+    public void getAsBytesAsync(final Callback<Response<byte[]>> callback) {
+        getAsBytesAsyncImpl(callback);
     }
     
     /**
@@ -259,6 +390,57 @@ public class RequestBuilder {
      * @param callback writes the response to this callback
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
+    public ConnectionRequest fetchAsJsonMap(final OnComplete<Response<Map>> callback) {
+        ConnectionRequest request = createRequest(true);
+        request.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                Response res = null;
+                Map response = (Map)evt.getMetaData();
+                res = new Response(evt.getResponseCode(), response, evt.getMessage());
+                callback.completed(res);
+            }
+        });
+        CN.addToQueue(request);       
+        return request;
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback. This fetches JSON data and parses it into a properties business object
+     * @param callback writes the response to this callback
+     * @param type the class of the business object returned
+     * @return returns the Connection Request object so it can be killed if necessary
+     */ 
+    public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
+        ConnectionRequest request = createRequest(true);
+        request.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                Response res = null;
+                Map response = (Map)evt.getMetaData();
+                try {
+                    PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                    pb.getPropertyIndex().populateFromMap(response);
+                    res = new Response(evt.getResponseCode(), pb, evt.getMessage());
+                    callback.completed(res);
+                } catch(Exception err) {
+                    Log.e(err);
+                    throw new RuntimeException(err.toString());
+                }
+            }
+        });
+        CN.addToQueue(request);       
+        return request;
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback
+     * @param callback writes the response to this callback
+     * @return returns the Connection Request object so it can be killed if necessary
+     * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
+     */ 
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback) {
         return getAsJsonMap(callback, null);
     }
@@ -269,6 +451,7 @@ public class RequestBuilder {
      * @param callback writes the response to this callback
      * @param onError the error callback
      * @return returns the Connection Request object so it can be killed if necessary
+     * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
      */ 
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
         ConnectionRequest request = createRequest(true);
@@ -314,6 +497,7 @@ public class RequestBuilder {
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
+     * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
      */ 
     public void getAsJsonMapAsync(final Callback<Response<Map>> callback) {
         getAsJsonMap(callback, callback);
@@ -331,16 +515,149 @@ public class RequestBuilder {
         return new Response(request.getResponseCode(), response, request.getResponseErrorMessage());
     }
 
-    static class Connection extends GZConnectionRequest {
+    /**
+     * Executes the request synchronously
+     * 
+     * @param type the type of the business object to create
+     * @return Response Object
+     */ 
+    public Response<PropertyBusinessObject> getAsProperties(Class type) {
+        ConnectionRequest request = createRequest(true);
+        CN.addToQueueAndWait(request);
+        Map response = ((Connection)request).json;
+        try {
+            PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+            pb.getPropertyIndex().populateFromMap(response);
+            return new Response(request.getResponseCode(), pb, request.getResponseErrorMessage());
+        } catch(Exception err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback. This fetches JSON data and parses it into a properties business object
+     * @param callback writes the response to this callback
+     * @param type the class of the business object returned
+     * @return returns the Connection Request object so it can be killed if necessary
+     */ 
+    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
+        ConnectionRequest request = createRequest(true);
+        request.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                Response res = null;
+                Map response = (Map)evt.getMetaData();
+                List<Map> lst = (List<Map>)response.get("root");
+                try {
+                    List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+                    for(Map m : lst) {
+                        PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                        pb.getPropertyIndex().populateFromMap(m);
+                        result.add(pb);
+                    }
+                    res = new Response(evt.getResponseCode(), result, evt.getMessage());
+                    callback.completed(res);
+                } catch(Exception err) {
+                    Log.e(err);
+                    throw new RuntimeException(err.toString());
+                }
+            }
+        });
+        CN.addToQueue(request);       
+        return request;
+    }
+    
+    /**
+     * Executes the request synchronously
+     * 
+     * @param type the type of the business object to create
+     * @return Response Object
+     */ 
+    public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
+        ConnectionRequest request = createRequest(true);
+        CN.addToQueueAndWait(request);
+        Map response = ((Connection)request).json;
+        try {
+            List<Map> lst = (List<Map>)response.get("root");
+            List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+            for(Map m : lst) {
+                PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                pb.getPropertyIndex().populateFromMap(m);
+                result.add(pb);
+            }
+            return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());
+        } catch(Exception err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+    
+    public String getRequestUrl() {
+        return this.url;
+    }
+    
+    class Connection extends GZConnectionRequest {
         private boolean parseJSON;
+        private boolean errorCode;
         Map json;
+        private ErrorCodeHandler errorHandler;
+        private Object errorObject;
         
         public Connection(boolean parseJSON) {
             this.parseJSON = parseJSON;
         }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            if(byteArrayErrorCallback != null || stringErrorCallback != null ||
+                    jsonErrorCallback != null || propertyErrorCallback != null) {
+                errorCode = true;
+            } else {
+                super.handleErrorResponseCode(code, message);
+            }
+        }   
         
         @Override
         protected void readUnzipedResponse(InputStream input) throws IOException {
+            if(errorCode) {
+                if(byteArrayErrorCallback != null) {
+                    super.readUnzipedResponse(input);
+                    errorObject = getResponseData();
+                    errorHandler = byteArrayErrorCallback;
+                    return;
+                }
+                if(stringErrorCallback != null) {
+                    super.readUnzipedResponse(input);
+                    errorObject = new String(getResponseData(), "UTF-8");
+                    errorHandler = stringErrorCallback;
+                    return;
+                }
+                if(jsonErrorCallback != null) {
+                    JSONParser jp = new JSONParser();
+                    errorObject = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
+                    errorHandler = jsonErrorCallback;
+                    return;
+                }
+                if(propertyErrorCallback != null) {
+                    try {
+                        JSONParser jp = new JSONParser();
+                        Map m = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
+                        PropertyBusinessObject pb = (PropertyBusinessObject)errorHandlerPropertyType.newInstance();
+                        pb.getPropertyIndex().populateFromMap(m);
+                        errorObject = pb;
+                        errorHandler = propertyErrorCallback;
+                    } catch(InstantiationException err) {
+                        Log.e(err);
+                        throw new IOException(err.toString());
+                    } catch(IllegalAccessException err) {
+                        Log.e(err);
+                        throw new IOException(err.toString());
+                    }
+                }
+                return;
+            }
             if(parseJSON) {
                 JSONParser parser = new JSONParser();
                 json = parser.parseJSON(new InputStreamReader(input, "UTF-8"));
@@ -351,6 +668,14 @@ public class RequestBuilder {
             } 
             super.readUnzipedResponse(input);
         }
+
+        @Override
+        protected void postResponse() {
+            if(errorHandler != null) {
+                errorHandler.onError(new Response(getResponseCode(), errorObject, getResponseErrorMessage()));
+            }
+        }
+        
     }
     
     private ConnectionRequest createRequest(boolean parseJson) {
@@ -379,6 +704,9 @@ public class RequestBuilder {
         }
         for (String key : headers.keySet()) {
             req.addRequestHeader(key, headers.get(key));
+        }
+        if(errorCallback != null) {
+            req.addExceptionListener(errorCallback);
         }
 
         return req;

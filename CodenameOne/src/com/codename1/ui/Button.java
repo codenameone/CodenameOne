@@ -933,7 +933,12 @@ public class Button extends Label {
     }
 
     /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * Indicates whether text on the button should be drawn capitalized by 
+     * default to match the Android design. By default only {@code Button} and
+     * {@code RaisedButton} will be capped to keep compatibility. You can add
+     * additional UIID's to the mix by using the theme constant 
+     * {@code capsButtonUiids} which can include a separated list of the 
+     * UIID's to capitalize
      * @return the capsText
      */
     public final boolean isCapsText() {
@@ -949,7 +954,12 @@ public class Button extends Label {
     }
 
     /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * Indicates whether text on the button should be drawn capitalized by 
+     * default to match the Android design. By default only {@code Button} and
+     * {@code RaisedButton} will be capped to keep compatibility. You can add
+     * additional UIID's to the mix by using the theme constant 
+     * {@code capsButtonUiids} which can include a separated list of the 
+     * UIID's to capitalize
      * @param capsText the capsText to set
      */
     public void setCapsText(boolean capsText) {

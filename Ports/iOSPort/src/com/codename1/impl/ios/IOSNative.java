@@ -234,6 +234,7 @@ public final class IOSNative {
     
     native void stopVideoComponent(long peer);
     native void pauseVideoComponent(long peer);
+    native void prepareVideoComponent(long moviePlayerPeer);
 
     native int getMediaTimeMS(long peer);
     
@@ -668,6 +669,22 @@ public final class IOSNative {
 
     
     native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
+    native void registerPushAction(String id, String title, String textInputPlaceholder, String replyButtonText);
+
+    native void startPushActionCategory(String id);
+
+    native void addPushActionToCategory(String id);
+
+    native void endPushActionCategory();
+
+    native void registerPushCategories();
+    
+    native void firePushCompletionHandler();
+
+    native boolean isMultiGallerySelectSupported();
+
+     
 
 
 

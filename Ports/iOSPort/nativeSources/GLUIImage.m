@@ -48,11 +48,21 @@ extern int nextPowerOf2(int val);
     if(textureName == 0) {
         textureWidth = texWidth;
         textureHeight = texHeight;
-        //natural_t memoryBefore = [ExecutableOp get_free_memory];
-        //_glEnableClientState(GL_VERTEX_ARRAY);
-        //glEnableClientState(GL_NORMAL_ARRAY);
-        //GLErrorLog;
-        //_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+#ifdef GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
+        if (textureWidth > GL_MAX_TEXTURE_SIZE || textureHeight > GL_MAX_TEXTURE_SIZE) {
+            if (textureWidth > GL_MAX_TEXTURE_SIZE) {
+                textureHeight = (int)(textureHeight * GL_MAX_TEXTURE_SIZE / (float)textureWidth);
+                textureWidth = GL_MAX_TEXTURE_SIZE;
+            }
+            if (textureHeight > GL_MAX_TEXTURE_SIZE) {
+               textureWidth = (int)(textureWidth * GL_MAX_TEXTURE_SIZE / (float)textureHeight);
+                textureHeight = GL_MAX_TEXTURE_SIZE;
+            }
+
+            texWidth = textureWidth;
+            texHeight = textureHeight;
+        }
+#endif
         GLErrorLog;
         glGenTextures(1, &textureName);
         GLErrorLog;
@@ -66,6 +76,14 @@ extern int nextPowerOf2(int val);
         int h = texHeight;//(int)img.size.height;
         int p2w = nextPowerOf2(w);
         int p2h = nextPowerOf2(h);
+        
+        if (p2w > GL_MAX_TEXTURE_SIZE) {
+            NSLog(@"Warning: Trying to create texture with width %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2w, GL_MAX_TEXTURE_SIZE);
+        }
+        if (p2h > GL_MAX_TEXTURE_SIZE) {
+            NSLog(@"Warning: Trying to create texture with height %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2h, GL_MAX_TEXTURE_SIZE);
+        }
+        
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
         void* imageData = malloc(p2h * p2w * 4);
         CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);

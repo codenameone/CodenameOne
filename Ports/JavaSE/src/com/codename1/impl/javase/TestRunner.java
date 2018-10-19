@@ -27,8 +27,10 @@ import com.codename1.testing.TestReporting;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.StringTokenizer;
+import java.util.prefs.Preferences;
 
 
 /**
@@ -42,6 +44,8 @@ public class TestRunner {
     private String mainClass;
     private String[] testCases;
     private String[] skins; 
+    private boolean forceLandscape;
+    private boolean forcePortrait;
     private boolean quietMode;
     private boolean cleanMode = true;
     private boolean stopOnFail;
@@ -80,14 +84,26 @@ public class TestRunner {
                         pos++;
                         continue;
                     }
-                    
+                                        
                     if(s.equalsIgnoreCase("-skins")) {
                         pos++;
                         skins = argv[pos].split(",");
                         pos++;
                         continue;
                     }
+
+                    if(s.equalsIgnoreCase("-landscape")) {
+                        forceLandscape = true;
+                        pos++;
+                        continue;
+                    }
                     
+                    if(s.equalsIgnoreCase("-portrait")) {
+                        forcePortrait = true;
+                        pos++;
+                        continue;
+                    }
+
                     if(s.equalsIgnoreCase("-quietMode")) {
                         quietMode = true;
                         pos++;
@@ -140,6 +156,20 @@ public class TestRunner {
                 tests = testCases;
             }
 
+            
+            if(forceLandscape) {
+                System.out.println("Forcing landscape");
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("Portrait", false);
+                pref.sync();
+            } else {
+                if(forcePortrait) {
+                    System.out.println("Forcing portrait");
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("Portrait", true);
+                    pref.sync();
+                }
+            }
             
             System.out.println("Preparing to execute " + tests.length + " tests");
             
@@ -200,11 +230,25 @@ public class TestRunner {
     }
     
     
-
+ 
     /**
      * The main method accepts several arguments of which only the main class is a requirement
+     * @param argv
      */
     public static void main(String[] argv) {
+        try {
+            if (JavaFXLoader.main(TestRunner.class, argv)) {
+                return;
+            }
+        } catch (JavaFXLoader.JavaFXNotLoadedException notLoaded) {
+            System.err.println("Your JDK doesn't appear to have JavaFX installed, and the loader failed to install it.  Please download the appropriate javafx-{platform}.zip file from https://github.com/codenameone/cn1-binaries, and extract it to $HOME/.codenameone/javafx");
+            notLoaded.printStackTrace();
+            System.exit(100);
+        } catch (InvocationTargetException ex) {
+            System.err.println("An exception occurred running the tests");
+            ex.printStackTrace();
+            System.exit(100);
+        }
         new TestRunner().init(argv);
     }
 }

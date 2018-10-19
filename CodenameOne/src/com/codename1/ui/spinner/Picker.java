@@ -75,6 +75,25 @@ import java.util.ListIterator;
  * @author Shai Almog
  */
 public class Picker extends Button {
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     * @return the defaultUseLightweightPopup
+     */
+    public static boolean isDefaultUseLightweightPopup() {
+        return defaultUseLightweightPopup;
+    }
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     * @param aDefaultUseLightweightPopup the defaultUseLightweightPopup to set
+     */
+    public static void setDefaultUseLightweightPopup(
+        boolean aDefaultUseLightweightPopup) {
+        defaultUseLightweightPopup = aDefaultUseLightweightPopup;
+    }
     private int type = Display.PICKER_TYPE_DATE;
     private Object value = new Date();
     private boolean showMeridiem;
@@ -84,12 +103,21 @@ public class Picker extends Button {
     private int preferredPopupWidth;
     private int preferredPopupHeight;
     private int minuteStep = 5;
+    private int minHour=-1;
+    private int maxHour=-1;
+    private Date startDate, endDate;
     private VirtualInputDevice currentInput;
     
     // Variables to store the form's previous margins before showing
     // the popup dialog so that we can restore them when the popup is disposed.
     private byte[] tmpContentPaneMarginUnit;
     private float tmpContentPaneBottomMargin;
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     */
+    private static boolean defaultUseLightweightPopup;
     
     /**
      * Flag to indicate that the picker should prefer lightweight components 
@@ -115,6 +143,106 @@ public class Picker extends Button {
                 return true;
         }
         return false;
+    }
+    
+    /**
+     * Sets the hour range for this picker.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @param min The minimum hour to display (0-24) or -1 for no limit.
+     * @param max The maximum hour to display (0-24) or -1 for no limit
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #getMaxHour() 
+     */
+    public void setHourRange(int min, int max) {
+        if (showMeridiem && min >= 0 && min <= 24 && max > min) {
+            setShowMeridiem(false);
+        }
+        minHour = min;
+        maxHour = max;
+    }
+    
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @since 6.0
+     * @see #getMaxHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMinHour() {
+        return minHour;
+    }
+    
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMaxHour() {
+        return maxHour;
+    }
+    
+    /**
+     * Sets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * 
+     * <p>This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @param start The start date.
+     * @since 6.0
+     * @see #getStartDate() 
+     * @see #setEndDate(java.util.Date) 
+     */
+    public void setStartDate(Date start) {
+        this.startDate = start;
+    }
+    
+    /**
+     * Sets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * 
+     * <p>This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @param end The end date.
+     * @since 6.0
+     * @see #setStartDate(java.util.Date) 
+     * @see #getEndDate() 
+     */
+    public void setEndDate(Date end) {
+        this.endDate = end;
+    }
+    
+    /**
+     * Gets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The start date or null if there is none set.
+     * 
+     * <p>This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @since 6.0
+     * @see #getEndDate() 
+     * @see #setStartDate(java.util.Date) 
+     * @see #getMinHour() 
+     */
+    public Date getStartDate() {
+        return this.startDate;
+    }
+    
+    /**
+     * Gets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The end date or null if there is none set.
+     * 
+     * <p>This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * 
+     * @since 6.0
+     * @see #getStartDate() 
+     * @see #setEndDate(java.util.Date) 
+     * @see #getMaxHour() 
+     */
+    public Date getEndDate() {
+        return this.endDate;
     }
     
     /**
@@ -156,6 +284,9 @@ public class Picker extends Button {
             // the default.  This will result in these platforms using the new Spinner3D classes
             // instead of the old Spinner classes
             useLightweightPopup = true;
+        } else {
+            defaultUseLightweightPopup = getUIManager().isThemeConstant("lightweightPickerBool", defaultUseLightweightPopup);
+            useLightweightPopup = defaultUseLightweightPopup;
         }
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
@@ -345,7 +476,7 @@ public class Picker extends Button {
             }
             
             private Spinner3D createStringPicker3D() {
-                Spinner3D out = new Spinner3D(new DefaultListModel((String[])metaData));
+                Spinner3D out = new Spinner3D(new DefaultListModel<String>((String[])metaData));
                 if (value != null) {
                     out.setValue(value);
                 }
@@ -355,6 +486,9 @@ public class Picker extends Button {
             
             private DateSpinner3D createDatePicker3D() {
                 DateSpinner3D out = new DateSpinner3D();
+                if (startDate != null && endDate != null) {
+                    out.setDateRange(startDate, endDate);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
@@ -379,6 +513,9 @@ public class Picker extends Button {
                 TimeSpinner3D out = new TimeSpinner3D();
                 out.setMinuteStep(minuteStep);
                 out.setShowMeridiem(showMeridiem);
+                if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
+                    out.setHourRange(minHour, maxHour);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
@@ -389,6 +526,16 @@ public class Picker extends Button {
             
             private DateTimeSpinner3D createDateTimePicker3D() {
                 DateTimeSpinner3D out = new DateTimeSpinner3D();
+                out.setShowMeridiem(showMeridiem);
+                if (startDate != null) {
+                    out.setStartDate(startDate);
+                }
+                if (endDate != null) {
+                    out.setEndDate(endDate);
+                }
+                if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
+                    out.setHourRange(minHour, maxHour);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
@@ -750,7 +897,8 @@ public class Picker extends Button {
                 }
                 break;
             case Display.PICKER_TYPE_STRINGS:
-                if(!Util.instanceofObjArray(value)) {
+                if(value == null || 
+                    (!Util.instanceofObjArray(value) && !(value instanceof String[]))) {
                     setStrings(new String[] {" "});
                 }
                 break;
@@ -840,6 +988,16 @@ public class Picker extends Button {
             style.setMarginBottom(tmpContentPaneBottomMargin);
             tmpContentPaneMarginUnit=null;
             f.revalidate();
+            // If we remove the margin, it sometimes leaves the content pane
+            // in a negative scroll position - which leaves a gap at the top.
+            // Simulating a drag will trigger tensile drag to push the content
+            // back up to the top.
+            // See https://github.com/codenameone/CodenameOne/issues/2476
+            if (f != null && f.getContentPane() != null && f.getContentPane().getScrollY() < 0) {
+                f.getContentPane().pointerPressed(100, 100);
+                f.getContentPane().pointerDragged(100, 100);
+                f.getContentPane().pointerReleased(100, 100);
+            }
         }
     }
 
@@ -1048,7 +1206,11 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
+                    int cookedHour = hour <= 12 ? hour : hour - 12;
+                    if (cookedHour == 0) {
+                        cookedHour = 12;
+                    }
+                    setText(twoDigits(cookedHour) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }
@@ -1328,7 +1490,9 @@ public class Picker extends Button {
     
     @Override
     public void paint(Graphics g) {
-        super.paint(g); //To change body of generated methods, choose Tools | Templates.
+        if (!suppressPaint) {
+            super.paint(g);
+        }
     }
     
     @Override
@@ -1339,4 +1503,10 @@ public class Picker extends Button {
         return super.getStyle(); 
     }
  
+    private boolean suppressPaint;
+    void setSuppressPaint(boolean suppress) {
+        suppressPaint = suppress;
+    }
+    
+    
 }

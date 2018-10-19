@@ -89,6 +89,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
@@ -103,6 +104,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN1Constants;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -126,6 +128,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
@@ -175,6 +178,8 @@ import org.w3c.dom.NodeList;
  */
 public class JavaSEPort extends CodenameOneImplementation {
 
+    
+    
     public final static boolean IS_MAC;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
@@ -187,33 +192,92 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     static JMenuItem pause;
     
+    /**
+     * Returns the Java version as an int value.
+     *
+     * @return the Java version as an int value (8, 9, etc.)
+     * @since 12130
+     */
+    private static int getJavaVersion() {
+        String version = System.getProperty("java.version");
+        if (version.startsWith("1.")) {
+            version = version.substring(2);
+        }
+        // Allow these formats:
+        // 1.8.0_72-ea
+        // 9-ea
+        // 9
+        // 9.0.1
+        int dotPos = version.indexOf('.');
+        int dashPos = version.indexOf('-');
+        return Integer.parseInt(version.substring(0,
+                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+    }
+
     public static boolean isRetina() {
-        //if (true) return false;
         boolean isRetina = false;
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
-            // TODO: In JDK9 this throws a warning
-            // WARNING: An illegal reflective access operation has occurred
-            // WARNING: Illegal reflective access by com.codename1.impl.javase.JavaSEPort to field sun.awt.CGraphicsDevice.scale
-            // WARNING: Please consider reporting this to the maintainers of com.codename1.impl.javase.JavaSEPort
-            // WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
-            // WARNING: All illegal access operations will be denied in a future release
-            // A workaround is sugtested in this bug report.  Will require some testing.
-            // https://bugs.openjdk.java.net/browse/JDK-8172962
-            // 
-            Field field = graphicsDevice.getClass().getDeclaredField("scale");
-            if (field != null) {
-                field.setAccessible(true);
-                Object scale = field.get(graphicsDevice);
-                if (scale instanceof Integer && ((Integer) scale).intValue() == 2) {
+            if (getJavaVersion() >= 9) {
+                // JDK9 Doesn't like the old hack for getting the scale via reflection.
+                // https://bugs.openjdk.java.net/browse/JDK-8172962
+                GraphicsConfiguration graphicsConfig = graphicsDevice 
+                        .getDefaultConfiguration(); 
+
+                AffineTransform tx = graphicsConfig.getDefaultTransform(); 
+                double scaleX = tx.getScaleX(); 
+                double scaleY = tx.getScaleY(); 
+                
+                if (scaleX >= 2 && scaleY >= 2) {
                     isRetina = true;
+                }
+            } else {
+
+                Field field = graphicsDevice.getClass().getDeclaredField("scale");
+                if (field != null) {
+                    field.setAccessible(true);
+                    Object scale = field.get(graphicsDevice);
+                    if (scale instanceof Integer && ((Integer) scale).intValue() >= 2) {
+                        isRetina = true;
+                    }
                 }
             }
         } catch (Throwable e) {
             //e.printStackTrace();
         }
         return isRetina;
+    }
+    
+    public static double calcRetinaScale() {
+        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+
+        try {
+            if (getJavaVersion() >= 9) {
+                // JDK9 Doesn't like the old hack for getting the scale via reflection.
+                // https://bugs.openjdk.java.net/browse/JDK-8172962
+                GraphicsConfiguration graphicsConfig = graphicsDevice 
+                        .getDefaultConfiguration(); 
+
+                AffineTransform tx = graphicsConfig.getDefaultTransform(); 
+                double scaleX = tx.getScaleX(); 
+                double scaleY = tx.getScaleY(); 
+                return Math.max(1.0, Math.min(scaleX, scaleY));
+            } else {
+
+                Field field = graphicsDevice.getClass().getDeclaredField("scale");
+                if (field != null) {
+                    field.setAccessible(true);
+                    Object scale = field.get(graphicsDevice);
+                    if (scale instanceof Integer && ((Integer) scale).intValue() >= 2) {
+                        return ((Integer)scale).doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            //e.printStackTrace();
+        }
+        return 1.0;
     }
     
     public static double getRetinaScale() {
@@ -264,8 +328,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     //private javafx.embed.swing.JFXPanel mediaContainer;
 
     private static File baseResourceDir;
-    private static final String DEFAULT_SKINS
-            = "/iphone3gs.skin;";
+    private static final String DEFAULT_SKIN = "/iPhoneX.skin";
+    private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
     private static String appHomeDir = ".cn1";
     
     /**
@@ -408,7 +472,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int smallFontSize = 11;
     private static int largeFontSize = 19;
     static {
-        retinaScale = isRetina() ? 2.0 : 1.0;
+        retinaScale = calcRetinaScale();
+        if (System.getProperty("cn1.retinaScale", null) != null) {
+            try {
+                retinaScale = Double.parseDouble(System.getProperty("cn1.retinaScale"));
+            } catch (Throwable t){}
+        } else if (System.getenv("CN1_RETINA_SCALE") != null) {
+            try {
+                retinaScale = Double.parseDouble(System.getenv("CN1_RETINA_SCALE"));
+            } catch (Throwable t) {}
+        }
+        System.out.println("Retina Scale: "+retinaScale);
+    
         if (retinaScale > 1.5) {
             medianFontSize = (int)(medianFontSize * retinaScale);
             smallFontSize = (int)(smallFontSize * retinaScale);
@@ -421,7 +496,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean alwaysOnTop = false;
     private static boolean useNativeInput = true;
     private static boolean simulateAndroidKeyboard = false;
-    private static boolean scrollableSkin = true;
+    private static boolean scrollableSkin = false;
     private JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
     private JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
     static final int GAME_KEY_CODE_FIRE = -90;
@@ -490,6 +565,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
+            checkIosBackgroundFetch();
             stopBackgroundFetchService();
             if (getPreferredBackgroundFetchInterval() > 0) {
                 backgroundFetchTimer = new java.util.Timer();
@@ -800,7 +876,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
-                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+                if(desktopSkin) {
+                    h.remove("@paintsTitleBarBool");
+                }
+                UIManager.getInstance().setThemeProps(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -2679,6 +2761,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new ComponentTreeInspector();
                 }
             });
+            JMenuItem appArg = new JMenuItem("Send App Argument");
+            appArg.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    Executor.stopApp();
+                    JPanel pnl = new JPanel();
+                    JTextField tf = new JTextField(20);
+                    pnl.add(new JLabel("Argument to The App"));
+                    pnl.add(tf);
+                    int val = JOptionPane.showConfirmDialog(canvas, pnl, "Please Enter The Argument", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                    if (val != JOptionPane.OK_OPTION) {
+                        Executor.startApp();
+                        return;
+                    }
+                    String arg = tf.getText();
+                    Display.getInstance().setProperty("AppArg", arg);
+                    Executor.startApp();
+                }
+            });
+            simulatorMenu.add(appArg);
             
             JMenuItem locactionSim = new JMenuItem("Location Simulation");
             locactionSim.addActionListener(new ActionListener() {
@@ -3057,7 +3159,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     zoomLevel = Math.min(h1, w1);
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
+                    if (window != null) {
+                        window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
+                    }
                     parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
 
@@ -3099,9 +3204,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    if (scrollableSkin) {
+                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    } else {
+                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                        float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
+                        if (window != null) {
+                            window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoom), (int)(getSkin().getHeight() * zoom)));
+                        }
+                    }
                     parent.add(BorderLayout.CENTER, canvas);
-
+                    
                     canvas.x = 0;
                     canvas.y = 0;
                     zoomLevel = 1;
@@ -3124,6 +3238,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     exitApplication();
                 }
             });
+    }
+    
+    public static void resumeApp() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Executor.startApp();
+                instance.minimized = false;
+            }
+        });
+        instance.canvas.setEnabled(true);
+        pause.setText("Pause App");
     }
     
     File findScreenshotFile() {
@@ -3172,7 +3297,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } else {
                     // remove the old builtin skins from the menu
-                    if(current.startsWith("/") && !current.equals("/iphone3gs.skin")) {
+                    if(current.startsWith("/") && !current.equals(DEFAULT_SKIN)) {
                         continue;
                     }
                 }
@@ -3208,6 +3333,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         JMenuItem dSkin = new JMenuItem("Desktop.skin");
+        
         dSkin.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent ae) {
@@ -3221,6 +3347,31 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 pref.putBoolean("desktopSkin", true);
+                pref.putBoolean("uwpDesktopSkin", false);
+                String mainClass = System.getProperty("MainClass");
+                if (mainClass != null) {
+                    deinitializeSync();
+                    frm.dispose();
+                    System.setProperty("reload.simulator", "true");
+                } 
+            }
+        });
+        JMenuItem uwpSkin = new JMenuItem("UWP Desktop.skin");
+        uwpSkin.setToolTipText("Windows 10 Desktop Skin");
+        uwpSkin.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                if (netMonitor != null) {
+                    netMonitor.dispose();
+                    netMonitor = null;
+                }
+                if (perfMonitor != null) {
+                    perfMonitor.dispose();
+                    perfMonitor = null;
+                }
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("desktopSkin", true);
+                pref.putBoolean("uwpDesktopSkin", true);
                 String mainClass = System.getProperty("MainClass");
                 if (mainClass != null) {
                     deinitializeSync();
@@ -3231,6 +3382,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         skinMenu.addSeparator();
         skinMenu.add(dSkin);
+        skinMenu.add(uwpSkin);
         
         skinMenu.addSeparator();
         JMenuItem more = new JMenuItem("More...");
@@ -3499,12 +3651,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
-                            pref.put("skin", "/iphone3gs.skin");
+                            pref.put("skin", DEFAULT_SKIN);
                             deinitializeSync();
                             frm.dispose();
                             System.setProperty("reload.simulator", "true");
                         } else {
-                            loadSkinFile("/iphone3gs.skin", frm);
+                            loadSkinFile(DEFAULT_SKIN, frm);
                             refreshSkin(frm);
                         }
                         
@@ -3599,13 +3751,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private float zoomLevel() {
+        float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+        float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
+        return Math.min(h1, w1);
+    }
+    
     private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
 
             public void run() {
-                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
-                zoomLevel = Math.min(h1, w1);
+
+                zoomLevel = zoomLevel();
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
                 deepRevaliate(Display.getInstance().getCurrent());
 
@@ -3616,7 +3773,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 deepRevaliate(Display.getInstance().getCurrent());
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 Display.getInstance().getCurrent().revalidate();
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
                 zoomLevel = 1;
                 frm.pack();
             }
@@ -3659,7 +3816,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     loadSkinFile(d, frm);
                     return;
                 } catch (MalformedURLException ex) {
-                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    loadSkinFile(getResourceAsStream(getClass(), DEFAULT_SKIN), frm);
                     
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -3669,13 +3826,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(is != null) {
                     loadSkinFile(is, frm);
                 } else {
-                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    loadSkinFile(getResourceAsStream(getClass(), DEFAULT_SKIN), frm);
                 }
             }
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             pref.put("skin", f);
             addSkinName(f);
         } catch (Throwable t) {
+            System.out.println("Failed loading the skin file: " + f);
             t.printStackTrace();
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             pref.remove("skin");
@@ -3688,12 +3846,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
 
-        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
+/*        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
         if(!updater.exists()) {
             System.out.println("******************************************************************************");
             System.out.println("* It seems that you are using an old plugin version please upate to the latest plugin and invoke Codename One -> Codename One Settings -> Basic -> Update Client Libs");
             System.out.println("******************************************************************************");
-        }
+        }*/
                 
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
@@ -3720,7 +3878,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             frame.add(panel, BorderLayout.CENTER);
             frame.setSize(new Dimension(300, 400));
             m = panel;
-            window = frame;            
+            window = frame;
+            if (pref.getBoolean("uwpDesktopSkin", false)) {
+                setNativeTheme("/winTheme.res");
+            } else {
+                setNativeTheme("/iOS7Theme.res");
+            }
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
         
@@ -3781,11 +3944,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             vSelector = new JScrollBar(Scrollbar.VERTICAL);
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
-            scrollableSkin = pref.getBoolean("Scrollable", true);
+            scrollableSkin = pref.getBoolean("Scrollable", scrollableSkin);
             if (scrollableSkin) {
                 window.add(java.awt.BorderLayout.SOUTH, hSelector);
                 window.add(java.awt.BorderLayout.EAST, vSelector);
             }
+            
             window.add(java.awt.BorderLayout.CENTER, canvas);
         }
         if(window != null){
@@ -3860,15 +4024,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             window.pack();
             if (getSkin() != null && !scrollableSkin) {
-                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
-                zoomLevel = Math.min(h1, w1);
+                zoomLevel = zoomLevel();
             }
 
             portrait = pref.getBoolean("Portrait", true);
             if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
+            } else if (portrait && getSkin() != null) {
+                int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
             }
             
             window.setVisible(true);
@@ -4223,7 +4390,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         javax.swing.text.JTextComponent swingT;
         if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
             JTextComponent t;
-            if(isDesktop() && (constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
+            if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
                     public void repaint(long tm, int x, int y, int width, int height) {
                         Display.getInstance().callSerially(new Runnable() {
@@ -5189,6 +5356,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Composite c = nativeGraphics.getComposite();
+        nativeGraphics.setComposite(AlphaComposite.Clear);
+        nativeGraphics.fillRect(x, y, width, height);
+        if (perfMonitor != null) {
+            perfMonitor.clearRect(x, y, width, height);
+        }
+        nativeGraphics.setComposite(c);
+    }
+    
+    
+
     /**
      * @inheritDoc
      */
@@ -5775,6 +5957,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         throw new RuntimeException("The file wasn't found: " + fontName);
     }
 
+    private static double fontScale=1.0;
+    
+    public static double getFontScale() {
+        return fontScale;
+    }
+    
+    
+    public static void setFontScale(double scale) {
+        fontScale = scale;
+    }
+    
+    
+    
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         java.awt.Font fnt;
@@ -5790,10 +5985,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
             style = style | java.awt.Font.ITALIC;
         }
-        java.awt.Font fff = fnt.deriveFont(style, size);
+        java.awt.Font fff = fnt.deriveFont(style, (float)(size * getFontScale()));
+        
         if(Math.abs(size / 2 - fff.getSize())  < 3) {
             // retina display bug!
-            return fnt.deriveFont(style, size * 2);
+            return fnt.deriveFont(style, (float)(size * 2 * getFontScale()));
         }
         return fff;
     }
@@ -6361,14 +6557,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
 
-    @Override
-    public com.codename1.ui.Transform getTransform(Object graphics) {
+    private com.codename1.ui.Transform getTransformInternal(Object graphics) {
         checkEDT();
         com.codename1.ui.Transform t = getNativeScreenGraphicsTransform(graphics);
         if ( t == null ){
             return Transform.makeIdentity();
         }
-        return t.copy();
+        return t;
+    }
+    
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        return getTransformInternal(graphics).copy();
     }
 
     @Override
@@ -7147,29 +7347,43 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public void resetAffine(Object nativeGraphics) {
         checkEDT();
+        setTransform(nativeGraphics, com.codename1.ui.Transform.makeIdentity());
+        /*
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
         if (zoomLevel != 1 && g != nativeGraphics) {
             g.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
-        }
+        }*/
     }
 
     public void scale(Object nativeGraphics, float x, float y) {
         checkEDT();
-        Graphics2D g = getGraphics(nativeGraphics);
-        g.scale(x, y);
+        //Graphics2D g = getGraphics(nativeGraphics);
+        //g.scale(x, y);
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.scale(x, y);
+        setTransform(nativeGraphics, tf);
     }
 
     public void rotate(Object nativeGraphics, float angle) {
+        /*
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.rotate(angle);
+        */
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.rotate(angle, 0, 0);
+        setTransform(nativeGraphics, tf);
+        
     }
 
     public void rotate(Object nativeGraphics, float angle, int pX, int pY) {
         checkEDT();
-        Graphics2D g = getGraphics(nativeGraphics);
-        g.rotate(angle, pX, pY);
+        //Graphics2D g = getGraphics(nativeGraphics);
+        //g.rotate(angle, pX, pY);
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.rotate(angle, pX, pY);
+        setTransform(nativeGraphics, tf);
     }
 
     public void shear(Object nativeGraphics, float x, float y) {
@@ -7179,7 +7393,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return tablet;
+        return tablet || isDesktop();
     }
 
     public boolean isDesktop() {
@@ -7563,8 +7777,49 @@ public class JavaSEPort extends CodenameOneImplementation {
                 nr.setMethod(method.toUpperCase());
             }
         }
+        if(method.equalsIgnoreCase("patch")) {
+            allowPatch((HttpURLConnection) connection);
+        }
         ((HttpURLConnection) connection).setRequestMethod(method);
     }
+    
+    // the following block is based on a few suggestions in this stack overflow 
+    // answer https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch
+    private static boolean enabledPatch;
+    private static boolean patchFailed;
+    private static void allowPatch(HttpURLConnection connection) {
+        if(enabledPatch) {
+            return;
+        }
+        if(patchFailed) {
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            return;
+        }
+        try {
+            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
+
+            Field modifiersField = Field.class.getDeclaredField("modifiers");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
+
+            methodsField.setAccessible(true);
+
+            String[] oldMethods = (String[]) methodsField.get(null);
+            Set<String> methodsSet = new LinkedHashSet<String>(Arrays.asList(oldMethods));
+            methodsSet.addAll(Arrays.asList("PATCH"));
+            String[] newMethods = methodsSet.toArray(new String[0]);
+
+            methodsField.set(null/*static field*/, newMethods);
+            enabledPatch = true;
+        } catch (NoSuchFieldException e) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        } catch(IllegalAccessException ee) {
+            patchFailed = true;
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        }
+    }    
+    
 
     /**
      * @inheritDoc
@@ -8213,12 +8468,47 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     @Override
+    public boolean isGalleryTypeSupported(int type) {
+        if (super.isGalleryTypeSupported(type)) {
+            return true;
+        }
+        switch (type) {
+            case -9999:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+            case Display.GALLERY_ALL_MULTI:
+                return true;
+        }
+        
+        return false;
+    }
+    
+    @Override
     public void openGallery(final com.codename1.ui.events.ActionListener response, int type){
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
         }
-        
-        if(type == Display.GALLERY_VIDEO){
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
+        if (type == Display.GALLERY_IMAGE_MULTI) {
+            checkGalleryMultiselect();
+            checkPhotoLibraryUsageDescription();
+            captureMulti(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
+        }else if(type == Display.GALLERY_VIDEO_MULTI){
+            checkGalleryMultiselect();
+            checkAppleMusicUsageDescription();
+            captureMulti(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
+        }else if(type == Display.GALLERY_ALL_MULTI) {
+            checkGalleryMultiselect();
+            checkPhotoLibraryUsageDescription();
+            checkAppleMusicUsageDescription();
+            String[] exts = new String[videoExtensions.length+imageExtensions.length];
+            System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
+            System.arraycopy(imageExtensions, 0, exts, videoExtensions.length, imageExtensions.length);
+            captureMulti(response, exts, getGlobsForExtensions(exts, ";"));
+        }
+        else if(type == Display.GALLERY_VIDEO){
             checkAppleMusicUsageDescription();
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
@@ -8240,6 +8530,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private boolean richPushBuildHintsChecked;
+    
+    public void checkRichPushBuildHints() {
+        if (!richPushBuildHintsChecked) {
+            richPushBuildHintsChecked = true;
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.useNotificationServiceExtension")) {
+                    Display.getInstance().setProjectBuildHint("ios.useNotificationServiceExtension", "true");
+                }
+            }
+        }
+    }
+    
     private boolean cameraUsageDescriptionChecked;
     
     private void checkCameraUsageDescription() {
@@ -8254,6 +8558,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private boolean enableGalleryMultiselectChecked;
+    private void checkGalleryMultiselect() {
+        if (!enableGalleryMultiselectChecked) {
+            enableGalleryMultiselectChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.enableGalleryMultiselect")) {
+                    Display.getInstance().setProjectBuildHint("ios.enableGalleryMultiselect", "true");
+                }
+            }
+        }
+    }
+    
     
     private boolean contactsUsageDescriptionChecked;
     
@@ -8284,6 +8603,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+    
+    private void checkIosBackgroundFetch() {
+        if (!iosBackgroundFetchChecked) {
+            iosBackgroundFetchChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                
+                String existingModes = m.get("ios.background_modes");
+                if (existingModes == null) {
+                    existingModes = "fetch";
+                } else if (!existingModes.contains("fetch")) {
+                    existingModes += ",fetch";
+                }
+                Display.getInstance().setProjectBuildHint("ios.background_modes", existingModes);
+                
+            }
+        }
+    }
+    
+    private boolean iosBackgroundFetchChecked;
     
     private boolean appleMusicUsageDescriptionChecked;
     
@@ -8340,6 +8680,57 @@ public class JavaSEPort extends CodenameOneImplementation {
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
     
+    private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
+        SwingUtilities.invokeLater(new Runnable() {
+
+            public void run() {
+                File[] selectedFiles = pickFiles(imageTypes, desc, true);
+                ArrayList<String> resultList = new ArrayList<String>();
+                com.codename1.ui.events.ActionEvent result = null;
+                if(!exposeFilesystem) { 
+                    if (selectedFiles != null) {
+                        for (File selected : selectedFiles) {
+                            try {
+                                String ext = selected.getName();
+                                int idx = ext.lastIndexOf(".");
+                                if(idx > 0) {
+                                    ext = ext.substring(idx);
+                                } else {
+                                    ext= imageTypes[0];
+                                }
+                                File tmp = selected;
+                                if (!"true".equals(Display.getInstance().getProperty("openGallery.openFilesInPlace", "false"))) {
+                                    tmp = File.createTempFile("temp", "." + ext);
+                                    tmp.deleteOnExit();
+                                    copyFile(selected, tmp);
+                                }
+                                resultList.add("file://" + tmp.getAbsolutePath().replace('\\', '/'));
+                                //result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
+                            } catch(IOException err) {
+                                err.printStackTrace();
+                            }
+                        }
+                    } 
+                } else {
+                    if(selectedFiles != null) {
+                        for (File selected : selectedFiles) {
+                            resultList.add("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                            //result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                        }
+                    }
+                }
+                result = new com.codename1.ui.events.ActionEvent(resultList.toArray(new String[resultList.size()]));
+                final com.codename1.ui.events.ActionEvent finalResult = result;
+                Display.getInstance().callSerially(new Runnable() {
+
+                    public void run() {
+                        response.actionPerformed(finalResult);
+                    }
+                });
+            }
+        });
+    }
+    
     private void capture(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {
 
@@ -8357,9 +8748,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                             } else {
                                 ext= imageTypes[0];
                             }
-                            File tmp = File.createTempFile("temp", "." + ext);
-                            tmp.deleteOnExit();
-                            copyFile(selected, tmp);
+                            File tmp = selected;
+                            if (!"true".equals(Display.getInstance().getProperty("openGallery.openFilesInPlace", "false"))) {
+                                tmp = File.createTempFile("temp", "." + ext);
+                                tmp.deleteOnExit();
+                                copyFile(selected, tmp);
+                            }
+                            
                             result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
                         } catch(IOException err) {
                             err.printStackTrace();
@@ -8399,7 +8794,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkMicrophoneUsageDescription();
         capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
     }
-
+    private static boolean isPlayable(String filename) {
+        try {
+            javafx.scene.media.Media media = new javafx.scene.media.Media(filename);
+        } catch (javafx.scene.media.MediaException e) {
+            if (e.getType() == javafx.scene.media.MediaException.Type.MEDIA_UNSUPPORTED) {
+                return false;
+            }
+        }
+        return true;
+    }
     
     class CodenameOneMediaPlayer implements Media {
 
@@ -8412,6 +8816,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private javafx.embed.swing.JFXPanel videoPanel;
         private JFrame frm;
         private boolean playing = false;
+        private boolean nativePlayerMode;
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             if (onCompletion != null) {
@@ -8421,6 +8826,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    playing = false;
                     fireCompletionHandlers();
                 }
                 
@@ -8428,11 +8834,42 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.isVideo = isVideo;
             this.frm = f;
             try {
+                if (uri.startsWith("file:")) {
+                    uri = unfile(uri);
+                }
                 File fff = new File(uri);
                 if(fff.exists()) {
                     uri = fff.toURI().toURL().toExternalForm();
                 }
+                if (isVideo && !isPlayable(uri)) {
+                    // JavaFX doesn't seem to support .mov files.  But if you simply rename it
+                    // to .mp4, then it will play it  (if it is mpeg4).
+                    // So this will improve .mov files from failing to 100% of the time
+                    // to only half of the time (when it isn't an mp4)
+                    File temp = File.createTempFile("mtmp", ".mp4");
+                    temp.deleteOnExit();
+                    FileOutputStream out = new FileOutputStream(temp);
+                    byte buf[] = new byte[1024];
+                    int len = 0;
+                    InputStream stream = new URL(uri).openStream();
+                    while ((len = stream.read(buf, 0, buf.length)) > -1) {
+                        out.write(buf, 0, len);
+                    }
+                    stream.close();
+                    uri = temp.toURI().toURL().toExternalForm();
+                }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                player.setOnPaused(new Runnable() {
+                    public void run() {
+                        playing = false;
+                    }
+                });
+                player.setOnPlaying(new Runnable() {
+                    public void run() {
+                        playing = true;
+                    }
+                });
+                
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
@@ -8491,6 +8928,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    playing = false;
                     fireCompletionHandlers();
                 }
             };
@@ -8498,6 +8936,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
+                player.setOnPaused(new Runnable() {
+                    public void run() {
+                        playing = false;
+                    }
+                });
+                player.setOnPlaying(new Runnable() {
+                    public void run() {
+                        playing = true;
+                    }
+                });
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
@@ -8558,6 +9006,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         public void play() {
+            if (isVideo && nativePlayerMode) {
+                // To simulate native player mode, we will show a form with the player.
+                final Form currForm = Display.getInstance().getCurrent();
+                Form playerForm = new Form("Video Player", new com.codename1.ui.layouts.BorderLayout()) {
+
+                    @Override
+                    protected void onShow() {
+                        player.play();
+                        playing = true;
+                    }
+                    
+                };
+                com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
+                playerForm.setToolbar(tb);
+                tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                        currForm.showBack();
+                    }
+                });
+                
+                Component videoComponent = getVideoComponent();
+                if (videoComponent.getComponentForm() != null) {
+                    videoComponent.remove();
+                }
+                playerForm.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, videoComponent);
+                playerForm.show();
+                return;
+                
+            }
             player.play();
             playing = true;
         }
@@ -8643,11 +9120,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void setNativePlayerMode(boolean nativePlayer) {
+            nativePlayerMode = nativePlayer;
         }
 
         @Override
         public boolean isNativePlayerMode() {
-            return false;
+            return nativePlayerMode;
         }
 
         public void setVariable(String key, Object value) {
@@ -8692,6 +9170,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return buf;
         }
+
+        
+        
+        
         
         /**
          * Paints the native component to the buffer
@@ -8865,7 +9347,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(vid.getWidth()), (int)(vid.getHeight()));
+            com.codename1.ui.geom.Dimension out = new com.codename1.ui.geom.Dimension((int)(vid.getPreferredSize().width), (int)(vid.getPreferredSize().height));
+            return out;
         }
 
         @Override
@@ -9167,8 +9650,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public String getDatabasePath(String databaseName) {
         if(exposeFilesystem){
-            return getStorageDir() + "/database/" + databaseName;
+            File f = getDatabaseFile(databaseName);
+        
+            return f.getAbsolutePath();
         }else{
+            if (databaseName.startsWith("file://")) {
+                return databaseName;
+            }
             return getAppHomePath() + "database/" + databaseName;        
         }
     }
@@ -9189,12 +9677,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             // current working directory
             SQLiteConfig config = new SQLiteConfig();
             config.enableLoadExtension(true);
-            File dir = new File(getStorageDir() + "/database");
+            File file = getDatabaseFile(databaseName);
+             
+            
+            File dir = file.getParentFile();
             if (!dir.exists()) {
                 dir.mkdir();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
-                    + getStorageDir() + "/database/" + databaseName,
+            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
+                    file.getAbsolutePath(),
                     config.toProperties()
             );
 
@@ -9205,19 +9696,42 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    
+    private File getDatabaseFile(String databaseName) {
+        File f = new File(getStorageDir() + "/database/" + databaseName);
+        if (exposeFilesystem) {
+            if (databaseName.contains("/") || databaseName.contains("\\")) {
+                f = new File(databaseName);
+            }
+        } else {
+            if (databaseName.startsWith("file://")) {
+                f = new File(FileSystemStorage.getInstance().toNativePath(databaseName));
+            }
+            
+        }
+        return f;
+    }
+    
+    //@Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+    
     @Override
     public void deleteDB(String databaseName) throws IOException {
         System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         if (f.exists()) {
             f.delete();
         }
     }
+    
+    
 
     @Override
     public boolean existsDB(String databaseName) {
         System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = getDatabaseFile(databaseName);
         return f.exists();
     }
 
@@ -9421,12 +9935,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    private void browserExposeInJavaScriptImpl(final PeerComponent browserPeer, final Object o, final String name) {
+        ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+    }
     public void browserExposeInJavaScript(final PeerComponent browserPeer, final Object o, final String name) {
+        if (Platform.isFxApplicationThread()) {
+            browserExposeInJavaScriptImpl(browserPeer, o, name);
+            return;
+        }
         Platform.runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+                browserExposeInJavaScriptImpl(browserPeer, o, name);
             }
         });
     }
@@ -9652,7 +10173,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         return pickFile(new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
 
-    private File pickFile(final String[] types, String name) {
+    private File pickFile(String[] types, String name) {
+        File[] out = pickFiles(types, name, false);
+        if (out == null || out.length < 1) {
+            return null;
+        }
+        return out[0];
+        
+    }
+    
+    private File[] pickFiles(final String[] types, String name, boolean multipleMode) {
         FileDialog fd = new FileDialog(java.awt.Frame.getFrames()[0]);
         fd.setFilenameFilter(new FilenameFilter() {
 
@@ -9667,24 +10197,46 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         fd.setFile(name);
+        if (multipleMode) {
+            fd.setMultipleMode(true);
+        }
         fd.pack();
         fd.setLocationByPlatform(true);
         fd.setVisible(true);
 
-        if (fd.getFile() != null) {
-            name = fd.getFile().toLowerCase();
-            for(String t : types) {
-                if(name.endsWith(t)) {
-                    File f = new File(fd.getDirectory(), fd.getFile());
-                    if(!f.exists()){
-                        return new File(fd.getDirectory());
-                    }else{
-                        return f;
+        if (multipleMode) {
+            File[] files = fd.getFiles();
+            ArrayList<File> out = new ArrayList<File>();
+            for (File f : files) {
+                name = f.getName().toLowerCase();
+                for (String t : types) {
+                    if (name.endsWith(t)) {
+                        if (!f.exists()) {
+                            out.add(f.getParentFile());
+                        } else {
+                            out.add(f);
+                        }
+                        break;
                     }
                 }
             }
+            return out.toArray(new File[out.size()]);
+        } else {
+            if (fd.getFile() != null) {
+                name = fd.getFile().toLowerCase();
+                for(String t : types) {
+                    if(name.endsWith(t)) {
+                        File f = new File(fd.getDirectory(), fd.getFile());
+                        if(!f.exists()){
+                            return new File[]{new File(fd.getDirectory())};
+                        }else{
+                            return new File[]{f};
+                        }
+                    }
+                }
+            }
+            return new File[0];
         }
-        return null;
     }
 
     @Override
@@ -9709,6 +10261,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         return "file://home/";
     }
 
+    
+    
     public int convertToPixels(int dipCount, boolean horizontal) {
         if (pixelMilliRatio != null) {
             return (int) Math.round(dipCount * pixelMilliRatio.doubleValue());

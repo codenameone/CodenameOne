@@ -116,7 +116,11 @@ public class TextComponent extends InputComponent {
                     text.setY(getLabel().getY());
                     text.setWidth(getLabel().getWidth());
                     text.setHeight(getLabel().getHeight());
-                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(getHintLabel().getUIID(), animationSpeed));
+                    String hintLabelUIID = "TextHint";
+                    if(getHintLabel() != null) {
+                        hintLabelUIID = getHintLabel().getUIID();
+                    }
+                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
                     getAnimationManager().addAnimation(anim, new Runnable() {
                         public void run() {
                             setHint(getLabel().getText());

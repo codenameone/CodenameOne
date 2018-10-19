@@ -56,6 +56,7 @@ import com.codename1.messaging.Message;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -85,6 +86,9 @@ import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
+import com.codename1.push.PushAction;
+import com.codename1.push.PushActionCategory;
+import com.codename1.push.PushContent;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -109,6 +113,8 @@ import java.util.Collections;
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
+    // Flag to indicate if the current openGallery process is selecting multiple files
+    private static boolean gallerySelectMultiple;
     public static IOSNative nativeInstance = new IOSNative();
     private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
@@ -408,8 +414,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance.repaintTextEditor(true);
     }
     
+    // A flag to override the invisible area under VKB.  This
+    // is used when hiding the keyboard, but the keyboard may still
+    // be visible so that we can perform revalidation of the form
+    // using a supposed state.
+    private int areaUnderVKBOverride=-1;
+    
     @Override
     public int getInvisibleAreaUnderVKB() {
+        if (areaUnderVKBOverride >= 0) {
+            return areaUnderVKBOverride;
+        }
         if(isAsyncEditMode() && isEditingText()) {
             return nativeInstance.getVKBHeight();
         }
@@ -549,7 +564,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 Form current = Display.getInstance().getCurrent();
                 if (current != null) {
-                    current.revalidate();
+                    instance.areaUnderVKBOverride = 0;
+                    try {
+                        current.revalidate();
+                        //Now that screen size is changed, the scroll positions may
+                        // be caught in a negative state, leaving a gap at the
+                        // top.
+                        //https://github.com/codenameone/CodenameOne/issues/2476
+                        Accessor.fixNegativeScrolls(current);
+                    } finally {
+                        instance.areaUnderVKBOverride = -1;
+                    }
                 }
             }
             
@@ -1023,7 +1048,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object createImage(String path) throws IOException {
         long ns;
         if(path.startsWith("file:")) {
-            ns = IOSImplementation.nativeInstance.createNSData(path);
+            ns = IOSImplementation.nativeInstance.createNSData(unfile(path));
         } else {
             ns = getResourceNSData(path);
         }
@@ -2803,13 +2828,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
-                if(r.startsWith("file:")) {
-                    captureCallback.fireActionEvent(new ActionEvent(r));
+                if (gallerySelectMultiple) {
+                    String[] paths = Util.split(r, "\n");
+                    int len = paths.length;
+                    for (int i=0; i<len; i++) {
+                        if (!paths[i].startsWith("file:")) {
+                            paths[i] = "file:"+paths[i];
+                        }
+                    }
+                    captureCallback.fireActionEvent(new ActionEvent(paths));
                 } else {
-                    captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                    if(r.startsWith("file:")) {
+                        captureCallback.fireActionEvent(new ActionEvent(r));
+                    } else {
+                        captureCallback.fireActionEvent(new ActionEvent("file:" + r));
+                    }
                 }
             } else {
-                captureCallback.fireActionEvent(null);
+                captureCallback.fireActionEvent(new ActionEvent(null));
             }
             captureCallback = null;
         }
@@ -2865,6 +2901,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!nativeInstance.checkCameraUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription build hint");
         }
+        gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
@@ -2991,6 +3028,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
         }
+        gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
@@ -3003,14 +3041,47 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isGalleryTypeSupported(int type) {
+        if (super.isGalleryTypeSupported(type)) {
+            return true;
+        }
+        if (type == -9999) {
+            return true;
+        }
+        switch (type) {
+            case Display.GALLERY_ALL_MULTI:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+                return nativeInstance.isMultiGallerySelectSupported();
+        }
+        return false;
+    }
+    
+    
+
+    @Override
     public void openGallery(ActionListener response, int type) {
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         if (!nativeInstance.checkPhotoLibraryUsage()) {
             throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
+        }
+        switch (type) {
+            case Display.GALLERY_ALL_MULTI:
+            case Display.GALLERY_IMAGE_MULTI:
+            case Display.GALLERY_VIDEO_MULTI:
+                gallerySelectMultiple = true;
+                break;
+            default:
+                gallerySelectMultiple = false;
+                
         }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
     }
+    
     
     
     static class IOSMediaCallback {
@@ -3107,6 +3178,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean fullScreen;
         private boolean embedNativeControls=true;
         private List<Runnable> completionHandlers;
+        private boolean prepareToPlay;
         
         
         
@@ -3262,6 +3334,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void prepare() {
+            prepareToPlay = true;
+            if(moviePlayerPeer != 0) {
+                if(isVideo) {
+                    nativeInstance.prepareVideoComponent(moviePlayerPeer);
+                }
+            }
         }
         
         @Override
@@ -3364,6 +3442,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         return new Label("Error loading video " + ex);
                     }
                 }
+            }
+            if (prepareToPlay && isVideo && !isPlaying()) {
+                prepare();
             }
             return component;
         }
@@ -6030,6 +6111,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * https://github.com/codenameone/CodenameOne/issues/2551
+     * 
+     * @param path The path to fix.  This should not include the file:// prefix
+     * @return The fixed path.  Does not include file:// prefix
+     */
+    private String fixAppRoot(String path) {
+        String base = "/var/mobile/Containers/Data/Application/";
+        String containerRoot = getContainerRoot();
+        if (path.startsWith(base) && !path.startsWith(containerRoot)) {
+            String theRest = path.substring(base.length(), path.length());
+            int slashPos = theRest.indexOf("/");
+            if (slashPos <= 0) {
+                return path;
+            }
+            
+            return containerRoot + theRest.substring(slashPos+1, theRest.length());
+        }
+        return path;
+    }
+    
+    // Gets the container root -- does not include file:// prefix
+    private String getContainerRoot() {
+        String appRoot = nativeInstance.getDocumentsDir();
+        if (appRoot.endsWith("/")) {
+            appRoot = appRoot.substring(0, appRoot.length()-1);
+        }
+        return appRoot.substring(0, appRoot.lastIndexOf("/")+1);
+        
+    }
+    
     @Override
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         url = unfile(url);
@@ -7045,15 +7157,15 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private String unfile(String file) {
         if (file.startsWith("file:///")) {
-            return file.substring(7);
+            return fixAppRoot(file.substring(7));
         }
         if (file.startsWith("file://")) {
-            return file.substring(6);
+            return fixAppRoot(file.substring(6));
         }
         if (file.startsWith("file:/")) {
-            return file.substring(5);
+            return fixAppRoot(file.substring(5));
         }
-        return file;
+        return fixAppRoot(file);
     }
     
     /**
@@ -7182,13 +7294,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    if(type != null) {
-                        Display.getInstance().setProperty("pushType", type);
+                    try {
+                        if(type != null) {
+                            Display.getInstance().setProperty("pushType", type);
+                            PushContent.setType(Integer.parseInt(type));
+                        }
+
+                        pushCallback.push(message);
+                    } finally {
+                        nativeInstance.firePushCompletionHandler();
                     }
-                    pushCallback.push(message);
                 }
             });
         } else {
+            nativeInstance.firePushCompletionHandler();
+            /*
+            // Removing this section because the race condition shouldn't happen
+            // anymore as setMainClass() is now called before initialization.
+            
             // could be a race condition against the native code... Retry in 2 seconds
             new Thread() {
                 public void run() {
@@ -7202,6 +7325,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
             }.start();
+            */
         }
     }
     public static void pushRegistered(final String deviceKey) {
@@ -7231,6 +7355,27 @@ public class IOSImplementation extends CodenameOneImplementation {
                     pushCallback.pushRegistrationError(message, 0);
                 }
             });
+        }
+    }
+    
+    public static void initPushActionCategories() {
+        if (pushCallback instanceof PushActionsProvider) {
+            PushActionsProvider actionsProvider = (PushActionsProvider)pushCallback;
+            PushActionCategory[] categories = actionsProvider.getPushActionCategories();
+            if (categories != null) {
+                PushAction[] actions = PushActionCategory.getAllActions(categories);
+                for (PushAction action : actions) {
+                    nativeInstance.registerPushAction(action.getId(), action.getTitle(), action.getTextInputPlaceholder(), action.getTextInputButtonText());
+                }
+                for (PushActionCategory category : categories) {
+                    nativeInstance.startPushActionCategory(category.getId());
+                    for (PushAction action : category.getActions()) {
+                        nativeInstance.addPushActionToCategory(action.getId());
+                    }
+                    nativeInstance.endPushActionCategory();
+                }
+                nativeInstance.registerPushCategories();
+            }
         }
     }
 
@@ -8073,7 +8218,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 time = new java.util.Date().getTime();
             }
-            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight, 5);
+            int minuteStep = 5;
+            if (data instanceof String) {
+                String strData = (String)data;
+                String[] parts = Util.split(strData, "\n");
+                for (String part : parts) {
+                    if (part.indexOf("minuteStep=") != -1) {
+                        minuteStep = Integer.parseInt(part.substring(part.indexOf("=")+1));
+                    }
+                }
+            }
+            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight, minuteStep);
         }
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {

@@ -9,21 +9,29 @@ namespace com.codename1.impl
 {
     public abstract class AsyncOp
     {
-        Rectangle clip;
+        Shape clip;
 
-        public AsyncOp(Rectangle clip)
+        public AsyncOp(Shape clip)
         {
             this.clip = clip;
         }
 
         public void executeWithClip(WindowsGraphics underlying)
         {
-            if (clip.getWidth() > 0 && clip.getHeight() > 0)
+            if (clip == null)
             {
-                underlying.setClip(clip);
                 execute(underlying);
-                underlying.removeClip();
+                return;
             }
+
+            if (clip.getBounds().getWidth() > 0 && clip.getBounds().getHeight() > 0)
+            {
+                //underlying.setRawClip(clip.getBounds());
+                execute(underlying);
+                //underlying.removeClip();
+            }
+           
+            
         }
 
         public abstract void execute(WindowsGraphics underlying);

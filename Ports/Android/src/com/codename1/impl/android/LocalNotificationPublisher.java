@@ -122,7 +122,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         }
         builder.setSmallIcon(smallIcon);
         builder.setContentIntent(content);
-        
+        AndroidImplementation.setNotificationChannel((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE), builder, context);
         String sound = localNotif.getAlertSound();
         if (sound != null && sound.length() > 0) {
             sound = sound.toLowerCase();

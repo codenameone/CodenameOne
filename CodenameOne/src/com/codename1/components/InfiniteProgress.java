@@ -29,8 +29,11 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -57,11 +60,70 @@ import com.codename1.ui.util.WeakHashMap;
  * @author Shai Almog
  */
 public class InfiniteProgress extends Component {
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     */
+    private static boolean defaultMaterialDesignMode;
+
+    /**
+     * The default color of the current material design progress spinner
+     */
+    private static int defaultMaterialDesignColor = 0x6200ee;
+
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     * @return the defaultMaterialDesignMode
+     */
+    public static boolean isDefaultMaterialDesignMode() {
+        return defaultMaterialDesignMode;
+    }
+
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     * @param aDefaultMaterialDesignMode the defaultMaterialDesignMode to set
+     */
+    public static void setDefaultMaterialDesignMode(
+        boolean aDefaultMaterialDesignMode) {
+        defaultMaterialDesignMode = aDefaultMaterialDesignMode;
+    }
+
+    /**
+     * The default color of the current material design progress spinner
+     * @return the defaultMaterialDesignColor
+     */
+    public static int getDefaultMaterialDesignColor() {
+        return defaultMaterialDesignColor;
+    }
+
+    /**
+     * The default color of the current material design progress spinner
+     * @param aDefaultMaterialDesignColor the defaultMaterialDesignColor to set
+     */
+    public static void setDefaultMaterialDesignColor(
+        int aDefaultMaterialDesignColor) {
+        defaultMaterialDesignColor = aDefaultMaterialDesignColor;
+    }
     private Image animation;
     private int angle = 0;
     private int tick;
     private WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
     private int tintColor = 0x90000000;
+
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     */
+    private boolean materialDesignMode = defaultMaterialDesignMode;
+
+    /**
+     * The color of the current material design progress spinner
+     */
+    private int materialDesignColor = defaultMaterialDesignColor;
+    private Motion materialLengthAngle;
+    private boolean materialLengthDirection;
     
     /**
      * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
@@ -167,6 +229,11 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
+        if(materialDesignMode) { 
+            int size = Display.getInstance().convertToPixels(6.667f);
+            return new Dimension(getStyle().getHorizontalPadding() + size, 
+                getStyle().getVerticalPadding() + size);
+        }
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
             if(animation == null) {
@@ -199,6 +266,36 @@ public class InfiniteProgress extends Component {
             return;
         }
         super.paint(g);
+        if(materialDesignMode) {
+            int size = Display.getInstance().convertToPixels(6.667f);
+            int strokeWidth = Display.getInstance().convertToPixels(0.635f);
+            g.setColor(materialDesignColor);
+            g.setAlpha(255);
+            Style s = getStyle();
+            GeneralPath gp = new GeneralPath();
+            if(materialLengthAngle == null || materialLengthAngle.isFinished()) {
+                materialLengthAngle = Motion.createEaseInOutMotion(
+                        10, 300, 1000);
+                materialLengthAngle.start();
+                materialLengthDirection = !materialLengthDirection;
+            }
+            int angleLength = materialLengthAngle.getValue();
+            double dr;
+            if(!materialLengthDirection) {
+                angleLength = 300 - angleLength;
+                dr = Math.toRadians((angle - angleLength) % 360);
+            } else {
+                dr = Math.toRadians(angle % 360);
+            }
+            double x = getX() + s.getPaddingLeft(isRTL());
+            double y = getY() + s.getPaddingTop();
+            //System.out.println("Arc x: " + x + " y: " + y + " width/height: " + size + " angle: " + angle + " endAngle: " + (angle % 180 + 45));
+            gp.arc(x, y, size, size, dr, Math.toRadians(angleLength));
+            Stroke st = new Stroke(strokeWidth, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1);
+            g.setAntiAliased(true);
+            g.drawShape(gp, st);
+            return;
+        }
         if(animation == null) {
             return;
         }
@@ -329,5 +426,39 @@ public class InfiniteProgress extends Component {
      */
     public void setAngleIncrease(int angleIncrease) {
         this.angleIncrease = angleIncrease;
+    }
+
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     * @return the materialDesignMode
+     */
+    public boolean isMaterialDesignMode() {
+        return materialDesignMode;
+    }
+
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     * @param materialDesignMode the materialDesignMode to set
+     */
+    public void setMaterialDesignMode(boolean materialDesignMode) {
+        this.materialDesignMode = materialDesignMode;
+    }
+
+    /**
+     * The color of the current material design progress spinner
+     * @return the materialDesignColor
+     */
+    public int getMaterialDesignColor() {
+        return materialDesignColor;
+    }
+
+    /**
+     * The color of the current material design progress spinner
+     * @param materialDesignColor the materialDesignColor to set
+     */
+    public void setMaterialDesignColor(int materialDesignColor) {
+        this.materialDesignColor = materialDesignColor;
     }
 }

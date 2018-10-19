@@ -4,7 +4,7 @@ namespace com.codename1.impl
 {
     class DrawRoundRectPainter : AsyncOp
     {
-        private Rectangle clip;
+        private Shape clip;
         private int x;
         private int y;
         private int w;
@@ -14,7 +14,7 @@ namespace com.codename1.impl
         private int arcW;
         private int arcH;
 
-        public DrawRoundRectPainter(Rectangle clip, int x, int y, int w, int h, int color, int alpha, int arcW, int arcH)
+        public DrawRoundRectPainter(Shape clip, int x, int y, int w, int h, int color, int alpha, int arcW, int arcH)
             : base(clip)
         {
             this.clip = clip;

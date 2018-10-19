@@ -441,6 +441,15 @@ public class SEBrowserComponent extends PeerComponent {
      * @return
      */
     public String executeAndReturnString(final String js){
+        if (Platform.isFxApplicationThread()) {
+            try {
+                return ""+web.getEngine().executeScript(js);
+            } catch (Throwable jse) {
+                System.out.println("Error trying to execute js "+js);
+                throw new RuntimeException(jse);
+            }
+        }
+        
         final String[] result = new String[1];
         final boolean[] complete = new boolean[]{false};
         final Throwable[] error = new Throwable[1];
@@ -482,17 +491,25 @@ public class SEBrowserComponent extends PeerComponent {
         return result[0];
     }
     
+    private void executeImpl(String js) {
+        try {
+            web.getEngine().executeScript(js);
+        } catch (Throwable t) {
+            Log.p("Javascript exception occurred while running expression: "+js);
+            throw t;
+        }
+    }
+    
     public void execute(final String js) {
-        Platform.runLater(new Runnable() {
-            public void run() {
-                try {
-                    web.getEngine().executeScript(js);
-                } catch (Throwable t) {
-                    Log.p("Javascript exception occurred while running expression: "+js);
-                    throw t;
+        if (Platform.isFxApplicationThread()) {
+            executeImpl(js);
+        } else {
+            Platform.runLater(new Runnable() {
+                public void run() {
+                    executeImpl(js);
                 }
-            }
-        });
+            });
+        }
     }
 
     

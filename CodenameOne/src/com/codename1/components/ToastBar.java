@@ -829,9 +829,10 @@ public class ToastBar {
      * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
      * @param timeout the timeout value in milliseconds
      * @param listener the action to perform when the ToastBar is tapped
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showMessage(String msg, char icon, int timeout, ActionListener listener) {
-        ToastBar.Status s = ToastBar.getInstance().createStatus();
+    public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
+        Status s = ToastBar.getInstance().createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
         s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
@@ -840,6 +841,7 @@ public class ToastBar {
         }
         s.setExpires(timeout);
         s.show();
+        return s;
     }
 
     /**
@@ -847,9 +849,10 @@ public class ToastBar {
      * @param msg the message
      * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
      * @param timeout the timeout value in milliseconds
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showMessage(String msg, char icon, int timeout) {
-        showMessage(msg, icon, timeout, null);
+    public static Status showMessage(String msg, char icon, int timeout) {
+        return showMessage(msg, icon, timeout, null);
     }
 
     /**
@@ -857,34 +860,38 @@ public class ToastBar {
      * @param msg the message
      * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
      * @param listener the action to perform when the ToastBar is tapped
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showMessage(String msg, char icon, ActionListener listener) {
-        showMessage(msg, icon, defaultMessageTimeout, listener);
+    public static Status showMessage(String msg, char icon, ActionListener listener) {
+        return showMessage(msg, icon, defaultMessageTimeout, listener);
     }
 
     /**
      * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
      * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
      * @param msg the message
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showMessage(String msg, char icon) {
-        showMessage(msg, icon, defaultMessageTimeout);
+    public static Status showMessage(String msg, char icon) {
+        return showMessage(msg, icon, defaultMessageTimeout);
     }
 
     /**
      * Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
      * @param msg the message
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showInfoMessage(String msg) {
-        showMessage(msg, FontImage.MATERIAL_INFO, defaultMessageTimeout);
+    public static Status showInfoMessage(String msg) {
+        return showMessage(msg, FontImage.MATERIAL_INFO, defaultMessageTimeout);
     }
     /**
      * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
      * @param msg the error message
      * @param timeout the timeout value in milliseconds
+     * @return the status if we want to clear it before timeout elapses
      */
-    public static void showErrorMessage(String msg, int timeout) {
-        showMessage(msg, FontImage.MATERIAL_ERROR, timeout);
+    public static Status showErrorMessage(String msg, int timeout) {
+        return showMessage(msg, FontImage.MATERIAL_ERROR, timeout);
     }
     
     /*

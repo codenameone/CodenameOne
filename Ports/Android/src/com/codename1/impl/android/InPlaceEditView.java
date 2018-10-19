@@ -901,6 +901,7 @@ public class InPlaceEditView extends FrameLayout{
             }
         }
 
+        
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
         mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
@@ -1185,9 +1186,15 @@ public class InPlaceEditView extends FrameLayout{
         }
         if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
             //in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
-            TextArea theNext = nextTextArea;
+            final TextArea theNext = nextTextArea;
             nextTextArea = null;
-            edit(sInstance.impl, theNext, theNext.getConstraint());
+            mLastEditText = mEditText;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    edit(sInstance.impl, theNext, theNext.getConstraint());
+                }
+            });
             return null;
         
         } else {
@@ -1585,6 +1592,7 @@ public class InPlaceEditView extends FrameLayout{
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 Display.getInstance().onEditingComplete(fPrevTextArea, retVal);
+                                textArea.requestFocus();
                             }
                         });
                     }

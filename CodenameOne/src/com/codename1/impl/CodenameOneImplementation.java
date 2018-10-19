@@ -590,6 +590,7 @@ public abstract class CodenameOneImplementation {
                 }
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                wrapper.resetAffine();
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
@@ -599,7 +600,6 @@ public abstract class CodenameOneImplementation {
                         wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                         cmp.setDirtyRegion(null);
                     }
-
                     cmp.paintComponent(wrapper);
                     getPaintableBounds(cmp, paintDirtyTmpRect);
                     int cmpAbsX = paintDirtyTmpRect.getX();
@@ -778,9 +778,9 @@ public abstract class CodenameOneImplementation {
     public abstract Object createImage(int[] rgb, int width, int height);
 
     /**
-     * Creates a native image from a file in the system jar
+     * Creates a native image from a file in the system jar or file system storage.
      * 
-     * @param path within the jar
+     * @param path If path begins with {@literal file:} this will load a file from FileSystemStorage.  Otherwise it will load from jar.
      * @return native system image
      * @throws java.io.IOException if thrown by loading
      */
@@ -4165,6 +4165,9 @@ public abstract class CodenameOneImplementation {
      * @param browserPeer browser instance
      * @param o the object to invoke, notice all public fields and methods would be exposed to JavaScript
      * @param name the name to expose within JavaScript
+     * @deprecated This method was never well-supported across platforms other than Android - and it will no longer work
+     * even in Android for SDK &gt;= 17, unless {@literal o}'s class has the {@literal @JavascriptInterface} annotation which
+     * would only be available if implemented inside a Native Interface.  Don't use this.
      */
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
     }
@@ -5164,6 +5167,21 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Checks if the given gallery type is supported on this platform.
+     * @param type A gallery type constant.  E.g. {@link CN1Constants#GALLERY_IMAGE}, {@link CN1Constants#GALLERY_VIDEO}, {@link CN1Constants#GALLERY_ALL}, {@link CN1Constants#GALLERY_IMAGE_MULTI}, {@link CN1Constants#GALLERY_VIDEO_MULTI}, {@link CN1Constants#GALLERY_ALL_MULTI}
+     * @return True if the gallery type is supported on this platform.
+     */
+    public boolean isGalleryTypeSupported(int type) {
+        switch (type) {
+            case Display.GALLERY_IMAGE:
+            case Display.GALLERY_VIDEO:
+            case Display.GALLERY_ALL:
+                return true;
+        }
+        return false;
+    }
+    
+    /**
      * Opens the device gallery
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
@@ -5176,6 +5194,9 @@ public abstract class CodenameOneImplementation {
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void openGallery(final ActionListener response, int type){
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+        }
         final Dialog d = new Dialog("Select a picture");
         d.setLayout(new BorderLayout());
         FileTreeModel model = new FileTreeModel(true);
@@ -6010,6 +6031,16 @@ public abstract class CodenameOneImplementation {
      */
     public void blockCopyPaste(boolean blockCopyPaste) {
         
+    }
+
+    /**
+     * Checks if this platform supports custom database paths.  On platforms
+     * where this returns {@literal true}, {@link #openOrCreateDB(java.lang.String) }
+     * will accept a file path (starting with "file://"
+     * @return True if platform supports custom paths.
+     */
+    public boolean isDatabaseCustomPathSupported() {
+        return false;
     }
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    

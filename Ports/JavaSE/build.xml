@@ -76,8 +76,8 @@
     </target>
     
     <target name="build-skins">
-        <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone3gs" />
-        <zip basedir="../../../codenameone-skins/iphone3gs" destfile="../../../codenameone-skins/iphone3gs.skin" compress="false">
+        <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/Phones/iPhoneX" />
+        <zip basedir="../../../codenameone-skins/Phones/iPhoneX" destfile="../../../codenameone-skins/OTA/iPhoneX.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
         <!-- copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/android" />
@@ -139,7 +139,7 @@
     </target>    
     
     <target name="-pre-compile" >
-        <available file="src/iphone3gs.skin" property="skinsAvailable" />
+        <available file="src/iPhoneX.skin" property="skinsAvailable" />
     </target>
     
     <target name="-post-compile" depends="init-skins">
@@ -148,8 +148,12 @@
         <copy file="../../../codenameone-skins/android.skin" todir="src" />
         <copy file="../../../codenameone-skins/ipad_os7.skin" tofile="src/ipad.skin" />
         <copy file="../../../codenameone-skins/nexus.skin" todir="src" / -->
-        <copy file="../../../codenameone-skins/OTA/iphone3gs_os7.skin" tofile="src/iphone3gs.skin" />
-        <copy file="../../../codenameone-skins/OTA/iphone3gs_os7.skin" tofile="build/classes/iphone3gs.skin" />
+        <copy file="../../../codenameone-skins/OTA/iPhoneX.skin" tofile="src/iPhoneX.skin" />
+        <copy file="../../../codenameone-skins/OTA/iPhoneX.skin" tofile="build/classes/iPhoneX.skin" />
+        <copy file="../../Themes/winTheme.res" tofile="src/winTheme.res" />
+        <copy file="../../Themes/winTheme.res" tofile="build/classes/winTheme.res" />
+        <copy file="../../Themes/iOS7Theme.res" tofile="src/iOS7Theme.res" />
+        <copy file="../../Themes/iOS7Theme.res" tofile="build/classes/iOS7Theme.res" />
         <!--copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" / -->
