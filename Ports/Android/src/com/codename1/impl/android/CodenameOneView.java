@@ -426,10 +426,16 @@ public class CodenameOneView {
         //    return false;
         //}
         Component componentAt;
-        if (x == null) {
-            componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
-        } else {
-            componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
+        try {
+            if (x == null) {
+                componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
+            } else {
+                componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
+            }
+        } catch (Throwable t) {
+            // Since this is is an EDT violation, we may get an exception
+            // Just consume it
+            componentAt = null;
         }
         boolean isPeer = (componentAt instanceof PeerComponent);
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
