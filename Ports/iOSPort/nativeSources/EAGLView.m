@@ -64,7 +64,7 @@ extern BOOL isRetinaBug();
 -(void) addPeerComponent:(UIView*) view {
     if ([self isPaintPeersBehindEnabled]) {
         if (self.peerComponentsLayer == nil) {
-            
+            UIView *newRoot = [[UIView alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer.opaque = TRUE;
@@ -74,7 +74,12 @@ extern BOOL isRetinaBug();
             self.opaque = FALSE;
             self.backgroundColor = [UIColor clearColor];
             UIView* parent = [self superview];
-            [parent insertSubview: self.peerComponentsLayer belowSubview:self];
+            [CodenameOne_GLViewController instance].view = newRoot;
+            [self removeFromSuperview];
+            [newRoot addSubview:self.peerComponentsLayer];
+            [newRoot addSubview:self];
+            [parent addSubview:newRoot];
+            
         }
         [self.peerComponentsLayer addSubview:view];
     } else {

@@ -5897,7 +5897,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected InputStream createFileInputStream(String fileName) throws FileNotFoundException {
-        return new FileInputStream(fileName);
+        return new FileInputStream(removeFilePrefix(fileName));
     }
 
     protected InputStream createFileInputStream(File f) throws FileNotFoundException {
@@ -5905,7 +5905,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
-        return new FileOutputStream(fileName);
+        return new FileOutputStream(removeFilePrefix(fileName));
     }
 
     protected OutputStream createFileOuputStream(java.io.File f) throws FileNotFoundException {
@@ -6312,7 +6312,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
-                
+                              
                 String id = getServiceProperty("android.NotificationChannel.id", "cn1-channel", context);
                 
                 CharSequence name = getServiceProperty("android.NotificationChannel.name", "Notifications", context);
@@ -6320,7 +6320,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String description = getServiceProperty("android.NotificationChannel.description", "Remote notifications", context);
                 
                 // NotificationManager.IMPORTANCE_LOW = 2
-                int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "2", context));
+                // NotificationManager.IMPORTANCE_HIGH = 4  // <-- Minimum level to produce sound.
+                int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "4", context));
+                    // Note: Currently we use a single notification channel for the app, but if the app uses different kinds of 
+                    // push notifications, then this may not be sufficient.   E.g. The app may send both silent push notifications
+                    // and regular notifications - but their settings (e.g. sound) are all managed through one channel with
+                    // same settings. 
+                    // TODO Add support for multiple channels.
+                    // See https://github.com/codenameone/CodenameOne/issues/2583
                 
                 Class clsNotificationChannel = Class.forName("android.app.NotificationChannel");
                 //android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name, importance);
