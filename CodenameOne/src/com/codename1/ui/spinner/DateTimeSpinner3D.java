@@ -163,14 +163,19 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return startDate;
     }
 
+    private void rebuildDate() {
+        if(date != null) {
+            long currTime = Math.max(startDate.getTime()+off, Math.min(endDate.getTime()+off, currentDate.getTime() + off));
+            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currTime));
+        }
+    }
+    
     /**
      * @param startDate the startDate to set
      */
     public void setStartDate(Date startDate) {
         this.startDate = startDate;
-        if(date != null) {
-            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));
-        }
+        rebuildDate();
     }
 
     /**
@@ -185,9 +190,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setEndDate(Date endDate) {
         this.endDate = endDate;
-        if(date != null) {
-            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));
-        }
+        rebuildDate();
     }
 
     /**
@@ -230,6 +233,73 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
+    /**
+     * Sets whether the time spinner should show times 12 hour format with an AM/PM selector.
+     * @param showMeridiem True to show times in 12 hour format (the default).  False to show in 24 hour format.
+     * @since 6.0
+     * @see #isShowMeridiem() 
+     * 
+     */
+    public void setShowMeridiem(boolean showMeridiem) {
+        if (time == null) return;
+        time.setShowMeridiem(showMeridiem);
+    }
+    
+    /**
+     * Checks if time is shown in 12 hour format with AM/PM selector.
+     * @return True if time is in 12 hour format.  False otherwise.
+     * @since 6.0
+     * @see #setShowMeridiem(boolean) 
+     */
+    public boolean isShowMeridiem() {
+        if (time == null) {
+            return false;
+        }
+        return time.isShowMeridiem();
+    }
+    
+    /**
+     * Sets the hour range to show for the time selector.  Setting the range will automatically switch
+     * the time to 24 hour format.
+     * @param min The minimum hour to display (0-24).  -1 for no limit.
+     * @param max The max hour to display (0-24).  -1 for no limit.
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #getMaxHour() 
+     */
+    public void setHourRange(int min, int max) {
+        if (time == null) return;
+        if (min >= 0 && max > min && isShowMeridiem()) {
+            time.setShowMeridiem(false);
+        }
+        time.setHourRange(min, max);
+        
+    }
+    
+    /**
+     * Gets the minimum hour to display.  Default -1 (for no limit).  
+     * @return Min hour (0-24) or -1 for no limit.
+     * @since 6.0
+     * @see #getMaxHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMinHour() {
+        if (time == null) return -1;
+        return time.getMinHour();
+    }
+    
+    /**
+     * Gets the maximum hour to display.  Default -1 (for no limit).
+     * @return Max hour (0-24) or -1 for no limit.
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMaxHour() {
+        if (time == null) return -1;
+        return time.getMaxHour();
+    }
+    
     /**
      * {@inheritDoc}
      */

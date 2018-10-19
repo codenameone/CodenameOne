@@ -22,16 +22,13 @@
  */
 package com.codename1.ui.spinner;
 
-import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
-import com.codename1.ui.CN;
 import static com.codename1.ui.CN.convertToPixels;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import java.util.Calendar;
 import java.util.Date;
@@ -51,6 +48,10 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     
     private int startYear = 1970;
     private int endYear = 2100;
+    private int startMonth = 1;
+    private int endMonth = 13;
+    private int startDay = 1;
+    private int endDay = 32;
     private int currentYear;
     private int currentDay;
     private int currentMonth;
@@ -194,7 +195,118 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             
         }
     }
+    
+    private void rebuildMonth() {
+        month.setModel(new SpinnerNumberModel(startMonth, endMonth, Math.max(startMonth, Math.min(endMonth, currentMonth)), 1));
+    }
+    
+    private void rebuildDay() {
+        day.setModel(new SpinnerNumberModel(startDay, endDay, Math.max(startDay, Math.min(endDay, currentDay)), 1));
+    }
 
+    
+    /**
+     * Sets the start and end dates in this spinner.  Month range is only limited if the year of the start and end dates are the same.  Day range is only limited if
+     * both the year and month  of the start and end dates are the same.
+     * @param start The start date.
+     * @param end The end date
+     * @since 6.0
+     */
+    public void setDateRange(Date start, Date end) {
+        setEndYear(end == null ? 2100 : getYear(end) + 1900);
+        setStartYear(start == null ? 1970 : getYear(start) + 1900);
+        
+        if (start != null && end != null && getYear(start) == getYear(end)) {
+            startMonth = getMonth(start)+1;
+            endMonth = getMonth(end) + 2;
+        } else {
+            startMonth = 1;
+            endMonth = 32;
+        }
+        rebuildMonth();
+        
+        if (start != null && end != null && getYear(start) == getYear(end) && getMonth(start) == getMonth(end)) {
+            startDay = getDate(start);
+            endDay = getDate(end)+1;
+        } else {
+            startDay = 1;
+            endDay = 32;
+        }
+        rebuildDay();
+        
+    }
+    
+    private Calendar tmpCal=Calendar.getInstance();
+    
+    /**
+     * Since CLDC11 doesn't have {@link Date#getDate() }, this returns the date of the given date as {@link Date#getDate() } would have.
+     * @param dt The date
+     * @return The day of month.
+     */
+    private int getDate(Date dt) {
+        tmpCal.setTime(dt);
+        return tmpCal.get(Calendar.DAY_OF_MONTH);
+    }
+    
+    /**
+     * Since CLDC11 doesn't have {@link Date#getMonth() }, this returns the month of the given date as {@link Date#getMonth()} would have.
+     * @param dt
+     * @return 
+     */
+    private int getMonth(Date dt) {
+        tmpCal.setTime(dt);
+        return tmpCal.get(Calendar.MONTH);
+    }
+    
+    /**
+     * Since CLDC doesn't have {@link Date#getYear() }, this returns the year of the given date as {@link Date#getYear() } would have.  E.g.
+     * this returns 0 for year 1900
+     * @param dt
+     * @return 
+     */
+    private int getYear(Date dt) {
+        tmpCal.setTime(dt);
+        return tmpCal.get(Calendar.YEAR)-1900;
+    }
+    
+    /**
+     * Gets the start month of this Spinner.
+     * @return 
+     * @since 6.0
+     */
+    public int getStartMonth() {
+        return startMonth;
+    }
+    
+    
+    /**
+     * Gets the end month of this spinner.
+     * @return 
+     * @since 6.0
+     */
+    public int getEndMonth() {
+        return endMonth;
+    }
+    
+    
+    /**
+     * Gets the start day of month.
+     * @return 
+     * @since 6.0
+     */
+    public int getStartDay() {
+        return startDay;
+    }
+    
+    /**
+     * Gets the end day of month.
+     * @return 
+     * @since 6.0
+     */
+    public int getEndDay() {
+        return endDay;
+    }
+    
     /**
      * @return the startYear
      */
@@ -262,7 +374,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     public void setCurrentDay(int currentDay) {
         this.currentDay = currentDay;
         if(day != null) {
-            day.setModel(new SpinnerNumberModel(1, 32, currentDay, 1));
+            rebuildDay();
         }
     }
 
@@ -282,7 +394,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     public void setCurrentMonth(int currentMonth) {
         this.currentMonth = currentMonth;
         if(month != null) {
-            month.setModel(new SpinnerNumberModel(1, 13, currentMonth, 1));
+            rebuildMonth();
         }
     }
 

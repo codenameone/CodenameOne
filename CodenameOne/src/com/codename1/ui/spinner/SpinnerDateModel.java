@@ -47,7 +47,11 @@ class SpinnerDateModel implements ListModel {
     private static final long DAY = 24 * 60 * 60 * 1000;
 
     void setValue(Date value) {
+        int oldIndex = getSelectedIndex();
         currentValue = value.getTime() - value.getTime() % DAY + 12 * 60 * 60000;
+        if (oldIndex != getSelectedIndex()) {
+            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
+        }
     }
 
     Object getValue() {
@@ -62,8 +66,8 @@ class SpinnerDateModel implements ListModel {
      * @param currentValue the starting value for the mode
      */
     public SpinnerDateModel(long min, long max, long currentValue) {
-        this.max = max;
-        this.min = min;
+        this.max = max - max % DAY;
+        this.min = min - min % DAY;
         this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
     }
 

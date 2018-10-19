@@ -103,6 +103,9 @@ public class Picker extends Button {
     private int preferredPopupWidth;
     private int preferredPopupHeight;
     private int minuteStep = 5;
+    private int minHour=-1;
+    private int maxHour=-1;
+    private Date startDate, endDate;
     private VirtualInputDevice currentInput;
     
     // Variables to store the form's previous margins before showing
@@ -140,6 +143,106 @@ public class Picker extends Button {
                 return true;
         }
         return false;
+    }
+    
+    /**
+     * Sets the hour range for this picker.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @param min The minimum hour to display (0-24) or -1 for no limit.
+     * @param max The maximum hour to display (0-24) or -1 for no limit
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #getMaxHour() 
+     */
+    public void setHourRange(int min, int max) {
+        if (showMeridiem && min >= 0 && min <= 24 && max > min) {
+            setShowMeridiem(false);
+        }
+        minHour = min;
+        maxHour = max;
+    }
+    
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @since 6.0
+     * @see #getMaxHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMinHour() {
+        return minHour;
+    }
+    
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @since 6.0
+     * @see #getMinHour() 
+     * @see #setHourRange(int, int) 
+     */
+    public int getMaxHour() {
+        return maxHour;
+    }
+    
+    /**
+     * Sets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * 
+     * <p>This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @param start The start date.
+     * @since 6.0
+     * @see #getStartDate() 
+     * @see #setEndDate(java.util.Date) 
+     */
+    public void setStartDate(Date start) {
+        this.startDate = start;
+    }
+    
+    /**
+     * Sets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * 
+     * <p>This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @param end The end date.
+     * @since 6.0
+     * @see #setStartDate(java.util.Date) 
+     * @see #getEndDate() 
+     */
+    public void setEndDate(Date end) {
+        this.endDate = end;
+    }
+    
+    /**
+     * Gets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The start date or null if there is none set.
+     * 
+     * <p>This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * @since 6.0
+     * @see #getEndDate() 
+     * @see #setStartDate(java.util.Date) 
+     * @see #getMinHour() 
+     */
+    public Date getStartDate() {
+        return this.startDate;
+    }
+    
+    /**
+     * Gets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     * @return The end date or null if there is none set.
+     * 
+     * <p>This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.</p>
+     * 
+     * @since 6.0
+     * @see #getStartDate() 
+     * @see #setEndDate(java.util.Date) 
+     * @see #getMaxHour() 
+     */
+    public Date getEndDate() {
+        return this.endDate;
     }
     
     /**
@@ -383,6 +486,9 @@ public class Picker extends Button {
             
             private DateSpinner3D createDatePicker3D() {
                 DateSpinner3D out = new DateSpinner3D();
+                if (startDate != null && endDate != null) {
+                    out.setDateRange(startDate, endDate);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
@@ -407,6 +513,9 @@ public class Picker extends Button {
                 TimeSpinner3D out = new TimeSpinner3D();
                 out.setMinuteStep(minuteStep);
                 out.setShowMeridiem(showMeridiem);
+                if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
+                    out.setHourRange(minHour, maxHour);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
@@ -417,6 +526,16 @@ public class Picker extends Button {
             
             private DateTimeSpinner3D createDateTimePicker3D() {
                 DateTimeSpinner3D out = new DateTimeSpinner3D();
+                out.setShowMeridiem(showMeridiem);
+                if (startDate != null) {
+                    out.setStartDate(startDate);
+                }
+                if (endDate != null) {
+                    out.setEndDate(endDate);
+                }
+                if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
+                    out.setHourRange(minHour, maxHour);
+                }
                 if (value != null) {
                     out.setValue(value);
                 } else {
