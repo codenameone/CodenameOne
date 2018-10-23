@@ -1342,7 +1342,7 @@ public class Toolbar extends Container {
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
                         }
-                        if (evt.getX() > sidemenuDialog.getWidth()) {
+                        if (sidemenuDialog != null && sidemenuDialog.isShowing() && evt.getX() > sidemenuDialog.getWidth()) {
                             parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                             evt.consume();
                             closeSideMenu();
