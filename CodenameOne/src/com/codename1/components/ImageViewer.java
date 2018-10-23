@@ -672,15 +672,33 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * Manipulate the zoom level of the application
+     * Manipulate the zoom level of the application and centers it
      * @param zoom the zoom to set
      */
     public void setZoom(float zoom) {
-        this.zoom = zoom;
-        updatePositions();
-        repaint();
+        new AnimateZoom(zoom);
     }
 
+    /**
+     * Manipulate the zoom level of the application and pans to specific location
+     * @param zoom the zoom to set
+     * @param panPositionX A float value between 0 and 1 to set the image x position
+     * @param panPositionY A float value between 0 and 1 to set the image y position 
+     */
+    public void setZoom(float zoom, float panPositionX, float panPositionY) {
+        if (panPositionX > 1)
+            panPositionX = 1;
+        if (panPositionX < 0)
+            panPositionX = 0;
+        if (panPositionY > 1)
+            panPositionY = 1;
+        if (panPositionY < 0)
+            panPositionY = 0;                
+        this.panPositionX = panPositionX;
+        this.panPositionY = panPositionY;
+        new AnimateZoom(zoom);
+    }
+    
     /**
      * This image is shown briefly during swiping while the full size image is loaded
      * @return the swipePlaceholder
@@ -821,6 +839,32 @@ public class ImageViewer extends Component {
                         getImageRight().unlock();
                     }
                 }
+                Display.getInstance().getCurrent().deregisterAnimated(this);
+            }
+            repaint();
+            return false;
+        }
+
+        public void paint(Graphics g) {
+        }
+        
+    }
+
+    class AnimateZoom implements Animation {
+        private Motion motion;
+        public AnimateZoom(float destZoom) {
+            motion = Motion.createEaseInOutMotion((int) (zoom * 10000), (int)(destZoom * 10000), 200);
+            motion.start();
+            Display.getInstance().getCurrent().registerAnimated(this);
+        }
+
+        @Override
+        public boolean animate() {
+            float v = motion.getValue();
+            v /= 10000.0f;
+            zoom = v;
+            updatePositions();
+            if(motion.isFinished()) {
                 Display.getInstance().getCurrent().deregisterAnimated(this);
             }
             repaint();
