@@ -2840,6 +2840,37 @@ public class Form extends Container {
             Display.getInstance().vibrate(tactileTouchDuration);
         }
     }
+    
+    
+
+    //https://github.com/codenameone/CodenameOne/issues/2352
+    private void cancelScrolling(Component cmp) {
+        Container parent = cmp.getParent();
+        //loop over the parents to check if there is a scrolling
+        //gesture that should be stopped
+        while (parent != null) {
+            if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+            	parent.draggedMotionX = null;
+            	parent.draggedMotionY = null;
+            }
+            parent = parent.getParent();
+        }
+    }
+    
+    // https://github.com/codenameone/CodenameOne/issues/2352
+    private boolean resumeDragAfterScrolling(int x, int y) {
+        Component cmp = getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        if (cmp != null && isCurrentlyScrolling(cmp)) {
+        	cancelScrolling(cmp);
+        	cmp.initDragAndDrop(x, y);
+            Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
+            return true;
+        }
+        return false;
+    }
 
     private Component pressedCmp;
     
@@ -2847,6 +2878,12 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
+        // See https://github.com/codenameone/CodenameOne/issues/2352
+        if (resumeDragAfterScrolling(x, y)) {
+            return;
+        }
+        
+        
         pressedCmp = null;
         stickyDrag = null;
         dragStopFlag = false;
