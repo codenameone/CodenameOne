@@ -674,6 +674,7 @@ public class Image {
      */
     public Graphics getGraphics() {
         Graphics g = new Graphics(Display.impl.getNativeGraphics(image));
+        rgbCache = null;	// the cache will become invalid
         return g;
     }
     
@@ -814,6 +815,17 @@ public class Image {
      */
     public int[] getRGB() {
         return getRGBImpl();
+    }
+    /**
+     * Returns the content of this image in the supplied ARGB array.
+     * @param rgbData
+     */
+    public void getRGB(int[] rgbData)
+    {
+        int width = getWidth();
+        int height = getHeight();
+        getRGB(rgbData, 0, 0, 0, width, height);
+
     }
 
     /**
