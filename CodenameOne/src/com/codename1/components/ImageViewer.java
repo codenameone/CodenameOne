@@ -526,7 +526,7 @@ public class ImageViewer extends Component {
             if(motion.isFinished()) {
                 zooming = false;
                 if( ! result ) {               
-                    Display.getInstance().getCurrent().deregisterAnimated(this);
+                    getComponentForm().deregisterAnimated(this);
                 }
             }
             repaint();
@@ -715,7 +715,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int)(zoom * 10000), 200);
             motion.start();
-            Display.getInstance().getCurrent().registerAnimated(this);
+            getComponentForm().registerAnimated(this);
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -745,7 +745,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;            
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int)(zoom * 10000), 200);
             motion.start();
-            Display.getInstance().getCurrent().registerAnimated(this);
+            getComponentForm().registerAnimated(this);
         } else {
             this.zoom = zoom;
             updatePositions();
