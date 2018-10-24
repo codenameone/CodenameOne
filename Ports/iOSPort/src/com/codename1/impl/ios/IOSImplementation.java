@@ -597,6 +597,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             foldKeyboard();
         }
     }
+
+    @Override
+    public void afterComponentPaint(Component c, Graphics g) {
+        super.afterComponentPaint(c, g);
+        if (isEditingText(c) && nativeInstance.isAsyncEditMode()) {
+            updateNativeTextEditorFrame();
+        }
+    }
+    
+    
     
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
