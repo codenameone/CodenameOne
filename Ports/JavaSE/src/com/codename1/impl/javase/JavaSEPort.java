@@ -4360,16 +4360,29 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean usesInvokeAndBlockForEditString() {
+        return false;
+    }
+
+    @Override
+    public boolean isAsyncEditMode() {
         return true;
     }
+
     
     
     
+    private interface EditingInProgress {
+        void invokeAfter(Runnable r);
+        void endEditing();
+    }
+    
+    private EditingInProgress editingInProgress;
+    private Component currentlyEditingField;
     
     /**
      * @inheritDoc
      */
-    public void editString(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
+    public void editString(final Component cmp, final int maxSize, final int constraint, String text, final int keyCode) {
         if(scrollWheeling) {
             return;
         }
@@ -4377,14 +4390,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             editStringLegacy(cmp, maxSize, constraint, text, keyCode);
             return;
         }
-        //a workaround to fix an issue where the previous Text Component wasn't removed properly. 
-        java.awt.Component [] cmps = canvas.getComponents();
-        for (int i = 0; i < cmps.length; i++) {
-            java.awt.Component cmp1 = cmps[i];
-            if(cmp1 instanceof JScrollPane || cmp1 instanceof javax.swing.text.JTextComponent){
-                canvas.remove(cmp1);
-            }
+        if (editingInProgress != null) {
+            final String fText = text;
+            editingInProgress.invokeAfter(new Runnable() {
+                public void run() {
+                    editString(cmp, maxSize, constraint, fText, keyCode);
+                }
+            });
+            editingInProgress.endEditing();
+            return;
         }
+        //a workaround to fix an issue where the previous Text Component wasn't removed properly. 
+        //java.awt.Component [] cmps = canvas.getComponents();
+        //for (int i = 0; i < cmps.length; i++) {
+        //    java.awt.Component cmp1 = cmps[i];
+        //    if(cmp1 instanceof JScrollPane || cmp1 instanceof javax.swing.text.JTextComponent){
+        //        canvas.remove(cmp1);
+        //    }
+        //}
         
         checkEDT();
         javax.swing.text.JTextComponent swingT;
@@ -4538,18 +4561,36 @@ public class JavaSEPort extends CodenameOneImplementation {
         tf.requestFocus();
         tf.setSelectionStart(0);
         tf.setSelectionEnd(0);
-        class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener {
-
-            public synchronized void run() {
-                while (textCmp.getParent() != null) {
-                    try {
-                        wait(20);
-                    } catch (InterruptedException ex) {
+        class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener, EditingInProgress {
+            private final JTextComponent textCmp;
+            private final JComponent swingComponentToRemove;
+            private boolean performed;
+            
+            Listener(JTextComponent textCmp, JComponent swingComponentToRemove) {
+                this.textCmp = textCmp;
+                this.swingComponentToRemove = swingComponentToRemove;
+            }
+            public void run() {
+                while (swingComponentToRemove.getParent() != null) {
+                    synchronized(this) {
+                        try {
+                            wait(20);
+                        } catch (InterruptedException ex) {
+                        }
                     }
                 }
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        actionPerformed(null);
+                    }
+                });
             }
 
             public void actionPerformed(ActionEvent e) {
+                if (performed) {
+                    return;
+                }
+                performed = true;
                 String txt = getText(tf);
                 if (testRecorder != null) {
                     testRecorder.editTextFieldCompleted(cmp, txt);
@@ -4567,11 +4608,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ((JTextComponent) tf).getDocument().removeDocumentListener(this);
                 
                 tf.removeFocusListener(this);
-                canvas.remove(textCmp);
+                canvas.remove(swingComponentToRemove);
+                editingInProgress = null;
+                currentlyEditingField = null;
                 synchronized (this) {
                     notify();
                 }
                 canvas.repaint();
+                if (invokeAfter != null) {
+                    for (Runnable r : invokeAfter) {
+                        r.run();
+                    }
+                    invokeAfter = null;
+                }
             }
 
             public void focusGained(FocusEvent e) {
@@ -4644,8 +4693,33 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void changedUpdate(DocumentEvent e) {
                 updateText();
             }
-        };
-        final Listener l = new Listener();
+
+            private ArrayList<Runnable> invokeAfter;
+            
+            @Override
+            public void invokeAfter(Runnable r) {
+                if (invokeAfter == null) {
+                    invokeAfter = new ArrayList<Runnable>();
+                }
+                invokeAfter.add(r);
+            }
+
+            @Override
+            public void endEditing() {
+                if (!EventQueue.isDispatchThread()) {
+                    EventQueue.invokeLater(new Runnable() {
+                        public void run() {
+                            endEditing();
+                        }
+                    });
+                    
+                    return;
+                }
+                actionPerformed(null);
+            }
+        }
+;
+        final Listener l = new Listener(tf, textCmp);
         if (tf instanceof JTextField) {
             ((JTextField) tf).addActionListener(l);
         }
@@ -4680,8 +4754,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             };
             t.schedule(tt, 300);
         }
-        Display.getInstance().invokeAndBlock(l);
+        editingInProgress = l;
+        currentlyEditingField = cmp;
+        new Thread(l).start();
     }
+
+    @Override
+    public boolean isEditingText(Component c) {
+        return currentlyEditingField == c && editingInProgress != null;
+    }
+
+    @Override
+    public boolean isEditingText() {
+        return editingInProgress != null;
+    }
+    
+    
+    
+    
 
     /**
      * @inheritDoc

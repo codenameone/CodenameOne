@@ -50,6 +50,8 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D minute;
     private Spinner3D amPM;
     
+    private int minHour = -1;
+    private int maxHour = -1;
     
     private int startHour = 1;
     private int endHour = 13;
@@ -286,27 +288,67 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     }
     
     /**
+     * Sets the hours range to display. Note that the spinner must not be in duration mode, and must by in 24 hour
+     * mode, otherwise this will thrown an {@link IllegalStateException}.
+     * @param min The minimum hour to display (0-24). Set to -1 to allow any minimum.
+     * @param nax The maximum hour to display (0-24).  Set -1 to allow any maximum.
+     * @throws IllegalStateException If the spinner is not in 24 hour mode.
+     * @see #getMinHour() 
+     * @see #getMaxHour() 
+     * @since 6.0
+     */
+    public void setHourRange(int min, int max) {
+        if (min >= 0 && max >= min && (showMeridiem || durationMode)) {
+            throw new IllegalStateException("TimeSpinner hour range only applies when isShowMeridiem() is false and durationMode is false.");
+        }
+        minHour = min;
+        maxHour = max;
+        rebuildHours();
+    }
+    
+    /**
+     * Gets the current minimum hour to display.  -1 for no limit
+     * @return The current minimum hour (0-24).  -1 for no limit.
+     * @see #setHourRange(int, int) 
+     * @see #getMaxHour() 
+     * @since 6.0
+     */
+    public int getMinHour() {
+        return minHour;
+    }
+    
+    /**
+     * Gets the current maximum hour to display.  -1 for no limit.
+     * 
+     * @return The current maximum hour (0-24). -1 for no limit.
+     * @see #getMinHour() 
+     * @see #setHourRange(int, int) 
+     * @since 6.0
+     */
+    public int getMaxHour() {
+        return maxHour;
+    }
+    
+    /**
      * @return the showMeridiem
      */
     public boolean isShowMeridiem() {
         return showMeridiem && !durationMode;
     }
 
-    /**
-     * Shows AM/PM indication
-     * @param showMeridiem the showMeridiem to set
-     */
-    public void setShowMeridiem(boolean showMeridiem) {
-        if(durationMode) {
-            return;
-        }
-        this.showMeridiem = showMeridiem;
+    private void rebuildHours() {
         if(showMeridiem) {
             startHour = 1;
             endHour = 13;
         } else {
             startHour = 0;
             endHour = 24;
+            if (minHour >= 0 && minHour <= 24) {
+                startHour = minHour;
+            }
+            if (maxHour >= 0 && maxHour <= 24 && maxHour > startHour) {
+                endHour = maxHour;
+            }
         }
         if(hour != null) {
             hour.setModel(new SpinnerNumberModel(startHour, endHour, currentHour, 1));
@@ -316,6 +358,18 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         if(isInitialized()) {
             getParent().revalidate();
         }
+    }
+    
+    /**
+     * Shows AM/PM indication
+     * @param showMeridiem the showMeridiem to set
+     */
+    public void setShowMeridiem(boolean showMeridiem) {
+        if(durationMode) {
+            return;
+        }
+        this.showMeridiem = showMeridiem;
+        rebuildHours();
     }
 
     /**
