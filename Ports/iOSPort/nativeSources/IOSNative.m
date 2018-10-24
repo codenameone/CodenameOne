@@ -5759,7 +5759,7 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     
     [pickerToolbar setItems:itemArray animated:YES];
     if(isIPad() || isIOS7()) {
-        [pickerView setFrame:CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height)];
+        [pickerView setFrame:CGRectMake(0, 44, isIPad() ? pickerView.frame.size.width : [CodenameOne_GLViewController instance].view.frame.size.width, pickerView.frame.size.height)];
     } else {
         [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
     }
