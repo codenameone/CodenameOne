@@ -77,7 +77,10 @@ public class ImageViewer extends Component {
     private Image swipePlaceholder;
     private float swipeThreshold = 0.4f;
     private int imageInitialPosition = IMAGE_FIT;
-
+    private Motion motion;
+    private boolean zooming = false;
+    private boolean animateZoom = true;
+    
     /**
      * Indicates the initial position of the image in the viewer to FIT to the 
      * component size
@@ -263,7 +266,7 @@ public class ImageViewer extends Component {
     public int getImageY() {
         return imageY;
     }
-
+        
     /**
      * {@inheritDoc}
      */
@@ -512,7 +515,22 @@ public class ImageViewer extends Component {
             if (result) {
                 updatePositions();
             }
-        }
+        }        
+        if (zooming) {
+            float v = motion.getValue();
+            v /= 10000.0f;
+            zoom = v;
+            if ( ! result ) {
+                updatePositions();
+            }
+            if(motion.isFinished()) {
+                zooming = false;
+                if( ! result ) {               
+                    Display.getInstance().getCurrent().deregisterAnimated(this);
+                }
+            }
+            repaint();
+        }        
         return super.animate() || result; 
     }
     
@@ -662,7 +680,23 @@ public class ImageViewer extends Component {
     public ListModel<Image> getImageList() {
         return swipeableImages;
     }
-
+    
+    /**
+     * Indicates if the zoom should bee animated. It's true by default
+     * @param animateZoom true if zoom is animated
+     */
+    public void setAnimateZoom(boolean animateZoom) {
+        this.animateZoom = animateZoom;
+    }
+    
+    /**
+     * Indicates if the zoom should bee animated. It's true by default
+     * @return true if zoom is animated
+     */
+    public boolean isAnimatedZoom() {
+        return animateZoom;
+    }
+    
     /**
      * Manipulate the zoom level of the application
      * @return the zoom
@@ -672,15 +706,25 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * Manipulate the zoom level of the application and centers it
+     * Manipulate the zoom level of the application
      * @param zoom the zoom to set
      */
     public void setZoom(float zoom) {
-        new AnimateZoom(zoom);
+        if (animateZoom) {
+            zooming = true;
+            float initZoom = this.zoom;
+            motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int)(zoom * 10000), 200);
+            motion.start();
+            Display.getInstance().getCurrent().registerAnimated(this);
+        } else {
+            this.zoom = zoom;
+            updatePositions();
+            repaint();
+        }
     }
 
     /**
-     * Manipulate the zoom level of the application and pans to specific location
+     * Manipulate the zoom level of the application
      * @param zoom the zoom to set
      * @param panPositionX A float value between 0 and 1 to set the image x position
      * @param panPositionY A float value between 0 and 1 to set the image y position 
@@ -696,7 +740,17 @@ public class ImageViewer extends Component {
             panPositionY = 0;                
         this.panPositionX = panPositionX;
         this.panPositionY = panPositionY;
-        new AnimateZoom(zoom);
+        if (animateZoom) {
+            zooming = true;
+            float initZoom = this.zoom;            
+            motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int)(zoom * 10000), 200);
+            motion.start();
+            Display.getInstance().getCurrent().registerAnimated(this);
+        } else {
+            this.zoom = zoom;
+            updatePositions();
+            repaint();            
+        }
     }
     
     /**
@@ -801,6 +855,7 @@ public class ImageViewer extends Component {
             Display.getInstance().getCurrent().registerAnimated(this);
         }
 
+        @Override
         public boolean animate() {
             float v = motion.getValue();
             v /= 10000.0f;
@@ -848,34 +903,8 @@ public class ImageViewer extends Component {
         public void paint(Graphics g) {
         }
         
-    }
-
-    class AnimateZoom implements Animation {
-        private Motion motion;
-        public AnimateZoom(float destZoom) {
-            motion = Motion.createEaseInOutMotion((int) (zoom * 10000), (int)(destZoom * 10000), 200);
-            motion.start();
-            Display.getInstance().getCurrent().registerAnimated(this);
-        }
-
-        @Override
-        public boolean animate() {
-            float v = motion.getValue();
-            v /= 10000.0f;
-            zoom = v;
-            updatePositions();
-            if(motion.isFinished()) {
-                Display.getInstance().getCurrent().deregisterAnimated(this);
-            }
-            repaint();
-            return false;
-        }
-
-        public void paint(Graphics g) {
-        }
-        
-    }
-
+    }   
+    
     /**
      * Sets the viewer initial image position to fill or to fit.
      * @param imageInitialPosition values can be IMAGE_FILL or IMAGE_FIT
