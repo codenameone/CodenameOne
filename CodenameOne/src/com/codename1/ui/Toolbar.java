@@ -1344,9 +1344,11 @@ public class Toolbar extends Container {
                         }
                         if (sidemenuDialog != null) {
                             if (evt.getX() > sidemenuDialog.getWidth()) {
-                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                                evt.consume();
-                                closeSideMenu();
+                                if(sidemenuDialog.isShowing()) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    evt.consume();
+                                    closeSideMenu();
+                                }
                                 return;
                             } 
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
