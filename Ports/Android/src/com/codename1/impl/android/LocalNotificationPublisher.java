@@ -100,8 +100,10 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         builder.setContentTitle(localNotif.getAlertTitle());
         builder.setContentText(localNotif.getAlertBody());
         builder.setAutoCancel(true);
-        if (localNotif.getBadgeNumber() > 0) {
-            builder.setNumber(localNotif.getBadgeNumber());
+        if (localNotif.getBadgeNumber() >= 0) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+                builder.setNumber(localNotif.getBadgeNumber());
+            }
         }
         String image = localNotif.getAlertImage();
         if (image != null && image.length() > 0) {
