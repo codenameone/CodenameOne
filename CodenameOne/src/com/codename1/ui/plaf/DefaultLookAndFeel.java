@@ -1378,7 +1378,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int inputModeWidth = f.stringWidth(inputMode);
 
         // QWERTY devices don't quite have an input mode hide it also when we have a VK
-        if(ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {
+        if(!Display.getInstance().platformUsesInputMode() || ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {
             inputMode = "";
             inputModeWidth = 0;
         }
