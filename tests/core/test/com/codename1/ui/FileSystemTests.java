@@ -102,7 +102,6 @@ public class FileSystemTests extends AbstractTest {
         if (res.error != null) {
             assertNull(res.error, res.error.getMessage());
         }
-        return true;
         
     }
     
