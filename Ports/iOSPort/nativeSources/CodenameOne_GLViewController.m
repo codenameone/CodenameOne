@@ -2588,7 +2588,7 @@ BOOL prefersStatusBarHidden = NO;
         
         // update the position of the edit component during drag events, we have to do this here
         // since the animation might run for a while
-        if(isVKBAlwaysOpen() && editingComponent != nil && !editingComponent.hidden) {
+        if(NO && isVKBAlwaysOpen() && editingComponent != nil && !editingComponent.hidden) {
 #ifndef NEW_CODENAME_ONE_VM
             com_codename1_impl_ios_IOSImplementation* impl = (com_codename1_impl_ios_IOSImplementation*)com_codename1_impl_ios_IOSImplementation_GET_instance();
             com_codename1_ui_Component* comp = (com_codename1_ui_Component*)impl->fields.com_codename1_impl_ios_IOSImplementation.currentEditing_;
