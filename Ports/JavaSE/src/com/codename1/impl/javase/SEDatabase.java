@@ -52,8 +52,8 @@ public class SEDatabase extends Database{
         try {
             conn.setAutoCommit(false);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
@@ -64,8 +64,8 @@ public class SEDatabase extends Database{
             conn.commit();
             conn.setAutoCommit(true);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
@@ -124,9 +124,9 @@ public class SEDatabase extends Database{
             }
             s.execute();
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            //ex.printStackTrace();
             cleanup(s);
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex.getMessage(), ex);
         }
     }
     
@@ -161,8 +161,8 @@ public class SEDatabase extends Database{
             s.execute();
         } catch (SQLException ex) {
             cleanup(s);
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
     
@@ -183,8 +183,8 @@ public class SEDatabase extends Database{
             return new SECursor(resultSet);
         } catch (SQLException ex) {
             cleanup(s);
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
@@ -197,8 +197,8 @@ public class SEDatabase extends Database{
             return new SECursor(resultSet);
         } catch (SQLException ex) {
             cleanup(s);
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
@@ -208,8 +208,8 @@ public class SEDatabase extends Database{
         try {
             conn.rollback();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            //ex.printStackTrace();
+            throw new IOException(ex.getMessage(), ex);
         }
     }
     

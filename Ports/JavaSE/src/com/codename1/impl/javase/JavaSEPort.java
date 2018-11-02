@@ -9926,8 +9926,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             
             try {
-                File f = new File(unfile(url));
-                url = f.toURI().toString();
+                try {
+                    URI uri = new URI(url);
+                    com.codename1.io.File cf = new com.codename1.io.File(uri);
+                    File f = new File(unfile(cf.getAbsolutePath()));
+                    url = f.toURI().toString();
+                    
+                } catch (URISyntaxException sex) {
+                    Log.p("Attempt to set invalid URL "+url+".  Allowing this to continue on the simulator, but this will likely crash on device.");
+                    Log.e(sex);
+                    File f = new File(unfile(url));
+                    url = f.toURI().toString();
+                }
+                
             } catch (Throwable t){
                 url = "file://" + unfile(url);
             }

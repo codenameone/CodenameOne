@@ -668,7 +668,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // NOTE:  This method may be called from the PushReceiver when the app isn't running so we can't access
         // the main activity context, display properties, or any CN1 stuff.  Just native android
         
-        File categoriesFile = new File(activity.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
+        File categoriesFile = new File(context.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
         if (!categoriesFile.exists()) {
             return new PushActionCategory[0];
         }
@@ -803,6 +803,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 String[] a = b.split(";");
                                 c.push(a[0]);
                                 c.push(a[1]);
+                            } else if (t != null && ("101".equals(t))) {
+                                c.push(b.substring(b.indexOf(" ")+1));
                             } else {
                                 c.push(b);
                             }
@@ -857,6 +859,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     v.add(m[1]);
                 } else if(t != null && "2".equals(t)){
                     continue;
+                }else if (t != null && "101".equals(t)) {
+                    v.add(b.substring(b.indexOf(" ")+1));
                 }else{
                     v.add(b);
                 }

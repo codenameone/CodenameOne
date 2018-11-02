@@ -46,6 +46,10 @@ public class URL {
     public URL(java.lang.String url) throws URISyntaxException {
         u = new URI(url);
     }
+    
+    URL(URI u) {
+        this.u = u;
+    }
 
     public java.lang.String getQuery() {
         return u.getQuery();
@@ -102,7 +106,11 @@ public class URL {
     public java.net.URI toURI() throws java.net.URISyntaxException {
         return u;
     }
+    
     public URLConnection openConnection() throws java.io.IOException {
+        if ("file".equals(getProtocol())) {
+            return new FileURLConnection(new File(u));
+        }
         return new HttpURLConnection(u.toASCIIString());
     }
     
@@ -156,6 +164,52 @@ public class URL {
         }
     }
 
+    private class FileURLConnection extends URLConnection {
+        private File file;
+        
+        private FileURLConnection(File f) {
+            this.file = f;
+        }
+
+        @Override
+        public void connect() throws IOException {
+            if (!file.exists()) {
+                throw new IOException("Failed to connect to file because it doesn't exist");
+            }
+        }
+
+        @Override
+        public int getContentLength() {
+            return (int)file.length();
+        }
+
+        @Override
+        public String getContentType() {
+            return null;
+        }
+
+        @Override
+        public String getHeaderField(String s) {
+            return null;
+        }
+
+        @Override
+        public Map<String, List<String>> getHeaderFields() {
+            return new HashMap();
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath());
+        }
+
+        @Override
+        public OutputStream getOutputStream() throws IOException {
+            return FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());
+        }
+        
+    }
+    
     public class HttpURLConnection extends URLConnection {
         private String url;
         private Object connection;
