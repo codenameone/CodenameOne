@@ -481,6 +481,11 @@ public class File {
     public URI toURI() throws URISyntaxException {
         String path = getAbsolutePath();
         path = path.substring(6);
+        path = StringUtil.replaceAll(path, "\\", "/");
+        while (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        path = "/" + path;
         return new URI("file", null, path, null, null);
         
         
