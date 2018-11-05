@@ -257,7 +257,7 @@ BOOL isVKBAlwaysOpen() {
 
 void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
     enteringNativeAllocations();
-    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__();
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(threadStateData);
     JAVA_OBJECT pkey = fromNSString(threadStateData, @"ios.doneButtonColor");
     JAVA_OBJECT pvalue = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(threadStateData, d, pkey, JAVA_NULL);
     
@@ -459,7 +459,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
-                        cn1_setStyleDoneButton(threadStateData, doneButton);
+                        cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                     } else {
 #ifndef NEW_CODENAME_ONE_VM
                         str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -468,7 +468,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
-                        cn1_setStyleDoneButton(threadStateData, doneButton);
+                        cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                         if(isVKBAlwaysOpen() && (utf.keyboardType == UIKeyboardTypeDecimalPad
                                              || utf.keyboardType == UIKeyboardTypePhonePad
                                              || utf.keyboardType == UIKeyboardTypeNumberPad)) {
@@ -480,7 +480,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                             buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                             UIBarButtonItem *anotherButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
-                            cn1_setStyleDoneButton(threadStateData, anotherButton);
+                            cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG anotherButton);
                             itemsArray = [NSArray arrayWithObjects: flexButton, anotherButton, doneButton, nil];
 #ifndef CN1_USE_ARC
                             [anotherButton release];
@@ -552,7 +552,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneClicked)];
-                    cn1_setStyleDoneButton(threadStateData, doneButton);
+                    cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                 } else {
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -561,7 +561,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardNextClicked)];
-                    cn1_setStyleDoneButton(threadStateData, doneButton);
+                    cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                 }
                 NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
                 
