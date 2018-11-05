@@ -42,7 +42,15 @@ public class URITests extends AbstractTest {
             home += fs.getFileSystemSeparator();
         }
         String homePath = home.substring(6);
+        homePath = StringUtil.replaceAll(homePath, "\\", "/");
+        while(homePath.startsWith("/")) {
+            homePath = homePath.substring(1);
+        }
+        homePath = "/" + homePath;
         com.codename1.io.URL url = new com.codename1.io.File("hello world.txt").toURL();
+        
+        //https://en.wikipedia.org/wiki/File_URI_scheme
+        assertTrue(url.toString().startsWith("file:/"), "URL should start with file:///");
         assertEqual("file:"+homePath+"hello%20world.txt", url.toString(), "URL failed to encode space in file name");
         
         

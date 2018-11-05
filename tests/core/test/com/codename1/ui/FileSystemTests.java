@@ -40,10 +40,16 @@ public class FileSystemTests extends AbstractTest {
         if (!appRoot.endsWith(""+fs.getFileSystemSeparator())) {
             appRoot += fs.getFileSystemSeparator();
         }
+        
         String appRootPath = appRoot.substring(6);
+        appRootPath = StringUtil.replaceAll(appRootPath, "\\", "/");
+        while (appRootPath.startsWith("/")) {
+            appRootPath = appRootPath.substring(1);
+        }
+        appRootPath = "/"+appRootPath;
         String appRootUrl = StringUtil.replaceAll("file:"+appRootPath, " ", "%20");
        
-        assertTrue(appRoot.startsWith("file://"), "App root doesn't start with file://");
+        assertTrue(appRoot.startsWith("file:/"), "App root doesn't start with file:/");
         File hello = new File("hello world.txt");
         assertEqual(appRoot+"hello world.txt", hello.getAbsolutePath(), "Incorrect absolute path for file");
         assertEqual(appRootUrl + "hello%20world.txt", hello.toURL().toString(), "Incorrect URL.");
@@ -102,7 +108,6 @@ public class FileSystemTests extends AbstractTest {
         if (res.error != null) {
             assertNull(res.error, res.error.getMessage());
         }
-        
     }
     
     @Override
