@@ -1331,6 +1331,24 @@ public class Form extends Container {
     }
     
     /**
+     * Gets the layered pane of the container without trying to create it.  If {@link #getLayeredPane() }
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * @return The layered pane if it's been created - or null.
+     */
+    protected Container getLayeredPaneIfExists() {
+        return layeredPane;
+    }
+    
+    /**
+     * Gets the form layered pane of the container without trying to create it.  If {@link #getFormLayeredPane(java.lang.Class, boolean)  }
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * @return The layered pane if it's been created - or null.
+     */
+    protected Container getFormLayeredPaneIfExists() {
+        return formLayeredPane;
+    }
+    
+    /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
      * will be created.

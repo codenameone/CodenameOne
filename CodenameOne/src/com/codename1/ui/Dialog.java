@@ -1710,12 +1710,76 @@ public class Dialog extends Form {
     }
 
     /**
+     * Checks if a point is in the layered pane of the dialog.  
+     * @param x The absolute x-coordinate.
+     * @param y The absolute y-coordinate
+     * @return True if the component at this location is in the layered pane.
+     */
+    private boolean pointInLayeredPane(int x, int y) {
+        Component cmp = getComponentAt(x, y);
+        if (cmp == null) {
+            return false;
+        }
+        Container layeredPane = getLayeredPaneIfExists();
+        if (layeredPane == null) {
+            return false;
+        }
+        if (layeredPane == cmp.getParent()) {
+            // This method is only concerned with clicks that originate with components
+            // inside the layered pane.  The immediate child of the layered pane
+            // will just be a container for a layered pane.  If getComponentAt(x,y) returned
+            // such a container, that means that the point is not on anything substantial.
+            return false;
+        }
+        if (cmp instanceof Container && !cmp.isGrabsPointerEvents()) {
+            // If the component at the given coord is a container and isn't set to grab pointer events
+            // then we are going to disregard this result and assume that there is 
+            // actually *nothing* at this position in the form.
+            return false;
+        }
+        return layeredPane.contains(cmp);
+    }
+    
+     /**
+     * Checks if a point is in the layered pane of the dialog.  
+     * @param x The absolute x-coordinate.
+     * @param y The absolute y-coordinate
+     * @return True if the component at this location is in the layered pane.
+     */
+    private boolean pointInFormLayeredPane(int x, int y) {
+        Component cmp = getComponentAt(x, y);
+        if (cmp == null) {
+            return false;
+        }
+        Container layeredPane = getFormLayeredPaneIfExists();
+        if (layeredPane == null) {
+            return false;
+        }
+        if (layeredPane == cmp.getParent()) {
+            // This method is only concerned with clicks that originate with components
+            // inside the layered pane.  The immediate child of the layered pane
+            // will just be a container for a layered pane.  If getComponentAt(x,y) returned
+            // such a container, that means that the point is not on anything substantial.
+            return false;
+        }
+        if (cmp instanceof Container && !cmp.isGrabsPointerEvents()) {
+            // If the component at the given coord is a container and isn't set to grab pointer events
+            // then we are going to disregard this result and assume that there is 
+            // actually *nothing* at this position in the form.
+            return false;
+        }
+        return layeredPane.contains(cmp);
+    }
+    
+    /**
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         if(disposeWhenPointerOutOfBounds && 
                 pressedOutOfBounds &&
+                !pointInLayeredPane(x, y) &&
+                !pointInFormLayeredPane(x, y) &&
                 !getTitleComponent().contains(x, y) && 
                 !getContentPane().contains(x, y) && 
                 !getMenuBar().contains(x, y)){
@@ -1729,6 +1793,8 @@ public class Dialog extends Form {
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
         if(!getTitleComponent().contains(x, y) && 
+                !pointInLayeredPane(x, y) &&
+                !pointInFormLayeredPane(x, y) &&
                 !getContentPane().contains(x, y) && 
                 !getMenuBar().contains(x, y)){
             pressedOutOfBounds = true;
