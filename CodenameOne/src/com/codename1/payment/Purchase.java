@@ -71,6 +71,10 @@ public abstract class Purchase {
         receiptStore = store;
     }
     
+    protected final ReceiptStore getReceiptStore() {
+        return receiptStore;
+    }
+    
     /**
      * Gets all of the receipts for this app.  Note:  You should periodically 
      * reload the receipts from the server to make sure that the user
@@ -265,8 +269,13 @@ public abstract class Purchase {
      * @param sku the SKU with which to perform the purchase process
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      * isManagedPaymentSupported() returns false
+     * @deprecated This API is not supported on iOS, and most other systems.  Use the Receipts API for a cross-platform in-app purchase.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html
      */
     public void subscribe(String sku) {
+        if (receiptStore != null) {
+            purchase(sku);
+            return;
+        }
         throw new RuntimeException("Unsupported");
     }
     
@@ -276,6 +285,7 @@ public abstract class Purchase {
      * @param sku the SKU with which to perform the purchase process
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      * isManagedPaymentSupported() returns false
+     * @deprecated This API is not supported on iOS, and most other systems.  Use the Receipts API for a cross-platform in-app purchase.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html
      */
     public void unsubscribe(String sku) {
         throw new RuntimeException("Unsupported");

@@ -129,12 +129,16 @@ class ZoozPurchase extends Purchase implements Runnable {
 
 
     public void subscribe(String sku) {
-        purchase(sku);
+        if (getReceiptStore() != null) {
+            purchase(sku);
+            return;
+        }
+        super.subscribe(sku);
     }
 
    
     public boolean isSubscriptionSupported() {
-        return true;
+        return getReceiptStore() != null;
     }
 
     public boolean isUnsubscribeSupported() {

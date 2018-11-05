@@ -71,6 +71,10 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
 
     @Override
     public void subscribe(String sku) {
+        if (getReceiptStore() != null) {
+            purchase(sku);
+            return;
+        }
         ((CodenameOneActivity)activity).subscribe(sku);
     }
 

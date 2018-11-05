@@ -10217,6 +10217,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void subscribe(final String sku) {
+                if (getReceiptStore() != null) {
+                    purchase(sku);
+                    return;
+                }
                 if (subscriptionSupported) {
                     SwingUtilities.invokeLater(new Runnable() {
 
