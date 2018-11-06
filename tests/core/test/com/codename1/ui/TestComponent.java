@@ -23,6 +23,7 @@ import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -61,6 +62,7 @@ public class TestComponent extends AbstractTest {
         //testSideMenuCloseNPE(true, false);
         testSideMenuCloseNPE(true, true);
         */
+        runOwnerTests();
         return true;
     }
 
@@ -779,5 +781,74 @@ public class TestComponent extends AbstractTest {
             }
         }
     }
+    
+    Point c(Component cmp) {
+            return new Point(cmp.getAbsoluteX()+cmp.getScrollX()+cmp.getWidth()/2, cmp.getAbsoluteY()+cmp.getScrollY()+cmp.getHeight()/2);
+        }
+        
+        boolean runOwnerTests() throws Exception {
+            Container cnt = new Container();
+            Button b2 = new Button();
+            assertTrue(!cnt.isOwnedBy(b2), "cnt is not owned by b2");
+            assertTrue(!b2.isOwnedBy(cnt), "b2 is not owned by cn1");
+            cnt.add(b2);
+            assertTrue(!b2.isOwnedBy(cnt), "button should not be owned by cn1 even though it is a child");
+            b2.setOwner(cnt);
+            assertTrue(b2.isOwnedBy(cnt), "Button should be owned by container");
+            b2.setOwner(null);
+            assertTrue(!b2.isOwnedBy(cnt), "Button should no longer be owned by container");
+
+            Container c2 = new Container();
+            c2.setOwner(cnt);
+            assertTrue(c2.isOwnedBy(cnt), "c2 should be owned by cnt");
+            b2.remove();
+            c2.add(b2);
+            assertTrue(b2.isOwnedBy(cnt), "b2 should be owned by cnt because its parent is owned by cnt");
+            b2.remove();
+            assertTrue(!b2.isOwnedBy(cnt), "b2 should no longer be owned by cnt");
+
+            b2.setOwner(c2);
+            assertTrue(b2.isOwnedBy(cnt), "b2 should be owned by cnt because of the owner hierarchy through c2");
+
+            Form f1 = new Form("Test Form", BoxLayout.y());
+            f1.setName("TestForm");
+            f1.show();
+            waitForFormName("TestForm");
+            //waitFor(2000);
+            Button b3 = new Button("B3");
+            Button b4 = new Button("B4");
+            f1.add(b3).add(b4);
+            f1.revalidate();
+            //System.out.println(c(b3));
+            //System.out.println(b3.contains(c(b3).getX(), c(b3).getY()));
+            //System.out.println("Absx="+b3.getAbsoluteX()+", absy="+b3.getAbsoluteY()+", w="+b3.getWidth()+", h="+b3.getHeight());
+            assertTrue(b3.contains(c(b3).getX(), c(b3).getY()));
+            assertTrue(!b3.contains(c(b4).getX(), c(b4).getY()));
+            assertTrue(b3.containsOrOwns(c(b3).getX(), c(b3).getY()));
+            assertTrue(!b3.containsOrOwns(c(b4).getX(), c(b4).getY()));
+            
+            b4.setOwner(b3);
+            assertTrue(b3.containsOrOwns(c(b4).getX(), c(b4).getY()));
+            
+            Container c4 = new Container(BoxLayout.x());
+            Button b5 = new Button("B5");
+            c4.add(b5);
+            f1.add(c4);
+            f1.revalidate();
+            assertTrue(!b3.containsOrOwns(c(b5).getX(), c(b5).getY()));
+            c4.setOwner(b3);
+            //System.out.println("Component: "+f1.getComponentAt(c(b5).getX(), c(b5).getY()));
+            assertTrue(b3.containsOrOwns(c(b5).getX(), c(b5).getY()));
+            Container c5 = new Container();
+            b3.remove();
+            c5.add(b3);
+            f1.add(c5);
+            f1.revalidate();
+            assertTrue(c5.containsOrOwns(c(b5).getX(), c(b5).getY()));
+            
+            
+        
+        return true;
+        }
     
 }

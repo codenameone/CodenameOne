@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
+import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
@@ -300,6 +301,8 @@ public class Component implements Animation, StyleListener {
     private Style disabledStyle;
     private Style allStyles;
     private Container parent;
+    private Component owner;
+    private ArrayList<Component> owned;
     private boolean focused = false;
     private boolean handlesInput = false;
     boolean shouldCalcPreferredSize = true;
@@ -1720,6 +1723,107 @@ public class Component implements Animation, StyleListener {
         }
         this.parent = parent;
     }
+    
+    /**
+     * Sets the owner of this component to the specified component.  This can be useful
+     * for denoting a hierarchical relationship that is outside the actual parent-child
+     * component hierarchy.  E.g. If there is a popup dialog that allows the user to select
+     * input for a text field, then you could set the text field as the owner of the popup
+     * dialog to denote a virtual parent-child relationship.
+     * 
+     * <p>This is used by {@link InteractionDialog#setDisposeWhenPointerOutOfBounds(boolean) } to figure out whether a
+     * pointer event actually occurred outside the bounds of the dialog.  The {@link #containsOrOwns(int, int) } method
+     * is used instead of {@link #contains(int, int) } so that it can cover the case where the pointer event occurred
+     * on a component that is logically a child of the dialog, but not physically.</p>
+     * popup dialog is opened, then 
+     * @param owner The component to set as the owner of this component.
+     * @since 6.0
+     * @see #isOwnedBy(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
+     */
+    public void setOwner(Component owner) {
+        if (this.owner != null) {
+            if (this.owner.owned != null) {
+                this.owner.owned.remove(this);
+            }
+            
+        }
+        this.owner = owner;
+        if (owner != null) {
+            if (owner.owned == null) {
+                owner.owned = new ArrayList<Component>();
+            }
+            owner.owned.add(this);
+        }
+    }
+    
+    /**
+     * Checks to see if this component is owned by the given other component.  A component {@literal A} is
+     * deemed to be owned by another component {@literal B} if any of the following conditions are true:
+     * <ul>
+     * <li>{@literal B} is the owner of {@literal A}</li>
+     * <li>{@literal B} contains {@literal A}'s owner.</li>
+     * <li>{@literal A}'s owner is owned by {@literal B}</li>
+     * </ul>
+     * @param cmp
+     * @return True if this component is owned by {@literal cmp}.
+     * @since 6.0
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
+     */
+    public boolean isOwnedBy(Component cmp) {
+        Component c = this.owner;
+        Container cnt = (cmp instanceof Container) ? (Container)cmp : null;
+        while (c != null) {
+            if (c == cmp) {
+                return true;
+            }
+            if (cnt != null) {
+                if (cnt.contains(c)) {
+                    return true;
+                }
+            }
+            c = c.owner;
+        }
+        c = this.getParent();
+        while (c != null) {
+            if (c.isOwnedBy(cmp)) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Checks to see if this component either contains the given point, or
+     * if it owns the component that contains the given point.
+     * @param x X-coordinate in absolute coordinates.
+     * @param y Y-coordinate in absolute coordinates.
+     * @return True if the coordinate is either inside the bounds of this component
+     * or a component owned by this component.
+     * @since 6.0
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #isOwnedBy(com.codename1.ui.Component) 
+     */
+    public boolean containsOrOwns(int x, int y) {
+        if (contains(x, y)) {
+            return true;
+        }
+        Form f = getComponentForm();
+        if (f != null) {
+            Component cmp = f.getComponentAt(x, y);
+            if (cmp != null) {
+                if (cmp.isOwnedBy(this)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+        
+    }
+    
 
     /**
      * Registers interest in receiving callbacks for focus gained events, a focus event 
