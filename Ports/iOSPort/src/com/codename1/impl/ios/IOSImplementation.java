@@ -3104,6 +3104,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return true;
         }
         switch (type) {
+            case -9998:
             case Display.GALLERY_ALL_MULTI:
             case Display.GALLERY_IMAGE_MULTI:
             case Display.GALLERY_VIDEO_MULTI:
@@ -3123,6 +3124,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
         }
         switch (type) {
+            case -9998:
             case Display.GALLERY_ALL_MULTI:
             case Display.GALLERY_IMAGE_MULTI:
             case Display.GALLERY_VIDEO_MULTI:
@@ -6203,7 +6205,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(url.startsWith("jar://")) {
             String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
             url = "file://localhost" + str + url.substring(6);
-        } 
+        }
         nativeInstance.setBrowserURL(get(browserPeer), url);
     }
 
