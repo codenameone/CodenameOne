@@ -26,6 +26,7 @@ import com.codename1.io.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import java.io.IOException;
 
@@ -199,5 +200,16 @@ class ZoozPurchase extends Purchase implements Runnable {
     @Override
     public void restore() {
         nativeInstance.restorePurchases();
-    }  
+    }
+
+    @Override
+    public boolean isManageSubscriptionsSupported() {
+        return true;
+    }
+
+    @Override
+    public void manageSubscriptions(String sku) {
+        CN.execute("itms-apps://apps.apple.com/account/subscriptions");
+    }
+
 }

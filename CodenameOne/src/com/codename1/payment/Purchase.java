@@ -25,6 +25,7 @@ package com.codename1.payment;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import java.io.IOException;
@@ -787,4 +788,34 @@ public abstract class Purchase {
      */
     public void restore() {
     } 
+    
+    /**
+     * Checks to see if this platform supports the {@link #manageSubscriptions(java.lang.String) } method.
+     * @return True if the platform supports the {@link #manageSubscriptions(java.lang.String) } method.
+     * 
+     * @since 6.0
+     */
+    public boolean isManageSubscriptionsSupported() {
+        return false;
+    }
+    
+    /**
+     * Open the platform's UI for managing subscriptions.  Currently iOS and Android
+     * are the only platforms that support this.  Other platforms will simply display a dialog stating that
+     * it doesn't support this feature.  Use the {@link #isManageSubscriptionsSupported() } method to check
+     * if the platform supports this feature.
+     * 
+     * 
+     * @param sku Optional sku of product whose subscription you wish to manage.  If left {@literal null}, then
+     * the general subscription management UI will be opened.  iOS doesn't support "deep-linking" directly to the 
+     * management for a particular sku, so this parameter is ignored there.  If included on Android, howerver, 
+     * it will open the UI for managing the specified sku.
+     * 
+     * @since 6.0
+     */
+    public void manageSubscriptions(String sku) {
+        Dialog.show("Not Supported", "This platform doesn't support in-app subscription management. ", "OK", null);
+    }
+    
+    
 }
