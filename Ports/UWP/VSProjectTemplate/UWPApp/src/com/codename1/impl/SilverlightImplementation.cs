@@ -2369,6 +2369,7 @@ namespace com.codename1.impl
                 case Display.GALLERY_ALL_MULTI:
                 case Display.GALLERY_VIDEO_MULTI:
                 case Display.GALLERY_IMAGE_MULTI:
+                case -9998:
                 case -9999:
                     return true;
             }
@@ -2392,8 +2393,12 @@ namespace com.codename1.impl
                     case Display.GALLERY_ALL_MULTI:
                     case Display.GALLERY_IMAGE_MULTI:
                     case Display.GALLERY_VIDEO_MULTI:
+                    case -9998:
                         multiple = true;
                         break;
+                }
+                if (type == -9998) {
+                    type = -9999;
                 }
                 openPicker.ViewMode = PickerViewMode.Thumbnail;
                 openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
