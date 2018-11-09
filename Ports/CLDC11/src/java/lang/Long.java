@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting a long to a String and a String to a long, as well as other constants and methods useful when dealing with a long.
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Long extends Number {
+public final class Long extends Number implements Comparable<Long>{
     /**
      * The largest value of type long.
      * See Also:Constant Field Values
@@ -157,5 +157,13 @@ public final class Long extends Number {
      */
     public static Long valueOf(long i) {
         return null;
+    }
+    
+    public static int compare(long l1, long l2) {
+        return l1 < l2 ? -1 : l1 > l2 ? 1 : 0;
+    }
+    
+    public int compareTo(Long l) {
+        return compare(this, l);
     }
 }

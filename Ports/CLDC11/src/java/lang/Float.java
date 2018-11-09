@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting a float to a String and a String to a float, as well as other constants and methods useful when dealing with a float.
  * Since: JDK1.0, CLDC 1.1
  */
-public final class Float extends Number {
+public final class Float extends Number implements Comparable<Float> {
     /**
      * The largest positive value of type float. It is equal to the value returned by Float.intBitsToFloat(0x7f7fffff).
      * See Also:Constant Field Values
@@ -231,5 +231,13 @@ public final class Float extends Number {
      */
     public static Float valueOf(float i) {
         return null;
+    }
+    
+    public static int compare(float f1, float f2) {
+        return f1 < f2 ? -1 : f1 > f2 ? 1 : 0;
+    }
+    
+    public int compareTo(Float f) {
+        return compare(this, f);
     }
 }

@@ -162,6 +162,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         this.value = new char[count];
         buffer.getChars(0, count, value, 0);
     }
+    
+    public String(java.lang.StringBuilder buffer) {
+        this.offset = 0;
+        this.count = buffer.length();
+        this.value = new char[count];
+        buffer.getChars(0, count, value, 0);
+    }
 
     /**
      * Returns the character at the specified index. An index ranges from 0 to length() - 1. The first character of the sequence is at index 0, the next at index 1, and so on, as for array indexing.
@@ -198,6 +205,23 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return toLowerCase().compareTo(anotherString.toLowerCase());
     }
     
+    public boolean contentEquals(CharSequence cs) {
+        if (cs == null) return false;
+        return equals(cs.toString());
+    }
+    
+    public boolean contentEquals(StringBuffer buf) {
+        if (null == buf) return false;
+        return equals(buf.toString());
+    }
+    
+    public static String copyValueOf(char[] data) {
+        return new String(data);
+    }
+    
+    public static String copyValueOf(char[] data, int offset, int count) {
+        return new String(data, offset, count);
+    }
 
     /**
      * Concatenates the specified string to the end of this string.

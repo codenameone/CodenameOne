@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting an int to a String and a String to an int, as well as other constants and methods useful when dealing with an int.
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Integer extends Number {
+public final class Integer extends Number implements Comparable<Integer> {
     /**
      * The largest value of type int. The constant value of this field is 2147483647.
      * See Also:Constant Field Values
@@ -231,5 +231,13 @@ public final class Integer extends Number {
      */
     public static int signum(int i) {
         return (i >> 31) | (-i >>> 31); // Hacker's delight 2-7
+    }
+    
+    public static int compare(int i1, int i2) {
+        return i1 < i2 ? -1 : i1 > i2 ? 1 : 0;
+    }
+    
+    public int compareTo(Integer i) {
+        return compare(this, i);
     }
 }
