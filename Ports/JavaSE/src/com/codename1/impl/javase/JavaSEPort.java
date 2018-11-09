@@ -192,6 +192,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     static JMenuItem pause;
     
+    private static int cachedJavaVersion=-1;
     /**
      * Returns the Java version as an int value.
      *
@@ -199,19 +200,28 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @since 12130
      */
     private static int getJavaVersion() {
-        String version = System.getProperty("java.version");
-        if (version.startsWith("1.")) {
-            version = version.substring(2);
+        if (cachedJavaVersion < 0) {
+
+            String version = System.getProperty("java.version");
+            if (version.startsWith("1.")) {
+                version = version.substring(2);
+            }
+            // Allow these formats:
+            // 1.8.0_72-ea
+            // 9-ea
+            // 9
+            // 9.0.1
+            int dotPos = version.indexOf('.');
+            int dashPos = version.indexOf('-');
+            if (dotPos < 0 && dashPos < 0) {
+                cachedJavaVersion = Integer.parseInt(version);
+                return cachedJavaVersion;
+            }
+            cachedJavaVersion = Integer.parseInt(version.substring(0,
+                    dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+            return cachedJavaVersion;
         }
-        // Allow these formats:
-        // 1.8.0_72-ea
-        // 9-ea
-        // 9
-        // 9.0.1
-        int dotPos = version.indexOf('.');
-        int dashPos = version.indexOf('-');
-        return Integer.parseInt(version.substring(0,
-                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+        return cachedJavaVersion;
     }
 
     public static boolean isRetina() {
@@ -250,6 +260,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     public static double calcRetinaScale() {
+        
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
@@ -1176,6 +1187,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
+            //g.setColor(Color.white);
+            //g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             AffineTransform t = ((Graphics2D)g).getTransform();
             AffineTransform t2 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
             
@@ -1205,7 +1218,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(roundedSkin) {
                     Graphics2D bg = buffer.createGraphics();
                     BufferedImage skin = getSkin();
-                    bg.drawImage(skin, -(int) ((getScreenCoordinates().getX() + x) * zoomLevel), -(int) ((getScreenCoordinates().getY() + y) * zoomLevel), 
+                    bg.drawImage(skin, -(int) ((getScreenCoordinates().getX()) * zoomLevel), -(int) ((getScreenCoordinates().getY()) * zoomLevel), 
                             (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
                     bg.dispose();
                 }
@@ -1228,6 +1241,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 }
                 //updateGraphicsScale(g);
+                BufferedImage skin = getSkin();
+                g.drawImage(skin, (int) (x * zoomLevel), (int) (( y) * zoomLevel), 
+                        (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
+
                 if (zoomLevel != 1) {
                     AffineTransform t3 = ((Graphics2D)g).getTransform();
                     t3.scale(zoomLevel/t3.getScaleX()/retinaScale, zoomLevel/t3.getScaleX()/retinaScale);
@@ -1236,8 +1253,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     ((Graphics2D)g).setTransform(t3);
                     
                 }
+                
                 //((Graphics2D)g).setTransform(t2);
-                g.drawImage(getSkin(), x, y, this);
+                /*
+                g.drawImage(getSkin(), 
+                        (int)(x * retinaScale), 
+                        (int)(y * retinaScale), 
+                        (int)(getSkin().getWidth() * retinaScale), 
+                        (int)(getSkin().getHeight() * retinaScale), this);
+                */
                 
             } else {
                 if(getComponentCount() > 0) {
@@ -1263,7 +1287,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean bufferSafeMode;
         public void paintComponent(java.awt.Graphics g) {
             //if (true) return;
-            
             // This will turn on buffer safe mode
             // next time blit() is run
             blitCounter=0;
@@ -1275,7 +1298,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 AffineTransform t = g2.getTransform();
                 double tx = t.getTranslateX();
                 double ty = t.getTranslateY();
-                AffineTransform t2 = AffineTransform.getScaleInstance(1, 1);
+                AffineTransform t2;
+                if (getJavaVersion() >= 9) {
+                    t2 = AffineTransform.getScaleInstance(retinaScale, retinaScale);
+                } else {
+                    t2 = AffineTransform.getScaleInstance(1, 1);
+                }
                 if (zoomLevel == 1) {
                     t2.translate(tx * retinaScale, ty * retinaScale);
                 } else {
@@ -3153,10 +3181,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                     portrait = !portrait;
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("Portrait", portrait);
-
-                    float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth()/(float)retinaScale);
-                    float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight()/(float)retinaScale);
-                    zoomLevel = Math.min(h1, w1);
+                    if (scrollableSkin) {
+                        float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth()/(float)retinaScale);
+                        float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight()/(float)retinaScale);
+                        zoomLevel = Math.min(1, Math.min(h1, w1));
+                    } else {
+                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                        float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                        float zoom = Math.min(1, Math.min(zoomX, zoomY));
+                    
+                        zoomLevel = zoom; //Math.min(h1, w1);
+                    }
+                    
+                    
                     Container parent = canvas.getParent();
                     parent.remove(canvas);
                     canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
@@ -3208,7 +3247,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                     } else {
                         int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
-                        float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                        float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                        float zoom = Math.min(zoomX, zoomY);
                         canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
                         if (window != null) {
                             window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoom), (int)(getSkin().getHeight() * zoom)));
@@ -4028,6 +4070,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             portrait = pref.getBoolean("Portrait", true);
+            if (getSkin() != null) {
+                if (scrollableSkin) {
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    if (window != null) {
+                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                        float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                        float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                        float zoom = Math.min(1,Math.min(zoomX, zoomY));
+                        window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * retinaScale * zoom), (int)(getSkin().getHeight() * retinaScale * zoom)));
+                    }
+                } else {
+                    int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                    int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                    float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                    float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                    float zoom = Math.min(1, Math.min(zoomX, zoomY));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
+                    if (window != null) {
+                        window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoom), (int)(getSkin().getHeight() * zoom)));
+                    }
+                }
+            }
+/*
+            
             if (!portrait && getSkin() != null) {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
@@ -4037,7 +4104,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
             }
-            
+            */
             window.setVisible(true);
         }
         if (useNativeInput) {
