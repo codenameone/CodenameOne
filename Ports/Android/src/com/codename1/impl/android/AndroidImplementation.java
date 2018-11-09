@@ -7943,6 +7943,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
+            if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+                return;
+            }
             ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;

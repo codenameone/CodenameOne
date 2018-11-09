@@ -770,6 +770,7 @@ public abstract class Purchase {
      * Some platforms support subscribing but don't support unsubscribe
      * 
      * @return true if the subscription API allows for unsubscribe
+     * @deprecated use {@link #isManageSubscriptionsSupported()} instead
      */
     public boolean isUnsubscribeSupported() {
         return isSubscriptionSupported();
