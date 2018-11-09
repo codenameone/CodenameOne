@@ -7873,6 +7873,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public boolean isNativeTitle() {
+        if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+            return false;
+        }
         Form f = getCurrentForm();
         boolean nativeCommand;
         if(f != null){
@@ -7884,7 +7887,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void refreshNativeTitle(){
-        if (getActivity() == null) {
+        if (getActivity() == null || com.codename1.ui.Toolbar.isGlobalToolbar()) {
             return;
         }
         Form f = getCurrentForm();
