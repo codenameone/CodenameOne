@@ -1682,7 +1682,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
-                    v = dw * 2 / 3;
+                    v = dw * 1 / 3;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
@@ -1698,7 +1698,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
                 if (v < 0) {
-                    v = dw * 3 / 4;
+                    v = dw * 1 / 4;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
