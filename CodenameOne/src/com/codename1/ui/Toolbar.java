@@ -1257,7 +1257,7 @@ public class Toolbar extends Container {
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                                    evt.consume();
+                                    //evt.consume();
                                 } else {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
                                     permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
