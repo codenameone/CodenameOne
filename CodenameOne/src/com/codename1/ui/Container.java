@@ -1301,6 +1301,39 @@ public class Container extends Component implements Iterable<Component>{
         resetScroll();
     }
 
+    private boolean revalidatePending;
+    
+    /**
+     * Revalidates the container in a way that doesn't conflict with
+     * running animations.  If you simply call {@link #revalidate() }
+     * on a container while an animation is in progress, it will produce
+     * paint artifacts as it will insert frames in the animation with
+     * the container at its final position.  Using this method, it will
+     * wait until running animations are complete before it revalidates.
+     * 
+     * @since 6.0
+     */
+    public void revalidateWithAnimationSafety() {
+        if (revalidatePending) {
+            return;
+        }
+        revalidatePending = true;
+        AnimationManager mgr = getAnimationManager();
+        if (mgr == null) {
+            revalidatePending = false;
+            revalidate();
+            return;
+        }
+        mgr.flushAnimation(new Runnable() {
+            @Override
+            public void run() {
+                revalidatePending = false;
+                revalidate();
+            }
+            
+        });
+    }
+   
     /**
      * Re-layout the container, this is useful when we modify the container hierarchy and
      * need to redo the layout

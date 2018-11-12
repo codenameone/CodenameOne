@@ -213,7 +213,7 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     public boolean animate() {
-        if (Display.getInstance().getCurrent() != this.getComponentForm()) {
+        if (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm()) {
             return false;
         }
         // reduce repaint thrushing of the UI from the infinite progress
