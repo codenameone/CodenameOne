@@ -1630,7 +1630,7 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above) {
-        if (layout.isOverlapSupported() && components.contains(cmp)) {
+        if (layout.isOverlapSupported() && cmp.getParent() == this) {
             int indexOfComponent = components.indexOf(cmp);
             
             int startIndex;

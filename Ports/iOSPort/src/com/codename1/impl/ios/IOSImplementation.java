@@ -431,22 +431,50 @@ public class IOSImplementation extends CodenameOneImplementation {
         return 0;
     }
     
-    
+    private static final String LAST_UPDATED_EDITOR_BOUNDS_KEY = "$$ios.updateNativeTextEditorFrame.lastUpdatedBounds";
     private static void updateNativeTextEditorFrame() {
+        updateNativeTextEditorFrame(true);
+    }
+    private static void updateNativeTextEditorFrame(boolean requestFocus) {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
-            final Style stl = cmp.getStyle();
-            final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
-            instance.doNotHideTextEditorSemaphore++;
-            try {
-                instance.currentEditing.requestFocus();
-            } finally {
-                instance.doNotHideTextEditorSemaphore--;
+            Form form = cmp.getComponentForm();
+            if (form == null) {
+                return;
             }
+            
             int x = cmp.getAbsoluteX() + cmp.getScrollX();
             int y = cmp.getAbsoluteY() + cmp.getScrollY();
             int w = cmp.getWidth();
             int h = cmp.getHeight();
+            String key = LAST_UPDATED_EDITOR_BOUNDS_KEY;
+            Rectangle lastUpdatedBounds = (Rectangle)cmp.getClientProperty(key);
+            if (lastUpdatedBounds != null) {
+                if (lastUpdatedBounds.getX() == x && lastUpdatedBounds.getY() == y && lastUpdatedBounds.getWidth() == w && lastUpdatedBounds.getHeight() == h) {
+                    return;
+                }
+                lastUpdatedBounds.setBounds(x, y, w, h);
+            } else {
+                
+                lastUpdatedBounds = new Rectangle(x, y, w, h);
+                cmp.putClientProperty(key, lastUpdatedBounds);
+            }
+            
+            
+            final Style stl = cmp.getStyle();
+            final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            if (requestFocus) {
+                instance.doNotHideTextEditorSemaphore++;
+                try {
+                    instance.currentEditing.requestFocus();
+                } finally {
+                    instance.doNotHideTextEditorSemaphore--;
+                }
+            }
+            x = cmp.getAbsoluteX() + cmp.getScrollX();
+            y = cmp.getAbsoluteY() + cmp.getScrollY();
+            w = cmp.getWidth();
+            h = cmp.getHeight();
             int pt = stl.getPaddingTop();
             int pb = stl.getPaddingBottom();
             int pl = stl.getPaddingLeft(rtl);
@@ -467,8 +495,15 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             */
+            Container contentPane = form.getContentPane();
+            Style contentPaneStyle = contentPane.getStyle();
+            int minY = contentPane.getAbsoluteY() + contentPane.getScrollY() + contentPaneStyle.getPaddingTop();
+            int maxH = Display.getInstance().getDisplayHeight() - minY - nativeInstance.getVKBHeight();
             
-            int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
+            if (y < minY) {
+                h -= (minY - y);
+                y = minY;
+            }
             
             if (h > maxH ) {
                 // For text areas, we don't want the keyboard to cover part of the 
@@ -479,6 +514,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 h = maxH;
             }
             
+            if (h < 0) {
+                // There isn't room for the editor at all.
+                Log.p("No room for text editor.  h="+h);
+                return;
+            }
+            if (x <= 0 || y <= 0 || w <= 0 || h <= 0) {
+                return;
+            }
             nativeInstance.resizeNativeTextView(x,
                     y,
                     w,
@@ -597,6 +640,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             foldKeyboard();
         }
     }
+
+    @Override
+    public void afterComponentPaint(Component c, Graphics g) {
+        super.afterComponentPaint(c, g);
+        if (isEditingText(c) && nativeInstance.isAsyncEditMode()) {
+            updateNativeTextEditorFrame(false);
+        }
+    }
+    
+    
     
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
@@ -891,11 +944,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                             if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
                                 ((TextField)instance.currentEditing).fireDoneEvent();
                             }
+                            Component cmp = instance.currentEditing;
                             instance.currentEditing = null;
                             instance.callHideTextEditor();
                             if (nativeInstance.isAsyncEditMode()) {
                                 nativeInstance.setNativeEditingComponentVisible(false);
                             }
+                            cmp.putClientProperty(LAST_UPDATED_EDITOR_BOUNDS_KEY, null);
                             EDITING_LOCK.notify();
                         }
                         Form current = Display.getInstance().getCurrent();
@@ -3049,6 +3104,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return true;
         }
         switch (type) {
+            case -9998:
             case Display.GALLERY_ALL_MULTI:
             case Display.GALLERY_IMAGE_MULTI:
             case Display.GALLERY_VIDEO_MULTI:
@@ -3068,6 +3124,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
         }
         switch (type) {
+            case -9998:
             case Display.GALLERY_ALL_MULTI:
             case Display.GALLERY_IMAGE_MULTI:
             case Display.GALLERY_VIDEO_MULTI:
@@ -6148,7 +6205,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(url.startsWith("jar://")) {
             String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
             url = "file://localhost" + str + url.substring(6);
-        } 
+        }
         nativeInstance.setBrowserURL(get(browserPeer), url);
     }
 

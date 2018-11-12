@@ -127,7 +127,8 @@ public class Switch extends Component {
     private boolean dragged;
     private int pressX;
     private int deltaX; //pressX - currentdragX
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher changeDispatcher = new EventDispatcher();
     private boolean animationLock;
 
     private int valign = CENTER;
@@ -413,11 +414,30 @@ public class Switch extends Component {
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
+    
+    /**
+     * Adds a listener to the switch which will cause an event on change
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void addChangeListener(ActionListener l) {
+        changeDispatcher.addListener(l);
+    }
+
+    /**
+     * Removes the given change listener from the switch
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void removeChangeListener(ActionListener l) {
+        changeDispatcher.removeListener(l);
+    }
 
     /**
      * Returns a collection containing the action listeners for this button
      *
      * @return the action listeners
+     * @deprecated This will be removed in a future version.
      */
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
@@ -429,6 +449,10 @@ public class Switch extends Component {
         if (d.isBuiltinSoundsEnabled()) {
             d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);
         }
+    }
+    
+    void fireChangeEvent() {
+        changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Data));
     }
 
     /**
@@ -676,7 +700,7 @@ public class Switch extends Component {
                         if (f != null) {
                             f.deregisterAnimated(this);
                         }
-                        Switch.this.setValue(value);
+                        Switch.this.setValue(value, true);
                     }
                     repaint();
                     return false;
@@ -687,7 +711,7 @@ public class Switch extends Component {
             });
         } else {
             deltaX = deltaEnd;
-            setValue(value);
+            setValue(value, true);
         }
         dragged = true;
     }
@@ -707,20 +731,22 @@ public class Switch extends Component {
      * @param value the value to set
      */
     public void setValue(boolean value) {
+        setValue(value, false);
+    }
+    
+    private void setValue(boolean value, boolean fireEvent) {
         boolean orig = animationLock;
         animationLock = true;
-        boolean fireEvent = this.value != value;
-        if (fireEvent) {
-            this.value = value;
-            fireActionEvent();
-            repaint();
-            /*
-            if(isInitialized()){
-                    animateLayoutAndWait(150);
-                }
-            }
-             */
+        boolean oldValue = this.value;
+        
+        this.value = value;
+        if (oldValue != value) {
+            fireChangeEvent();
         }
+        if (fireEvent && oldValue != value) {
+            fireActionEvent();
+        }
+        repaint();
         animationLock = orig;
     }
 

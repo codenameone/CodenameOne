@@ -1331,6 +1331,24 @@ public class Form extends Container {
     }
     
     /**
+     * Gets the layered pane of the container without trying to create it.  If {@link #getLayeredPane() }
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * @return The layered pane if it's been created - or null.
+     */
+    protected Container getLayeredPaneIfExists() {
+        return layeredPane;
+    }
+    
+    /**
+     * Gets the form layered pane of the container without trying to create it.  If {@link #getFormLayeredPane(java.lang.Class, boolean)  }
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * @return The layered pane if it's been created - or null.
+     */
+    protected Container getFormLayeredPaneIfExists() {
+        return formLayeredPane;
+    }
+    
+    /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
      * will be created.
@@ -2840,6 +2858,37 @@ public class Form extends Container {
             Display.getInstance().vibrate(tactileTouchDuration);
         }
     }
+    
+    
+
+    //https://github.com/codenameone/CodenameOne/issues/2352
+    private void cancelScrolling(Component cmp) {
+        Container parent = cmp.getParent();
+        //loop over the parents to check if there is a scrolling
+        //gesture that should be stopped
+        while (parent != null) {
+            if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+            	parent.draggedMotionX = null;
+            	parent.draggedMotionY = null;
+            }
+            parent = parent.getParent();
+        }
+    }
+    
+    // https://github.com/codenameone/CodenameOne/issues/2352
+    private boolean resumeDragAfterScrolling(int x, int y) {
+        Component cmp = getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        if (cmp != null && isCurrentlyScrolling(cmp)) {
+        	cancelScrolling(cmp);
+        	cmp.initDragAndDrop(x, y);
+            Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
+            return true;
+        }
+        return false;
+    }
 
     private Component pressedCmp;
     
@@ -2847,6 +2896,12 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
+        // See https://github.com/codenameone/CodenameOne/issues/2352
+        if (resumeDragAfterScrolling(x, y)) {
+            return;
+        }
+        
+        
         pressedCmp = null;
         stickyDrag = null;
         dragStopFlag = false;

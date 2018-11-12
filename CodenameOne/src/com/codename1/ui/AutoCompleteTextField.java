@@ -96,6 +96,7 @@ public class AutoCompleteTextField extends TextField {
             }
             
         };
+        popup.setOwner(this);
         filter = new FilterProxyListModel<String>(listModel);                
         popup.setScrollable(false);
         popup.setUIID("AutoCompletePopup");

@@ -658,6 +658,7 @@ public class Picker extends Button {
                     
                     
                 };
+                dlg.setOwner(Picker.this);
                 //dlg.setFormMode(!isTablet);
                 ComponentSelector.select("DialogTitle", dlg).getParent().setPadding(0).setMargin(0).setBorder(Border.createEmpty());
                 dlg.getTitleComponent().setVisible(false);

@@ -1257,7 +1257,7 @@ public class Toolbar extends Container {
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                                    evt.consume();
+                                    //evt.consume();
                                 } else {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
                                     permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
@@ -1342,13 +1342,15 @@ public class Toolbar extends Container {
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
                         }
-                        if (evt.getX() > sidemenuDialog.getWidth()) {
-                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                            evt.consume();
-                            closeSideMenu();
-                            return;
-                        } 
                         if (sidemenuDialog != null) {
+                            if (evt.getX() > sidemenuDialog.getWidth()) {
+                                if(sidemenuDialog.isShowing()) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    evt.consume();
+                                    closeSideMenu();
+                                }
+                                return;
+                            } 
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
@@ -1680,7 +1682,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
-                    v = dw * 2 / 3;
+                    v = dw * 1 / 3;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
@@ -1696,7 +1698,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
                 if (v < 0) {
-                    v = dw * 3 / 4;
+                    v = dw * 1 / 4;
                 } else {
                     v = dw * (100 - v) / 100;
                 }

@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.components.MultiButton;
 import com.codename1.components.SpanButton;
 import com.codename1.components.SpanLabel;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
@@ -5040,6 +5041,8 @@ public class FontImage extends Image {
     private byte backgroundOpacity;
     private int opacity=-1;
 
+    private Motion rotationMotion;
+    
     /**
      * Default factor for image size, icons without a given size are sized as
      * defaultSize X default font height.
@@ -5351,13 +5354,21 @@ public class FontImage extends Image {
      * {@inheritDoc}
      */
     public boolean isAnimation() {
-        return false;
+        return rotationMotion != null;
     }
 
     /**
      * {@inheritDoc}
      */
     public boolean animate() {
+        if(rotationMotion != null) {
+            rotated = rotationMotion.getValue();
+            if(rotationMotion.isFinished()) {
+                rotationMotion = Motion.createLinearMotion(0, 360, 1500);
+                rotationMotion.start();
+            }
+            return true;
+        }
         return false;
     }
 
@@ -5480,5 +5491,16 @@ public class FontImage extends Image {
      */
     public void setBgTransparency(int t) {
         backgroundOpacity = (byte)t;
+    }
+    
+    /**
+     * Creates a copy of this image that rotates itself in an animation
+     * @return a copy of the image
+     */
+    public FontImage rotateAnimation() {
+        FontImage newImage = (FontImage)rotate(0);
+        newImage.rotationMotion = Motion.createLinearMotion(0, 360, 1500);
+        newImage.rotationMotion.start();
+        return newImage;
     }
 }

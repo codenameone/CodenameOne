@@ -34,6 +34,8 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -62,6 +64,7 @@ public class InteractionDialog extends Container {
     private boolean animateShow = true;
     private boolean repositionAnimation = true;
     private boolean disposed;
+    private boolean disposeWhenPointerOutOfBounds;
     
     /**
      * Whether the interaction dialog uses the form layered pane of the regular layered pane
@@ -120,6 +123,36 @@ public class InteractionDialog extends Container {
         titleArea.addComponent(BorderLayout.CENTER, title);
         super.addComponent(BorderLayout.CENTER, contentPane);
         setGrabsPointerEvents(true);
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        installPointerOutOfBoundsListeners();
+    }
+    
+    
+    
+    
+    
+    /**
+     * This flag indicates if the dialog should be disposed if a pointer 
+     * released event occurred out of the dialog content.
+     * 
+     * @param disposeWhenPointerOutOfBounds
+     */
+    public void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
+        this.disposeWhenPointerOutOfBounds = disposeWhenPointerOutOfBounds;
+    }
+
+    /**
+     * This flag indicates if the dialog should be disposed if a pointer
+     * released event occurred out of the dialog content.
+     *
+     * @return  true if the dialog should dispose
+     */
+    public boolean isDisposeWhenPointerOutOfBounds() {
+        return disposeWhenPointerOutOfBounds;
     }
 
     /**
@@ -247,6 +280,12 @@ public class InteractionDialog extends Container {
         if(disposed) {
             Form f = getComponentForm();
             if(f != null) {
+                if (pressedListener != null) {
+                    f.removePointerPressedListener(pressedListener);
+                }
+                if (releasedListener != null) {
+                    f.removePointerReleasedListener(releasedListener);
+                }
                 Container pp = getLayeredPane(f);
                 Container p = getParent();
                 remove();
@@ -516,6 +555,60 @@ public class InteractionDialog extends Container {
         this.animateShow = animateShow;
     }
 
+    
+    
+    private boolean pressedOutOfBounds;
+    private ActionListener pressedListener;
+    private ActionListener releasedListener;
+    private void installPointerOutOfBoundsListeners() {
+        
+        final Form f = getComponentForm();
+        if (f != null) {
+            if (pressedListener == null) {
+                pressedListener = new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        if (disposed) {
+                            f.removePointerPressedListener(pressedListener);
+                            f.removePointerReleasedListener(releasedListener);
+                            return;
+                        }
+                        pressedOutOfBounds = disposeWhenPointerOutOfBounds && 
+                                !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
+                                !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())
+                                ;
+                    }
+                };
+            }
+            if (releasedListener == null) {
+                releasedListener = new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        if (disposed) {
+                            f.removePointerPressedListener(pressedListener);
+                            f.removePointerReleasedListener(releasedListener);
+                            return;
+                        }
+                        if (disposeWhenPointerOutOfBounds && 
+                                pressedOutOfBounds && 
+                                !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
+                                !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {
+                            f.removePointerPressedListener(pressedListener);
+                            f.removePointerReleasedListener(releasedListener);
+                            dispose();
+                        }
+                    }
+                };
+            }
+            f.addPointerPressedListener(pressedListener);
+            f.addPointerReleasedListener(releasedListener);
+            
+        }
+    }
+    
+    
+    
     /**
      * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
      * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup

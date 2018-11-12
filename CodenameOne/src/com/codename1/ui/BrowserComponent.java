@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
+import com.codename1.io.URL;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
 import com.codename1.ui.events.ActionEvent;
@@ -40,6 +41,7 @@ import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
 import com.codename1.util.regex.StringReader;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -441,6 +443,22 @@ public class BrowserComponent extends Container {
      */
     public void setURL(String url) {
         Display.impl.setBrowserURL(internal, url);
+    }
+    
+    /**
+     * Sets the page URL.
+     * @param url The URL to the page to display.
+     */
+    public void setURL(URL url) {
+        setURL(url.toString());
+    }
+    
+    /**
+     * Sets the page URL.
+     * @param uri URI to the page to display.
+     */
+    public void setURL(URI uri) {
+        setURL(uri.toString());
     }
 
     /**

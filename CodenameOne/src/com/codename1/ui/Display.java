@@ -779,6 +779,14 @@ public final class Display extends CN1Constants {
             }
         }
     }
+    
+    /**
+     * Checks if this platform uses input modes.  No current platforms return true for this.  It is a holdover from J2ME.
+     * @return True if the platform supports input modes.  Only true for J2ME and RIM.
+     */
+    public boolean platformUsesInputMode() {
+        return impl.platformUsesInputMode();
+    }
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.

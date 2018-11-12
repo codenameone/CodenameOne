@@ -147,7 +147,7 @@ public abstract class PushNotificationService extends Service implements PushCal
 
                 String description = getProperty("android.NotificationChannel.description", "Remote notifications");
 
-                int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_LOW));
+                int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_HIGH));
 
                 android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
 
