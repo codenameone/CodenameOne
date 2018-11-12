@@ -2156,7 +2156,7 @@ public class Component implements Animation, StyleListener {
             Style s = getStyle();
             if(s.getOpacity() < 255 && g.isAlphaSupported()) {
                 int oldAlpha = g.getAlpha();
-                g.setAlpha(s.getOpacity());
+                g.setAlpha(s.getOpacity());                
                 internalPaintImpl(g, paintIntersects);
                 g.setAlpha(oldAlpha);
             } else {
@@ -2206,14 +2206,16 @@ public class Component implements Animation, StyleListener {
         int ty = g.getTranslateY();
 
         g.translate(-tx, -ty);
+        int x1 = getAbsoluteX() + getScrollX();
+        int y1 = getAbsoluteY() + getScrollY();
+        int w = getWidth();
+        int h = getHeight();
         while (parent != null) {
-            g.translate(parent.getAbsoluteX() + parent.getScrollX(),
-                    parent.getAbsoluteY() + parent.getScrollY());
-            parent.paintIntersecting(g, component, getAbsoluteX() + getScrollX(),
-                    getAbsoluteY() + getScrollY(),
-                    getWidth(), getHeight(), true);
-            g.translate(-parent.getAbsoluteX() - parent.getScrollX(),
-                    -parent.getAbsoluteY() - parent.getScrollY());
+            int ptx = parent.getAbsoluteX() + parent.getScrollX();
+            int pty = parent.getAbsoluteY() + parent.getScrollY();
+            g.translate(ptx, pty);
+            parent.paintIntersecting(g, component, x1, y1, w, h, true);
+            g.translate(-ptx, -pty);
             component = parent;
             parent = parent.getParent();
         }
@@ -2352,6 +2354,9 @@ public class Component implements Animation, StyleListener {
      * @param background if true paints all parents background
      */
     final public void paintComponent(Graphics g, boolean background) {
+        if (!isVisible()) {
+            return;
+        }
         int clipX = g.getClipX();
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
