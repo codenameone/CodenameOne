@@ -65,7 +65,6 @@ public class LocationSimulation extends javax.swing.JFrame {
      */
     public static final char[] E_MeasUnitS_ms2_Char = {'°', '"', 'h'};
     private static final double[] E_MeasUnitPerM = {1, 1 / 0.91440, 1 / 1 / 0.91440};
-
     /**
      * Creates new form LocationSimulation
      */
@@ -80,6 +79,32 @@ public class LocationSimulation extends javax.swing.JFrame {
         final String htmlPage = "<!DOCTYPE html>\n"
                 + "<html>\n"
                 + "  <head>\n"
+                + " <script>\n"
+                + "(function() {\n" +
+                "    var lastTime = 0;\n" +
+                "    var vendors = ['ms', 'moz', 'webkit', 'o'];\n" +
+                "    for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {\n" +
+                "        window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];\n" +
+                "        window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] \n" +
+                "                                   || window[vendors[x]+'CancelRequestAnimationFrame'];\n" +
+                "    }\n" +
+                " \n" +
+                "    if (!window.requestAnimationFrame)\n" +
+                "        window.requestAnimationFrame = function(callback, element) {\n" +
+                "            var currTime = new Date().getTime();\n" +
+                "            var timeToCall = Math.max(0, 16 - (currTime - lastTime));\n" +
+                "            var id = window.setTimeout(function() { callback(currTime + timeToCall); }, \n" +
+                "              timeToCall);\n" +
+                "            lastTime = currTime + timeToCall;\n" +
+                "            return id;\n" +
+                "        };\n" +
+                " \n" +
+                "    if (!window.cancelAnimationFrame)\n" +
+                "        window.cancelAnimationFrame = function(id) {\n" +
+                "            clearTimeout(id);\n" +
+                "        };\n" +
+                "}());\n"
+                + "</script>"
                 + "    <meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />\n"
                 + "    <style type=\"text/css\">\n"
                 + "      html { height: 100% }\n"
@@ -87,16 +112,19 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + "      #map-canvas { height: 100% }\n"
                 + "      .gm-style-mtc > div, .gm-style > div, .gm-style-cc > div, .gm-style {font-family:sans-serif !important;}\n"
                 + "    </style>\n"
+                //+ " <script>"
+                //+ "if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}"
+                //+"  </script>"
                 + "    <script type=\"text/javascript\"\n"
-                + "      src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyA6cHeMqVVOHlZ0i9A2oD3jIg56Slvq0Aw&sensor=false\">\n"
+                + "      src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyA6cHeMqVVOHlZ0i9A2oD3jIg56Slvq0Aw\">\n"
                 + "    </script>\n"
                 + "    <script type=\"text/javascript\">\n"
                 + "function moveToLocation(lat, lng){\n"
                 + "    var center = new google.maps.LatLng(lat, lng);\n"
                 + "    // using global variable:\n"
                 + "    document.map.panTo(center);\n"
-                + "}"
-                + "function initialize() {"
+                + "}\n"
+                + "function initialize() {\n"
                 + "var latlng = new google.maps.LatLng(40.714353, -74.005973 );\n"
                 + "var myOptions = {\n"
                 + "  zoom: "+startingZoom+",\n"
@@ -109,6 +137,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + "\n"
                 + "document.geocoder = new google.maps.Geocoder();\n"
                 + "document.map = new google.maps.Map(document.getElementById(\"map_canvas\"),myOptions);\n"
+                + "console.log('map', document.map);\n"
                 + "\n"
                 + "document.marker = new google.maps.Marker({\n"
                 + "    position: document.map.getCenter(),\n"
@@ -147,8 +176,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 webView = new WebView();
                 root.getChildren().add(webView);
                 webContainer.setScene(new Scene(root));
-                
-                webView.getEngine().loadContent(htmlPage);
+                webView.getEngine().loadContent(htmlPage, "text/html");
                 //revalidate();
                 firstRun = true;
                 Timer t = new Timer();
@@ -198,7 +226,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                                     }
 
                                 } catch (Exception e) {
-
+//e.printStackTrace();
                                 }
                             }
                         });

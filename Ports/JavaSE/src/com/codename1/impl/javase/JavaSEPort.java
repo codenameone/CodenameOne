@@ -2821,9 +2821,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     if(locSimulation==null) {
                             locSimulation = new LocationSimulation();
-                    } else {
-                            locSimulation.setVisible(true);
                     }
+                            locSimulation.setVisible(true);
+                    
                 }
             });
             simulatorMenu.add(locactionSim);
