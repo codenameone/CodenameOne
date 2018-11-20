@@ -25,6 +25,7 @@ package com.codename1.ui.layouts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Form;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.Style;
 
@@ -82,6 +83,13 @@ public class BoxLayout extends Layout{
      */
     public static final int X_AXIS_NO_GROW = 3;
 
+    /**
+     * Same as Y_AXIS with a special case for the last component. The last 
+     * component is glued to the end of the available space
+     */
+    public static final int Y_AXIS_BOTTOM_LAST = 4;
+    
+    
     private int axis;
     
     /** 
@@ -100,6 +108,14 @@ public class BoxLayout extends Layout{
      */
     public static BoxLayout y() {
         return new BoxLayout(BoxLayout.Y_AXIS);
+    }
+
+    /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST)}
+     * @return a new Y bottom last axis {@code BoxLayout}
+     */
+    public static BoxLayout yLast() {
+        return new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
     }
     
     /**
@@ -133,6 +149,7 @@ public class BoxLayout extends Layout{
             
             switch(axis) {
                 case Y_AXIS:
+                case Y_AXIS_BOTTOM_LAST: 
                     int cmpBottom = height;
                     cmp.setWidth(width - stl.getHorizontalMargins());
                     int cmpH = cmp.getPreferredH();
@@ -201,6 +218,16 @@ public class BoxLayout extends Layout{
                     break;
             }
         }
+        
+        if(axis == Y_AXIS_BOTTOM_LAST && numOfcomponents > 0) {
+            if(parent instanceof Form) {
+                parent = ((Form)parent).getContentPane();
+            }
+            Component cmp = parent.getComponentAt(numOfcomponents - 1);
+            if(cmp.getY() + cmp.getHeight() < height) {
+                cmp.setY(height - cmp.getHeight());
+            }
+        }        
     }
     
     private Dimension dim = new Dimension(0, 0);
@@ -217,7 +244,7 @@ public class BoxLayout extends Layout{
             Component cmp = parent.getComponentAt(i);
             Style stl = cmp.getStyle();
             
-            if(axis == Y_AXIS){
+            if(axis == Y_AXIS || axis == Y_AXIS_BOTTOM_LAST){
                 int cmpH = cmp.getPreferredH() + stl.getVerticalMargins();
                 height += cmpH;
                 width = Math.max(width , cmp.getPreferredW()+ stl.getHorizontalMargins());
@@ -269,6 +296,16 @@ public class BoxLayout extends Layout{
         return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS), cmps);
     }
     
+    /**
+     * The equivalent of Container.enclose() with a box layout Y in bottom 
+     * last mode
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseYBottomLast(Component... cmps) {
+        return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST), cmps);
+    }
+
     /**
      * The equivalent of Container.enclose() with a box layout X
      * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" />

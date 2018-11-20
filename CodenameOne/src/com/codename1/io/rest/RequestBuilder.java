@@ -550,6 +550,9 @@ public class RequestBuilder {
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 List<Map> lst = (List<Map>)response.get("root");
+                if(lst == null) {
+                    return;
+                }
                 try {
                     List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
                     for(Map m : lst) {
