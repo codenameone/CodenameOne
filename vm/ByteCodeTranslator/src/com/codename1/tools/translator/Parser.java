@@ -676,6 +676,9 @@ public class Parser extends ClassVisitor {
 
     @Override
     public void visitInnerClass(String name, String outerName, String innerName, int access) {
+        if(name.equals(cls.getOriginalClassName())) {
+            cls.setIsAnonymous(innerName==null);
+        }
         super.visitInnerClass(name, outerName, innerName, access); 
     }
 
@@ -715,6 +718,13 @@ public class Parser extends ClassVisitor {
         if((access & Opcodes.ACC_INTERFACE) == Opcodes.ACC_INTERFACE) {
             cls.setIsInterface(true);
         }
+        if((access & Opcodes.ACC_ANNOTATION) == Opcodes.ACC_ANNOTATION) {
+            cls.setIsAnnotation(true);
+        }
+        if((access & Opcodes.ACC_SYNTHETIC) == Opcodes.ACC_SYNTHETIC) {
+            cls.setIsSynthetic(true);
+        }
+        
         if((access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL) {
             cls.setFinalClass(true);
         }

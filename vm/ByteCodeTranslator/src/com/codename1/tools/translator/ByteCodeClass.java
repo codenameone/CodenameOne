@@ -36,6 +36,27 @@ import java.util.TreeSet;
  * @author Shai Almog
  */
 public class ByteCodeClass {
+
+    /**
+     * @param isAnonymous the isAnonymous to set
+     */
+    public void setIsAnonymous(boolean isAnonymous) {
+        this.isAnonymous = isAnonymous;
+    }
+
+    /**
+     * @param isSynthetic the isSynthetic to set
+     */
+    public void setIsSynthetic(boolean isSynthetic) {
+        this.isSynthetic = isSynthetic;
+    }
+
+    /**
+     * @param isAnnotation the isAnnotation to set
+     */
+    public void setIsAnnotation(boolean isAnnotation) {
+        this.isAnnotation = isAnnotation;
+    }
     private List<ByteCodeField> fullFieldList;
     private List<ByteCodeField> staticFieldList;
     private Set<String> dependsClassesInterfaces = new TreeSet<String>();
@@ -48,6 +69,9 @@ public class ByteCodeClass {
     private List<String> baseInterfaces;
     private boolean isInterface;
     private boolean isAbstract;
+    private boolean isSynthetic;
+    private boolean isAnnotation;
+    private boolean isAnonymous;
     private boolean usedByNative;
     private static boolean saveUnitTests;
     private boolean isUnitTest;
@@ -442,6 +466,23 @@ public class ByteCodeClass {
             b.append(", 0");
         }
         
+        /*
+        JAVA_BOOLEAN isSynthetic;
+    JAVA_BOOLEAN isInterface;
+    JAVA_BOOLEAN isAnonymous;
+    JAVA_BOOLEAN isAnnotation;
+        */
+        b
+                .append(", ")
+                .append(isSynthetic?"JAVA_TRUE":"0")
+                .append(", ")
+                .append(isInterface?"JAVA_TRUE":"0")
+                .append(", ")
+                .append(isAnonymous?"JAVA_TRUE":"0")
+                .append(", ")
+                .append(isAnnotation?"JAVA_TRUE":"0");
+        
+        
         b.append("};\n\n");
 
         // create class objects for 1 - 3 dimension arrays
@@ -472,11 +513,29 @@ public class ByteCodeClass {
             b.append(", &class__");
             b.append(clsName);
 
+            /*
+            JAVA_BOOLEAN primitiveType;
+
+            const struct clazz* baseClass;
+            const struct clazz** baseInterfaces;
+            const int baseInterfaceCount;
+
+            void* newInstanceFp;
+
+            // virtual method table lookup
+            void** vtable;
+
+            void* enumValueOfFp;
+            JAVA_BOOLEAN isSynthetic;
+            JAVA_BOOLEAN isInterface;
+            JAVA_BOOLEAN isAnonymous;
+            JAVA_BOOLEAN isAnnotation;
+            */
             // primitive type is always false here object is always the base class of the array it has no base interfaces
             b.append(", JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, ");
 
             // new instance function pointer and vtable 
-            b.append("0, 0\n};\n\n");
+            b.append("0, 0, 0, 0, 0, 0, 0\n};\n\n");
         }
 
         staticFieldList = new ArrayList<ByteCodeField>();

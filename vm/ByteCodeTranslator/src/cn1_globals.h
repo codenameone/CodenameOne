@@ -129,6 +129,10 @@ struct clazz {
     void** vtable;
     
     void* enumValueOfFp;
+    JAVA_BOOLEAN isSynthetic;
+    JAVA_BOOLEAN isInterface;
+    JAVA_BOOLEAN isAnonymous;
+    JAVA_BOOLEAN isAnnotation;
 };
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)
