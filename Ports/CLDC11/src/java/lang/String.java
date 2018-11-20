@@ -112,6 +112,10 @@ public final class String implements CharSequence {
     public String(java.lang.StringBuffer buffer){
          //TODO codavaj!!
     }
+    
+    public String(java.lang.StringBuilder buffer) {
+        //TODO codavaj!!
+    }
 
     /**
      * Returns the character at the specified index. An index ranges from 0 to length() - 1. The first character of the sequence is at index 0, the next at index 1, and so on, as for array indexing.
@@ -128,6 +132,26 @@ public final class String implements CharSequence {
      */
     public int compareTo(java.lang.String anotherString){
         return 0; //TODO codavaj!!
+    }
+    
+    public int compareToIgnoreCase(java.lang.String anotherString){
+        return 0; //TODO codavaj!!
+    }
+    
+    public boolean contentEquals(CharSequence cs) {
+        return false;
+    }
+    
+    public boolean contentEquals(StringBuffer sb) {
+        return false;
+    }
+    
+    public static String copyValueOf(char[] data) {
+        return null;
+    }
+    
+    public static String copyValueOf(char[] data, int offset, int count) {
+        return null;
     }
 
     /**

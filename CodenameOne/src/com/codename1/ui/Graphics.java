@@ -1136,10 +1136,26 @@ public final class Graphics {
     /**
      * Rotates the coordinate system around a radian angle using the affine transform
      *
-     * @param angle the rotation angle in radians
+     * @param angle the rotation angle in radians about the screen origin.
+     * @deprecated The behaviour of this method is inconsistent with the rest of the API, in that it doesn't
+     * take into account the current Graphics context's translation.  Rotation is performed around the Screen's origin
+     * rather than the current Graphics context's translated origin.  Prefer to use {@link #rotateRadians(float) } 
+     * which pivots around the context's translated origin.
+     * @see #rotateRadians(float) 
+     * 
      */
     public void rotate(float angle) {
         impl.rotate(nativeGraphics, angle);
+    }
+    
+    /**
+     * RRotates the coordinate system around a radian angle using the affine transform
+     *
+     * @param angle the rotation angle in radians about graphics context's translated origin.
+     * @since 6.0
+     */
+    public void rotateRadians(float angle) {
+        rotateRadians(angle, 0, 0);
     }
     
     /**
@@ -1148,9 +1164,25 @@ public final class Graphics {
      * @param angle the rotation angle in radians
      * @param pivotX the pivot point In absolute coordinates.
      * @param pivotY the pivot point In absolute coordinates.
+     * @deprecated The behaviour of this method is inconsistent with the rest of the API, in that the pivotX and pivotY parameters
+     * are expressed in absolute screen coordinates and don't take into account the current Graphics context's translation.  Prefer
+     * to use {@link #rotateRadians(float, int, int) } whose pivot coordinates are relative to the current translation.
+     * @see #rotateRadians(float, int, int) 
      */
     public void rotate(float angle, int pivotX, int pivotY) {
         impl.rotate(nativeGraphics, angle, pivotX, pivotY);
+    }
+    
+    /**
+     * Rotates the coordinate system around a radian angle using the affine transform
+     *
+     * @param angle the rotation angle in radians
+     * @param pivotX the pivot point relative to the current graphics context's translation.
+     * @param pivotY the pivot point relative to the current graphics context's translation.
+     * @since 6.0
+     */
+    public void rotateRadians(float angle, int pivotX, int pivotY) {
+        impl.rotate(nativeGraphics, angle, pivotX+xTranslate, pivotY+yTranslate);
     }
 
     /**

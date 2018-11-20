@@ -47,6 +47,8 @@ public interface PurchaseCallback {
      * Invoked if a refund was granted for a purchase
      * 
      * @param sku the sku purchased
+     * @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+     * into how to set up in-app purchase for all scenarios including subscriptions.
      */
     public void itemRefunded(String sku);
 
@@ -54,6 +56,8 @@ public interface PurchaseCallback {
      * Invoked when a subscription SKU is started
      * 
      * @param sku the sku purchased
+     * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+     * into how to set up in-app purchase for all scenarios including subscriptions.
      */
     public void subscriptionStarted(String sku);
 
@@ -61,6 +65,8 @@ public interface PurchaseCallback {
      * Invoked when a subscription SKU is canceled
      * 
      * @param sku the sku purchased
+     * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+     * into how to set up in-app purchase for all scenarios including subscriptions.
      */
     public void subscriptionCanceled(String sku);
     

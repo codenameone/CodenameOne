@@ -24,6 +24,8 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.components.InfiniteProgress;
+import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
@@ -38,8 +40,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 
@@ -297,6 +301,8 @@ public class Component implements Animation, StyleListener {
     private Style disabledStyle;
     private Style allStyles;
     private Container parent;
+    private Component owner;
+    private ArrayList<Component> owned;
     private boolean focused = false;
     private boolean handlesInput = false;
     boolean shouldCalcPreferredSize = true;
@@ -305,6 +311,10 @@ public class Component implements Animation, StyleListener {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
+    
+    // A flag to indicate whether to paint the component's background.
+    // Setting this to false will cause the component's background to not be painted.
+    private boolean opaque=true;
 
     private boolean hideInPortrait;
 
@@ -350,6 +360,7 @@ public class Component implements Animation, StyleListener {
     private int destScrollY = -1;
     private int lastScrollY;
     private int lastScrollX;
+    private int pullY;
     private boolean shouldGrabScrollEvents;
 
     /**
@@ -417,6 +428,8 @@ public class Component implements Animation, StyleListener {
     private String cloudDestinationProperty;
     boolean noBind;
     private Runnable refreshTask;
+    private ActionListener refreshTaskDragListener;
+    
     private double pinchDistance;
     static int restoreDragPercentage = -1;
 
@@ -1019,7 +1032,23 @@ public class Component implements Animation, StyleListener {
     public void setVisible(boolean visible) {
         this.visible = visible;
     }
-
+    /**
+     * Sets whether or not to paint the component background.  Default is {@literal true}
+     * @param opaque False to not paint the component's background.
+     * @since 6.0
+     */
+    public void setOpaque(boolean opaque) {
+        this.opaque = opaque;
+    }
+    
+    /**
+     * Checks whether the component's background should be painted.
+     * @return {@literal true} if the component's background should be painted.
+     */
+    public boolean isOpaque() {
+        return opaque;
+    }
+    
     /**
      * Returns the component width
      * 
@@ -1694,6 +1723,107 @@ public class Component implements Animation, StyleListener {
         }
         this.parent = parent;
     }
+    
+    /**
+     * Sets the owner of this component to the specified component.  This can be useful
+     * for denoting a hierarchical relationship that is outside the actual parent-child
+     * component hierarchy.  E.g. If there is a popup dialog that allows the user to select
+     * input for a text field, then you could set the text field as the owner of the popup
+     * dialog to denote a virtual parent-child relationship.
+     * 
+     * <p>This is used by {@link InteractionDialog#setDisposeWhenPointerOutOfBounds(boolean) } to figure out whether a
+     * pointer event actually occurred outside the bounds of the dialog.  The {@link #containsOrOwns(int, int) } method
+     * is used instead of {@link #contains(int, int) } so that it can cover the case where the pointer event occurred
+     * on a component that is logically a child of the dialog, but not physically.</p>
+     * popup dialog is opened, then 
+     * @param owner The component to set as the owner of this component.
+     * @since 6.0
+     * @see #isOwnedBy(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
+     */
+    public void setOwner(Component owner) {
+        if (this.owner != null) {
+            if (this.owner.owned != null) {
+                this.owner.owned.remove(this);
+            }
+            
+        }
+        this.owner = owner;
+        if (owner != null) {
+            if (owner.owned == null) {
+                owner.owned = new ArrayList<Component>();
+            }
+            owner.owned.add(this);
+        }
+    }
+    
+    /**
+     * Checks to see if this component is owned by the given other component.  A component {@literal A} is
+     * deemed to be owned by another component {@literal B} if any of the following conditions are true:
+     * <ul>
+     * <li>{@literal B} is the owner of {@literal A}</li>
+     * <li>{@literal B} contains {@literal A}'s owner.</li>
+     * <li>{@literal A}'s owner is owned by {@literal B}</li>
+     * </ul>
+     * @param cmp
+     * @return True if this component is owned by {@literal cmp}.
+     * @since 6.0
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
+     */
+    public boolean isOwnedBy(Component cmp) {
+        Component c = this.owner;
+        Container cnt = (cmp instanceof Container) ? (Container)cmp : null;
+        while (c != null) {
+            if (c == cmp) {
+                return true;
+            }
+            if (cnt != null) {
+                if (cnt.contains(c)) {
+                    return true;
+                }
+            }
+            c = c.owner;
+        }
+        c = this.getParent();
+        while (c != null) {
+            if (c.isOwnedBy(cmp)) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Checks to see if this component either contains the given point, or
+     * if it owns the component that contains the given point.
+     * @param x X-coordinate in absolute coordinates.
+     * @param y Y-coordinate in absolute coordinates.
+     * @return True if the coordinate is either inside the bounds of this component
+     * or a component owned by this component.
+     * @since 6.0
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #isOwnedBy(com.codename1.ui.Component) 
+     */
+    public boolean containsOrOwns(int x, int y) {
+        if (contains(x, y)) {
+            return true;
+        }
+        Form f = getComponentForm();
+        if (f != null) {
+            Component cmp = f.getComponentAt(x, y);
+            if (cmp != null) {
+                if (cmp.isOwnedBy(this)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+        
+    }
+    
 
     /**
      * Registers interest in receiving callbacks for focus gained events, a focus event 
@@ -2026,7 +2156,7 @@ public class Component implements Animation, StyleListener {
             Style s = getStyle();
             if(s.getOpacity() < 255 && g.isAlphaSupported()) {
                 int oldAlpha = g.getAlpha();
-                g.setAlpha(s.getOpacity());
+                g.setAlpha(s.getOpacity());                
                 internalPaintImpl(g, paintIntersects);
                 g.setAlpha(oldAlpha);
             } else {
@@ -2044,7 +2174,8 @@ public class Component implements Animation, StyleListener {
         paintComponentBackground(g);
 
         if (isScrollable()) {
-            if(refreshTask != null && (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
+            if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() && 
+                (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
                 paintPullToRefresh(g);
             }
             int scrollX = getScrollX();
@@ -2075,14 +2206,16 @@ public class Component implements Animation, StyleListener {
         int ty = g.getTranslateY();
 
         g.translate(-tx, -ty);
+        int x1 = getAbsoluteX() + getScrollX();
+        int y1 = getAbsoluteY() + getScrollY();
+        int w = getWidth();
+        int h = getHeight();
         while (parent != null) {
-            g.translate(parent.getAbsoluteX() + parent.getScrollX(),
-                    parent.getAbsoluteY() + parent.getScrollY());
-            parent.paintIntersecting(g, component, getAbsoluteX() + getScrollX(),
-                    getAbsoluteY() + getScrollY(),
-                    getWidth(), getHeight(), true);
-            g.translate(-parent.getAbsoluteX() - parent.getScrollX(),
-                    -parent.getAbsoluteY() - parent.getScrollY());
+            int ptx = parent.getAbsoluteX() + parent.getScrollX();
+            int pty = parent.getAbsoluteY() + parent.getScrollY();
+            g.translate(ptx, pty);
+            parent.paintIntersecting(g, component, x1, y1, w, h, true);
+            g.translate(-ptx, -pty);
             component = parent;
             parent = parent.getParent();
         }
@@ -2221,6 +2354,9 @@ public class Component implements Animation, StyleListener {
      * @param background if true paints all parents background
      */
     final public void paintComponent(Graphics g, boolean background) {
+        if (!isVisible()) {
+            return;
+        }
         int clipX = g.getClipX();
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
@@ -2412,7 +2548,7 @@ public class Component implements Animation, StyleListener {
      * @param g the component graphics
      */
     void paintComponentBackground(Graphics g) {
-        if(isFlatten()) {
+        if(isFlatten() || !opaque) {
             return;
         }
         paintBackgroundImpl(g);
@@ -4022,6 +4158,110 @@ public class Component implements Animation, StyleListener {
         return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents());
     }
     
+    private boolean pointerReleaseMaterialPullToRefresh() {
+        if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
+            Container c = getComponentForm().getLayeredPane(InfiniteProgress.class, true);
+            if(c.getComponentCount() > 0) {
+                Component cc = c.getComponentAt(0);
+                if(cc instanceof InfiniteProgress) {
+                    return false;
+                }
+                Motion opacityMotion = (Motion)cc.getClientProperty("cn1$opacityMotion");
+                c.removeAll();
+                if(opacityMotion.isFinished()) {
+                    final InfiniteProgress ip = new InfiniteProgress();
+                    ip.setUIID("RefreshLabel");
+                    ip.getUnselectedStyle().
+                        setBorder(RoundBorder.create().
+                            color(getUnselectedStyle().getBgColor()).
+                            shadowX(0).
+                            shadowY(0).
+                            shadowSpread(1, true).
+                            shadowOpacity(100));
+                    Style s = ip.getUnselectedStyle();
+                    s.setMarginUnit(Style.UNIT_TYPE_DIPS);
+                    s.setMarginTop(10);
+                    c.add(ip);
+                    Display.INSTANCE.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            refreshTask.run();
+                            ip.remove();
+                        }
+                    });
+                } 
+                c.revalidate();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private boolean updateMaterialPullToRefresh(final Form p, int y) {
+        if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
+            pullY < getHeight() / 4 &&
+            scrollableYFlag() && getScrollY() == 0) {
+            int mm = Display.INSTANCE.convertToPixels(1);
+            if(mm < y - pullY) {
+                if(p.buttonsAwatingRelease != null) {
+                    p.buttonsAwatingRelease.clear();
+                }
+                Container c = p.getLayeredPane(InfiniteProgress.class, true);
+                c.setLayout(new FlowLayout(CENTER));
+                Motion rotationMotion;
+                Motion opacityMotion;
+                Label refreshLabel;
+                if(c.getComponentCount() == 0) {
+                    refreshLabel = new Label("", "RefreshLabel");
+                    FontImage.setMaterialIcon(refreshLabel, FontImage.MATERIAL_REFRESH, 5);
+                    refreshLabel.
+                        getUnselectedStyle().setBorder(RoundBorder.create().
+                            color(getUnselectedStyle().getBgColor()).
+                            shadowX(0).
+                            shadowY(0).
+                            shadowSpread(1, true).
+                            shadowOpacity(100));
+                    opacityMotion = Motion.createLinearMotion(
+                        40, 255, getHeight() / 4);
+                    opacityMotion.setStartTime(pullY);
+
+                    rotationMotion = Motion.createLinearMotion(
+                        0, 360, getHeight() / 4);
+                    rotationMotion.setStartTime(pullY);
+                    refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
+                    refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
+                    c.add(refreshLabel);
+                    p.addPointerReleasedListener(new ActionListener() {
+                        public void actionPerformed(ActionEvent evt) {
+                            pointerReleaseMaterialPullToRefresh();
+                            p.removePointerReleasedListener(this);
+                            evt.consume();
+                        }
+                    });
+                } else {
+                    Component cc = c.getComponentAt(0);
+                    if(cc instanceof InfiniteProgress) {
+                        return false;
+                    }
+                    refreshLabel = (Label)cc;
+                    opacityMotion = (Motion)refreshLabel.getClientProperty("cn1$opacityMotion");
+                    rotationMotion = (Motion)refreshLabel.getClientProperty("cn1$rotationMotion");                    
+                }
+                rotationMotion.setCurrentMotionTime(y);
+                opacityMotion.setCurrentMotionTime(y);
+                Style s = refreshLabel.getAllStyles();
+                s.setOpacity(opacityMotion.getValue());
+                Image i = ((FontImage)refreshLabel.getIcon()).rotate(rotationMotion.getValue());
+                refreshLabel.setIcon(i);
+                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                s.setMarginTop(Math.min(getHeight() / 5, y - pullY));
+                c.revalidate();
+                return true;
+            }
+        }
+        return false;
+    }
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
@@ -4038,7 +4278,7 @@ public class Component implements Animation, StyleListener {
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
-        
+
         if(dragAndDropInitialized) {
             //keep call to pointerDragged to move the parent scroll if needed
             if (dragCallbacks < 2) {
@@ -4155,7 +4395,7 @@ public class Component implements Animation, StyleListener {
             // and pulling it in the reverse direction of the drag
             if (isScrollableY()) {
                 int tl;
-                if(getTensileLength() > -1 && refreshTask == null) {
+                if(getTensileLength() > -1 && (refreshTask == null || InfiniteProgress.isDefaultMaterialDesignMode())) {
                     tl = getTensileLength();
                 } else {
                     tl = getHeight() / 2;
@@ -4652,7 +4892,7 @@ public class Component implements Animation, StyleListener {
             }
             if(isScrollableY()){
                 if (scrollY < 0) {
-                    if(refreshTask != null){
+                    if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode()){
                         putClientProperty("$pullToRelease", "normal");
                         if(scrollY < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
                             putClientProperty("$pullToRelease", "update");                  
@@ -5555,6 +5795,25 @@ public class Component implements Animation, StyleListener {
             }
             initComponent();
             showNativeOverlay();
+            if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
+                final Form p = getComponentForm();
+                if(refreshTaskDragListener == null) {
+                    refreshTaskDragListener = new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            if(evt.getEventType() == ActionEvent.Type.PointerDrag) {
+                                if(updateMaterialPullToRefresh(p, evt.getY() - getAbsoluteY())) {
+                                    evt.consume();
+                                }
+                            } else {
+                                pullY = evt.getY() - getAbsoluteY();
+                            }
+                        }
+                    };
+                }
+                p.addPointerDraggedListener(refreshTaskDragListener);
+                p.addPointerPressedListener(refreshTaskDragListener);
+            }
         }
     }
 
@@ -5585,6 +5844,11 @@ public class Component implements Animation, StyleListener {
                 ((BGPainter)p).radialCache = null;
             }           
             deinitialize();
+            if(refreshTaskDragListener != null) {
+                Form f = getComponentForm();
+                f.removePointerDraggedListener(refreshTaskDragListener);
+                f.removePointerPressedListener(refreshTaskDragListener);
+            }
         }
     }
 
@@ -6252,7 +6516,7 @@ public class Component implements Animation, StyleListener {
      * @return the alwaysTensile
      */
     public boolean isAlwaysTensile() {
-        return alwaysTensile && !isScrollableX() || refreshTask != null;
+        return alwaysTensile && !isScrollableX() || (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode());
     }
 
     /**

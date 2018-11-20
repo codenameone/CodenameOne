@@ -26,7 +26,7 @@ package java.lang;
  * The Short class is the standard wrapper for short values.
  * Since: JDK1.1, CLDC 1.0
  */
-public final class Short{
+public final class Short extends Number implements Comparable<Short> {
     /**
      * The maximum value a Short can have.
      * See Also:Constant Field Values
@@ -96,5 +96,34 @@ public final class Short{
      */
     public static Short valueOf(short i) {
         return null;
+    }
+
+    @Override
+    public int intValue() {
+        return shortValue();
+    }
+
+    @Override
+    public long longValue() {
+        return shortValue();
+    }
+
+    @Override
+    public float floatValue() {
+        return shortValue();
+    }
+
+    @Override
+    public double doubleValue() {
+        return shortValue();
+    }
+
+    @Override
+    public int compareTo(Short another) {
+        return compare(this, another);
+    }
+    
+    public static int compare(short s1, short s2) {
+        return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
     }
 }

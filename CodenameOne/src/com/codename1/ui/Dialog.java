@@ -1709,6 +1709,7 @@ public class Dialog extends Form {
         return disposeWhenPointerOutOfBounds;
     }
 
+    
     /**
      * {@inheritDoc}
      */
@@ -1716,9 +1717,9 @@ public class Dialog extends Form {
         super.pointerReleased(x, y);
         if(disposeWhenPointerOutOfBounds && 
                 pressedOutOfBounds &&
-                !getTitleComponent().contains(x, y) && 
-                !getContentPane().contains(x, y) && 
-                !getMenuBar().contains(x, y)){
+                !getTitleComponent().containsOrOwns(x, y) && 
+                !getContentPane().containsOrOwns(x, y) && 
+                !getMenuBar().containsOrOwns(x, y)){
             dispose();
         }
     }
@@ -1728,9 +1729,9 @@ public class Dialog extends Form {
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
-        if(!getTitleComponent().contains(x, y) && 
-                !getContentPane().contains(x, y) && 
-                !getMenuBar().contains(x, y)){
+        if(!getTitleComponent().containsOrOwns(x, y) && 
+                !getContentPane().containsOrOwns(x, y) && 
+                !getMenuBar().containsOrOwns(x, y)){
             pressedOutOfBounds = true;
         }else{
             pressedOutOfBounds = false;        

@@ -717,6 +717,16 @@ public class Util {
     public static String encodeUrl(final String str) {
         return encode(str, "%20");
     }
+    
+    /**
+     * Encodes the provided string as a URL (with %20 for spaces).
+     * @param str The URL to encode
+     * @param doNotEncodeChars A string whose characters will not be encoded.
+     * @return 
+     */
+    public static String encodeUrl(final String str, String doNotEncodeChars) {
+        return encode(str.toCharArray(), "%20", doNotEncodeChars);
+    }
 
     /**
      * toCharArray should return a new array always, however some devices might
@@ -829,13 +839,18 @@ public class Util {
     }
    
     private static String encode(char[] buf, String spaceChar) {
+        return encode(buf, spaceChar, null);
+    }
+    
+    private static String encode(char[] buf, String spaceChar, String doNotEncode) {
         final StringBuilder sbuf = new StringBuilder(buf.length * 3);
         int blen = buf.length;
         for (int i = 0; i < blen; i++) {
             final char ch = buf[i];
+            
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
                     (ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '!'
-          || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) > -1)) {
+          || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) > -1) || (doNotEncode != null && doNotEncode.indexOf(ch) > -1)) {
                 sbuf.append(ch);
             } else if (ch == ' ') {
                 sbuf.append(spaceChar);

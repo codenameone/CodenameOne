@@ -195,7 +195,7 @@ public class CodenameOneThread extends Thread {
         if(t instanceof CodenameOneThread) {
             Log.p(err.toString());
             Log.p(((CodenameOneThread)t).getStack(err));
-            Preferences.set("$CN1Uncaught", true);
+            //Preferences.set("$CN1Uncaught", true);
             CrashReport r = Display.getInstance().getCrashReporter();
             if(r != null) {
                 r.exception(err);

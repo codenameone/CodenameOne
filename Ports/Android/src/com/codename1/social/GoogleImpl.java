@@ -372,9 +372,11 @@ public class GoogleImpl extends GoogleConnect implements
 
     private boolean wasConnected;
     public void onCreate(Bundle savedInstanceState) {
-        clientId = savedInstanceState.getString("clientId");
-        clientSecret = savedInstanceState.getString("clientSecret");
-        wasConnected = savedInstanceState.getBoolean("isConnected", false);
+        if(savedInstanceState != null) {
+            clientId = savedInstanceState.getString("clientId");
+            clientSecret = savedInstanceState.getString("clientSecret");
+            wasConnected = savedInstanceState.getBoolean("isConnected", false);
+        }
     }
 
     public void onResume() {

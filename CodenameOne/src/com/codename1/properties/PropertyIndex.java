@@ -409,7 +409,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             if(p instanceof Property) {
                 Property pp = (Property)p;
                 if(pp.get() != null) {
-                    m.put(p.getName(), pp.get());
+                    if(pp.getGenericType() != null && PropertyBusinessObject.class.isAssignableFrom(pp.getGenericType())) {
+                        m.put(p.getName(), ((PropertyBusinessObject)pp.get()).getPropertyIndex().toMapRepresentationImpl(excludeFlag));
+                    } else {
+                        m.put(p.getName(), pp.get());
+                    }
                 }
             }
         }

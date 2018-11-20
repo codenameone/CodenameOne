@@ -49,6 +49,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -416,7 +417,7 @@ public class CodenameOneActivity extends Activity {
 
         try {
             Form currentForm = Display.getInstance().getCurrent();
-            if (currentForm == null) {
+            if (currentForm == null || Toolbar.isGlobalToolbar()) {
                 return false;
             }
 

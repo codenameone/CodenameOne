@@ -997,9 +997,12 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopSidemenu(Component cmp) {
         if (cmp != null) {
+            if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
+                return true;
+            }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentSideMenuContainer || cmp == this) {
+                if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
                     return true;
                 }
             }
@@ -1009,9 +1012,14 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopRightSidemenu(Component cmp) {
         if (cmp != null) {
+            if (cmp == permanentRightSideMenuContainer || cmp == this
+                || cmp == rightSidemenuSouthComponent) {
+                return true;
+            }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentRightSideMenuContainer || cmp == this) {
+                if (cmp == permanentRightSideMenuContainer || cmp == this
+                    || cmp == rightSidemenuSouthComponent) {
                     return true;
                 }
             }
@@ -1177,8 +1185,6 @@ public class Toolbar extends Container {
                         if (sidemenuDialog != null && !isRTL()) {
                             if (sidemenuDialog.isShowing()) {
                                 if (evt.getX() > sidemenuDialog.getWidth()) {
-                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
-                                    closeSideMenu();
                                     evt.consume();
                                 } else {
                                     if (evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
@@ -1195,7 +1201,7 @@ public class Toolbar extends Container {
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
-                                    evt.consume();
+                                    //evt.consume();
                                 } else {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
@@ -1251,7 +1257,7 @@ public class Toolbar extends Container {
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
-                                    evt.consume();
+                                    //evt.consume();
                                 } else {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
                                     permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
@@ -1293,7 +1299,7 @@ public class Toolbar extends Container {
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
-                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null) {
+                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null || getComponentForm().isEditing()) {
                             return;
                         }
                         if (sidemenuDialog != null) {
@@ -1337,6 +1343,14 @@ public class Toolbar extends Container {
                             return;
                         }
                         if (sidemenuDialog != null) {
+                            if (evt.getX() > sidemenuDialog.getWidth()) {
+                                if(sidemenuDialog.isShowing()) {
+                                    parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                                    evt.consume();
+                                    closeSideMenu();
+                                }
+                                return;
+                            } 
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
@@ -1499,6 +1513,18 @@ public class Toolbar extends Container {
                     
                 });
                 return;
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This "hack" achieves that.  
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize 
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+                f.stopEditing(new Runnable() {public void run() {}});
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1621,6 +1647,18 @@ public class Toolbar extends Container {
                     
                 });
                 return;
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This "hack" achieves that.  
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize 
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+                f.stopEditing(new Runnable(){public void run(){}});
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1644,7 +1682,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
-                    v = dw * 2 / 3;
+                    v = dw * 1 / 3;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
@@ -1660,7 +1698,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
                 if (v < 0) {
-                    v = dw * 3 / 4;
+                    v = dw * 1 / 4;
                 } else {
                     v = dw * (100 - v) / 100;
                 }

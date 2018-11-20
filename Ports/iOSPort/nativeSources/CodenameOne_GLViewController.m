@@ -257,7 +257,7 @@ BOOL isVKBAlwaysOpen() {
 
 void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
     enteringNativeAllocations();
-    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__();
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(threadStateData);
     JAVA_OBJECT pkey = fromNSString(threadStateData, @"ios.doneButtonColor");
     JAVA_OBJECT pvalue = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(threadStateData, d, pkey, JAVA_NULL);
     
@@ -395,7 +395,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.font = (BRIDGE_CAST UIFont*)font;
             }
             utf.text = [NSString stringWithUTF8String:str];
-            utf.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
+            utf.delegate = [[CodenameOne_GLViewController instance] eaglView];
             [utf setBackgroundColor:[UIColor clearColor]];
             
 #ifndef NEW_CODENAME_ONE_VM
@@ -459,7 +459,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
-                        cn1_setStyleDoneButton(threadStateData, doneButton);
+                        cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                     } else {
 #ifndef NEW_CODENAME_ONE_VM
                         str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -468,7 +468,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                         buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                         doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardNextClicked)];
-                        cn1_setStyleDoneButton(threadStateData, doneButton);
+                        cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                         if(isVKBAlwaysOpen() && (utf.keyboardType == UIKeyboardTypeDecimalPad
                                              || utf.keyboardType == UIKeyboardTypePhonePad
                                              || utf.keyboardType == UIKeyboardTypeNumberPad)) {
@@ -480,7 +480,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                             buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                             UIBarButtonItem *anotherButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utf.delegate action:@selector(keyboardDoneClicked)];
-                            cn1_setStyleDoneButton(threadStateData, anotherButton);
+                            cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG anotherButton);
                             itemsArray = [NSArray arrayWithObjects: flexButton, anotherButton, doneButton, nil];
 #ifndef CN1_USE_ARC
                             [anotherButton release];
@@ -517,7 +517,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utv.font = (BRIDGE_CAST UIFont*)font;
             }
             utv.text = [NSString stringWithUTF8String:str];
-            utv.delegate = (EAGLView*)[CodenameOne_GLViewController instance].view;
+            utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
             
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard
@@ -552,7 +552,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardDoneClicked)];
-                    cn1_setStyleDoneButton(threadStateData, doneButton);
+                    cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                 } else {
 #ifndef NEW_CODENAME_ONE_VM
                     str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String(obj, fromNSString(@"next"), fromNSString(@"Next"));
@@ -561,7 +561,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
                     buttonTitle = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
                     doneButton = [[UIBarButtonItem alloc]initWithTitle:buttonTitle style:UIBarButtonItemStyleDone target:utv.delegate action:@selector(keyboardNextClicked)];
-                    cn1_setStyleDoneButton(threadStateData, doneButton);
+                    cn1_setStyleDoneButton(CN1_THREAD_GET_STATE_PASS_ARG doneButton);
                 }
                 NSArray *itemsArray = [NSArray arrayWithObjects: flexButton, doneButton, nil];
                 
@@ -1769,7 +1769,7 @@ bool lockDrawing;
     }
     int currentWidth = (int)self.view.bounds.size.width * scaleValue;
     if(currentWidth != displayWidth) {
-        [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+        [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
         displayWidth = currentWidth;
         displayHeight = (int)self.view.bounds.size.height * scaleValue;
         screenSizeChanged(displayWidth, displayHeight);
@@ -1894,6 +1894,26 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     return img;
 }
 
+/**
+ * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
+ * if there are peer components, and they are to be painted behind, then the view hierarchy
+ * is re-rooted with a parent.  This method is a convenience method in cases where
+ * we need to obtain the EAGLView.
+ */
+-(EAGLView*) eaglView {
+    if ([self.view class] == [EAGLView class]) {
+        return (EAGLView*)self.view;
+    }
+    for (UIView* child in self.view.subviews) {
+        
+        if ([child class] == [EAGLView class]) {
+            return (EAGLView*)child;
+        }
+    }
+    NSLog(@"EAGLView not found.  This is not good!!");
+    return nil;
+}
+
 - (void)awakeFromNib
 {
 #ifdef USE_ES2
@@ -1929,8 +1949,8 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     [aContext release];
 #endif
 	
-    [(EAGLView *)self.view setContext:context];
-    [(EAGLView *)self.view setFramebuffer];
+    [[self eaglView] setContext:context];
+    [[self eaglView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
     
@@ -1989,7 +2009,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
             
             gl = [[GLUIImage alloc] initWithImage:img];
             dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
-            [(EAGLView *)self.view setFramebuffer];
+            [[self eaglView] setFramebuffer];
         } else {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
             
@@ -2013,7 +2033,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
             }
             
             CN1Log(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
-            [(EAGLView *)self.view setFramebuffer];
+            [[self eaglView] setFramebuffer];
         }
 
         
@@ -2036,7 +2056,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
         _glScalef(xScale, -1, 1);
         GLErrorLog;
         
-        [(EAGLView *)self.view presentFramebuffer];
+        [[self eaglView] presentFramebuffer];
         GLErrorLog;
     }
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
@@ -2449,8 +2469,8 @@ BOOL prefersStatusBarHidden = NO;
     }
     
     // simply create a property of 'BOOL' type
-    [(EAGLView *)self.view updateFrameBufferSize:(int)size.width h:(int)size.height];
-    [(EAGLView *)self.view deleteFramebuffer];
+    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [[self eaglView] deleteFramebuffer];
     
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
@@ -2478,8 +2498,8 @@ BOOL prefersStatusBarHidden = NO;
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
     
-    [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-    [(EAGLView *)self.view deleteFramebuffer];
+    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    [[self eaglView] deleteFramebuffer];
 
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
@@ -2517,7 +2537,7 @@ BOOL prefersStatusBarHidden = NO;
     if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
-    [(EAGLView *)self.view setFramebuffer];
+    [[self eaglView] setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {
         if([currentTarget count] > 0) {
@@ -2568,7 +2588,7 @@ BOOL prefersStatusBarHidden = NO;
         
         // update the position of the edit component during drag events, we have to do this here
         // since the animation might run for a while
-        if(isVKBAlwaysOpen() && editingComponent != nil && !editingComponent.hidden) {
+        if(NO && isVKBAlwaysOpen() && editingComponent != nil && !editingComponent.hidden) {
 #ifndef NEW_CODENAME_ONE_VM
             com_codename1_impl_ios_IOSImplementation* impl = (com_codename1_impl_ios_IOSImplementation*)com_codename1_impl_ios_IOSImplementation_GET_instance();
             com_codename1_ui_Component* comp = (com_codename1_ui_Component*)impl->fields.com_codename1_impl_ios_IOSImplementation.currentEditing_;
@@ -2616,7 +2636,7 @@ BOOL prefersStatusBarHidden = NO;
     }
     GLErrorLog;
     
-    [(EAGLView *)self.view presentFramebuffer];
+    [[self eaglView] presentFramebuffer];
     GLErrorLog;
 }
 
@@ -3169,12 +3189,16 @@ void cn1_addSelectedImagePath(NSString* path) {
 #else
     [picker dismissModalViewControllerAnimated:YES];
 #endif
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 - (void)qb_imagePickerControllerDidCancel:(QBImagePickerController *)picker
 {
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 #endif
@@ -3184,6 +3208,8 @@ void cn1_addSelectedImagePath(NSString* path) {
     //[self dismissModalViewControllerAnimated:YES];
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
+    popoverController = nil;
+    popoverControllerInstance = nil;
 }
 
 //#define LOW_MEM_CAMERA
@@ -3229,6 +3255,8 @@ void cn1_addSelectedImagePath(NSString* path) {
         [picker dismissModalViewControllerAnimated:YES];
 #endif
     }
+    popoverController = nil;
+    popoverControllerInstance = nil;
 
 }
 
@@ -3394,6 +3422,7 @@ extern SKPayment *paymentInstance;
     });
 }
 #endif
+
 
 - (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
     if(datepickerPopover) {

@@ -415,23 +415,27 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
             CGRect existingBounds = editingComponent.frame;
             NSString *currText = ((UITextField*)editingComponent).text;
 
-            editCompoentX = (x + padLeft) / scale;
-            editCompoentY = (y + padTop) / scale;
-            editComponentPadTop = padTop;
-            editComponentPadLeft = padLeft;
+            float neditCompoentX = (x + padLeft) / scale;
+            float neditCompoentY = (y + padTop) / scale;
+            float neditComponentPadTop = padTop;
+            float neditComponentPadLeft = padLeft;
             if (scale > 1) {
-                editCompoentY -= 1.5;
+                neditCompoentY -= 1.5;
             } else {
-                editCompoentY -= 1;
+                neditCompoentY -= 1;
             }
-            editCompoentW = (w - padLeft - padRight) / scale;
-            editCompoentH = (h - padTop - padBottom) / scale;
-            CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
+            float neditCompoentW = (w - padLeft - padRight) / scale;
+            float neditCompoentH = (h - padTop - padBottom) / scale;
+            CGRect rect = CGRectMake(neditCompoentX, neditCompoentY, neditCompoentW, neditCompoentH);
             //CN1Log(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
             if (fabs(existingBounds.size.width - rect.size.width) > 1 || fabs(existingBounds.size.height - rect.size.height) > 1 ||
-                fabs(existingBounds.origin.x - rect.origin.x) > 1 || fabs(existingBounds.origin.y - 1.5 - rect.origin.y) > 1
+                fabs(existingBounds.origin.x - rect.origin.x) > 1 || fabs(existingBounds.origin.y - rect.origin.y) > 1
                 ) {
                 //CN1Log(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+                editCompoentH = neditCompoentH;
+                editCompoentW = neditCompoentW;
+                editCompoentX = neditCompoentX;
+                editCompoentY = neditCompoentY;
                 editingComponent.frame = rect;
             }
             
@@ -1916,7 +1920,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
             }
         } else {
             if([v superview] == nil) {
-                [[CodenameOne_GLViewController instance].view addPeerComponent:v];
+                [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
             }
         }
         POOL_END();
@@ -1955,7 +1959,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
         if([v superview] == nil) {
-            [[CodenameOne_GLViewController instance].view addPeerComponent:v];
+            [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;
@@ -5759,7 +5763,7 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     
     [pickerToolbar setItems:itemArray animated:YES];
     if(isIPad() || isIOS7()) {
-        [pickerView setFrame:CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height)];
+        [pickerView setFrame:CGRectMake(0, 44, isIPad() ? pickerView.frame.size.width : [CodenameOne_GLViewController instance].view.frame.size.width, pickerView.frame.size.height)];
     } else {
         [pickerView setFrame:CGRectMake(0, 44, 0, 0)];
     }
@@ -7860,7 +7864,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
     notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
     notification.timeZone = [NSTimeZone defaultTimeZone];
-    notification.applicationIconBadgeNumber = badgeNumber;
+    if (badgeNumber >= 0) {
+        notification.applicationIconBadgeNumber = badgeNumber;
+    }
     switch (repeatType) {
         case 0:
             notification.repeatInterval = nil;

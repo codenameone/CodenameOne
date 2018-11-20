@@ -37,7 +37,7 @@ public class EasyThread {
     private Thread t;
     private boolean running = true;
     private ArrayList<Object> queue = new ArrayList<Object>();
-    private static final Object LOCK = new Object();
+    private final Object LOCK = new Object();
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {
             public void run() {

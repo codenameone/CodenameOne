@@ -668,7 +668,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // NOTE:  This method may be called from the PushReceiver when the app isn't running so we can't access
         // the main activity context, display properties, or any CN1 stuff.  Just native android
         
-        File categoriesFile = new File(activity.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
+        File categoriesFile = new File(context.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
         if (!categoriesFile.exists()) {
             return new PushActionCategory[0];
         }
@@ -803,6 +803,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 String[] a = b.split(";");
                                 c.push(a[0]);
                                 c.push(a[1]);
+                            } else if (t != null && ("101".equals(t))) {
+                                c.push(b.substring(b.indexOf(" ")+1));
                             } else {
                                 c.push(b);
                             }
@@ -857,6 +859,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     v.add(m[1]);
                 } else if(t != null && "2".equals(t)){
                     continue;
+                }else if (t != null && "101".equals(t)) {
+                    v.add(b.substring(b.indexOf(" ")+1));
                 }else{
                     v.add(b);
                 }
@@ -5897,7 +5901,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected InputStream createFileInputStream(String fileName) throws FileNotFoundException {
-        return new FileInputStream(fileName);
+        return new FileInputStream(removeFilePrefix(fileName));
     }
 
     protected InputStream createFileInputStream(File f) throws FileNotFoundException {
@@ -5905,7 +5909,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
-        return new FileOutputStream(fileName);
+        return new FileOutputStream(removeFilePrefix(fileName));
     }
 
     protected OutputStream createFileOuputStream(java.io.File f) throws FileNotFoundException {
@@ -6312,7 +6316,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
-                
+                              
                 String id = getServiceProperty("android.NotificationChannel.id", "cn1-channel", context);
                 
                 CharSequence name = getServiceProperty("android.NotificationChannel.name", "Notifications", context);
@@ -6320,7 +6324,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String description = getServiceProperty("android.NotificationChannel.description", "Remote notifications", context);
                 
                 // NotificationManager.IMPORTANCE_LOW = 2
-                int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "2", context));
+                // NotificationManager.IMPORTANCE_HIGH = 4  // <-- Minimum level to produce sound.
+                int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "4", context));
+                    // Note: Currently we use a single notification channel for the app, but if the app uses different kinds of 
+                    // push notifications, then this may not be sufficient.   E.g. The app may send both silent push notifications
+                    // and regular notifications - but their settings (e.g. sound) are all managed through one channel with
+                    // same settings. 
+                    // TODO Add support for multiple channels.
+                    // See https://github.com/codenameone/CodenameOne/issues/2583
                 
                 Class clsNotificationChannel = Class.forName("android.app.NotificationChannel");
                 //android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name, importance);
@@ -7372,7 +7383,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (super.isGalleryTypeSupported(type)) {
             return true;
         }
-        if (type == -9999) {
+        if (type == -9999 || type == -9998) {
             return true;
         }
         if (android.os.Build.VERSION.SDK_INT >= 16) {
@@ -7416,6 +7427,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 multi = true;
                 type = Display.GALLERY_IMAGE;
                 break;
+            case -9998:
+                multi = true;
+                type = -9999;
+                break;
             default:
                 multi = false;
         }
@@ -7430,6 +7445,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             galleryIntent.setType("video/*");
         }else if(type == Display.GALLERY_IMAGE){
             galleryIntent.setType("image/*");
+        }else if(type == Display.GALLERY_ALL){
+            galleryIntent.setType("image/* video/*");
         }else if (type == -9999) {
             galleryIntent = new Intent();
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
@@ -7858,6 +7875,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public boolean isNativeTitle() {
+        if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+            return false;
+        }
         Form f = getCurrentForm();
         boolean nativeCommand;
         if(f != null){
@@ -7869,7 +7889,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void refreshNativeTitle(){
-        if (getActivity() == null) {
+        if (getActivity() == null || com.codename1.ui.Toolbar.isGlobalToolbar()) {
             return;
         }
         Form f = getCurrentForm();
@@ -7925,6 +7945,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
+            if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+                return;
+            }
             ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;

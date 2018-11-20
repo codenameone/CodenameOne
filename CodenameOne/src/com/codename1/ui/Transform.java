@@ -553,6 +553,7 @@ public class Transform {
         scaleX = 1f; scaleY = 1f; scaleZ = 1f;
         translateX = 0f; translateY = 0f; translateZ = 0f;
         dirty = true;
+        inverseDirty=true;
     }
     
     public String toString(){
@@ -574,6 +575,7 @@ public class Transform {
         if ( type == TYPE_IDENTITY ){
             type = TYPE_TRANSLATION;
         }
+        inverseDirty=true;
         if ( type == TYPE_TRANSLATION){
             translateX += x;
             translateY += y;
@@ -605,7 +607,7 @@ public class Transform {
      */
     public void setTranslation(float x, float y, float z){
         type = TYPE_TRANSLATION;
-        
+        inverseDirty=true;
         if ( type == TYPE_TRANSLATION){
             translateX = x;
             translateY = y;
@@ -635,6 +637,7 @@ public class Transform {
         if ( type == TYPE_IDENTITY ){
             type = TYPE_SCALE;
         }
+        inverseDirty=true;
         if ( type == TYPE_SCALE ){
             scaleX *= x;
             scaleY *= y;
@@ -721,7 +724,7 @@ public class Transform {
         translateX = t.translateX;
         translateY = t.translateY;
         translateZ = t.translateZ;
-        
+        inverseDirty = true;
         switch (type){
             case TYPE_IDENTITY:
             case TYPE_TRANSLATION:
@@ -745,6 +748,7 @@ public class Transform {
      * @param t The transform to concatenate to this one.
      */
     public void concatenate(Transform t){
+        inverseDirty=true;
         impl.concatenateTransform(getNativeTransform(), t.getNativeTransform());
         type = TYPE_UNKNOWN;
     }
@@ -760,6 +764,7 @@ public class Transform {
      */
     public void setPerspective(float fovy, float aspect, float zNear, float zFar){
         type = TYPE_UNKNOWN;
+        inverseDirty=true;
         impl.setTransformPerspective(getNativeTransform(), fovy, aspect, zNear, zFar);
     }
     
@@ -776,6 +781,7 @@ public class Transform {
     public void setOrtho(float left, float right, float bottom, float top,
                 float near, float far){
         type = TYPE_UNKNOWN;
+        inverseDirty=true;
         impl.setTransformOrtho(getNativeTransform(), left, right, bottom, top, near, far);
     }
     

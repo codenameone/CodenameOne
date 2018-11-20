@@ -28,6 +28,7 @@ import android.util.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 /* ZOOZMARKER_START 
 import com.zooz.android.lib.CheckoutActivity;
@@ -71,6 +72,10 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
 
     @Override
     public void subscribe(String sku) {
+        if (getReceiptStore() != null) {
+            purchase(sku);
+            return;
+        }
         ((CodenameOneActivity)activity).subscribe(sku);
     }
 
@@ -176,6 +181,24 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
                 }
             }
     }
+
+    @Override
+    public boolean isManageSubscriptionsSupported() {
+        return true;
+    }
+
+    @Override
+    public void manageSubscriptions(String sku) {
+        if (sku == null) {
+            CN.execute("https://play.google.com/store/account/subscriptions");
+        } else {
+            String packageName = activity.getApplicationContext().getPackageName();
+            CN.execute("https://play.google.com/store/account/subscriptions?sku="+sku+"&package="+packageName);
+        }
+        
+    }
+    
+    
     
     
     

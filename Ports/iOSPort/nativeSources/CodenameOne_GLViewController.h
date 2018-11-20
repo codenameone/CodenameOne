@@ -24,7 +24,7 @@
 #import <UIKit/UIKit.h>
 
 #import <OpenGLES/EAGL.h>
-
+#import "EAGLView.h"
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
@@ -146,6 +146,8 @@
 #define CN1_CAP_ROUND 1
 #define CN1_CAP_SQUARE 2
 
+#define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
+
 //ADD_INCLUDE
 
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
@@ -207,6 +209,8 @@
 - (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error;
 - (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
 #endif
+
+-(EAGLView*)eaglView;
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;

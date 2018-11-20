@@ -245,12 +245,11 @@ public final class CN1Matrix4f {
     public void transformCoord(float[] pIn, float[] pOut) {
         //Log.p("Transforming "+pIn[0]+","+pIn[1]);
         //Log.p("Transform is "+this);
-        int len = pIn.length;
+        int len = Math.min(pIn.length, 3);
         factory.sTemp[2] = 0;
-        factory.sTemp[3] = 1f;
-        
         
         System.arraycopy(pIn, 0, factory.sTemp, 0, len);
+        factory.sTemp[3] = 1f;
         
         Matrix.multiplyMV(factory.sTemp, 4, data, 0, factory.sTemp, 0);
         float w = factory.sTemp[7];

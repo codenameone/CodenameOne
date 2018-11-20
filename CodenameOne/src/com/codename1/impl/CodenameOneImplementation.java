@@ -377,6 +377,15 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     *  Checks to see if this is a platform that uses the {@link TextField#setInputMode(java.lang.String) }.
+     */
+    public boolean platformUsesInputMode() {
+        Display d = Display.getInstance();
+        String platform = d.getPlatformName();
+        return "me".equals(platform) || "rim".equals(platform);
+    }
+    
+    /**
      * Checks whether the native text editor is currently visible over top of the 
      * given component (usually a {@code TextArea}
      * @param c The textarea/component we are checking

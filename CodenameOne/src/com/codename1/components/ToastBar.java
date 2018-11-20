@@ -523,7 +523,7 @@ public class ToastBar {
                 }
                 Status s = c.currentlyShowing;
 
-                Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
+                Label l = new Label(s.getMessage() != null ? s.getMessage() : "", defaultMessageUIID);
 
                 c.leadButton.getListeners().clear();
                 c.leadButton.addActionListener(s.getListener());
@@ -591,6 +591,7 @@ public class ToastBar {
                     
                     if (c.isVisible()) {
                         TextArea newLabel = new TextArea();
+                        newLabel.setUIID(defaultMessageUIID);
                         //newLabel.setColumns(l.getText().length()+1);
                         //newLabel.setRows(l.getText().length()+1);
                         newLabel.setFocusable(false);
@@ -684,6 +685,7 @@ public class ToastBar {
             this.getAllStyles().setBgTransparency(128);
             setVisible(false);
             label = new TextArea();
+            label.setUIID(defaultMessageUIID);
             label.setEditable(false);
             label.setFocusable(false);
             label.setVerticalAlignment(CENTER);

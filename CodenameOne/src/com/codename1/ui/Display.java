@@ -779,6 +779,14 @@ public final class Display extends CN1Constants {
             }
         }
     }
+    
+    /**
+     * Checks if this platform uses input modes.  No current platforms return true for this.  It is a holdover from J2ME.
+     * @return True if the platform supports input modes.  Only true for J2ME and RIM.
+     */
+    public boolean platformUsesInputMode() {
+        return impl.platformUsesInputMode();
+    }
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
@@ -1518,7 +1526,9 @@ public final class Display extends CN1Constants {
     }
     
     /**
-     * Allows us to stop editString on the given text component
+     * Allows us to stop editString on the given text component or Form.
+     * If {@literal cmp} is a {@link Form}, it will stop editing in any active
+     * component on the form, and close the keyboard if it is opened.
      * @param cmp the text field/text area component
      * @param onFinish invoked when editing stopped
      */
@@ -1529,6 +1539,10 @@ public final class Display extends CN1Constants {
     }
 
     boolean isTextEditing(Component c) {
+        if (c instanceof Form && c == getCurrent()) {
+            return impl.isEditingText();
+        }
+            
         return impl.isEditingText(c);
     }
     

@@ -161,10 +161,10 @@
         <zip basedir="build/tmp" compress="true" file="updatedLibs.zip" />
         <deltree dir="build/tmp"/>        
         
-        <copy file="dist/CodenameOne.jar" todir="../../../Dropbox/website/files/updates" />
-        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../../../Dropbox/website/files/updates" />
-        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../../../Dropbox/website/files/updates" />
-        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="../../../Dropbox/website/files/updates" />        
+        <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/website/files/updates" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/website/files/updates" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="${codenameone.dir}/website/files/updates" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/website/files/updates" />        
     </target>
             
     <target name="release" depends="stamp,jar">

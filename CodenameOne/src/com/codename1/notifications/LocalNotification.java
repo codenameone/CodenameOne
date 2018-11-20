@@ -98,7 +98,7 @@ public class LocalNotification {
     // support repeat by milliseconds etc..
     
     private String id = "";
-    private int badgeNumber;
+    private int badgeNumber=-1;
     private String alertBody = "";
     private String alertTitle = "";
     private String alertSound = "";
