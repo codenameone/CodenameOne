@@ -65,6 +65,8 @@ extern BOOL isRetinaBug();
     if ([self isPaintPeersBehindEnabled]) {
         if (self.peerComponentsLayer == nil) {
             UIView *newRoot = [[UIView alloc] initWithFrame:self.bounds];
+            newRoot.autoresizesSubviews = YES;
+            newRoot.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer.opaque = TRUE;
