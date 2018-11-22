@@ -770,6 +770,8 @@ public class InPlaceEditView extends FrameLayout{
     //private TimerTask cursorTimerTask;
     private KeyListener defaultKeyListener;
     private int defaultMaxLines=-2;
+    private int defaultInputType;
+    private int defaultIMEOptions;
 
     /**
      * Start editing the given text-area
@@ -810,6 +812,8 @@ public class InPlaceEditView extends FrameLayout{
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
         if (!isEditedFieldSwitch) {
             mEditText = new EditView(activity, textArea.textArea, this, id);
+            defaultInputType = mEditText.getInputType();
+            defaultIMEOptions = mEditText.getImeOptions();
         } else {
             mEditText.switchToTextArea(textArea.textArea);
         }
@@ -950,6 +954,8 @@ public class InPlaceEditView extends FrameLayout{
                 defaultKeyListener = mEditText.getKeyListener();
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
+        } else {
+
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
@@ -1956,8 +1962,8 @@ public class InPlaceEditView extends FrameLayout{
             }
             
             this.mTextArea = other;
-            this.setInputType(0);
-            this.setImeOptions(0);
+            this.setInputType(defaultInputType);
+            this.setImeOptions(defaultIMEOptions);
             if (defaultKeyListener != null) {
                 setKeyListener(defaultKeyListener);
             }
