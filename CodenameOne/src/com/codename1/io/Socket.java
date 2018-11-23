@@ -221,7 +221,8 @@ public class Socket {
           		// end has closed the socket, resulting in eof, but the local end hasn't
           		// closed it yet.
           		if(buffer==null) { return(false); }
-        		if( !closed
+        		if( (buffer.length==0)
+        			&& !closed
         			&& Util.getImplementation().isSocketConnected(impl))
          		{	// wait a while if there's still hope
         			try {
