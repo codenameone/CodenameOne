@@ -24,6 +24,8 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
@@ -55,6 +57,7 @@ public class RadioButton extends Button {
     private boolean oppositeSide;
 
     private EventDispatcher bindListeners;
+    private EventDispatcher changeListeners;
 
     /**
      * Constructs a radio with the given text
@@ -207,7 +210,11 @@ public class RadioButton extends Button {
     }
 
     void setSelectedImpl(boolean selected) {
+        boolean changed = selected != this.selected;
         this.selected = selected;
+        if (changed) {
+            fireChangeEvent();
+        }
         repaint();
     }
     
@@ -422,5 +429,40 @@ public class RadioButton extends Button {
             return;
         }
         super.setBoundPropertyValue(prop, value);
+    }
+    
+    /**
+     * Adds a listener to be notified when the the checkbox's selected value changes.  The difference
+     * between a change listener and an action listener is that a change listener is fired 
+     * whenever there is a change, but action events are only fired when the change is a result
+     * of the user clicking on the checkbox.
+     * @param l Listener to be notified when selected value changes.
+     * @since 6.0
+     * @see #removeChangeListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void addChangeListener(ActionListener l) {
+        if (changeListeners == null) {
+            changeListeners = new EventDispatcher();
+        }
+        changeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a change change listener.
+     * @param l 
+     * @since 6.0
+     * @see #addChangeListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void removeChangeListeners(ActionListener l) {
+        if (changeListeners != null) {
+            changeListeners.removeListener(l);
+        }
+    }
+    
+    private void fireChangeEvent() {
+        if (changeListeners != null) {
+            ActionEvent evt = new ActionEvent(this, ActionEvent.Type.Change);
+            changeListeners.fireActionEvent(evt);
+        }
     }
 }
