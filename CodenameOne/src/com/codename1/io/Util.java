@@ -702,7 +702,7 @@ public class Util {
         } catch (InstantiationException ex1) {
             Log.e(ex1);
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
-        } catch (IllegalAccessException ex1) {
+        } catch (IllegalAccessError|IllegalAccessException ex1) {
             Log.e(ex1);
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
         } 
