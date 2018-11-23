@@ -77,7 +77,7 @@ public class SwitchList extends ButtonList {
     }
 
     @Override
-    protected void setSelected(Component button, boolean selected) {
+    protected void setSelected(Component button, final boolean selected) {
         $(".switch", button).each(new ComponentSelector.ComponentClosure() {
             @Override
             public void call(Component c) {
