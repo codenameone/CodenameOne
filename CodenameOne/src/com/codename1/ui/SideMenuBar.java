@@ -1721,6 +1721,7 @@ public class SideMenuBar extends MenuBar {
             super.setPressedIcon(cmd.getPressedIcon());
             super.setRolloverIcon(cmd.getRolloverIcon());
             super.setDisabledIcon(cmd.getDisabledIcon());
+            super.setIconGapMM(cmd.getIconGapMM());
             this.cmd = cmd;
         }
 
