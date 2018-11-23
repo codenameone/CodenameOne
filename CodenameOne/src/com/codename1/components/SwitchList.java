@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
@@ -77,11 +78,14 @@ public class SwitchList extends ButtonList {
 
     @Override
     protected void setSelected(Component button, boolean selected) {
-        $(".switch", button).each(c->{
-            if (selected) {
-                ((Switch)c).setOn();
-            } else {
-                ((Switch)c).setOff();
+        $(".switch", button).each(new ComponentSelector.ComponentClosure() {
+            @Override
+            public void call(Component c) {
+                if (selected) {
+                    ((Switch)c).setOn();
+                } else {
+                    ((Switch)c).setOff();
+                }
             }
         });
     }
