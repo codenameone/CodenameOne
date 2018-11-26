@@ -1299,7 +1299,7 @@ public class CN extends  CN1Constants {
      * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
      * @since 6.0
      */
-    public boolean promptInstallOnHomescreen() {
+    public static boolean promptInstallOnHomescreen() {
         return Display.impl.promptInstallOnHomescreen();
     }
     
@@ -1310,7 +1310,7 @@ public class CN extends  CN1Constants {
      * the app on their homescreen.
      * @since 6.0
      */
-    public void onCanInstallOnHomescreen(Runnable r) {
+    public static void onCanInstallOnHomescreen(Runnable r) {
         Display.impl.onCanInstallOnHomescreen(r);
     }
 
