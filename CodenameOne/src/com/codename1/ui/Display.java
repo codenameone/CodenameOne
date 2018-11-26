@@ -1094,7 +1094,7 @@ public final class Display extends CN1Constants {
      * @param text new text for the component
      */
     public void onEditingComplete(final Component c, final String text) {
-        if(!isEdt()) {
+        if(!isEdt() && codenameOneRunning) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     onEditingComplete(c, text);

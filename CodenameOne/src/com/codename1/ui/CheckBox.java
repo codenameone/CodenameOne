@@ -25,6 +25,8 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
@@ -47,6 +49,7 @@ public class CheckBox extends Button {
     
     private boolean oppositeSide;
     private EventDispatcher bindListeners = null;
+    private EventDispatcher changeListeners;
 
     /**
      * Constructs a checkbox with the given text
@@ -101,7 +104,11 @@ public class CheckBox extends Button {
      * @param selected value for selection
      */
     public void setSelected(boolean selected) {
+        boolean changed = selected != this.selected;
         this.selected = selected;
+        if (changed) {
+            fireChangeEvent();
+        }
         repaint();
     }
     
@@ -109,7 +116,7 @@ public class CheckBox extends Button {
      * {@inheritDoc}
      */
     public void released(int x, int y) {
-        selected = !isSelected();
+        setSelected(!isSelected());
         super.released(x, y);
     }
 
@@ -314,6 +321,41 @@ public class CheckBox extends Button {
         CheckBox cb = new CheckBox("", icon);
         cb.setToggle(true);
         return cb;
+    }
+    
+    /**
+     * Adds a listener to be notified when the the checkbox's selected value changes.  The difference
+     * between a change listener and an action listener is that a change listener is fired 
+     * whenever there is a change, but action events are only fired when the change is a result
+     * of the user clicking on the checkbox.
+     * @param l Listener to be notified when selected value changes.
+     * @since 6.0
+     * @see #removeChangeListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void addChangeListener(ActionListener l) {
+        if (changeListeners == null) {
+            changeListeners = new EventDispatcher();
+        }
+        changeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a change change listener.
+     * @param l 
+     * @since 6.0
+     * @see #addChangeListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void removeChangeListeners(ActionListener l) {
+        if (changeListeners != null) {
+            changeListeners.removeListener(l);
+        }
+    }
+    
+    private void fireChangeEvent() {
+        if (changeListeners != null) {
+            ActionEvent evt = new ActionEvent(this, ActionEvent.Type.Change);
+            changeListeners.fireActionEvent(evt);
+        }
     }
     
 }
