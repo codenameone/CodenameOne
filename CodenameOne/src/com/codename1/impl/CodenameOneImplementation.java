@@ -7607,4 +7607,59 @@ public abstract class CodenameOneImplementation {
     public void setProjectBuildHint(String key, String value) {
         throw new RuntimeException();
     }
+    
+    /**
+     * Checks to see if you can prompt the user to install the app on their homescreen.
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+     * previously prompted the user and they have declined, then this will return false.  
+     * 
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
+     * inside that method - or sometime after.</p>
+     * 
+     * <h3>Example</h3>
+     * <pre>{@code 
+     * onCanInstallOnHomescreen(()->{
+     *      if (canInstallOnHomescreen()) {
+     *           if (promptInstallOnHomescreen()) {
+     *               // User accepted installation
+     *           } else {
+     *               // user rejected installation
+     *           }
+     *      }
+     * });
+     * }</pre>
+     * 
+     * https://developers.google.com/web/fundamentals/app-install-banners/
+     * @return True if you are able to prompt the user to install the app on their homescreen.  
+     * @see #promptInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean canInstallOnHomescreen() {
+        return false;
+    }
+    
+    /**
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
+     * javascript port. 
+     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
+     * {@literal false} if they reject it.
+     * @see #canInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean promptInstallOnHomescreen() {
+        return false;
+    }
+    
+    /**
+     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+     * Only relevant in the javascript port.
+     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
+     * the app on their homescreen.
+     */
+    public void onCanInstallOnHomescreen(Runnable r) {
+        
+    }
+
 }
