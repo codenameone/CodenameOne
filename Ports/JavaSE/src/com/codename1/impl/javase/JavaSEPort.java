@@ -5955,7 +5955,25 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        return (int)(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight());
+        FontMetrics metrics = canvas.getGraphics2D().getFontMetrics(font(nativeFont));
+        if (metrics.getDescent() < 0) {
+            return metrics.getAscent() - metrics.getDescent() + metrics.getLeading();
+        } else {
+            return metrics.getHeight();
+        }
+        /*
+        int out = metrics.getHeight();
+        int ascent = metrics.getAscent();
+        int descent = metrics.getDescent();
+        int leading = metrics.getLeading();
+        int maxAscent = metrics.getMaxAscent();
+        int maxDescent = metrics.getMaxDescent();
+        
+        if (font(nativeFont).getName().contains("Hyundai")) {
+            int foo = 1;
+        }
+        return out;
+        */
     }
 
     /**
