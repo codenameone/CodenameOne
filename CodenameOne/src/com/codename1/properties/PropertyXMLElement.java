@@ -167,18 +167,18 @@ class PropertyXMLElement extends Element {
 
     @Override
     public Vector getDescendantsByTagName(String name) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     public Vector getDescendantsByTagName(String name, int depth) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     public Vector getDescendantsByTagNameAndAttribute(String name,
         String attributeName, int depth) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
@@ -251,19 +251,19 @@ class PropertyXMLElement extends Element {
 
     @Override
     public Vector getTextChildren(String text, boolean caseSensitive) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     public Vector getTextDescendants(String text,
         boolean caseSensitive) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     public Vector getTextDescendants(String text,
         boolean caseSensitive, int depth) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
@@ -273,7 +273,7 @@ class PropertyXMLElement extends Element {
 
     @Override
     public void insertChildAt(Element child, int index) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
@@ -293,12 +293,12 @@ class PropertyXMLElement extends Element {
 
     @Override
     protected void removeAttribute(Object id) {
-        throw new UnsupportedOperationException();        
+        throw new RuntimeException();        
     }
 
     @Override
     public void removeAttribute(String attribute) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
@@ -322,17 +322,17 @@ class PropertyXMLElement extends Element {
 
     @Override
     public void removeChildAt(int index) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     public void replaceChild(Element oldChild, Element newChild) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
     protected void setAttribute(Object id, String value) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
@@ -346,7 +346,7 @@ class PropertyXMLElement extends Element {
 
     @Override
     protected void setChildren(Vector children) {
-        throw new UnsupportedOperationException();
+        throw new RuntimeException();
     }
 
     @Override
