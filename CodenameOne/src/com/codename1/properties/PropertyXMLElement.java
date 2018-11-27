@@ -28,7 +28,6 @@ import com.codename1.xml.Element;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
-import java.util.Spliterator;
 import java.util.Vector;
 
 /**
@@ -316,6 +315,10 @@ class PropertyXMLElement extends Element {
             public Element next() {
                 offset++;
                 return getChildAt(index);
+            }
+            
+            @Override
+            public void remove() {
             }
         };
     }
