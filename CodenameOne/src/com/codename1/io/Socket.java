@@ -216,12 +216,8 @@ public class Socket {
           			}
           		buffer = Util.getImplementation().readFromSocketStream(impl);
           		bufferOffset = 0;
-          		// the contract of readFromSocket is to get data for sure. If it returns 
-          		// null, there will never be data.  The case of interest is when the remote
-          		// end has closed the socket, resulting in eof, but the local end hasn't
-          		// closed it yet.
-          		if(buffer==null) { return(false); }
-        		if( (buffer.length==0)
+          		
+        		if(((buffer==null) || (buffer.length==0))
         			&& !closed
         			&& Util.getImplementation().isSocketConnected(impl))
          		{	// wait a while if there's still hope
