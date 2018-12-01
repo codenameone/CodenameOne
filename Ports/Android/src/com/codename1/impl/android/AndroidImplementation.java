@@ -3377,7 +3377,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
                             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
                         }
-                        recorder.setOutputFile(path);
+                        recorder.setOutputFile(removeFilePrefix(path));
                         try {
                             recorder.prepare();
                             record[0] = new AndroidRecorder(recorder);
