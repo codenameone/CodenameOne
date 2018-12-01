@@ -185,7 +185,22 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+
+    /**
+     * @return the fullScreen
+     */
+    public static boolean isFullScreen() {
+        return fullScreen;
+    }
+
+    /**
+     * @param aFullScreen the fullScreen to set
+     */
+    public static void setFullScreen(boolean aFullScreen) {
+        fullScreen = aFullScreen;
+    }
     boolean takingScreenshot;
+    private static boolean fullScreen;
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
@@ -1724,7 +1739,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 getParent().repaint();
             } else {  
                 //some ugly hacks to workaround black screen issue
-                if (canvas != null) {
+                if (canvas != null && !fullScreen) {
                     
                     //dumpSwingHierarchy(getTopLevelAncestor(), "");
                     Dimension topSize = ((JFrame)getTopLevelAncestor()).getContentPane().getSize();
