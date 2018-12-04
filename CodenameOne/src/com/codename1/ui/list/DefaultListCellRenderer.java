@@ -26,6 +26,7 @@ package com.codename1.ui.list;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.plaf.Style;
@@ -131,7 +132,16 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
             }
         }
         if(value instanceof Command) {
-            setIcon(((Command)value).getIcon());
+            Image i = ((Command)value).getIcon();
+            if(i == null) {
+                if(((Command)value).getMaterialIcon() != 0) {
+                    setMaterialIcon(((Command)value).getMaterialIcon());
+                } else {
+                    setIcon(null);
+                }
+            } else {
+                setIcon(i);
+            }
             setEnabled(((Command)value).isEnabled());
         }
         return this;
