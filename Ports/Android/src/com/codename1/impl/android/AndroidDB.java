@@ -114,8 +114,14 @@ public class AndroidDB extends Database {
                         s.bindBlob(i + 1, (byte [])p);
                     }else if(p instanceof Double){
                         s.bindDouble(i + 1, ((Double)p).doubleValue());
-                    }else if(p instanceof Long){
+                    } else if(p instanceof Long){
                         s.bindLong(i + 1, ((Long)p).longValue());
+                    } else if(p instanceof Integer){
+                        s.bindLong(i + 1, ((Integer)p).intValue());
+                    } else {
+                        if(p != null) {
+                            s.bindString(i + 1, p.toString());
+                        }
                     }
                 }
             }
