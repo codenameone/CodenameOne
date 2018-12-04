@@ -2177,6 +2177,8 @@ public class Toolbar extends Container {
      */
     protected List createOverflowCommandList(Vector commands) {
         List l = new List(commands);
+        l.setRenderingPrototype(null);
+        l.setListSizeCalculationSampleCount(commands.size());
         l.setUIID("CommandList");
         Component c = (Component) l.getRenderer();
         c.setUIID("Command");
