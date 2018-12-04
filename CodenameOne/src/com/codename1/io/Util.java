@@ -1446,7 +1446,8 @@ public class Util {
             return ((Boolean)val).booleanValue();
         }
         if(val instanceof String) {
-            return ((String)val).toLowerCase().startsWith("t");
+            String sl = ((String)val).toLowerCase();
+            return sl.startsWith("t") || sl.equals("1");
         }
         return toIntValue(val) != 0;
     }
