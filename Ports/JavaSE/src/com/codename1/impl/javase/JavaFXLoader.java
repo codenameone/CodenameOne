@@ -303,7 +303,7 @@ public class JavaFXLoader {
         return new URLClassLoader(urls.toArray(new java.net.URL[urls.size()])) {
             @Override
             public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-                if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop")) {
+                if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop") || name.startsWith("org.w3c.dom")) {
                     return super.loadClass(name, resolve);
                 }
                 Class cls = findLoadedClass(name);

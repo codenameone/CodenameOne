@@ -216,7 +216,10 @@ class Spinner3D extends Container implements InternalPickerWidget {
         ListModel lm = root.getListModel();
         if (lm instanceof NumberModelAdapter) {
             NumberModelAdapter adapter = (NumberModelAdapter)lm;
-            return adapter.inner.getItemAt(adapter.getSelectedIndex());
+            int selectedIndex = adapter.getSelectedIndex();
+            Object out = adapter.inner.getItemAt(selectedIndex);
+            
+            return out;
         }
         if (lm instanceof DateModelAdapter) {
             DateModelAdapter adapter = (DateModelAdapter)lm;
