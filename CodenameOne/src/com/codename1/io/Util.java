@@ -1610,6 +1610,16 @@ public class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
     
+    private static SimpleDateFormat dateFormatter;
+    
+    /**
+     * Sets a custom formatter to use when toDateValue is invoked
+     * @param formatter the formatter to use
+     */
+    public static void setDateFormatter(SimpleDateFormat formatter) {
+        dateFormatter = formatter;
+    }
+    
     /**
      * Tries to convert an arbitrary object to a date
      * @param o an object that can be a string, number or date
@@ -1623,6 +1633,14 @@ public class Util {
             return (Date)o;
         }
         if(o instanceof String) {
+            if(dateFormatter != null) {
+                try {
+                    return dateFormatter.parse((String)o);
+                } catch(ParseException e) {
+                    // falls back to the default formatting
+                    Log.e(e);
+                }
+            }
             try {
                 return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String)o);
             } catch(ParseException e) {
