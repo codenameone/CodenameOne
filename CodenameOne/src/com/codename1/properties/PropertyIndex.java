@@ -191,18 +191,33 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return user readable printout of the property values which is useful for debugging
      */
     public String toString() {
+        return toString(true);
+    }
+    
+    /**
+     * Returns a user readable printout of the property values which is useful for debugging
+     * 
+     * @param includeNewline true to indicate that newline characters should be included
+     * @return user readable printout of the property values which is useful for debugging
+     */
+    public String toString(boolean includeNewline) {
         StringBuilder b = new StringBuilder(name);
-        b.append(" : {\n");
+        b.append(" : {");
+        if(includeNewline) {
+            b.append('\n');
+        }
         for(PropertyBase p : this) {
             b.append(p.getName());
             b.append(" = ");
             b.append(p.toString());
-            b.append("\n");
+            if(includeNewline) {
+                b.append('\n');
+            }
         }
         b.append("}");
         return b.toString();
     }
-    
+
     /**
      * This is useful for JSON parsing, it allows converting JSON map data to objects
      * @param m the map
