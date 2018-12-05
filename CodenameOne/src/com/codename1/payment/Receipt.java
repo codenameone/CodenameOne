@@ -380,5 +380,22 @@ public class Receipt implements Externalizable {
         this.internalId = internalId;
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Receipt {")
+                .append("sku:").append(sku).append(", ")
+                .append("expiryDate:").append(expiryDate).append(", ")
+                .append("cancellationDate:").append(cancellationDate).append(", ")
+                .append("purchaseDate:").append(purchaseDate).append(", ")
+                .append("orderData:").append(orderData).append(", ")
+                .append("quantity:").append(quantity).append(", ")
+                .append("transactionId:").append(transactionId).append(", ")
+                .append("storeCode:").append(storeCode).append(", ")
+                .append("internalId:").append(internalId).append("}");
+        return sb.toString();
+    }
+
+    
     
 }

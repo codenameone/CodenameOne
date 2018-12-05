@@ -54,7 +54,6 @@ import java.util.Map;
 public abstract class Purchase {
     
     
-    
     private static ReceiptStore receiptStore;
     
     
@@ -294,10 +293,13 @@ public abstract class Purchase {
     
     
     /**
-     * Gets a list of purchases that haven't yet been sent to the server.
-     * @return 
+     * Gets a list of purchases that haven't yet been sent to the server.  You can
+     * use this for diagnostic and debugging purposes periodically in the app to 
+     * make sure there aren't a queue of purchases that aren't getting submitted
+     * to the server.
+     * @return List of receipts that haven't been sent to the server.
      */
-    private List<Receipt> getPendingPurchases() {
+    public List<Receipt> getPendingPurchases() {
         synchronized(PENDING_PURCHASE_KEY) {
             Storage s = Storage.getInstance();
             Util.register(new Receipt());
