@@ -1299,7 +1299,8 @@ public class Toolbar extends Container {
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
-                        if (Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || getComponentForm().findCurrentlyEditingComponent() != null || getComponentForm().isEditing()) {
+                        Form f = getComponentForm();
+                        if (f == null || Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || f.findCurrentlyEditingComponent() != null || f.isEditing()) {
                             return;
                         }
                         if (sidemenuDialog != null) {
