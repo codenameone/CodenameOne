@@ -254,6 +254,11 @@ public abstract class Purchase {
     /**
      * Begins the purchase process for the given SKU
      * 
+     * <p>On Android you *must* use {@link #subscribe(java.lang.String) } for play store subscription products instead of this method.  You cannot use {@link #purchase(java.lang.String) }.  On iOS
+     * there is no difference between {@link #subscribe(java.lang.String) } and {@link #purchase(java.lang.String) }, so if you are simulating subscriptions
+     * on iOS using auto-renewables, you are better to use {@link #subscribe(java.lang.String) } as this will work correctly on both Android 
+     * and iOS.</p>
+     * 
      * @param sku the SKU with which to perform the purchase process
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      * isManagedPaymentSupported() returns false
@@ -266,10 +271,14 @@ public abstract class Purchase {
     /**
      * Begins subscribe process for the given subscription SKU
      * 
+     * <p>On Android you *must* use this method for play store subscription products.  You cannot use {@link #purchase(java.lang.String) }.  On iOS
+     * there is no difference between {@link #subscribe(java.lang.String) } and {@link #purchase(java.lang.String) }, so if you are simulating subscriptions
+     * on iOS using auto-renewables, you are better to use {@link #subscribe(java.lang.String) } as this will work correctly on both Android 
+     * and iOS.</p>
+     * 
      * @param sku the SKU with which to perform the purchase process
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      * isManagedPaymentSupported() returns false
-     * @deprecated This API is not supported on iOS, and most other systems.  Use the Receipts API for a cross-platform in-app purchase.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html
      */
     public void subscribe(String sku) {
         if (receiptStore != null) {
@@ -285,7 +294,6 @@ public abstract class Purchase {
      * @param sku the SKU with which to perform the purchase process
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      * isManagedPaymentSupported() returns false
-     * @deprecated This API is not supported on iOS, and most other systems.  Use the Receipts API for a cross-platform in-app purchase.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html
      */
     public void unsubscribe(String sku) {
         throw new RuntimeException("Unsupported");

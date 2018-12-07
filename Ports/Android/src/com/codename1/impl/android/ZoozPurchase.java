@@ -72,10 +72,9 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
 
     @Override
     public void subscribe(String sku) {
-        if (getReceiptStore() != null) {
-            purchase(sku);
-            return;
-        }
+        // Note that for Subscription products in Android, you can't just use
+        // purchase(sku) like iOS does.  We need to run through the subscribe 
+        // workflow.
         ((CodenameOneActivity)activity).subscribe(sku);
     }
 
