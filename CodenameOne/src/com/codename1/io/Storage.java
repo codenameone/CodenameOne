@@ -262,7 +262,7 @@ public class Storage {
             d.close();
             cache.put(name, o);
             return o;
-        } catch(Exception err) {
+        } catch(Throwable err) {
             Log.e(err);
             if(Log.isCrashBound()) {
                 Log.sendLog();
