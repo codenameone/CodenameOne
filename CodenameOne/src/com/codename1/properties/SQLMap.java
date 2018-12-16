@@ -60,6 +60,14 @@ public class SQLMap {
                 }
                 return i.intValue() == 1;
             }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+                if(data == null) {
+                    return null;
+                }
+                return ((Boolean)data).booleanValue() ? 1 : 0;
+            }
         },
         SQL_LONG("INTEGER") {
             @Override
