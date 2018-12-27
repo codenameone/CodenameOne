@@ -689,7 +689,10 @@ public class RequestBuilder {
         if(contentType != null) {
             req.setContentType(contentType);
         }
-        req.setFailSilently(true);
+        req.setFailSilently(byteArrayErrorCallback != null || 
+            propertyErrorCallback != null || 
+            jsonErrorCallback != null ||
+            stringErrorCallback != null);
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);
