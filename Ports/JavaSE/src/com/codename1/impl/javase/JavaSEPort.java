@@ -10054,14 +10054,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
-            
             try {
                 try {
-                    URI uri = new URI(url);
-                    com.codename1.io.File cf = new com.codename1.io.File(uri);
-                    File f = new File(unfile(cf.getAbsolutePath()));
-                    url = f.toURI().toString();
-                    
+                    if(url.startsWith("file://home/")) {
+                        url = new File(unfile(url)).
+                            toURI().toURL().toExternalForm();
+                    } else {
+                        URI uri = new URI(url);
+                        com.codename1.io.File cf = new com.codename1.io.File(uri);
+                        File f = new File(unfile(cf.getAbsolutePath()));
+                        url = f.toURI().toString();
+                    }
                 } catch (URISyntaxException sex) {
                     Log.p("Attempt to set invalid URL "+url+".  Allowing this to continue on the simulator, but this will likely crash on device.");
                     Log.e(sex);
