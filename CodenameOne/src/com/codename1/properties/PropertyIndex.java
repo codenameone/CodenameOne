@@ -32,6 +32,7 @@ import com.codename1.processing.Result;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.util.Base64;
+import com.codename1.util.regex.StringReader;
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLWriter;
 import java.io.DataInputStream;
@@ -650,6 +651,23 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         } catch(Exception err) {
             Log.e(err);
             return null;
+        }
+    }
+
+    /**
+     * Populates the object from a JSON string
+     * @param jsonString the JSON String
+     */
+    public void fromJSON(String jsonString) {
+        try {
+            StringReader r = new StringReader(jsonString);
+            JSONParser jp = new JSONParser();
+            JSONParser.setUseBoolean(true);
+            JSONParser.setUseLongs(true);
+            populateFromMap(jp.parseJSON(r), parent.getClass());
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
         }
     }
     
