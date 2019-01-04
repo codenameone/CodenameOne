@@ -477,7 +477,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         cld.set(Calendar.MINUTE, getCurrentMinute());
         cld.set(Calendar.SECOND, 0);
         cld.set(Calendar.MILLISECOND, 0);
-        cld.set(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY, getCurrentHour());
+        int hour = getCurrentHour();
+        if (showMeridiem && hour == 12) {
+            hour = 0;
+        }
+        cld.set(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY, hour);
         if (showMeridiem) {
             cld.set(Calendar.AM_PM, isCurrentMeridiem() ? 1 : 0);
         }
@@ -504,7 +508,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         cld.set(Calendar.MILLISECOND, 0);
         cld.setTime(new Date(cld.getTime().getTime() + dt.intValue() * 60l * 1000l));
         setCurrentMinute(cld.get(Calendar.MINUTE));
-        setCurrentHour(cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY));
+        int hour = cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY);
+        if (showMeridiem && hour == 0) {
+            hour = 12;
+        }
+        setCurrentHour(hour);
         setCurrentMeridiem(cld.get(Calendar.AM_PM) == 0 ? false : true);
     }
 
