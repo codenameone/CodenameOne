@@ -6052,6 +6052,41 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /**
+     * Attempt to enter full-screen mode.  Should be overridden by the 
+     * platform implementation.
+     * @return True if already in full-screen mode, or successfully entered full-screen mode.
+     */
+    public boolean requestFullScreen() {
+        return false;
+    }
+
+    /**
+     * Exit full-screen mode.
+     * @return True if already not in full-screen mode or successfully exited full-screen mode.
+     */
+    public boolean exitFullScreen() {
+        return false;
+    }
+    
+    /**
+     * Checks to see if the app is currently running in full-screen mode.
+     * @return True if the app is currently running in full-screen mode.
+     */
+    public boolean isInFullScreenMode() {
+        return false;
+    }
+
+    /**
+     * Checks if the platform supports full-screen mode.  If this returns true
+     * then a call to {@link #requestFullScreen() } should enter full-screen mode.
+     * @return 
+     */
+    public boolean isFullScreenSupported() {
+        return false;
+    }
+
+
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {

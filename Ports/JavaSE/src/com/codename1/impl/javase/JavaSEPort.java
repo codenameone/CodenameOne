@@ -128,6 +128,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -199,6 +200,108 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static void setFullScreen(boolean aFullScreen) {
         fullScreen = aFullScreen;
     }
+
+    private JFrame findTopFrame() {
+        java.awt.Component c = canvas;
+        if (c == null) return null;
+        while (c.getParent() != null) {
+            c = c.getParent();
+            if (c instanceof JFrame) {
+                return (JFrame)c;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isFullScreenSupported() {
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+        if (isSimulator() && !desktopSkin) {
+            return false;
+        }
+        return true;
+    }
+    
+    
+    
+    @Override
+    public boolean requestFullScreen() {
+        if (!isFullScreenSupported()) return false;
+        if (!fullScreen) {
+            if (!EventQueue.isDispatchThread()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            requestFullScreen();
+                            
+                        }
+                    });
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (InvocationTargetException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                return fullScreen;
+            }
+            GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            JFrame frm = findTopFrame();
+            
+            if (frm == null) {
+                return false;
+            }
+            
+            if(gd.isFullScreenSupported()) {
+                frm.setResizable(false);
+                gd.setFullScreenWindow(frm);
+            }
+            fullScreen = true;
+        }
+        return fullScreen;
+    }
+
+    @Override
+    public boolean exitFullScreen() {
+        if (!isFullScreenSupported()) return false;
+        if (fullScreen) {
+            if (!EventQueue.isDispatchThread()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            exitFullScreen();
+                            
+                        }
+                    });
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (InvocationTargetException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                return !fullScreen;
+            }
+            GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            JFrame frm = findTopFrame();
+            if (frm == null) {
+                return false;
+            }
+            if(gd.isFullScreenSupported()) {
+                frm.setResizable(true);
+                gd.setFullScreenWindow(null);
+            }
+            fullScreen = false;
+        }
+        return !fullScreen;
+    }
+
+    @Override
+    public boolean isInFullScreenMode() {
+        return fullScreen;
+    }
+    
+    
+    
+    
+    
     boolean takingScreenshot;
     private static boolean fullScreen;
     float screenshotActualZoomLevel;
