@@ -558,6 +558,78 @@ public class CN extends  CN1Constants {
     public static boolean isPortrait() {
         return Display.impl.isPortrait();
     }
+    
+    /**
+     * Try to enter full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
+     * if the app fails to enter full-screen mode.
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public static boolean requestFullScreen() {
+        return Display.impl.requestFullScreen();
+    }
+    
+    /**
+     * Try to exit full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
+     * if the app fails to exit full-screen mode.
+     * @see #requestFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public static boolean exitFullScreen() {
+        return Display.impl.exitFullScreen();
+    }
+    
+    /**
+     * Checks if the app is currently running in full-screen mode.
+     * @return {@literal true} if the app is currently in full-screen mode.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isFullScreenSupported() 
+     */
+    public static boolean isInFullScreenMode() {
+        return Display.impl.isInFullScreenMode();
+    }
+    
+    /**
+     * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
+     * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
+     * to enter and exit full-screen - and query the current state.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     */
+    public static boolean isFullScreenSupported() {
+        return Display.impl.isFullScreenSupported();
+    }
 
     /**
      * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
