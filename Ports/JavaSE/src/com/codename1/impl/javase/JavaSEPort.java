@@ -203,6 +203,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JFrame findTopFrame() {
         java.awt.Component c = canvas;
+        return (JFrame)canvas.getTopLevelAncestor();
+        /*
         if (c == null) return null;
         while (c.getParent() != null) {
             c = c.getParent();
@@ -211,6 +213,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return null;
+        */
     }
 
     @Override
@@ -223,7 +226,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
     
-    
+    private java.awt.Rectangle restoreWindowBounds;
     
     @Override
     public boolean requestFullScreen() {
@@ -252,6 +255,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             if(gd.isFullScreenSupported()) {
+                restoreWindowBounds = frm.getBounds();
+                frm.dispose();
+                frm.setUndecorated(true);
                 frm.setResizable(false);
                 gd.setFullScreenWindow(frm);
             }
@@ -285,8 +291,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return false;
             }
             if(gd.isFullScreenSupported()) {
+                frm.dispose();
+                frm.setUndecorated(false);
                 frm.setResizable(true);
                 gd.setFullScreenWindow(null);
+                if (restoreWindowBounds != null) {
+                    frm.setBounds(restoreWindowBounds);
+                } else {
+                    frm.setBounds(new java.awt.Rectangle(0, 0, 800, 600));
+                }
+                frm.setVisible(true);
             }
             fullScreen = false;
         }
@@ -4179,6 +4193,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             } else {
                 Resources.setRuntimeMultiImageEnabled(true);
+                
                 window.setUndecorated(true);
                 window.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
