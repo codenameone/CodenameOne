@@ -1040,6 +1040,7 @@ public class Dialog extends Form {
     void onShowCompletedImpl() {
         pressedOutOfBounds = false;
         disposedDueToRotation = false;
+        setLightweightMode(false);
         onShowCompleted();
         if(isDisposed()) {
             disposeImpl();
