@@ -27,6 +27,7 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.EncodedImage;
 import com.codename1.util.Base64;
 import java.io.IOException;
@@ -66,7 +67,7 @@ public class SQLMap {
                 if(data == null) {
                     return null;
                 }
-                return ((Boolean)data).booleanValue() ? 1 : 0;
+                return Util.toBooleanValue(data) ? 1 : 0;
             }
         },
         SQL_LONG("INTEGER") {

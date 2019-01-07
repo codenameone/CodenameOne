@@ -6116,7 +6116,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getSMSSupport() {
-        return Display.SMS_BOTH;
+        if(canDial()) {
+            return Display.SMS_BOTH;
+        }
+        return Display.SMS_NOT_SUPPORTED;
     }
 
     /**
