@@ -793,7 +793,26 @@ public class InPlaceEditView extends FrameLayout{
         int paddingLeft = textArea.paddingLeft;
         int paddingRight = textArea.paddingRight;
         int paddingBottom = textArea.paddingBottom;
-
+        
+        // An ugly hack to smooth over an apparent race condition where
+        // the lightweight textarea is not repainted after the native text field
+        // becomes visible - resulting in the hint still appearing while typing.
+        // https://github.com/codenameone/CodenameOne/issues/2629
+        // We just blindly repaint the textfield every 50ms for half a second
+        // to make sure it gets a repaint properly.
+        final TextArea fTextArea = textArea.textArea;
+        new Thread(new Runnable() {
+            public void run() {
+                for (int i=0; i< 10; i++) {
+                    com.codename1.io.Util.sleep(50);
+                    com.codename1.ui.CN.callSerially(new Runnable() {
+                        public void run() {
+                            fTextArea.repaint();
+                        }
+                    });
+                }
+            }
+        }).start();
         if (textArea.isTextField) {
             switch (textArea.getVerticalAlignment()) {
                 case Component.BOTTOM:
