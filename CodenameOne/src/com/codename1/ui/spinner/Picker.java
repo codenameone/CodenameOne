@@ -486,13 +486,20 @@ public class Picker extends Button {
             
             private DateSpinner3D createDatePicker3D() {
                 DateSpinner3D out = new DateSpinner3D();
+                Date defaultValue = value == null ? new Date() : (Date)value;
                 if (startDate != null && endDate != null) {
                     out.setDateRange(startDate, endDate);
+                    if (defaultValue.getTime() < startDate.getTime()) {
+                        defaultValue = startDate;
+                    }
+                    if (defaultValue.getTime() > endDate.getTime()) {
+                        defaultValue = startDate;
+                    }
                 }
                 if (value != null) {
                     out.setValue(value);
                 } else {
-                    out.setValue(new Date());
+                    out.setValue(defaultValue);
                 }
                 return out;
             }

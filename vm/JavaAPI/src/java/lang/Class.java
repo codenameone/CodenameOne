@@ -157,9 +157,7 @@ public final class Class<T> implements java.lang.reflect.Type {
         return getName() + " class";
     }
 
-    public boolean isAnnotation() {
-        return false;
-    }
+    public native boolean isAnnotation();
 
     /**
      * Returns this element's annotation for the specified type if such an
@@ -230,16 +228,13 @@ public final class Class<T> implements java.lang.reflect.Type {
      * @param class_ class we want to test.
      * @return true if the class was declared as an Enum.
      */
-    public boolean isEnum() {
-        return false;
-    }
+    public native boolean isEnum();
 
     /**
      * replacement for Class.isAnonymousClass()
      */
-    public boolean isAnonymousClass() {
-        return false;
-    }
+    public native boolean isAnonymousClass();    
+    
 
     /**
      * replacement for Class.getSimpleName()
@@ -252,9 +247,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     /**
      * replacement for Class.isSynthetic()
      */
-    public boolean isSynthetic() {
-        return false;
-    }
+    public native boolean isSynthetic();
 
     public String getCanonicalName() {
         return getName();
@@ -278,7 +271,5 @@ public final class Class<T> implements java.lang.reflect.Type {
         throw new UnsupportedOperationException("Class.getGenericInterfaces() not supported on this platform");
     }
     
-    public boolean isPrimitive() {
-        return false;
-    }
+    public native boolean isPrimitive();
 }

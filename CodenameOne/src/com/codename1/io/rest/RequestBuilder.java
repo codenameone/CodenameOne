@@ -550,6 +550,9 @@ public class RequestBuilder {
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 List<Map> lst = (List<Map>)response.get("root");
+                if(lst == null) {
+                    return;
+                }
                 try {
                     List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
                     for(Map m : lst) {
@@ -686,7 +689,10 @@ public class RequestBuilder {
         if(contentType != null) {
             req.setContentType(contentType);
         }
-        req.setFailSilently(true);
+        req.setFailSilently(byteArrayErrorCallback != null || 
+            propertyErrorCallback != null || 
+            jsonErrorCallback != null ||
+            stringErrorCallback != null);
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);

@@ -1094,7 +1094,7 @@ public final class Display extends CN1Constants {
      * @param text new text for the component
      */
     public void onEditingComplete(final Component c, final String text) {
-        if(!isEdt()) {
+        if(!isEdt() && codenameOneRunning) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     onEditingComplete(c, text);
@@ -2789,6 +2789,78 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
+     * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
+     * to enter and exit full-screen - and query the current state.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     */
+    public boolean isFullScreenSupported() {
+        return impl.isFullScreenSupported();
+    }
+    
+    /**
+     * Try to enter full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
+     * if the app fails to enter full-screen mode.
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public boolean requestFullScreen() {
+        return impl.requestFullScreen();
+    }
+    
+    /**
+     * Try to exit full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
+     * if the app fails to exit full-screen mode.
+     * @see #requestFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public boolean exitFullScreen() {
+        return impl.exitFullScreen();
+    }
+    
+    /**
+     * Checks if the app is currently running in full-screen mode.
+     * @return {@literal true} if the app is currently in full-screen mode.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isFullScreenSupported() 
+     */
+    public boolean isInFullScreenMode() {
+        return impl.isInFullScreenMode();
+    }
+    
+    /**
      * Shows a native Form/Canvas or some other heavyweight native screen
      *
      * @param nativeFullScreenPeer the native screen peer
@@ -3135,8 +3207,16 @@ public final class Display extends CN1Constants {
     /**
      * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
      * although some include a jad property allowing for this feature
+     * 
+     * <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @return true if lockOrientation  would work
+     * @see #lockOrientation(boolean) 
+     * @see #unlockOrientation() 
      */
     public boolean canForceOrientation() {
         return impl.canForceOrientation();
@@ -3145,8 +3225,16 @@ public final class Display extends CN1Constants {
     /**
      * On devices that return true for canForceOrientation() this method can lock the device orientation
      * either to portrait or landscape mode
+     * 
+     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @param portrait true to lock to portrait mode, false to lock to landscape mode
+     * @see #unlockOrientation() 
+     * @see #canForceOrientation() 
      */
     public void lockOrientation(boolean portrait) {
         impl.lockOrientation(portrait);
@@ -3154,6 +3242,15 @@ public final class Display extends CN1Constants {
 
     /**
      * This is the reverse method for lock orientation allowing orientation lock to be disabled
+     * 
+     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
+     * 
+     * @see #lockOrientation(boolean) 
+     * @see #canForceOrientation() 
      */
     public void unlockOrientation() {
         impl.unlockOrientation();
@@ -4207,4 +4304,59 @@ hi.show();}</pre></noscript>
     public void setProjectBuildHint(String key, String value) {
         impl.setProjectBuildHint(key, value);
     }
+    
+    /**
+     * Checks to see if you can prompt the user to install the app on their homescreen.
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+     * previously prompted the user and they have declined, then this will return false.  
+     * 
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
+     * inside that method - or sometime after.</p>
+     * 
+     * <h3>Example</h3>
+     * <pre>{@code 
+     * onCanInstallOnHomescreen(()->{
+     *      if (canInstallOnHomescreen()) {
+     *           if (promptInstallOnHomescreen()) {
+     *               // User accepted installation
+     *           } else {
+     *               // user rejected installation
+     *           }
+     *      }
+     * });
+     * }</pre>
+     * 
+     * https://developers.google.com/web/fundamentals/app-install-banners/
+     * @return True if you are able to prompt the user to install the app on their homescreen.  
+     * @see #promptInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean canInstallOnHomescreen() {
+        return impl.canInstallOnHomescreen();
+    }
+    
+    /**
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
+     * javascript port. 
+     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
+     * {@literal false} if they reject it.
+     * @see #canInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean promptInstallOnHomescreen() {
+        return impl.promptInstallOnHomescreen();
+    }
+    
+    /**
+     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+     * Only relevant in the javascript port.
+     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
+     * the app on their homescreen.
+     */
+    public void onCanInstallOnHomescreen(Runnable r) {
+        impl.onCanInstallOnHomescreen(r);
+    }
+
 }

@@ -128,6 +128,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -185,7 +186,138 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+
+    /**
+     * @return the fullScreen
+     */
+    public static boolean isFullScreen() {
+        return fullScreen;
+    }
+
+    /**
+     * @param aFullScreen the fullScreen to set
+     */
+    public static void setFullScreen(boolean aFullScreen) {
+        fullScreen = aFullScreen;
+    }
+
+    private JFrame findTopFrame() {
+        java.awt.Component c = canvas;
+        return (JFrame)canvas.getTopLevelAncestor();
+        /*
+        if (c == null) return null;
+        while (c.getParent() != null) {
+            c = c.getParent();
+            if (c instanceof JFrame) {
+                return (JFrame)c;
+            }
+        }
+        return null;
+        */
+    }
+
+    @Override
+    public boolean isFullScreenSupported() {
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+        if (isSimulator() && !desktopSkin) {
+            return false;
+        }
+        return true;
+    }
+    
+    private java.awt.Rectangle restoreWindowBounds;
+    
+    @Override
+    public boolean requestFullScreen() {
+        if (!isFullScreenSupported()) return false;
+        if (!fullScreen) {
+            if (!EventQueue.isDispatchThread()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            requestFullScreen();
+                            
+                        }
+                    });
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (InvocationTargetException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                return fullScreen;
+            }
+            GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            JFrame frm = findTopFrame();
+            
+            if (frm == null) {
+                return false;
+            }
+            
+            if(gd.isFullScreenSupported()) {
+                restoreWindowBounds = frm.getBounds();
+                frm.dispose();
+                frm.setUndecorated(true);
+                frm.setResizable(false);
+                gd.setFullScreenWindow(frm);
+            }
+            fullScreen = true;
+        }
+        return fullScreen;
+    }
+
+    @Override
+    public boolean exitFullScreen() {
+        if (!isFullScreenSupported()) return false;
+        if (fullScreen) {
+            if (!EventQueue.isDispatchThread()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            exitFullScreen();
+                            
+                        }
+                    });
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (InvocationTargetException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                return !fullScreen;
+            }
+            GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            JFrame frm = findTopFrame();
+            if (frm == null) {
+                return false;
+            }
+            if(gd.isFullScreenSupported()) {
+                frm.dispose();
+                frm.setUndecorated(false);
+                frm.setResizable(true);
+                gd.setFullScreenWindow(null);
+                if (restoreWindowBounds != null) {
+                    frm.setBounds(restoreWindowBounds);
+                } else {
+                    frm.setBounds(new java.awt.Rectangle(0, 0, 800, 600));
+                }
+                frm.setVisible(true);
+            }
+            fullScreen = false;
+        }
+        return !fullScreen;
+    }
+
+    @Override
+    public boolean isInFullScreenMode() {
+        return fullScreen;
+    }
+    
+    
+    
+    
+    
     boolean takingScreenshot;
+    private static boolean fullScreen;
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
@@ -1724,7 +1856,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 getParent().repaint();
             } else {  
                 //some ugly hacks to workaround black screen issue
-                if (canvas != null) {
+                if (canvas != null && !fullScreen) {
                     
                     //dumpSwingHierarchy(getTopLevelAncestor(), "");
                     Dimension topSize = ((JFrame)getTopLevelAncestor()).getContentPane().getSize();
@@ -2821,9 +2953,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     if(locSimulation==null) {
                             locSimulation = new LocationSimulation();
-                    } else {
-                            locSimulation.setVisible(true);
                     }
+                            locSimulation.setVisible(true);
+                    
                 }
             });
             simulatorMenu.add(locactionSim);
@@ -4061,6 +4193,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             } else {
                 Resources.setRuntimeMultiImageEnabled(true);
+                
                 window.setUndecorated(true);
                 window.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
@@ -5955,7 +6088,25 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        return (int)(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight());
+        FontMetrics metrics = canvas.getGraphics2D().getFontMetrics(font(nativeFont));
+        if (metrics.getDescent() < 0) {
+            return metrics.getAscent() - metrics.getDescent() + metrics.getLeading();
+        } else {
+            return metrics.getHeight();
+        }
+        /*
+        int out = metrics.getHeight();
+        int ascent = metrics.getAscent();
+        int descent = metrics.getDescent();
+        int leading = metrics.getLeading();
+        int maxAscent = metrics.getMaxAscent();
+        int maxDescent = metrics.getMaxDescent();
+        
+        if (font(nativeFont).getName().contains("Hyundai")) {
+            int foo = 1;
+        }
+        return out;
+        */
     }
 
     /**
@@ -10021,14 +10172,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
-            
             try {
                 try {
-                    URI uri = new URI(url);
-                    com.codename1.io.File cf = new com.codename1.io.File(uri);
-                    File f = new File(unfile(cf.getAbsolutePath()));
-                    url = f.toURI().toString();
-                    
+                    if(url.startsWith("file://home/")) {
+                        url = new File(unfile(url)).
+                            toURI().toURL().toExternalForm();
+                    } else {
+                        URI uri = new URI(url);
+                        com.codename1.io.File cf = new com.codename1.io.File(uri);
+                        File f = new File(unfile(cf.getAbsolutePath()));
+                        url = f.toURI().toString();
+                    }
                 } catch (URISyntaxException sex) {
                     Log.p("Attempt to set invalid URL "+url+".  Allowing this to continue on the simulator, but this will likely crash on device.");
                     Log.e(sex);

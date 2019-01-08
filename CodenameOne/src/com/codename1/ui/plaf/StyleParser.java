@@ -1098,7 +1098,11 @@ public class StyleParser {
     }
     
     static MarginInfo parseMargin(String margin) {
-        return new MarginInfo(parseTRBLValue(margin));
+        ScalarValue[] v = parseTRBLValue(margin);
+        if(v == null) {
+            return null;
+        }
+        return new MarginInfo(v);
     }
     
     static String parseMargin(Style baseStyle, String margin) {
@@ -1136,7 +1140,11 @@ public class StyleParser {
     }
     
     static PaddingInfo parsePadding(String padding) {
-        return new PaddingInfo(parseTRBLValue(padding));
+        ScalarValue[] v = parseTRBLValue(padding);
+        if(v == null) {
+            return null;
+        }
+        return new PaddingInfo(v);
     }
     
     static String parsePadding(Style baseStyle, String padding) {

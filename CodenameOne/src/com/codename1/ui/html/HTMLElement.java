@@ -1456,7 +1456,7 @@ static int getColor(String colorStr,int defaultColor) {
      * @param spacing Increased by one in each recursion phase to provide with indentation
      * @return the printout of this tag
      */
-    private String toString(String spacing) {
+    public String toString(String spacing) {
         String str=spacing;
         if (!isTextElement()) {
             str+="<"+getTagName();

@@ -3377,7 +3377,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
                             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
                         }
-                        recorder.setOutputFile(path);
+                        recorder.setOutputFile(removeFilePrefix(path));
                         try {
                             recorder.prepare();
                             record[0] = new AndroidRecorder(recorder);
@@ -6116,7 +6116,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getSMSSupport() {
-        return Display.SMS_BOTH;
+        if(canDial()) {
+            return Display.SMS_BOTH;
+        }
+        return Display.SMS_NOT_SUPPORTED;
     }
 
     /**
@@ -7445,6 +7448,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             galleryIntent.setType("video/*");
         }else if(type == Display.GALLERY_IMAGE){
             galleryIntent.setType("image/*");
+        }else if(type == Display.GALLERY_ALL){
+            galleryIntent.setType("image/* video/*");
         }else if (type == -9999) {
             galleryIntent = new Intent();
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {

@@ -27,7 +27,10 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -40,14 +43,17 @@ import java.util.Vector;
  * 
  * @author Chen Fishbein
  */
-public class DefaultListModel<T> implements ListModel<T> {
+public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
+
     
+    private boolean multiSelectionMode;
     private java.util.List items;
 
     private EventDispatcher dataListener = new EventDispatcher();
     private EventDispatcher selectionListener = new EventDispatcher();
         
     private int selectedIndex = 0;
+    private Set<Integer> selectedIndices;
     
     /** 
      * Creates a new instance of DefaultListModel 
@@ -116,6 +122,14 @@ public class DefaultListModel<T> implements ListModel<T> {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
+        if (isMultiSelectionMode()) {
+            int[] selected = getSelectedIndices();
+            if (selected.length == 0) {
+                return -1;
+            } else {
+                return selected[0];
+            }
+        }
         return selectedIndex;
     }
     
@@ -124,7 +138,7 @@ public class DefaultListModel<T> implements ListModel<T> {
      */
     public void addItem(T item){
         items.add(item);
-        fireDataChangedEvent(DataChangedListener.ADDED, items.size());
+        fireDataChangedEvent(DataChangedListener.ADDED, items.size()-1);
     }
     
     /**
@@ -176,9 +190,13 @@ public class DefaultListModel<T> implements ListModel<T> {
      * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
-        int oldIndex = selectedIndex;
-        this.selectedIndex = index;
-        selectionListener.fireSelectionEvent(oldIndex, selectedIndex);
+        if (isMultiSelectionMode()) {
+            setSelectedIndices(index);
+        } else {
+            int oldIndex = selectedIndex;
+            this.selectedIndex = index;
+            selectionListener.fireSelectionEvent(oldIndex, selectedIndex);
+        }
     }
 
     /**
@@ -225,5 +243,158 @@ public class DefaultListModel<T> implements ListModel<T> {
      */
     public java.util.List<T> getList() {
         return items;
+    }
+    
+    // Multi-selection Mode methods.
+    
+    private java.util.List<Integer> toList(int[] ints) {
+        int len = ints.length;
+        ArrayList<Integer> out = new ArrayList<Integer>(len);
+        
+        for (int i=0; i<len; i++) {
+            out.add(ints[i]);
+        }
+        return out;
+    }
+  
+
+    /**
+     * For use with multi-selection mode.  Sets the selected indices in this model.
+     * 
+     * <p>Note:  This may fire multiple selectionChange events.  For each "deselected" index,
+     * it will fire an event with the (oldIndex, newIndex) being (index, -1) (i.e. selected index
+     * changes from the index to -1.  And for each newly selected index, it will fire 
+     * the event with (oldIndex, newIndex) being (-1, index).</p>
+     * 
+     * 
+     * 
+     * @param indices The indices to select.
+     * @throws IllegalArgumentException If {@link #isMultiSelectionMode() } is false, and {@literal indices} length is greater than 1.
+     * 
+     * @see #setMultiSelectionMode(boolean) 
+     * @see #isMultiSelectionMode() 
+     * @since 6.0
+     */
+    @Override
+    public void setSelectedIndices(int... indices) {
+        if (isMultiSelectionMode()) {
+            if (selectedIndices == null) {
+                selectedIndices = new HashSet<Integer>();
+            }
+            java.util.Set newSelections = new HashSet(toList(indices));
+            if (selectedIndices.size() != indices.length || !selectedIndices.containsAll(newSelections)) {
+                HashSet toRemove = new HashSet(selectedIndices);
+                toRemove.removeAll(newSelections);
+                HashSet toAdd = new HashSet(newSelections);
+                toAdd.removeAll(selectedIndices);
+                selectedIndices.clear();
+                selectedIndices.addAll(newSelections);
+                
+                for (Integer i : (Set<Integer>)toRemove) {
+                    selectionListener.fireSelectionEvent(i, -1);
+                }
+                for (Integer i : (Set<Integer>) toAdd) {
+                    selectionListener.fireSelectionEvent(-1, i);
+                }
+            }
+        } else {
+            if (indices.length == 1) {
+                setSelectedIndex(indices[0]);
+            } else if (indices.length == 0) {
+                setSelectedIndex(-1);
+            } else {
+                throw new IllegalArgumentException("setSelectedIndices can only include 0 or 1 index in multiselection mode, but received "+indices.length);
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addSelectedIndices(int... indices) {
+        if (isMultiSelectionMode()) {
+            if (selectedIndices == null) {
+                selectedIndices = new HashSet<Integer>();
+            }
+            for (int index : indices) {
+                if (!selectedIndices.contains((Integer)index)) {
+                    selectedIndices.add(index);
+                    selectionListener.fireSelectionEvent(-1, index);
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("addSelectedIndices only supported if isMultiSelectionMode() is on");
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * @since 6.0
+     */
+    @Override
+    public void removeSelectedIndices(int... indices) {
+        if (isMultiSelectionMode()) {
+            if (selectedIndices == null) {
+                return;
+            }
+            for (int index : indices) {
+                if (selectedIndices.contains((Integer)index)) {
+                    selectedIndices.remove((Integer)index);
+                    selectionListener.fireSelectionEvent(index, -1);
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("removeSelectedIndices only supported if isMultiSelectionMode() is on");
+        }
+    }
+    
+
+    
+
+    /**
+     * {@inheritDoc}
+     * @since 6.0
+     */
+    @Override
+    public int[] getSelectedIndices() {
+        
+        if (isMultiSelectionMode()) {
+            if (selectedIndices == null) {
+                return new int[0];
+            }
+            int[] out = new int[selectedIndices.size()];
+            int index=0;
+            for (Integer i : selectedIndices) {
+                out[index++] = i;
+            }
+            Arrays.sort(out);
+            return out;
+        } else {
+            int selectedIndex = getSelectedIndex();
+            if (selectedIndex >= 0) {
+                return new int[]{selectedIndex};
+            } else {
+                return new int[0];
+            }
+        }
+    }
+    
+    /**
+     * Checks to see if this list model is in multi-selection mode.
+     * @return the multiSelectionMode
+     * @since 6.0
+     */
+    public boolean isMultiSelectionMode() {
+        return multiSelectionMode;
+    }
+
+    /**
+     * Enables or disables multi-selection mode.
+     * @param multiSelectionMode the multiSelectionMode to set
+     * @since 6.0
+     */
+    public void setMultiSelectionMode(boolean multiSelectionMode) {
+        this.multiSelectionMode = multiSelectionMode;
     }
 }

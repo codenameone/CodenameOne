@@ -26,6 +26,8 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
@@ -34,10 +36,14 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JOptionPane;
 import javax.swing.JTree;
+import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeModelListener;
@@ -214,6 +220,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         themes = new javax.swing.JComboBox();
         jToolBar1 = new javax.swing.JToolBar();
         refreshTree = new javax.swing.JButton();
+        validate = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
@@ -368,6 +375,14 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         refreshTree.addActionListener(formListener);
         jToolBar1.add(refreshTree);
 
+        validate.setText("Validate");
+        validate.setFocusable(false);
+        validate.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        validate.setName(""); // NOI18N
+        validate.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        validate.addActionListener(formListener);
+        jToolBar1.add(validate);
+
         getContentPane().add(jToolBar1, java.awt.BorderLayout.PAGE_START);
 
         pack();
@@ -378,11 +393,14 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
     private class FormListener implements java.awt.event.ActionListener {
         FormListener() {}
         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            if (evt.getSource() == refreshTree) {
+            if (evt.getSource() == unselected) {
+                ComponentTreeInspector.this.unselectedActionPerformed(evt);
+            }
+            else if (evt.getSource() == refreshTree) {
                 ComponentTreeInspector.this.refreshTreeActionPerformed(evt);
             }
-            else if (evt.getSource() == unselected) {
-                ComponentTreeInspector.this.unselectedActionPerformed(evt);
+            else if (evt.getSource() == validate) {
+                ComponentTreeInspector.this.validateActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -394,6 +412,78 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private void unselectedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unselectedActionPerformed
         editStyle();
     }//GEN-LAST:event_unselectedActionPerformed
+
+    private void showErrorMessage(final String message, final String title) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                JOptionPane.showMessageDialog(ComponentTreeInspector.this, message, title, JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+    }
+    
+    private void validateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_validateActionPerformed
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                final Form f = Display.getInstance().getCurrent();
+                ArrayList<Container> scrollables = new ArrayList<>();
+                findScrollableContainers(f.getContentPane(), scrollables);
+                if(scrollables.size() > 1) {
+                    for(final Container cnt : scrollables) {
+                        for(final Container child : scrollables) {
+                            if(cnt != child) {
+                                if(isChildOf(cnt, child)) {
+                                    String message = "Nested scrollable containers detected: ";
+                                    if(cnt == f.getContentPane()) {
+                                        message += "\nContent pane is scrollable";
+                                    } else {
+                                        message += "\nScrollable container named: " + cnt.getName();
+                                    }
+                                    if(child == f.getContentPane()) {
+                                        message += "\nContent pane is scrollable";
+                                    } else {
+                                        message += "\nScrollable container named: " + child.getName();
+                                    }
+                                    showErrorMessage(message, "Nested Scrollables");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }//GEN-LAST:event_validateActionPerformed
+    
+    public boolean isChildOf(Container cnt, Component cmp) {
+        while(cmp.getParent() != null) {
+            cmp = cmp.getParent();
+            if(cmp == cnt) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private void findScrollableContainers(Container cnt, List<Container> response) {
+        try {
+            Method m = Container.class.getDeclaredMethod("scrollableYFlag");
+            m.setAccessible(true);
+            Boolean res = (Boolean)m.invoke(cnt);
+            if(res) {
+                response.add(cnt);
+            }
+        } catch(Exception ex) {
+            ex.printStackTrace();
+        }
+        for(Component c : cnt) {
+            if(c instanceof Container) {
+                findScrollableContainers((Container)c, response);
+            }
+        }
+    }
     
     private void editStyle() {
         File cn1dir = new File(System.getProperty("user.home"), ".codenameone");
@@ -499,5 +589,6 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JButton refreshTree;
     private javax.swing.JComboBox themes;
     private javax.swing.JButton unselected;
+    private javax.swing.JButton validate;
     // End of variables declaration//GEN-END:variables
 }
