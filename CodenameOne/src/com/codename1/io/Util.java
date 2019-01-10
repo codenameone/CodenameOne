@@ -1466,7 +1466,11 @@ public class Util {
             return ((Integer)number).intValue();
         }
         if(number instanceof String) {
-            return Integer.parseInt((String)number);
+            String n = (String)number;
+            if(n.length() == 0 || n.equals(" ")) {
+                return 0;
+            }
+            return Integer.parseInt(n);
         }
         if(number instanceof Double) {
             return ((Double)number).intValue();
