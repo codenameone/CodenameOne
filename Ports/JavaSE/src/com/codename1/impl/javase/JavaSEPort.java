@@ -4752,10 +4752,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
-            tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
+            tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
+        }
+        if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
+            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, tf.getFont().getSize());
+            tf.setFont(fallback);
         }
         setCaretPosition(tf, getText(tf).length());
         tf.requestFocus();
@@ -5791,13 +5795,75 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * A cache of fallback fonts
+     * @see #requiresFallbackFont(java.awt.Font, java.lang.String) 
+     * @see #fallback(java.awt.Font, java.lang.String) 
+     * @see #getFallbackFont(java.awt.Font) 
+     * 
+     * 
+     */
+    private Map<Integer,java.awt.Font> fallbackFonts = new HashMap<>();
+    
+    /**
+     * Checks to see if the given font is Roboto and the string contains the password 
+     * char {@literal \u25cf}.  Roboto font is missing that glyph so we need to be 
+     * able to substitute it out.
+     * 
+     * https://github.com/google/roboto/issues/291
+     * 
+     * @param fnt A font to check
+     * @param str A string to check
+     * @return True if the font is roboto and the string contains the password dot.
+     */
+    private boolean requiresFallbackFont(java.awt.Font fnt, String str) {
+        return (fnt != null && fnt.getFontName().contains("Roboto") && str.contains("\u25cf"));
+    }
+    
+    /**
+     * Used only for roboto fonts because they cannot display the password "dot" glyph.  Usually this
+     * should just return the font object that is passed into it.  However, if the font is Roboto,
+     * and the string {@literal str} contains the password "dot" character ({@literal \u25cf}, then 
+     * it will return a fallback font - a default sans-serif font.
+     * @param fnt The font to check.
+     * @param str The string to check for password chars.
+     * @return Either the original font, or a fallback font if the original font can't render the string properly.
+     */
+    private java.awt.Font fallback(java.awt.Font fnt, String str) {
+        if (requiresFallbackFont(fnt, str)) {
+            return getFallbackFont(fnt);
+        }
+        return fnt;
+    }
+    
+    /**
+     * This can be used to get a default sans-serif font for the given font
+     * @param f A font
+     * @return A default sans-serif font of the same size.
+     */
+    private java.awt.Font getFallbackFont(java.awt.Font f) {
+        int size = f.getSize();
+        if (fallbackFonts.containsKey(size)) {
+            return fallbackFonts.get(new Integer(size));
+        }
+        java.awt.Font fallbackFont = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, size);
+        fallbackFonts.put(size, fallbackFont);
+        return fallbackFont;
+    }
+    
+    /**
      * @inheritDoc
      */
     public void drawString(Object graphics, String str, int x, int y) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        java.awt.Font fnt = nativeGraphics.getFont();
+        java.awt.Font origFont = nativeGraphics.getFont();
+        java.awt.Font fnt = fallback(origFont, str);
+        if (origFont != fnt) {
+            // We need to deal with Roboto and password fields
+            // https://github.com/google/roboto/issues/291
+            nativeGraphics.setFont(fnt);
+        }
         if (isEmojiFontLoaded() && fnt.canDisplayUpTo(str) != -1) {
             // This might have emojis
             // render as attributed string
@@ -5805,6 +5871,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             nativeGraphics.drawString(astr.getIterator(), x, y + nativeGraphics.getFontMetrics().getAscent());
         } else {
             nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        }
+        if (origFont != fnt) {
+            nativeGraphics.setFont(origFont);
         }
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
@@ -6040,7 +6109,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(str == null) {
             return 0;
         }
-        java.awt.Font fnt = font(nativeFont);
+        java.awt.Font fnt = fallback(font(nativeFont), str);
         java.awt.geom.Rectangle2D r2d = getStringBoundsWithEmojis(fnt, str);//fnt.getStringBounds(str, canvas.getFRC());
         int w = (int) Math.ceil(r2d.getWidth());
         return w;
@@ -6054,11 +6123,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.charWidth(nativeFont, ch);
         }
         checkEDT();
-        java.awt.Font fnt = font(nativeFont);
+        String strch = ""+ch;
+        java.awt.Font fnt = fallback(font(nativeFont), strch);
+        
         if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
             fnt = deriveEmojiFont(fnt.getSize2D());
         }
-        int w = (int) Math.ceil(fnt.getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        int w = (int) Math.ceil(fnt.getStringBounds(strch, canvas.getFRC()).getWidth());
         return w;
     }
 
