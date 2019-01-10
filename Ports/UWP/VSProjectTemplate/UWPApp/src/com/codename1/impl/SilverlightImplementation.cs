@@ -4846,5 +4846,41 @@ namespace com.codename1.impl
 
             return canvasPath;
         }
+
+        public override bool isScreenLockSupported()
+        {
+            return true;
+        }
+
+        private Windows.System.Display.DisplayRequest _displayRequest;
+
+        
+
+        public override void lockScreen()
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+               if (_displayRequest == null)
+                {
+                    _displayRequest = new Windows.System.Display.DisplayRequest();
+                    _displayRequest.RequestActive();
+                }
+
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public override void unlockScreen()
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (_displayRequest != null)
+                {
+                    _displayRequest.RequestRelease();
+                    _displayRequest = null;
+                    
+                }
+
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
     }
 }// end of namespace: com.codename1.impl
