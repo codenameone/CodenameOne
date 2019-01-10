@@ -1993,10 +1993,19 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     void deinitializeImpl() {
-        try {
-            setCurrentInputDevice(null);
-        } catch (Exception ex) {
-            Log.e(ex);
+        if (!comboLock) {
+            // Some input devices are compound widgets that contain
+            // comboboxes.  If those comboboxes are selected, then
+            // it shows the combobox popup (which is a Dialog) which will 
+            // denitialize the form.  We don't want this to trigger the 
+            // input device change (which may close the input device).
+            // Specifically this is to fix an issue with the Calendar picker
+            // https://groups.google.com/d/msgid/codenameone-discussions/b8e198a4-3dd1-4feb-81a1-456188e81d92%40googlegroups.com?utm_medium=email&utm_source=footer
+            try {
+                setCurrentInputDevice(null);
+            } catch (Exception ex) {
+                Log.e(ex);
+            }
         }
         super.deinitializeImpl();
         animMananger.flush();
