@@ -82,6 +82,8 @@
 #endif
 #endif
 
+//#define CN1_HANDLE_UNIVERSAL_LINKS
+
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 #import "QBImagePickerController.h"
