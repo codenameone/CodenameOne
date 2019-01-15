@@ -3108,40 +3108,47 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private int nextMediaId;
+    private int backgroundMediaCount;
+    private ServiceConnection backgroundMediaServiceConnection;
     @Override
     public Media createBackgroundMedia(final String uri) throws IOException {
         int mediaId = nextMediaId++;
-
+        backgroundMediaCount++;
 
         Intent serviceIntent = new Intent(getContext(), AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
         serviceIntent.putExtra("mediaId", mediaId);
-        final ServiceConnection mConnection = new ServiceConnection() {
+        if (background == null) {
+            ServiceConnection mConnection = new ServiceConnection() {
 
-            public void onServiceDisconnected(ComponentName name) {
+                public void onServiceDisconnected(ComponentName name) {
 
-                background = null;
-            }
-
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
-                AudioService svc = (AudioService)mLocalBinder.getService();
-                background = svc;
-            }
-        };
-
-        boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
-        if (!boundSuccess) {
-            throw new RuntimeException("Failed to bind background media service for uri "+uri);
-        }
-        getContext().startService(serviceIntent);
-        while (background == null) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    Util.sleep(200);
+                    background = null;
+                    backgroundMediaServiceConnection = null;
                 }
-            });
+
+                public void onServiceConnected(ComponentName name, IBinder service) {
+                    AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
+                    AudioService svc = (AudioService)mLocalBinder.getService();
+                    background = svc;
+                }
+            };
+            backgroundMediaServiceConnection = mConnection;
+            boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+            if (!boundSuccess) {
+                throw new RuntimeException("Failed to bind background media service for uri "+uri);
+            }
+            getContext().startService(serviceIntent);
+            while (background == null) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        Util.sleep(200);
+                    }
+                });
+            }
+        } else {
+            getContext().startService(serviceIntent);
         }
 
         while (background.getMedia(mediaId) == null) {
@@ -3162,9 +3169,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void cleanup() {
                 super.cleanup();
-                getContext().unbindService(mConnection);
+                if (--backgroundMediaCount <= 0) {
+                    if (backgroundMediaServiceConnection != null) {
+                        getContext().unbindService(backgroundMediaServiceConnection);
+                    }
+                }
             }
         };
+        
         return ret;
 
     }
