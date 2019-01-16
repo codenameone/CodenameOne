@@ -24,6 +24,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.charts.util.ColorUtil;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -111,6 +112,7 @@ import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
 import com.jhlabs.image.GaussianFilter;
@@ -11237,6 +11239,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         // The native peer component.
         private java.awt.Component cmp;
         
+        private boolean matchCN1Style;
+        
         // Buffered image that will be drawn to by AWT and read from
         // by CN1
         BufferedImage buf;
@@ -11286,6 +11290,112 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
         }
+
+        private void applyStyle() {
+            System.out.println("Applying CN1 styles");
+            Style source = getStyle();
+            
+            if (true) {
+                int fgColor = source.getFgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setForeground(new Color(r, g, b));
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (true) {
+                int fgColor = source.getBgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setBackground(new Color(r, g, b));
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (true) {
+                Font f = source.getFont();
+                final java.awt.Font nf = (java.awt.Font)f.getNativeFont();
+                
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        java.awt.Font nff = nf;
+                        if ((cmp instanceof JPasswordField || cmp instanceof JComboBox) && nf.getFontName().contains("Roboto")) {
+                            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, nf.getSize());
+                            nff = fallback;
+                        }
+                        cmp.setFont(nff);
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+            }
+        }
+        
+        @Override
+        public void styleChanged(String propertyName, Style source) {
+            super.styleChanged(propertyName, source);
+            if (!matchCN1Style || getParent() == null) {
+                return;
+            }
+            
+            if (source != getParent().getStyle()) {
+                return;
+            }
+            
+            if (Style.FG_COLOR.equals(propertyName)) {
+                int fgColor = source.getFgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setForeground(new Color(r, g, b));
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (Style.BG_COLOR.equals(propertyName)) {
+                int fgColor = source.getBgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setBackground(new Color(r, g, b));
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (Style.FONT.equals(propertyName)) {
+                Font f = source.getFont();
+                final java.awt.Font nf = (java.awt.Font)f.getNativeFont();
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        java.awt.Font nff = nf;
+                        if ((cmp instanceof JPasswordField || cmp instanceof JComboBox) && nf.getFontName().contains("Roboto")) {
+                            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, nf.getSize());
+                            nff = fallback;
+                        }
+                        cmp.setFont(nff);
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+            }
+            
+            
+        }
+        
+        
         
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
@@ -11325,6 +11435,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             super(null);
             this.frm = f;
             this.cmp = c;
+            if (c instanceof JComponent) {
+                JComponent jc = (JComponent)c;
+                if (null != jc.getClientProperty("cn1-match-style")) {
+                    matchCN1Style = true;
+                    applyStyle();
+                }
+            }
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
