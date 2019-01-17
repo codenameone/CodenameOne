@@ -7809,6 +7809,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
     
+    /**
+     * Called by the application delegate's <a href="https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content/handling_universal_links?language=objc">universal links handler</a>.
+     * This will stop the app, set the AppArg, and then start the app again.
+     * @param url 
+     */
+    public static void applicationReceivedUniversalLink(String url) {
+        applicationDidEnterBackground();
+        if(Display.getInstance() != null) {
+            Display.getInstance().setProperty("AppArg", url);
+        }
+        applicationWillEnterForeground();
+    }
+    
     public static void performBackgroundFetch() {
         
         Display.getInstance().callSerially(new Runnable() {
