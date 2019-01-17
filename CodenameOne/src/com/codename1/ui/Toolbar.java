@@ -154,6 +154,8 @@ public class Toolbar extends Container {
     private Vector<Command> overflowCommands;
 
     private Button menuButton;
+    private Command leftSideMenuCommand;
+    private Command rightSideMenuCommand;
 
     private ScrollListener scrollListener;
 
@@ -1429,7 +1431,7 @@ public class Toolbar extends Container {
                             findCommandComponent(cmd).setPressedIcon(p);
                         }
                     } else {
-                        addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                        leftSideMenuCommand = addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
                             public void actionPerformed(ActionEvent evt) {
                                 if (sidemenuDialog.isShowing()) {
                                     closeSideMenu();
@@ -1475,7 +1477,7 @@ public class Toolbar extends Container {
                             findCommandComponent(cmd).setPressedIcon(p);
                         }
                     } else {
-                        addMaterialCommandToRightBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                        rightSideMenuCommand = addMaterialCommandToRightBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
                             public void actionPerformed(ActionEvent evt) {
                                 if (rightSidemenuDialog.isShowing()) {
                                     closeRightSideMenu();
@@ -1488,6 +1490,33 @@ public class Toolbar extends Container {
                 }
             }
         }
+    }
+    
+    /**
+     * Allows runtime manipulation of the side menu button, notice this will 
+     * only work after the menu was created
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getLeftSideMenuButton() {
+        return findCommandComponent(leftSideMenuCommand);
+    }
+    
+    /**
+     * Allows runtime manipulation of the side menu button, notice this will 
+     * only work after the menu was created
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getRightSideMenuButton() {
+        return findCommandComponent(rightSideMenuCommand);
+    }
+    
+    /**
+     * Allows runtime manipulation of the overflow button, notice this will 
+     * only work after the menu was created
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getOverflowButton() {
+        return menuButton;
     }
     
     private void constructOnTopSideMenu() {
