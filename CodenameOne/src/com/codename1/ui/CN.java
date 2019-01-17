@@ -768,6 +768,9 @@ public class CN extends  CN1Constants {
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
      * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @param text String to share.
      * @param image file path to the image or null
      * @param mimeType type of the image or null if no image to share
@@ -778,6 +781,10 @@ public class CN extends  CN1Constants {
     
     /**
      * Indicates if the underlying platform supports sharing capabilities
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @return true if the underlying platform handles share.
      */
     public static boolean isNativeShareSupported(){

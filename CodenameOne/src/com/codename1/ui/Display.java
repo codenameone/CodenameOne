@@ -3759,6 +3759,10 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @param toShare String to share.
      * @deprecated use the method share that accepts an image and mime type
      */
@@ -3771,6 +3775,9 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
      * 
      * @param text String to share.
      * @param image file path to the image or null
@@ -3787,6 +3794,9 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
      * 
      * @param text String to share.
      * @param image file path to the image or null

@@ -289,9 +289,11 @@ public class InteractionDialog extends Container {
                 Container pp = getLayeredPane(f);
                 Container p = getParent();
                 remove();
-                p.remove();
-                pp.removeAll();
-                pp.revalidate();
+                if (p.getComponentCount() == 0) {
+                    p.remove();
+                }
+                //pp.removeAll();
+                pp.revalidateWithAnimationSafety();
                 cleanupLayer(f);
             }
         }
@@ -422,8 +424,12 @@ public class InteractionDialog extends Container {
                 }
                 Container pp = getLayeredPane(f);
                 remove();
-                p.remove();
-                pp.removeAll();
+                if (p.getComponentCount() == 0) {
+                    p.remove();
+                }
+                //p.remove();
+                //pp.removeAll();
+                
                 pp.revalidate();
                 cleanupLayer(f);
             } else {
