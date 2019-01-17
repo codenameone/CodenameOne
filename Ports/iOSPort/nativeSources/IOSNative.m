@@ -1887,8 +1887,8 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 #else
         JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
 #endif
-        data[0] = (JAVA_INT)s.width;
-        data[1] = (JAVA_INT)s.height;
+        data[0] = (JAVA_INT)(s.width * scaleValue);
+        data[1] = (JAVA_INT)(s.height * scaleValue);
         POOL_END();
     });
 }
