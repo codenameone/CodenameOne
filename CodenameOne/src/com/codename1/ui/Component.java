@@ -4576,13 +4576,15 @@ public class Component implements Animation, StyleListener {
     }
 
     boolean isScrollDecelerationMotionInProgress() {
-        if (draggedMotionY != null) {
-            if (draggedMotionY == decelerationMotion &&  !draggedMotionY.isFinished()) {
+        Motion dmY = draggedMotionY;
+        if (dmY != null) {
+            if (dmY == decelerationMotion &&  !dmY.isFinished()) {
                 return true;
             }
         }
-        if (draggedMotionX != null) {
-            if (draggedMotionX == decelerationMotion && !draggedMotionX.isFinished()) {
+        Motion dmX = draggedMotionX;
+        if (dmX != null) {
+            if (dmX == decelerationMotion && !dmX.isFinished()) {
                 return true;
             }
         }
