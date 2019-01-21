@@ -473,7 +473,7 @@ public class ComboBox<T> extends List<T> {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
-        if(isEnabled()) {
+        if(isEnabled() && !Display.impl.isScrollWheeling()) {
             fireClicked();
         }
     }
