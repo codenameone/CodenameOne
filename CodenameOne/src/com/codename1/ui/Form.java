@@ -3546,6 +3546,7 @@ public class Form extends Container {
      * 
      * @param cmd the Form command to be added
      * @param offset position in which the command is added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd, int offset) {
         menuBar.addCommand(cmd, offset);
@@ -3555,6 +3556,7 @@ public class Form extends Container {
      * A helper method to check the amount of commands within the form menu
      * 
      * @return the number of commands
+     * @deprecated Please use {@link Toolbar#getComponentCount()} or similar methods
      */
     public int getCommandCount() {
         return menuBar.getCommandCount();
@@ -3580,6 +3582,7 @@ public class Form extends Container {
      * and a Menu will be added with all the remain Commands.
      * 
      * @param cmd the Form command to be added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);
