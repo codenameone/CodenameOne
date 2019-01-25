@@ -1734,11 +1734,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
 
-    static class NativeFont {
+    public static class NativeFont {
         int face;
         int style;
         int size;
-        Object font;
+        public Object font;
         String fileName;
         float height;
         int weight;
@@ -3983,7 +3983,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             w = Math.max(v.getMeasuredWidth(), w);
             h = Math.max(v.getMeasuredHeight(), h);
             if (v instanceof TextView) {
+                TextView tv = (TextView)v;
                 w = (int) android.text.Layout.getDesiredWidth(((TextView) v).getText(), ((TextView) v).getPaint());
+                int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+                tv.measure(w, heightMeasureSpec);
+                h = (int)Math.max(h, tv.getMeasuredHeight());
+
+
             }
             return new Dimension(w, h);
         }
@@ -4633,6 +4639,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         });
     }
+    
+    public static void runOnUiThreadSync(final Runnable r) {
+        if (getActivity() == null) {
+            throw new RuntimeException("Cannot run on UI thread because getActivity() is null.  This generally means we are running inside a service in the background so UI access is disabled.");
+        }
+
+        final boolean[] completed = new boolean[1];
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    r.run();
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+                synchronized(completed) {
+                    completed[0] = true;
+                    completed.notify();
+                }
+            }
+        });
+        synchronized(completed) {
+            while(!completed[0]) {
+                try {
+                    completed.wait();
+                } catch(InterruptedException err) {}
+            }
+        }
+    }
+
 
     public int convertToPixels(int dipCount, boolean horizontal) {
         DisplayMetrics dm = getContext().getResources().getDisplayMetrics();

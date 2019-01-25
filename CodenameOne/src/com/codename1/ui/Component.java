@@ -61,7 +61,7 @@ import java.util.HashMap;
  * @see Container
  * @author Chen Fishbein
  */
-public class Component implements Animation, StyleListener {
+public class Component implements Animation, StyleListener, Editable {
     
     private int tabIndex;
     // -1 = the element should be focusable, but should not be reachable via sequential keyboard navigation. Mostly useful to create accessible widgets 
@@ -213,6 +213,8 @@ public class Component implements Animation, StyleListener {
      */
     private Component nextFocusDown;
     private Component nextFocusUp;
+    
+    private Editable editingDelegate;
     
     /**
      * Indicates whether component is enabled or disabled
@@ -449,6 +451,28 @@ public class Component implements Animation, StyleListener {
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
     }
+    
+    /**
+     * Sets the editing delegate for this component.  The editing delegate allows you to define the 
+     * editing workflow for a component.  If a delegate is registered, then editing methods such as 
+     * {@link #isEditable() }, {@link #isEditing() }, {@link #startEditingAsync() }, and {@link #stopEditing(java.lang.Runnable) }
+     * will be delegated to the delegate object.
+     * @param editable An editable delegate.
+     * @since 6.0
+     */
+    public void setEditingDelegate(Editable editable) {
+        this.editingDelegate = editable;
+    }
+    
+    /**
+     * Gets the delegate that handles the editing of this component.
+     * @return The editing delegate for this component.
+     * @since 6.0
+     */
+    public Editable getEditingDelegate() {
+        return this.editingDelegate;
+    }
+    
 
     /**
      * Sets a custom mouse cursor for this component if the platform supports mouse cursors, notice that this isn't applicable for touch devices.  
@@ -5862,9 +5886,14 @@ public class Component implements Animation, StyleListener {
      * @see #stopEditing(java.lang.Runnable) 
      * @see #isEditing() 
      * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public void startEditingAsync() {
         // Empty implementation overridden by subclass
+        if (editingDelegate != null) {
+            editingDelegate.startEditingAsync();
+        }
     }
     
     /**
@@ -5873,9 +5902,13 @@ public class Component implements Animation, StyleListener {
      * @see #startEditingAsync() 
      * @see #isEditing() 
      * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public void stopEditing(Runnable onFinish) {
-        
+        if (editingDelegate != null) {
+            editingDelegate.stopEditing(onFinish);
+        }
     }
     
     /**
@@ -5885,8 +5918,13 @@ public class Component implements Animation, StyleListener {
      * @see #startEditingAsync() 
      * @see #stopEditing(java.lang.Runnable) 
      * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public boolean isEditing() {
+        if (editingDelegate != null) {
+            return editingDelegate.isEditing();
+        }
         return false;
     }
     
@@ -5894,8 +5932,16 @@ public class Component implements Animation, StyleListener {
      * Checks to see if the component is editable.   This is used for next/previous
      * focus traversal on forms.
      * @return 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
+     * @see #isEditing() 
+     * @see #startEditingAsync() 
+     * @see #stopEditing(java.lang.Runnable) 
      */
     public boolean isEditable() {
+        if (editingDelegate != null) {
+            return editingDelegate.isEditable();
+        }
         return false;
     }
     
