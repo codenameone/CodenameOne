@@ -163,6 +163,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
+import javax.swing.event.MouseInputAdapter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
@@ -4128,6 +4129,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             window.add(java.awt.BorderLayout.CENTER, canvas);
         }
+        
+        findTopFrame().setGlassPane(new CN1GlassPane());
+        findTopFrame().getGlassPane().setVisible(true);
         if(window != null){
             java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
             java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
@@ -4663,6 +4667,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
+                
+                
+                
                 public void repaint(long tm, int x, int y, int width, int height) {
                     
                     int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
@@ -4698,8 +4705,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
-            pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-            pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            // Without these scrollbars, it seems terribly difficult
+            // to work with TextAreas that contain more text than can fit.
+            // Commenting these out for better usability - at least on OS X.
+            //pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+            //pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             textCmp = pane;
         }
         if (cmp.isRTL()) {
@@ -11766,5 +11776,221 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
-   }  
+   }
+    
+    /**
+    * A component used in the JFrame's GlassPane to transform mouse events
+    * so that they are directed at the correct place.  This is necessary on
+    * Retina/HiDPI displays where native Text Components are rendered
+    * in the CN1 pipeline transformed for retina so the mouse events
+    * don't line up.  This checks if the mouse event should target the
+    * current native text editor.  If so, it transforms the event and
+    * dispatches it to the native editor.  If not, it just passes the
+    * event through to the content pane unchanged.
+    */
+   class CN1GlassPane extends JComponent {
+       CN1EventDispatcher dispatcher;
+       CN1GlassPane() {
+           //setLayout(new java.awt.BorderLayout());
+           //add(new JButton("Test"), java.awt.BorderLayout.CENTER);
+           //setVisible(true);
+           dispatcher = new CN1EventDispatcher(this);
+           addMouseListener(dispatcher);
+           addMouseMotionListener(dispatcher);
+           addMouseWheelListener(dispatcher);
+       }
+
+   }
+   
+   /**
+    * Event dispatcher used in glass pane.  
+    * @see CN1GlassPane
+    */
+   class CN1EventDispatcher extends MouseInputAdapter implements MouseWheelListener {
+        Toolkit toolkit;
+        java.awt.Container contentPane;
+        CN1GlassPane glassPane;
+        boolean isPress;
+
+        public CN1EventDispatcher(CN1GlassPane glassPane) {
+            toolkit = Toolkit.getDefaultToolkit();
+            this.glassPane = glassPane;
+            this.contentPane = findTopFrame().getContentPane();
+        }
+
+        public void mouseMoved(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseDragged(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseClicked(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseEntered(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseExited(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mousePressed(MouseEvent e) {
+            isPress = true;
+            redispatchMouseEvent(e);
+            isPress = false;
+        }
+
+        public void mouseReleased(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        @Override
+        public void mouseWheelMoved(MouseWheelEvent e) {
+            redispatchMouseWheelEvent(e);
+        }
+        
+        //A basic implementation of redispatching events.
+        private void redispatchMouseWheelEvent(MouseWheelEvent e) {
+            Point glassPanePoint = e.getPoint();
+            Point containerPoint = SwingUtilities.convertPoint(
+                                            glassPane,
+                                            glassPanePoint,
+                                            canvas);
+            boolean inCanvas = !(containerPoint.y < 0 || containerPoint.x < 0 || containerPoint.x > canvas.getWidth() || containerPoint.y > canvas.getHeight());
+            if (inCanvas) {
+                // The mouse it probably over the canvas 
+                
+                Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
+                        (int)(containerPoint.y * retinaScale));
+                
+                if (textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                    
+                    Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
+                    java.awt.Component target = SwingUtilities.getDeepestComponentAt(
+                                            textCmp,
+                                            componentPoint.x,
+                                            componentPoint.y);
+                    componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
+                    target.dispatchEvent(new MouseWheelEvent(target,
+                                                             e.getID(),
+                                                             e.getWhen(),
+                                                             e.getModifiers(),
+                                                             componentPoint.x,
+                                                             componentPoint.y,
+                                                             e.getClickCount(),
+                                                             e.isPopupTrigger(),
+                                                             e.getScrollType(),
+                                                             e.getScrollAmount(),
+                                                             e.getWheelRotation()));
+                    return;
+                }
+            }
+            
+            //we're not in the canvas
+            // redispatch to the content pane
+            containerPoint = SwingUtilities.convertPoint(
+                                        glassPane,
+                                        glassPanePoint,
+                                        contentPane);
+            java.awt.Component component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        contentPane,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            if (component != null) {
+                Point componentPoint = SwingUtilities.convertPoint(
+                                                glassPane,
+                                                glassPanePoint,
+                                                component);
+
+                component.dispatchEvent(new MouseWheelEvent(component,
+                                                         e.getID(),
+                                                         e.getWhen(),
+                                                         e.getModifiers(),
+                                                         componentPoint.x,
+                                                         componentPoint.y,
+                                                         e.getClickCount(),
+                                                         e.isPopupTrigger(),
+                                                         e.getScrollType(),
+                                                         e.getScrollAmount(),
+                                                         e.getWheelRotation()
+                ));
+            }
+        }
+
+        //A basic implementation of redispatching events.
+        private void redispatchMouseEvent(MouseEvent e) {
+            Point glassPanePoint = e.getPoint();
+            Point containerPoint = SwingUtilities.convertPoint(
+                                            glassPane,
+                                            glassPanePoint,
+                                            canvas);
+            boolean inCanvas = !(containerPoint.y < 0 || containerPoint.x < 0 || containerPoint.x > canvas.getWidth() || containerPoint.y > canvas.getHeight());
+            
+            if (inCanvas) {
+                Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
+                        (int)(containerPoint.y * retinaScale));
+                boolean isTextEditing=false;
+                try {
+                    isTextEditing = isEditingText();
+                } catch (Throwable t){
+                    isTextEditing = false;
+                }
+                if (isTextEditing && textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                    
+                    Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
+                    java.awt.Component target = SwingUtilities.getDeepestComponentAt(
+                                            textCmp,
+                                            componentPoint.x,
+                                            componentPoint.y);
+                    componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
+                    target.dispatchEvent(new MouseEvent(target,
+                                                             e.getID(),
+                                                             e.getWhen(),
+                                                             e.getModifiers(),
+                                                             componentPoint.x,
+                                                             componentPoint.y,
+                                                             e.getClickCount(),
+                                                             e.isPopupTrigger()));
+                    return;
+                }
+                
+            }
+            
+            
+            //we're not in the canvas
+            // redispatch to the content pane
+            containerPoint = SwingUtilities.convertPoint(
+                                        glassPane,
+                                        glassPanePoint,
+                                        contentPane);
+            java.awt.Component component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        contentPane,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            if (component != null) {
+                Point componentPoint = SwingUtilities.convertPoint(
+                                                glassPane,
+                                                glassPanePoint,
+                                                component);
+
+                component.dispatchEvent(new MouseEvent(component,
+                                                         e.getID(),
+                                                         e.getWhen(),
+                                                         e.getModifiers(),
+                                                         componentPoint.x,
+                                                         componentPoint.y,
+                                                         e.getClickCount(),
+                                                         e.isPopupTrigger()));
+            }
+                
+            
+
+        }
+    }
 }
