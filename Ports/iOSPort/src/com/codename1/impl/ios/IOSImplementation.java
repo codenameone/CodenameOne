@@ -201,7 +201,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance = this;
         setUseNativeCookieStore(false);
         Display.getInstance().setTransitionYield(10);
-        Display.getInstance().setDefaultVirtualKeyboard(null);
+        Display.getInstance().setDefaultVirtualKeyboard(new IOSVirtualKeyboard(this));
         callback = (Runnable)m;
         if(m instanceof Lifecycle) {
             life = (Lifecycle)m;
@@ -425,7 +425,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (areaUnderVKBOverride >= 0) {
             return areaUnderVKBOverride;
         }
-        if(isAsyncEditMode() && isEditingText()) {
+        if(isAsyncEditMode()) {
             return nativeInstance.getVKBHeight();
         }
         return 0;
@@ -535,41 +535,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
+    boolean keyboardShowing;
+    
     /**
      * Callback for native.  Called when keyboard is shown.  Used for async editing 
      * with formBottomPaddingEditingMode.
      */
     static void keyboardWillBeShown(){
+        instance.keyboardShowing = true;
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
             //final Component currentEditingFinal = instance.currentEditing;
-            if(current.isFormBottomPaddingEditingMode()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        if (current != null) {
-                            getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                            current.revalidate();
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    updateNativeTextEditorFrame();
-                                }
-                            });
-                        }
-                    }
-                });
-            } else {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        if (current != null) {
-                            if (instance.currentEditing != null) {
-                                instance.doNotHideTextEditorSemaphore++;
-                                try {
-                                    instance.currentEditing.requestFocus();
-                                } finally {
-                                    instance.doNotHideTextEditorSemaphore--;
-                                }
+            if (current != null) {
+                if(current.isFormBottomPaddingEditingMode()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (current != null) {
+                                getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                                getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                                 current.revalidate();
                                 Display.getInstance().callSerially(new Runnable() {
                                     public void run() {
@@ -577,23 +561,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                                     }
                                 });
                             }
-                            
                         }
-                    }
-                });
+                    });
+                } else {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (current != null) {
+                                if (instance.currentEditing != null) {
+                                    instance.doNotHideTextEditorSemaphore++;
+                                    try {
+                                        instance.currentEditing.requestFocus();
+                                    } finally {
+                                        instance.doNotHideTextEditorSemaphore--;
+                                    }
+                                    current.revalidate();
+                                    Display.getInstance().callSerially(new Runnable() {
+                                        public void run() {
+                                            updateNativeTextEditorFrame();
+                                        }
+                                    });
+                                }
+
+                            }
+                        }
+                    });
+                }
             }
         }
         
-        if (Display.getInstance().getVirtualKeyboardListener() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
-                    if (l != null) {
-                        l.actionPerformed(new ActionEvent(true));
-                    }
-                }
-            });
-        }
+        Display.getInstance().fireVirtualKeyboardEvent(true);
     }
     
     /**
@@ -601,6 +597,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * with formBottomPaddingEditingMode.
      */
     static void keyboardWillBeHidden(){
+        instance.keyboardShowing = false;
         Display.getInstance().callSerially(new Runnable(){
 
             @Override
@@ -622,16 +619,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
         });
-        if (Display.getInstance().getVirtualKeyboardListener() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
-                    if (l != null) {
-                        l.actionPerformed(new ActionEvent(false));
-                    }
-                }
-            });
-        }
+        Display.getInstance().fireVirtualKeyboardEvent(false);
     }
     
     public void setCurrentForm(Form f) {
@@ -4971,6 +4959,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    public static long getFontPeer(NativeFont font) {
+        return font.peer;
+    }
+    
     class NativeFont {
         long peer;
         int style;

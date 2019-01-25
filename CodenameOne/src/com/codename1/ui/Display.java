@@ -446,6 +446,7 @@ public final class Display extends CN1Constants {
     private boolean multiKeyMode;
     
     private ActionListener virtualKeyboardListener;
+    private EventDispatcher virtualKeyboardListeners;
     
     private int lastSizeChangeEventWH = -1;
 
@@ -2508,21 +2509,80 @@ public final class Display extends CN1Constants {
      * Boolean value.
      * 
      * @param l the listener 
-     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
+     * @deprecated Use {@link #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */
     public void setVirtualKeyboardListener(ActionListener l){
+        if (virtualKeyboardListener != null) {
+            removeVirtualKeyboardListener(l);
+        }
         virtualKeyboardListener = l;
+        addVirtualKeyboardListener(l);
     }
-
+    
     /**
      * Gets the VirtualKeyboardListener Objects of exists.
      * 
      * @return a Listener Object or null if not exists
-     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
+     * @deprecated Use {@link #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */ 
     public ActionListener getVirtualKeyboardListener() {
         return virtualKeyboardListener;
     }
+    
+    /**
+     * Adds a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * on hide.
+     * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
+     * is shown or hidden.</p>
+     * @param l The listener. 
+     * @see #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     * @since 6.0
+     */
+    public synchronized void addVirtualKeyboardListener(ActionListener l) {
+        if (virtualKeyboardListeners == null) {
+            virtualKeyboardListeners = new EventDispatcher();
+        }
+        virtualKeyboardListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * on hide.
+     * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
+     * is shown or hidden.</p>
+     * @param l The listener. 
+     * @see #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     * @since 6.0
+     */
+    public synchronized void removeVirtualKeyboardListener(ActionListener l) {
+        if (virtualKeyboardListeners != null) {
+            virtualKeyboardListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Fires a virtual keyboard show event.
+     * @param show 
+     * @since 6.0
+     */
+    public void fireVirtualKeyboardEvent(boolean show) {
+        if (virtualKeyboardListeners != null) {
+            virtualKeyboardListeners.fireActionEvent(new ActionEvent(show));
+        }
+    }
+    
+    /**
+     * Gets the invisible area under the Virtual Keyboard.
+     * @return Height of the VKB that overlaps the screen.
+     * @since 6.0
+     */
+    public int getInvisibleAreaUnderVKB() {
+        return impl.getInvisibleAreaUnderVKB();
+    }
+
+    
     
     /**
      * Returns the type of the input device one of:
