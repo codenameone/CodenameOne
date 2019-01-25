@@ -11973,6 +11973,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                                         contentPane,
                                         containerPoint.x,
                                         containerPoint.y);
+            if (component == null) {
+                JMenuBar mb = findTopFrame().getJMenuBar();
+                if (mb != null) {
+                    containerPoint = SwingUtilities.convertPoint(
+                                            glassPane,
+                                            glassPanePoint,
+                                            mb);
+                    component = SwingUtilities.getDeepestComponentAt(
+                                            mb,
+                                            containerPoint.x,
+                                            containerPoint.y);
+                }
+            }
             if (component != null) {
                 Point componentPoint = SwingUtilities.convertPoint(
                                                 glassPane,
@@ -11987,7 +12000,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                          componentPoint.y,
                                                          e.getClickCount(),
                                                          e.isPopupTrigger()));
-            }
+            } 
                 
             
 
