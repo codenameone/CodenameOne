@@ -616,9 +616,9 @@ public class InteractionDialog extends Container {
     
     
     /**
-     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
-     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the PopupDialog style by default.
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
      *
      * @param c the context component which is used to position the dialog and can also be pointed at
      */
@@ -633,9 +633,9 @@ public class InteractionDialog extends Container {
     }
     
     /**
-     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
-     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the PopupDialog style by default.
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
      *
      * @param rect the screen rectangle to which the popup should point
      */
