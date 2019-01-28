@@ -11799,9 +11799,39 @@ public class JavaSEPort extends CodenameOneImplementation {
            addMouseMotionListener(dispatcher);
            addMouseWheelListener(dispatcher);
        }
+       
+        
 
+        @Override
+        public boolean contains(int x, int y) {
+            // We only want the glasspane to catch events that were targeting the 
+            // canvas, so the hit-tesr for the glasspane should see if the x,y coordinate
+            // would go to Canvas.  If we don't do this, then the glasspane will 
+            // intercept all events, even those destined for the menu items - and
+            // that causes all hell to break loose on Windows.
+            JFrame jframe = findTopFrame();
+            JLayeredPane jlp = jframe.getLayeredPane();
+            Point containerPoint = SwingUtilities.convertPoint(
+                                            this,
+                                            new Point(x, y),
+                                            jlp);
+            java.awt.Component component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        jlp,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            return (component != null && (canvas == component || containsInHierarchy(canvas, component)));   
+        }
    }
    
+   private static boolean containsInHierarchy(java.awt.Component parent, java.awt.Component cmp) {
+        Container p = cmp.getParent();
+        while (p != parent && p != null) {
+            p = p.getParent();
+        }
+        return p == parent;
+    }
+    
    /**
     * Event dispatcher used in glass pane.  
     * @see CN1GlassPane
@@ -11922,10 +11952,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        
+        
         //A basic implementation of redispatching events.
         private void redispatchMouseEvent(MouseEvent e) {
             Point glassPanePoint = e.getPoint();
-            Point containerPoint = SwingUtilities.convertPoint(
+            Point containerPoint = null;
+            java.awt.Component component = null;
+            containerPoint = SwingUtilities.convertPoint(
                                             glassPane,
                                             glassPanePoint,
                                             canvas);
@@ -11968,24 +12002,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                                         glassPane,
                                         glassPanePoint,
                                         contentPane);
-            java.awt.Component component = 
+            component = 
                 SwingUtilities.getDeepestComponentAt(
                                         contentPane,
                                         containerPoint.x,
                                         containerPoint.y);
-            if (component == null) {
-                JMenuBar mb = findTopFrame().getJMenuBar();
-                if (mb != null) {
-                    containerPoint = SwingUtilities.convertPoint(
-                                            glassPane,
-                                            glassPanePoint,
-                                            mb);
-                    component = SwingUtilities.getDeepestComponentAt(
-                                            mb,
-                                            containerPoint.x,
-                                            containerPoint.y);
-                }
-            }
+            
             if (component != null) {
                 Point componentPoint = SwingUtilities.convertPoint(
                                                 glassPane,
