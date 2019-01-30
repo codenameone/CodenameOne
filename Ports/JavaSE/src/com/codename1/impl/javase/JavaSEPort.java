@@ -2276,6 +2276,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                         GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(result);
                     } catch (FontFormatException ex) {
                         ex.printStackTrace();
+                    } catch (IOException ex) {
+                        if (ex.getMessage().contains("Problem reading font data")) {
+                            System.err.println("Problem reading entry "+name+" from skin file");
+                            System.err.println("This issue may be related to https://github.com/codenameone/CodenameOne/issues/2640");
+                            System.err.println("The application should still function normally, although this font may not render correctly.");
+                            System.err.println("Please help us out by posting your build output log to https://github.com/codenameone/CodenameOne/issues/2640 and any other information you think may be helpful in tracking down the cause.");
+                            System.err.println("Skin Properties:");
+                            System.err.println(props);
+                            System.err.println("Stack Trace:");
+                            ex.printStackTrace(System.err);
+                        } else {
+                            throw ex;
+                        }
                     }
 
                     e = z.getNextEntry();
