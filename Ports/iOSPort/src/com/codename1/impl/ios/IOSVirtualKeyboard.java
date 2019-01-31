@@ -20,60 +20,59 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
+package com.codename1.impl.ios;
 
-import com.codename1.ui.Component;
-import com.codename1.ui.Display;
-import com.codename1.ui.Form;
-import com.codename1.ui.TextArea;
 import com.codename1.impl.VirtualKeyboardInterface;
+import com.codename1.io.Log;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Form;
 
 /**
  *
- * @author cf130546
+ * @author shannah
  */
-public class AndroidKeyboard implements VirtualKeyboardInterface {
-
-    private AndroidImplementation impl;
-
-    public AndroidKeyboard(AndroidImplementation impl) {
+public class IOSVirtualKeyboard implements VirtualKeyboardInterface {
+    private IOSImplementation impl;
+    
+    public IOSVirtualKeyboard(IOSImplementation impl) {
         this.impl = impl;
     }
-
-    public String getVirtualKeyboardName() {
-        return "Android Keyboard";
-
+    
+    @Override
+    public void setInputType(int inputType) {
+        Log.p("setInputType not supported on this keyboard");
     }
 
+    @Override
+    public String getVirtualKeyboardName() {
+        return "IOS Keyboard";
+    }
+
+    @Override
     public void showKeyboard(boolean show) {
-//        manager.restartInput(myView);
-//        if (keyboardShowing != show) {
-//            manager.toggleSoftInputFromWindow(myView.getWindowToken(), 0, 0);
-//            this.keyboardShowing = show;
-//        }
-        System.out.println("showKeyboard " + show);
-        Form current = Display.getInstance().getCurrent();
-        if(current != null){
-            Component cmp = current.getFocused();
-            if(cmp != null && cmp instanceof TextArea){
-                TextArea txt = (TextArea)cmp;
-                if(show){
-                    Display.getInstance().editString(txt, txt.getMaxSize(), txt.getConstraint(), txt.getText(), 0);
+        if (show) {
+            if (isVirtualKeyboardShowing()) {
+                return;
+            }
+            Form f = CN.getCurrentForm();
+            if (f != null) {
+                Component focused = f.getFocused();
+                if (focused != null && focused.isEditable() && focused.isEnabled() && focused.isVisible() && !focused.isEditing()) {
+                    focused.startEditingAsync();
                 }
             }
-        }else{
-            InPlaceEditView.endEdit();
+        } else {
+            if (!isVirtualKeyboardShowing()) {
+                return;
+            }
+            impl.stopTextEditing();
         }
-//        if(!show){
-//            impl.saveTextEditingState();
-//        }
     }
 
+    @Override
     public boolean isVirtualKeyboardShowing() {
-        //return InPlaceEditView.isEditing();
-        return InPlaceEditView.isKeyboardShowing();
+        return impl.keyboardShowing;
     }
-
-    public void setInputType(int inputType) {
-    }
+    
 }

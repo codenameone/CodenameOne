@@ -1993,10 +1993,19 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     void deinitializeImpl() {
-        try {
-            setCurrentInputDevice(null);
-        } catch (Exception ex) {
-            Log.e(ex);
+        if (!comboLock) {
+            // Some input devices are compound widgets that contain
+            // comboboxes.  If those comboboxes are selected, then
+            // it shows the combobox popup (which is a Dialog) which will 
+            // denitialize the form.  We don't want this to trigger the 
+            // input device change (which may close the input device).
+            // Specifically this is to fix an issue with the Calendar picker
+            // https://groups.google.com/d/msgid/codenameone-discussions/b8e198a4-3dd1-4feb-81a1-456188e81d92%40googlegroups.com?utm_medium=email&utm_source=footer
+            try {
+                setCurrentInputDevice(null);
+            } catch (Exception ex) {
+                Log.e(ex);
+            }
         }
         super.deinitializeImpl();
         animMananger.flush();
@@ -3537,6 +3546,7 @@ public class Form extends Container {
      * 
      * @param cmd the Form command to be added
      * @param offset position in which the command is added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd, int offset) {
         menuBar.addCommand(cmd, offset);
@@ -3546,6 +3556,7 @@ public class Form extends Container {
      * A helper method to check the amount of commands within the form menu
      * 
      * @return the number of commands
+     * @deprecated Please use {@link Toolbar#getComponentCount()} or similar methods
      */
     public int getCommandCount() {
         return menuBar.getCommandCount();
@@ -3571,6 +3582,7 @@ public class Form extends Container {
      * and a Menu will be added with all the remain Commands.
      * 
      * @param cmd the Form command to be added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);

@@ -24,6 +24,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.charts.util.ColorUtil;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -111,6 +112,7 @@ import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
 import com.jhlabs.image.GaussianFilter;
@@ -161,6 +163,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
+import javax.swing.event.MouseInputAdapter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
@@ -2273,6 +2276,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                         GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(result);
                     } catch (FontFormatException ex) {
                         ex.printStackTrace();
+                    } catch (IOException ex) {
+                        if (ex.getMessage().contains("Problem reading font data")) {
+                            System.err.println("Problem reading entry "+name+" from skin file");
+                            System.err.println("This issue may be related to https://github.com/codenameone/CodenameOne/issues/2640");
+                            System.err.println("The application should still function normally, although this font may not render correctly.");
+                            System.err.println("Please help us out by posting your build output log to https://github.com/codenameone/CodenameOne/issues/2640 and any other information you think may be helpful in tracking down the cause.");
+                            System.err.println("Skin Properties:");
+                            System.err.println(props);
+                            System.err.println("Stack Trace:");
+                            ex.printStackTrace(System.err);
+                        } else {
+                            throw ex;
+                        }
                     }
 
                     e = z.getNextEntry();
@@ -4126,6 +4142,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             window.add(java.awt.BorderLayout.CENTER, canvas);
         }
+        
+        findTopFrame().setGlassPane(new CN1GlassPane());
+        findTopFrame().getGlassPane().setVisible(true);
         if(window != null){
             java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
             java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
@@ -4661,6 +4680,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
+                
+                
+                
                 public void repaint(long tm, int x, int y, int width, int height) {
                     
                     int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
@@ -4696,8 +4718,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
-            pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-            pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            // Without these scrollbars, it seems terribly difficult
+            // to work with TextAreas that contain more text than can fit.
+            // Commenting these out for better usability - at least on OS X.
+            //pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+            //pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             textCmp = pane;
         }
         if (cmp.isRTL()) {
@@ -4752,10 +4777,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
-            tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
+            tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
+        }
+        if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
+            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, tf.getFont().getSize());
+            tf.setFont(fallback);
         }
         setCaretPosition(tf, getText(tf).length());
         tf.requestFocus();
@@ -5791,13 +5820,75 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * A cache of fallback fonts
+     * @see #requiresFallbackFont(java.awt.Font, java.lang.String) 
+     * @see #fallback(java.awt.Font, java.lang.String) 
+     * @see #getFallbackFont(java.awt.Font) 
+     * 
+     * 
+     */
+    private Map<Integer,java.awt.Font> fallbackFonts = new HashMap<>();
+    
+    /**
+     * Checks to see if the given font is Roboto and the string contains the password 
+     * char {@literal \u25cf}.  Roboto font is missing that glyph so we need to be 
+     * able to substitute it out.
+     * 
+     * https://github.com/google/roboto/issues/291
+     * 
+     * @param fnt A font to check
+     * @param str A string to check
+     * @return True if the font is roboto and the string contains the password dot.
+     */
+    private boolean requiresFallbackFont(java.awt.Font fnt, String str) {
+        return (fnt != null && fnt.getFontName().contains("Roboto") && str.contains("\u25cf"));
+    }
+    
+    /**
+     * Used only for roboto fonts because they cannot display the password "dot" glyph.  Usually this
+     * should just return the font object that is passed into it.  However, if the font is Roboto,
+     * and the string {@literal str} contains the password "dot" character ({@literal \u25cf}, then 
+     * it will return a fallback font - a default sans-serif font.
+     * @param fnt The font to check.
+     * @param str The string to check for password chars.
+     * @return Either the original font, or a fallback font if the original font can't render the string properly.
+     */
+    private java.awt.Font fallback(java.awt.Font fnt, String str) {
+        if (requiresFallbackFont(fnt, str)) {
+            return getFallbackFont(fnt);
+        }
+        return fnt;
+    }
+    
+    /**
+     * This can be used to get a default sans-serif font for the given font
+     * @param f A font
+     * @return A default sans-serif font of the same size.
+     */
+    private java.awt.Font getFallbackFont(java.awt.Font f) {
+        int size = f.getSize();
+        if (fallbackFonts.containsKey(size)) {
+            return fallbackFonts.get(new Integer(size));
+        }
+        java.awt.Font fallbackFont = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, size);
+        fallbackFonts.put(size, fallbackFont);
+        return fallbackFont;
+    }
+    
+    /**
      * @inheritDoc
      */
     public void drawString(Object graphics, String str, int x, int y) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        java.awt.Font fnt = nativeGraphics.getFont();
+        java.awt.Font origFont = nativeGraphics.getFont();
+        java.awt.Font fnt = fallback(origFont, str);
+        if (origFont != fnt) {
+            // We need to deal with Roboto and password fields
+            // https://github.com/google/roboto/issues/291
+            nativeGraphics.setFont(fnt);
+        }
         if (isEmojiFontLoaded() && fnt.canDisplayUpTo(str) != -1) {
             // This might have emojis
             // render as attributed string
@@ -5805,6 +5896,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             nativeGraphics.drawString(astr.getIterator(), x, y + nativeGraphics.getFontMetrics().getAscent());
         } else {
             nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        }
+        if (origFont != fnt) {
+            nativeGraphics.setFont(origFont);
         }
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
@@ -6040,7 +6134,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(str == null) {
             return 0;
         }
-        java.awt.Font fnt = font(nativeFont);
+        java.awt.Font fnt = fallback(font(nativeFont), str);
         java.awt.geom.Rectangle2D r2d = getStringBoundsWithEmojis(fnt, str);//fnt.getStringBounds(str, canvas.getFRC());
         int w = (int) Math.ceil(r2d.getWidth());
         return w;
@@ -6054,11 +6148,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.charWidth(nativeFont, ch);
         }
         checkEDT();
-        java.awt.Font fnt = font(nativeFont);
+        String strch = ""+ch;
+        java.awt.Font fnt = fallback(font(nativeFont), strch);
+        
         if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
             fnt = deriveEmojiFont(fnt.getSize2D());
         }
-        int w = (int) Math.ceil(fnt.getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        int w = (int) Math.ceil(fnt.getStringBounds(strch, canvas.getFRC()).getWidth());
         return w;
     }
 
@@ -11166,6 +11262,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         // The native peer component.
         private java.awt.Component cmp;
         
+        private boolean matchCN1Style;
+        
         // Buffered image that will be drawn to by AWT and read from
         // by CN1
         BufferedImage buf;
@@ -11215,6 +11313,112 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
         }
+
+        private void applyStyle() {
+            System.out.println("Applying CN1 styles");
+            Style source = getStyle();
+            
+            if (true) {
+                int fgColor = source.getFgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setForeground(new Color(r, g, b));
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (true) {
+                int fgColor = source.getBgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setBackground(new Color(r, g, b));
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (true) {
+                Font f = source.getFont();
+                final java.awt.Font nf = (java.awt.Font)f.getNativeFont();
+                
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        java.awt.Font nff = nf;
+                        if ((cmp instanceof JPasswordField || cmp instanceof JComboBox) && nf.getFontName().contains("Roboto")) {
+                            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, nf.getSize());
+                            nff = fallback;
+                        }
+                        cmp.setFont(nff);
+                    }
+                });
+                //super.styleChanged(propertyName, getStyle());
+            }
+        }
+        
+        @Override
+        public void styleChanged(String propertyName, Style source) {
+            super.styleChanged(propertyName, source);
+            if (!matchCN1Style || getParent() == null) {
+                return;
+            }
+            
+            if (source != getParent().getStyle()) {
+                return;
+            }
+            
+            if (Style.FG_COLOR.equals(propertyName)) {
+                int fgColor = source.getFgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setForeground(new Color(r, g, b));
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (Style.BG_COLOR.equals(propertyName)) {
+                int fgColor = source.getBgColor();
+                final int r = ColorUtil.red(fgColor);
+                final int g = ColorUtil.green(fgColor);
+                final int b = ColorUtil.blue(fgColor);
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        cmp.setBackground(new Color(r, g, b));
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+                return;
+            }
+            if (Style.FONT.equals(propertyName)) {
+                Font f = source.getFont();
+                final java.awt.Font nf = (java.awt.Font)f.getNativeFont();
+                EventQueue.invokeLater(new Runnable() { 
+                    public void run() {
+                        java.awt.Font nff = nf;
+                        if ((cmp instanceof JPasswordField || cmp instanceof JComboBox) && nf.getFontName().contains("Roboto")) {
+                            java.awt.Font fallback = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, nf.getSize());
+                            nff = fallback;
+                        }
+                        cmp.setFont(nff);
+                    }
+                });
+                super.styleChanged(propertyName, getStyle());
+            }
+            
+            
+        }
+        
+        
         
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
@@ -11254,6 +11458,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             super(null);
             this.frm = f;
             this.cmp = c;
+            if (c instanceof JComponent) {
+                JComponent jc = (JComponent)c;
+                if (null != jc.getClientProperty("cn1-match-style")) {
+                    matchCN1Style = true;
+                    applyStyle();
+                }
+            }
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
@@ -11578,5 +11789,256 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
-   }  
+   }
+    
+    /**
+    * A component used in the JFrame's GlassPane to transform mouse events
+    * so that they are directed at the correct place.  This is necessary on
+    * Retina/HiDPI displays where native Text Components are rendered
+    * in the CN1 pipeline transformed for retina so the mouse events
+    * don't line up.  This checks if the mouse event should target the
+    * current native text editor.  If so, it transforms the event and
+    * dispatches it to the native editor.  If not, it just passes the
+    * event through to the content pane unchanged.
+    */
+   class CN1GlassPane extends JComponent {
+       CN1EventDispatcher dispatcher;
+       CN1GlassPane() {
+           //setLayout(new java.awt.BorderLayout());
+           //add(new JButton("Test"), java.awt.BorderLayout.CENTER);
+           //setVisible(true);
+           dispatcher = new CN1EventDispatcher(this);
+           addMouseListener(dispatcher);
+           addMouseMotionListener(dispatcher);
+           addMouseWheelListener(dispatcher);
+       }
+       
+        
+
+        @Override
+        public boolean contains(int x, int y) {
+            // We only want the glasspane to catch events that were targeting the 
+            // canvas, so the hit-tesr for the glasspane should see if the x,y coordinate
+            // would go to Canvas.  If we don't do this, then the glasspane will 
+            // intercept all events, even those destined for the menu items - and
+            // that causes all hell to break loose on Windows.
+            JFrame jframe = findTopFrame();
+            JLayeredPane jlp = jframe.getLayeredPane();
+            Point containerPoint = SwingUtilities.convertPoint(
+                                            this,
+                                            new Point(x, y),
+                                            jlp);
+            java.awt.Component component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        jlp,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            return (component != null && (canvas == component || containsInHierarchy(canvas, component)));   
+        }
+   }
+   
+   private static boolean containsInHierarchy(java.awt.Component parent, java.awt.Component cmp) {
+        Container p = cmp.getParent();
+        while (p != parent && p != null) {
+            p = p.getParent();
+        }
+        return p == parent;
+    }
+    
+   /**
+    * Event dispatcher used in glass pane.  
+    * @see CN1GlassPane
+    */
+   class CN1EventDispatcher extends MouseInputAdapter implements MouseWheelListener {
+        Toolkit toolkit;
+        java.awt.Container contentPane;
+        CN1GlassPane glassPane;
+        boolean isPress;
+
+        public CN1EventDispatcher(CN1GlassPane glassPane) {
+            toolkit = Toolkit.getDefaultToolkit();
+            this.glassPane = glassPane;
+            this.contentPane = findTopFrame().getContentPane();
+        }
+
+        public void mouseMoved(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseDragged(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseClicked(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseEntered(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mouseExited(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        public void mousePressed(MouseEvent e) {
+            isPress = true;
+            redispatchMouseEvent(e);
+            isPress = false;
+        }
+
+        public void mouseReleased(MouseEvent e) {
+            redispatchMouseEvent(e);
+        }
+
+        @Override
+        public void mouseWheelMoved(MouseWheelEvent e) {
+            redispatchMouseWheelEvent(e);
+        }
+        
+        //A basic implementation of redispatching events.
+        private void redispatchMouseWheelEvent(MouseWheelEvent e) {
+            Point glassPanePoint = e.getPoint();
+            Point containerPoint = SwingUtilities.convertPoint(
+                                            glassPane,
+                                            glassPanePoint,
+                                            canvas);
+            boolean inCanvas = !(containerPoint.y < 0 || containerPoint.x < 0 || containerPoint.x > canvas.getWidth() || containerPoint.y > canvas.getHeight());
+            if (inCanvas) {
+                // The mouse it probably over the canvas 
+                
+                Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
+                        (int)(containerPoint.y * retinaScale));
+                
+                if (textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                    
+                    Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
+                    java.awt.Component target = SwingUtilities.getDeepestComponentAt(
+                                            textCmp,
+                                            componentPoint.x,
+                                            componentPoint.y);
+                    componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
+                    target.dispatchEvent(new MouseWheelEvent(target,
+                                                             e.getID(),
+                                                             e.getWhen(),
+                                                             e.getModifiers(),
+                                                             componentPoint.x,
+                                                             componentPoint.y,
+                                                             e.getClickCount(),
+                                                             e.isPopupTrigger(),
+                                                             e.getScrollType(),
+                                                             e.getScrollAmount(),
+                                                             e.getWheelRotation()));
+                    return;
+                }
+            }
+            
+            //we're not in the canvas
+            // redispatch to the content pane
+            containerPoint = SwingUtilities.convertPoint(
+                                        glassPane,
+                                        glassPanePoint,
+                                        contentPane);
+            java.awt.Component component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        contentPane,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            if (component != null) {
+                Point componentPoint = SwingUtilities.convertPoint(
+                                                glassPane,
+                                                glassPanePoint,
+                                                component);
+
+                component.dispatchEvent(new MouseWheelEvent(component,
+                                                         e.getID(),
+                                                         e.getWhen(),
+                                                         e.getModifiers(),
+                                                         componentPoint.x,
+                                                         componentPoint.y,
+                                                         e.getClickCount(),
+                                                         e.isPopupTrigger(),
+                                                         e.getScrollType(),
+                                                         e.getScrollAmount(),
+                                                         e.getWheelRotation()
+                ));
+            }
+        }
+
+        
+        
+        //A basic implementation of redispatching events.
+        private void redispatchMouseEvent(MouseEvent e) {
+            Point glassPanePoint = e.getPoint();
+            Point containerPoint = null;
+            java.awt.Component component = null;
+            containerPoint = SwingUtilities.convertPoint(
+                                            glassPane,
+                                            glassPanePoint,
+                                            canvas);
+            boolean inCanvas = !(containerPoint.y < 0 || containerPoint.x < 0 || containerPoint.x > canvas.getWidth() || containerPoint.y > canvas.getHeight());
+            
+            if (inCanvas) {
+                Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
+                        (int)(containerPoint.y * retinaScale));
+                boolean isTextEditing=false;
+                try {
+                    isTextEditing = isEditingText();
+                } catch (Throwable t){
+                    isTextEditing = false;
+                }
+                if (isTextEditing && textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                    
+                    Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
+                    java.awt.Component target = SwingUtilities.getDeepestComponentAt(
+                                            textCmp,
+                                            componentPoint.x,
+                                            componentPoint.y);
+                    componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
+                    target.dispatchEvent(new MouseEvent(target,
+                                                             e.getID(),
+                                                             e.getWhen(),
+                                                             e.getModifiers(),
+                                                             componentPoint.x,
+                                                             componentPoint.y,
+                                                             e.getClickCount(),
+                                                             e.isPopupTrigger()));
+                    return;
+                }
+                
+            }
+            
+            
+            //we're not in the canvas
+            // redispatch to the content pane
+            containerPoint = SwingUtilities.convertPoint(
+                                        glassPane,
+                                        glassPanePoint,
+                                        contentPane);
+            component = 
+                SwingUtilities.getDeepestComponentAt(
+                                        contentPane,
+                                        containerPoint.x,
+                                        containerPoint.y);
+            
+            if (component != null) {
+                Point componentPoint = SwingUtilities.convertPoint(
+                                                glassPane,
+                                                glassPanePoint,
+                                                component);
+
+                component.dispatchEvent(new MouseEvent(component,
+                                                         e.getID(),
+                                                         e.getWhen(),
+                                                         e.getModifiers(),
+                                                         componentPoint.x,
+                                                         componentPoint.y,
+                                                         e.getClickCount(),
+                                                         e.isPopupTrigger()));
+            } 
+                
+            
+
+        }
+    }
 }

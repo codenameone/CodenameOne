@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.android;
 
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -178,8 +179,20 @@ public abstract class PushNotificationService extends Service implements PushCal
             </SDK26>*/
 
             Notification notif = builder.build();
-            nm.notify((int)System.currentTimeMillis(), notif);
+            int notifId = getNotifyId();//(int)System.currentTimeMillis();
+
+            //notif.extras.putInt("notificationId", notifId);
+            nm.notify(notifId, notif);
         }
+    }
+
+    static int getNotifyId() {
+        return 1;
+    }
+
+    static void cancelNotification(Context context) {
+        NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
+        nm.cancel(getNotifyId());
     }
 
     @Override

@@ -2163,9 +2163,7 @@ BOOL prefersStatusBarHidden = NO;
     // Hide the datepicker if it is currently showing.
     [self datePickerCancel];
     
-    if(editingComponent == nil) {
-        return;
-    }
+    
     NSDictionary* userInfo = [n userInfo];
     
     // get the size of the keyboard
@@ -2186,8 +2184,8 @@ BOOL prefersStatusBarHidden = NO;
     // Callback to Java for async editing so that it can resize the form to account for the
     // keyboard taking up space.
     com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    
-    if (!isVKBAlwaysOpen()) {
+
+    if (editingComponent != nil && !isVKBAlwaysOpen()) {
         // resize the noteView
         CGRect viewFrame = self.view.frame;
         

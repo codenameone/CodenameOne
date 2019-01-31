@@ -42,6 +42,67 @@ public class DateUtil {
     }
     
     /**
+     * Returns the earliest of a set of dates.
+     * @param dates
+     * @return The earliest of a set of dates.
+     * @since 6.0
+     */
+    public static Date min(Date... dates) {
+        int len = dates.length;
+        if (len == 0) return null;
+        Date out = null;
+        for (int i=0; i<len; i++) {
+            if (dates[i] == null) {
+                continue;
+            }
+            if (out == null || dates[i].getTime() < out.getTime()) {
+                out = dates[i];
+            }
+        }
+        return out;
+    }
+    
+    /**
+     * Compares two dates.
+     * @param d1 A date
+     * @param d2 A date
+     * @return -1 if first date is earlier.  1 if first date is later.  0 if they are the same.
+     * @since 6.0
+     */
+    public static int compare(Date d1, Date d2) {
+        if (d1 == null) return d2 == null ? 0 : -1;
+        if (d2 == null) return 1;
+        if (d1.getTime() < d2.getTime()) {
+            return -1;
+        } else if (d1.getTime() > d2.getTime()) {
+            return 1;
+        }
+        return 0;
+    }
+    
+    /**
+     * Returns the latest of a set of dates.
+     * @param dates
+     * @return The latest of a set of dates.
+     * @since 6.0
+     */
+    public static Date max(Date... dates) {
+        int len = dates.length;
+        if (len == 0) return null;
+        Date out = null;
+        for (int i=0; i<len; i++) {
+            if (dates[i] == null) {
+                continue;
+            }
+            if (out == null || dates[i].getTime() > out.getTime()) {
+                out = dates[i];
+            }
+        }
+        return out;
+    }
+    
+    
+    /**
      * Creates DateUtil object in default timezone.
      */
     public DateUtil() {

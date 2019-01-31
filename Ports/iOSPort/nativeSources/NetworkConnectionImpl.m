@@ -106,7 +106,7 @@ int connections = 0;
 }
 
 - (void)addHeader:(NSString*)key value:(NSString*)value {
-    [request addValue:value forHTTPHeaderField:key];
+    [request setValue:value forHTTPHeaderField:key];
 }
 
 - (void)setBody:(void*)body size:(int)size {
