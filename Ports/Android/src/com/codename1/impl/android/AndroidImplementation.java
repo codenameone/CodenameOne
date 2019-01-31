@@ -112,6 +112,9 @@ import com.codename1.background.BackgroundFetch;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.impl.android.compat.app.NotificationCompatWrapper;
+import com.codename1.impl.android.compat.app.NotificationCompatWrapper.ActionWrapper;
+import com.codename1.impl.android.compat.app.RemoteInputWrapper;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.*;
@@ -494,7 +497,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return out;
     }
-    
+
+
+
     public static void initPushContent(String message, String image, String messageType, String category, Context context) {
         com.codename1.push.PushContent.reset();
         
@@ -502,19 +507,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {iMessageType = Integer.parseInt(messageType);}catch(Throwable t){}
         
         String actionId = null;
+        String reply = null;
+        boolean cancel = true;
         if (context instanceof Activity) {
             Activity activity = (Activity)context;
             Bundle extras = activity.getIntent().getExtras();
             if (extras != null) {
                 actionId = extras.getString("pushActionId");
                 extras.remove("pushActionId");
+
+                if (actionId != null && RemoteInputWrapper.isSupported()) {
+                    Bundle textExtras = RemoteInputWrapper.getResultsFromIntent(activity.getIntent());
+                    if (textExtras != null) {
+                        CharSequence cs  = textExtras.getCharSequence(actionId + "$Result");
+                        if (cs != null) {
+                            reply = cs.toString();
+                        }
+                    }
+
+                    
+                }
             }
             
+        }
+        if (cancel) {
+            PushNotificationService.cancelNotification(context);
         }
         com.codename1.push.PushContent.setType(iMessageType);
         com.codename1.push.PushContent.setCategory(category);
         if (actionId != null) {
             com.codename1.push.PushContent.setActionId(actionId);
+        }
+        if (reply != null) {
+            com.codename1.push.PushContent.setTextResponse(reply);
         }
         switch (iMessageType) {
             case 1:
@@ -639,6 +664,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     
                 }
+                
+                if (action.getTextInputPlaceholder() != null) {
+                    org.w3c.dom.Attr textInputPlaceholderAttr = doc.createAttribute("textInputPlaceholder");
+                    textInputPlaceholderAttr.setValue(action.getTextInputPlaceholder());
+                    actionEl.setAttributeNode(textInputPlaceholderAttr);
+                }
+                if (action.getTextInputButtonText() != null) {
+                    org.w3c.dom.Attr textInputButtonTextAttr = doc.createAttribute("textInputButtonText");
+                    textInputButtonTextAttr.setValue(action.getTextInputButtonText());
+                    actionEl.setAttributeNode(textInputButtonTextAttr);
+                }
                 categoryEl.appendChild(actionEl);
             }
             root.appendChild(categoryEl);
@@ -698,8 +734,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             int alen = al.getLength();
             for (int j=0; j<alen; j++) {
                 org.w3c.dom.Element actionEl = (org.w3c.dom.Element)al.item(j);
-                PushAction action = new PushAction(actionEl.getAttribute("id"), actionEl.getAttribute("title"), actionEl.getAttribute("icon"));
-                
+                String textInputPlaceholder = actionEl.hasAttribute("textInputPlaceholder") ? actionEl.getAttribute("textInputPlaceholder") : null;
+                String textInputButtonText = actionEl.hasAttribute("textInputButtonText") ? actionEl.getAttribute("textInputButtonText") : null;
+                PushAction action = new PushAction(actionEl.getAttribute("id"), actionEl.getAttribute("title"), actionEl.getAttribute("icon"), textInputPlaceholder, textInputButtonText);
                 actions.add(action);
             }
             
@@ -752,7 +789,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 //android.app.Notification.Action.Builder actionBuilder = new android.app.Notification.Action.Builder(iconId, action.getTitle(), contentIntent);
 
                 System.out.println("Adding action "+action.getId()+", "+action.getTitle()+", icon="+iconId);
-                builder.addAction(iconId, action.getTitle(), contentIntent);
+                if (ActionWrapper.BuilderWrapper.isSupported()) {
+                    // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
+                    // aren't available until API 22.
+                    // These classes use reflection to provide support for these classes safely.
+                    ActionWrapper.BuilderWrapper actionBuilder = new ActionWrapper.BuilderWrapper(iconId, action.getTitle(), contentIntent);
+                    if (action.getTextInputPlaceholder() != null && RemoteInputWrapper.isSupported()) {
+                        RemoteInputWrapper.BuilderWrapper remoteInputBuilder = new RemoteInputWrapper.BuilderWrapper(action.getId()+"$Result");
+                        remoteInputBuilder.setLabel(action.getTextInputPlaceholder());
+
+                        RemoteInputWrapper remoteInput = remoteInputBuilder.build();
+                        actionBuilder.addRemoteInput(remoteInput);
+                    }
+                    ActionWrapper actionWrapper = actionBuilder.build();
+                    new NotificationCompatWrapper.BuilderWrapper(builder).addAction(actionWrapper);
+                } else {
+                    builder.addAction(iconId, action.getTitle(), contentIntent);
+                }
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
