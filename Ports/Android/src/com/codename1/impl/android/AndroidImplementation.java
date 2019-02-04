@@ -2024,7 +2024,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 fis.close();
 
                 //fix rotation
-                ExifInterface exif = new ExifInterface(path);
+                ExifInterface exif = new ExifInterface(removeFilePrefix(path));
                 int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 
                 int angle = 0;
@@ -5942,6 +5942,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
+        }
         return file;
     }
 
@@ -7806,7 +7809,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     BitmapFactory.decodeStream(fis, null, o);
                     fis.close();
 
-                    ExifInterface exif = new ExifInterface(imageFilePath);
+                    ExifInterface exif = new ExifInterface(removeFilePrefix(imageFilePath));
 
                     // if the image is in portrait mode
                     int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
@@ -7841,7 +7844,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException{
-                    ExifInterface exif = new ExifInterface(imageFilePath);
+                    ExifInterface exif = new ExifInterface(removeFilePrefix(imageFilePath));
                     Dimension d = getImageSizeNoRotation(imageFilePath);
                     if(onlyDownscale) {
                         if(scaleToFill) {
