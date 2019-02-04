@@ -6120,12 +6120,16 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setAntiAliased(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliased(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliased(a);
     }
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliasedText(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliasedText(a);
     }
 
     /*@Override
