@@ -1756,6 +1756,11 @@ bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     [self becomeFirstResponder];
+    [self updateCanvas:animated];
+    //replaceViewDidAppear
+}
+
+-(void)updateCanvas:(BOOL)animated {
     if(viewDidAppearRepaint) {
         if(animated) {
             // postpone this to the next edt cycle to prevent a black screen
@@ -1775,7 +1780,6 @@ bool lockDrawing;
         screenSizeChanged(displayWidth, displayHeight);
     }
     
-    //replaceViewDidAppear
 }
 
 - (BOOL)canBecomeFirstResponder {

@@ -244,4 +244,5 @@
 +(BOOL)isCurrentMutableTransformSet;
 
 +(CGAffineTransform) currentMutableTransform;
+-(void)updateCanvas:(BOOL)animated;
 @end
