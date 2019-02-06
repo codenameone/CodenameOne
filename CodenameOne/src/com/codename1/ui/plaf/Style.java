@@ -1222,24 +1222,26 @@ public class Style {
     }
 
     /**
-     * Sets the Style Padding
+     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      *  
-     * @param top number of pixels to pad the top
-     * @param bottom number of pixels to pad the bottom
-     * @param left number of pixels to pad the left
-     * @param right number of pixels to pad the right
+     * @param top number of units to pad the top
+     * @param bottom number of units to pad the bottom
+     * @param left number of units to pad the left
+     * @param right number of units to pad the right
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPadding(int top, int bottom, int left, int right) {
         this.setPadding((float)top, (float)bottom, (float)left, (float)right);
     }
     
     /**
-     * Sets the Style Padding
+     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      *  
-     * @param top number of pixels to pad the top
-     * @param bottom number of pixels to pad the bottom
-     * @param left number of pixels to pad the left
-     * @param right number of pixels to pad the right
+     * @param top number of units to pad the top
+     * @param bottom number of units to pad the bottom
+     * @param left number of units to pad the left
+     * @param right number of units to pad the right
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPadding(float top, float bottom, float left, float right) {
         if(proxyTo != null) {
@@ -1266,20 +1268,20 @@ public class Style {
     }
 
     /**
-     * Sets the Style Padding
+     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of pixels to pad the orientation
+     * @param gap number of units to pad the orientation
      */
     public void setPadding(int orientation, int gap) {
         setPadding(orientation, gap, false);
     }
 
     /**
-     * Sets the Style Padding
+     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of pixels to pad the orientation
+     * @param gap number of units to pad the orientation
      */
     public void setPadding(int orientation, float gap) {
         setPadding(orientation, gap, false);
@@ -1355,7 +1357,8 @@ public class Style {
      *
      * @param rtl flag indicating whether the padding is for an RTL bidi component
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of padding pixels in the given orientation
+     * @return amount of padding in the given orientation using current units.
+     * @see #getPaddingUnit() 
      */
     public int getPaddingValue(boolean rtl, int orientation) {
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
@@ -1412,7 +1415,8 @@ public class Style {
     /**
      * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
      * 
-     * @param gap number of pixels to pad the top
+     * @param gap amount to pad the top in current units.
+     * @see #getPaddingUnit() 
      */
     public void setPaddingTop(int gap) {
         this.setPaddingTop((float)gap);
@@ -1421,7 +1425,9 @@ public class Style {
     /**
      * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
      * 
-     * @param gap number of pixels to pad the top
+     * @param gap Amount to pad the top in current units.
+     * @see #getPaddingUnit()
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingTop(float gap) {
         if(proxyTo != null) {
@@ -1443,7 +1449,9 @@ public class Style {
     /**
      * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
      * 
-     * @param gap number of pixels to pad the bottom
+     * @param gap Amount to pad the bottom in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingBottom(int gap) {
         this.setPaddingBottom((float)gap);
@@ -1452,7 +1460,9 @@ public class Style {
     /**
      * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
      * 
-     * @param gap number of pixels to pad the bottom
+     * @param gap Amount to pad the bottom in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingBottom(float gap) {
         if(proxyTo != null) {
@@ -1474,7 +1484,9 @@ public class Style {
     /**
      * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
      * 
-     * @param gap number of pixels to pad the left
+     * @param gap Amount to pad the left in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingLeft(int gap) {
         this.setPaddingLeft((float)gap);
@@ -1483,7 +1495,9 @@ public class Style {
     /**
      * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
      * 
-     * @param gap number of pixels to pad the left
+     * @param gap Amount to pad the left in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingLeft(float gap) {
         if(proxyTo != null) {
@@ -1505,7 +1519,9 @@ public class Style {
     /**
      * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
      * 
-     * @param gap number of pixels to pad the right
+     * @param gap Amount to pad the right in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingRight(int gap) {
         this.setPaddingRight((float)gap);
@@ -1514,7 +1530,9 @@ public class Style {
     /**
      * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
      * 
-     * @param gap number of pixels to pad the right
+     * @param gap Amount to pad the right in current units.
+     * @see #getPaddingUnit() 
+     * @see #setPaddingUnit(byte...) 
      */
     public void setPaddingRight(float gap) {
         if(proxyTo != null) {
