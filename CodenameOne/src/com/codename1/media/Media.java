@@ -93,12 +93,12 @@ public interface Media {
     public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
             
     /**
-     * Starts playing the audio file
+     * Starts playing the media file
      */
     public void play();
 
     /**
-     * Pauses the playback of the audio file
+     * Pauses the playback of the media file
      */
     public void pause();
     
