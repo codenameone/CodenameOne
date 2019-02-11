@@ -75,18 +75,26 @@ public class RequestBuilder {
     private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
     private Class errorHandlerPropertyType;
     private ActionListener<NetworkEvent> errorCallback;
+    boolean fetched;
     
     RequestBuilder(String method, String url) {
         this.method = method;
         this.url = url;
     }
 
+    private void checkFetched() {
+        if(fetched) {
+            throw new RuntimeException("This method can't be invoked after a request was sent");
+        }
+    }
+    
     /**
      * Sets the value of the content type
      * @param s the content type
      * @return RequestBuilder instance
      */
     public RequestBuilder contentType(String s) {
+        checkFetched();
         contentType = s;
         return this;
     } 
@@ -102,6 +110,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder pathParam(String key, String value) {
+        checkFetched();
         pathParams.put(key, value);
         return this;
     }
@@ -114,6 +123,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder queryParam(String key, String value) {
+        checkFetched();
         queryParams.put(key, value);
         return this;
     }
@@ -126,6 +136,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder header(String key, String value) {
+        checkFetched();
         // .toString() is used to trigger an NPE early for null headers
         headers.put(key.toString(), value.toString());
         return this;
@@ -138,6 +149,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder body(String body) {
+        checkFetched();
         this.body = body;
         return this;
     }
@@ -149,6 +161,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder body(PropertyBusinessObject body) {
+        checkFetched();
         this.body = body.getPropertyIndex().toJSON();
         return this;
     }
@@ -160,6 +173,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder onErrorCodeBytes(ErrorCodeHandler<byte[]> err) {
+        checkFetched();
         byteArrayErrorCallback = err;
         return this;
     }
@@ -171,6 +185,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder onErrorCodeJSON(ErrorCodeHandler<Map> err) {
+        checkFetched();
         jsonErrorCallback = err;
         return this;
     }
@@ -184,6 +199,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder onErrorCode(ErrorCodeHandler<PropertyBusinessObject> err, Class errorClass) {
+        checkFetched();
         propertyErrorCallback = err;
         errorHandlerPropertyType = errorClass;
         return this;
@@ -196,6 +212,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder onErrorCodeString(ErrorCodeHandler<String> err) {
+        checkFetched();
         stringErrorCallback = err;
         return this;
     }
@@ -207,6 +224,7 @@ public class RequestBuilder {
      * 
      */
     public RequestBuilder onError(ActionListener<NetworkEvent> error) {
+        checkFetched();
         errorCallback = error;
         return this;
     }
@@ -218,6 +236,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder timeout(int timeout) {
+        checkFetched();
         this.timeout = timeout;
         return this;
     }
@@ -302,6 +321,7 @@ public class RequestBuilder {
                 }
             }
         });
+        fetched = true;
         CN.addToQueue(request);        
         return request;
     }
@@ -323,6 +343,7 @@ public class RequestBuilder {
      */ 
     public Response<String> getAsString() {
         ConnectionRequest request = createRequest(false);
+        fetched = true;
         CN.addToQueueAndWait(request);
         Response res = null;
         try {
@@ -358,6 +379,7 @@ public class RequestBuilder {
                 }
             }
         });
+        fetched = true;
         CN.addToQueue(request);        
         return request;
     }
@@ -379,6 +401,7 @@ public class RequestBuilder {
      */ 
     public Response<byte[]> getAsBytes() {
         ConnectionRequest request = createRequest(false);
+        fetched = true;
         CN.addToQueueAndWait(request);
         Response res = new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());
         return res;
@@ -401,6 +424,7 @@ public class RequestBuilder {
                 callback.completed(res);
             }
         });
+        fetched = true;
         CN.addToQueue(request);       
         return request;
     }
@@ -430,6 +454,7 @@ public class RequestBuilder {
                 }
             }
         });
+        fetched = true;
         CN.addToQueue(request);       
         return request;
     }
@@ -471,6 +496,7 @@ public class RequestBuilder {
             }
         });
         bindOnError(request, onError);
+        fetched = true;
         CN.addToQueue(request);       
         return request;
     }
@@ -510,6 +536,7 @@ public class RequestBuilder {
      */ 
     public Response<Map> getAsJsonMap() {
         ConnectionRequest request = createRequest(true);
+        fetched = true;
         CN.addToQueueAndWait(request);
         Map response = ((Connection)request).json;
         return new Response(request.getResponseCode(), response, request.getResponseErrorMessage());
@@ -523,6 +550,7 @@ public class RequestBuilder {
      */ 
     public Response<PropertyBusinessObject> getAsProperties(Class type) {
         ConnectionRequest request = createRequest(true);
+        fetched = true;
         CN.addToQueueAndWait(request);
         Map response = ((Connection)request).json;
         try {
@@ -568,6 +596,7 @@ public class RequestBuilder {
                 }
             }
         });
+        fetched = true;
         CN.addToQueue(request);       
         return request;
     }
@@ -580,6 +609,7 @@ public class RequestBuilder {
      */ 
     public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
         ConnectionRequest request = createRequest(true);
+        fetched = true;
         CN.addToQueueAndWait(request);
         Map response = ((Connection)request).json;
         try {
