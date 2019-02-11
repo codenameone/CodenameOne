@@ -1622,6 +1622,25 @@ public class Resources {
                             bezierCorners(input.readBoolean()).
                             topOnlyMode(input.readBoolean()).
                             bottomOnlyMode(input.readBoolean());
+            // round rect border with top-left, top-right, bottom-right, bottom-left corners
+            // specified independently
+            case 0xff15:                    
+                    return RoundRectBorder.create().
+                            stroke(input.readFloat(), input.readBoolean()).
+                            strokeColor(input.readInt()).
+                            strokeOpacity(input.readInt()).
+                            shadowBlur(input.readFloat()).
+                            shadowOpacity(input.readInt()).
+                            shadowSpread(input.readFloat()).
+                            shadowX(input.readFloat()).
+                            shadowY(input.readFloat()).
+                            cornerRadius(input.readFloat()).
+                            bezierCorners(input.readBoolean()).
+                            topLeftMode(input.readBoolean()).
+                            topRightMode(input.readBoolean()).
+                            bottomRightMode(input.readBoolean()).
+                            bottomLeftMode(input.readBoolean());
+                            
         }
         return null;
     }
