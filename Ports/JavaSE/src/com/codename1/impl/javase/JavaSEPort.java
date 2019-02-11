@@ -4142,10 +4142,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             window.add(java.awt.BorderLayout.CENTER, canvas);
         }
-        
-        findTopFrame().setGlassPane(new CN1GlassPane());
-        findTopFrame().getGlassPane().setVisible(true);
+        if (findTopFrame() != null && retinaScale > 1.0) {
+            findTopFrame().setGlassPane(new CN1GlassPane());
+            findTopFrame().getGlassPane().setVisible(true);
+        }
         if(window != null){
+            
             java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
             java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
             try {
@@ -6443,6 +6445,52 @@ public class JavaSEPort extends CodenameOneImplementation {
                 break;
             default:
                 fontName += medianFontSize;
+                break;
+        }
+        return java.awt.Font.decode(fontName);
+    }
+    
+    public java.awt.Font createAWTFont(int face, int style, int size, double scale) {
+        String fontName;
+        switch (face) {
+            case Font.FACE_MONOSPACE:
+                fontName = fontFaceMonospace + "-";
+                break;
+            case Font.FACE_PROPORTIONAL:
+                fontName = fontFaceProportional + "-";
+                break;
+            default: //Font.FACE_SYSTEM:
+                fontName = fontFaceSystem + "-";
+                break;
+        }
+        switch (style) {
+            case Font.STYLE_BOLD:
+                fontName += "bold-";
+                break;
+            case Font.STYLE_ITALIC:
+                fontName += "italic-";
+                break;
+            case Font.STYLE_PLAIN:
+                fontName += "plain-";
+                break;
+            case Font.STYLE_UNDERLINED:
+                // unsupported...
+                fontName += "plain-";
+                break;
+            default:
+                // probably bold/italic
+                fontName += "bold-";
+                break;
+        }
+        switch (size) {
+            case Font.SIZE_LARGE:
+                fontName += (int)Math.round(largeFontSize*scale);
+                break;
+            case Font.SIZE_SMALL:
+                fontName += (int)Math.round(smallFontSize*scale);
+                break;
+            default:
+                fontName += (int)Math.round(medianFontSize*scale);
                 break;
         }
         return java.awt.Font.decode(fontName);
