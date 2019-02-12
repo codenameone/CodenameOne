@@ -75,7 +75,8 @@ public class RequestBuilder {
     private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
     private Class errorHandlerPropertyType;
     private ActionListener<NetworkEvent> errorCallback;
-    boolean fetched;
+    private ConnectionRequest.CachingMode cache;
+    private boolean fetched;
     
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -86,6 +87,16 @@ public class RequestBuilder {
         if(fetched) {
             throw new RuntimeException("This method can't be invoked after a request was sent");
         }
+    }
+    
+    /**
+     * Sets the caching mode for this request, see {@link com.codename1.io.ConnectionRequest#getCacheMode()}
+     * @param cache the cache mode
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder cacheMode(ConnectionRequest.CachingMode cache) {
+        this.cache = cache;
+        return this;
     }
     
     /**
@@ -723,6 +734,9 @@ public class RequestBuilder {
             propertyErrorCallback != null || 
             jsonErrorCallback != null ||
             stringErrorCallback != null);
+        if(cache != null) {
+            req.setCacheMode(cache);
+        }
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);
