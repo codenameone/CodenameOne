@@ -730,10 +730,7 @@ public class RequestBuilder {
         if(contentType != null) {
             req.setContentType(contentType);
         }
-        req.setFailSilently(byteArrayErrorCallback != null || 
-            propertyErrorCallback != null || 
-            jsonErrorCallback != null ||
-            stringErrorCallback != null);
+        req.setFailSilently(false);
         if(cache != null) {
             req.setCacheMode(cache);
         }
