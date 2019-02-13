@@ -10239,8 +10239,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         return fxExists && !blockNativeBrowser;
         //return false;
     }
-
+    private boolean useWKWebViewChecked;
+    
     public PeerComponent createBrowserComponent(final Object parent) {
+        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
+        if (useWKWebView) {
+            if (!useWKWebViewChecked) {
+                useWKWebViewChecked = true;
+                Map<String, String> m = Display.getInstance().getProjectBuildHints();
+                if(m != null) {
+                    if(!m.containsKey("ios.useWKWebView")) {
+                        Display.getInstance().setProjectBuildHint("ios.useWKWebView", "true");
+                    }
+                }
+            }
+        }
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();

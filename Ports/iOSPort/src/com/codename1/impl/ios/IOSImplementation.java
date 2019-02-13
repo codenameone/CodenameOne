@@ -102,6 +102,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
@@ -5098,6 +5099,27 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
+        if (Boolean.TRUE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
+            final String[] res = new String[1];
+            final boolean[] complete = new boolean[1];
+            nativeInstance.browserExecuteAndReturnStringCallback(get(browserPeer), javaScript, new SuccessCallback<String>() {
+                @Override
+                public void onSucess(String value) {
+                    synchronized(complete) {
+                        res[0] = value;
+                        complete[0] = true;
+                        complete.notify();
+                    }
+                }
+                
+            });
+            while (!complete[0]) {
+                synchronized(complete) {
+                    Util.wait(complete);
+                }
+            }
+            return res[0];
+        }
         if(Display.getInstance().isEdt()) {
             final String[] result = new String[1];
 
@@ -5326,7 +5348,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        long browserPeer = nativeInstance.createBrowserComponent(browserComponent);
+        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
+        if (useWKWebView && browserComponent instanceof Component) {
+            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.TRUE);
+        }
+        long browserPeer = useWKWebView ? 
+                nativeInstance.createWKBrowserComponent(browserComponent) : 
+                nativeInstance.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
         nativeInstance.releasePeer(browserPeer);
         return pc;
