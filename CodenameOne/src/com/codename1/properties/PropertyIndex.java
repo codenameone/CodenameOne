@@ -530,10 +530,12 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public void fromXml(Element e) {
         Hashtable atts = e.getAttributes();
-        for(Object a : atts.keySet()) {
-            PropertyBase pb = get((String)a);
-            if(pb != null) {
-                setSimpleObject(pb, atts.get(a));
+        if(atts != null) {
+            for(Object a : atts.keySet()) {
+                PropertyBase pb = get((String)a);
+                if(pb != null) {
+                    setSimpleObject(pb, atts.get(a));
+                }
             }
         }
         int cc = e.getNumChildren();
@@ -553,7 +555,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 try {
                     PropertyBusinessObject business = (PropertyBusinessObject)cls.newInstance();
                     business.getPropertyIndex().fromXml(chld);
-                    pb.setImpl(business);
+                    if(pb instanceof ListProperty) {
+                        ((ListProperty)pb).add(business);
+                    } else {
+                        pb.setImpl(business);
+                    }
                 } catch(InstantiationException ex) {
                     Log.e(ex);
                 } catch(IllegalAccessException ex) {

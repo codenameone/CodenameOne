@@ -257,7 +257,7 @@ public class SignatureComponent extends Container {
                 int maxH = lead.getHeight() - lead.getStyle().getPaddingTop()- lead.getStyle().getPaddingBottom();
                 
                 Image icon = img;
-                if (icon.getWidth() > maxW || icon.getHeight() > maxH) {
+                if ((icon.getWidth() > maxW || icon.getHeight() > maxH) && maxW > 1 && maxH > 1) {
                     icon = icon.scaledSmallerRatio(maxW, maxH);
                 }
                 
