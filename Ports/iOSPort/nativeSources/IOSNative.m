@@ -34,12 +34,7 @@
 #else
 #include "cn1_globals.h"
 #endif
-#ifdef ENABLE_WKWEBVIEW
-#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
-#import <WebKit/WebKit.h>
-#define supportsWKWebKit
-#endif
-#endif
+
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import "NetworkConnectionImpl.h"
@@ -82,7 +77,12 @@
 #include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
-
+#ifdef ENABLE_WKWEBVIEW
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
+#import <WebKit/WebKit.h>
+#define supportsWKWebKit
+#endif
+#endif
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
 #endif
@@ -2314,14 +2314,16 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
         dispatch_sync(dispatch_get_main_queue(), ^{
-            com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
+            WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+            config.allowsInlineMediaPlayback = YES;
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
             UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
-            [com_codename1_impl_ios_IOSNative_createWKBrowserComponent setAllowsInlineMediaPlayback:YES];
+            
     #ifndef CN1_USE_ARC
             [com_codename1_impl_ios_IOSNative_createWKBrowserComponent retain];
     #endif
