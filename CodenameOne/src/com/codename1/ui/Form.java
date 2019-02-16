@@ -356,7 +356,11 @@ public class Form extends Container {
         if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
             Button bar = new Button();
             bar.setShowEvenIfBlank(true);
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             bar.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -369,7 +373,11 @@ public class Form extends Container {
             return bar;
         } else {
             Container bar = new Container();
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             return bar;
         }
     }

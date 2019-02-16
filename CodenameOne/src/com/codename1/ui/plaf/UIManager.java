@@ -417,6 +417,7 @@ public class UIManager {
         themeProps.put("TitleCommandLandscape.derive", "TitleCommand");
         themeProps.put("BackCommandLandscape.derive", "BackCommand");
         themeProps.put("TitleLandscape.derive", "Title");
+        themeProps.put("StatusBarLandscape.derive", "StatusBar");
         
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
             themeProps.put("TextFieldSearch.derive", "Title");
