@@ -122,6 +122,7 @@ public class IntentIntegrator {
     public static final String DEFAULT_NO = "No";
     private static final String BS_PACKAGE = "com.google.zxing.client.android";
     private static final String BSPLUS_PACKAGE = "com.srowen.bs.android";
+    private static final String BSSIMPLE_PACKAGE = BSPLUS_PACKAGE+".simple";
     // supported barcode formats
     public static final Collection<String> PRODUCT_CODE_TYPES = list("UPC_A", "UPC_E", "EAN_8", "EAN_13", "RSS_14");
     public static final Collection<String> ONE_D_CODE_TYPES =
@@ -132,9 +133,9 @@ public class IntentIntegrator {
     public static final Collection<String> ALL_CODE_TYPES = null;
     public static final Collection<String> TARGET_BARCODE_SCANNER_ONLY = Collections.singleton(BS_PACKAGE);
     public static final Collection<String> TARGET_ALL_KNOWN = list(
-            BS_PACKAGE, // Barcode Scanner
+            BS_PACKAGE,
+            BSSIMPLE_PACKAGE, // Barcode Scanner+ Simple
             BSPLUS_PACKAGE, // Barcode Scanner+
-            BSPLUS_PACKAGE + ".simple", // Barcode Scanner+ Simple
             "la.droid.qr",
             "la.droid.qr.priva"
             );
@@ -302,7 +303,7 @@ public class IntentIntegrator {
         Dialog d = new Dialog();
         d.setTitle(title);
         if (Dialog.show(title, message, "Yes", "No")) {
-            Uri uri = Uri.parse("market://details?id=" + BS_PACKAGE);
+            Uri uri = Uri.parse("market://details?id=" + BSSIMPLE_PACKAGE);
             Intent intent = new Intent(Intent.ACTION_VIEW, uri);
             try {
                 activity.startActivity(intent);
