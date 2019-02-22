@@ -3699,6 +3699,8 @@ public class CSSTheme {
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER;
                 case "cn1-image-tile-halign-bottom" :
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM;
+                case "cn1-image-align-top":
+                    return Style.BACKGROUND_IMAGE_ALIGNED_TOP;
                 case "cn1-image-align-bottom" :
                     return Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
                 case "cn1-image-align-right" :
