@@ -1,4 +1,4 @@
-<img src="https://www.codenameone.com/img/blog/codenameone-5-release-banner.jpg"> 
+<img src="https://www.codenameone.com/img/blog/codenameone-6-release-banner.jpg"> 
 
 [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
