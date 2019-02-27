@@ -833,6 +833,14 @@ public class Container extends Component implements Iterable<Component>{
             });
         }
         components.add(index, cmp);
+        if (layout instanceof BorderLayout && !BorderLayout.OVERLAY.equals(layout.getComponentConstraint(cmp))) {
+            // Make sure overlay component is always on top
+            Component overlay = ((BorderLayout)layout).getOverlay();
+            if (overlay != null) {
+                components.remove(overlay);
+                components.add(index, overlay);
+            }
+        }
         setShouldCalcPreferredSize(true);
         if (isInitialized()) {
             cmp.initComponentImpl();
