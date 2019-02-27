@@ -5092,6 +5092,7 @@ public class CSSTheme {
                                 case "cn1-image-tile-halign-top" :
                                 case "cn1-image-tile-halign-center" :
                                 case "cn1-image-tile-halign-bottom" :
+                                case "cn1-image-align-top" :
                                 case "cn1-image-align-bottom" :
                                 case "cn1-image-align-left" :
                                 case "cn1-image-align-right" :
