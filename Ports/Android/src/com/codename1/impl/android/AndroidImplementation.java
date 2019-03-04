@@ -5122,7 +5122,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         s.setUserAgentString((String)value);
                         return;
                     }
-                    s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    try {
+                        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    } catch(Throwable t) {
+                        // the method isn't available in Android 4.x
+                    }
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
                         if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 1) {
@@ -6221,7 +6225,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int getSMSSupport() {
         if(canDial()) {
-            return Display.SMS_BOTH;
+            return Display.SMS_INTERACTIVE;
         }
         return Display.SMS_NOT_SUPPORTED;
     }
@@ -6230,9 +6234,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
-        if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
+        /*if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
             return;
-        }
+        }*/
         if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to send a SMS")){
             return;
         }
@@ -6250,11 +6254,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             getContext().startActivity(smsIntent);
 
-        } else {
+        } /*else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);
             sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
-        }
+        }*/
     }
 
     @Override
