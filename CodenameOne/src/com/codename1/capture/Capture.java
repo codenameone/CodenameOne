@@ -109,6 +109,20 @@ public class Capture {
     }
 
     /**
+     * Same as {@link #captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) } only a 
+     * blocking version that holds the EDT.
+     * @param constraints
+     * @return A video file location or null if the user canceled.
+     * @since 7.0
+     */
+    public static String captureVideo(VideoCaptureConstraints constraints) {
+        CallBack c = new CallBack();
+        captureVideo(constraints, c);
+        Display.getInstance().invokeAndBlock(c);
+        return c.url;
+    }
+    
+    /**
      * <p>Invokes the camera and takes a photo synchronously while blocking the EDT, the sample below
      * demonstrates a simple usage and applying a mask to the result</p>
      * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
@@ -166,6 +180,19 @@ public class Capture {
     }
 
     /**
+     * Captures video with some constraints, like width, height, and max length.  Video constraints
+     * may not be supported on all platforms.  Use {@link VideoCaptureConstraints#isSupported() } and {@link VideoCaptureConstraints#isSizeSupported() }
+     * to check whether constraints are supported on the current platform.  If constraints are not supported, then, in the worst case, this will fall
+     * back to just use {@link #captureVideo(com.codename1.ui.events.ActionListener) }, i.e. capture with no constraints.
+     * @param constraints The constraints to use for the video capture.
+     * @param response a callback Object to retrieve the file path
+     * @since 7.0
+     */
+    public static void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        Display.getInstance().captureVideo(constraints, response);
+    }
+    
+    /**
      * This method tries to invoke the device native camera to capture video.
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
@@ -176,6 +203,7 @@ public class Capture {
      * 
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @see #captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
      */
     public static void captureVideo(ActionListener response){    
         Display.getInstance().captureVideo(response);

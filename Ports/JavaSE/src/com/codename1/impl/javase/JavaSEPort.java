@@ -24,6 +24,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
@@ -9269,13 +9270,31 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void captureVideo(com.codename1.ui.events.ActionListener response) {
+        captureVideo(null, response);
+    }
+
+    private boolean includeVideoJS;
+    
+    @Override
+    public void captureVideo(VideoCaptureConstraints constraints, com.codename1.ui.events.ActionListener response) {
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to take a video")){
             return;
+        }
+        if (constraints != null && !includeVideoJS) {
+            includeVideoJS = true;
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("javascript.includeVideoJS")) {
+                    Display.getInstance().setProjectBuildHint("javascript.includeVideoJS", "true");
+                }
+            }
         }
         checkCameraUsageDescription();
         checkMicrophoneUsageDescription();
         capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
     }
+    
+    
     private static boolean isPlayable(String filename) {
         try {
             javafx.scene.media.Media media = new javafx.scene.media.Media(filename);

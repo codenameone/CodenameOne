@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
@@ -3437,6 +3438,21 @@ hi.show();}</pre></noscript>
     }
     
     /**
+     * Same as {@link #captureVideo(com.codename1.ui.events.ActionListener) }, except that it
+     * attempts to impose constraints on the capture.  Constraints include width, height, 
+     * and max length.  Not all platforms support capture constraints.  Use the {@link VideoCaptureConstraints#isSupported()}
+     * to see if a constraint is supported.  If constraints are not supported at all, then this method 
+     * will fall back to calling {@link #captureVideo(com.codename1.ui.events.ActionListener) }.
+     * @param constraints Capture constraints to use.
+     * @param response a callback Object to retrieve the file path
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        impl.captureVideo(constraints, response);
+    }
+    
+    /**
      * Opens the device image gallery
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
@@ -4428,5 +4444,7 @@ hi.show();}</pre></noscript>
     public void onCanInstallOnHomescreen(Runnable r) {
         impl.onCanInstallOnHomescreen(r);
     }
+
+    
 
 }
