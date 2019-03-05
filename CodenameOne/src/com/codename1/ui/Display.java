@@ -157,7 +157,14 @@ public final class Display extends CN1Constants {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     
-
+    /**
+     * Enable Async stack traces.  This is disabled by default, but will cause
+     * stack traces of callSerially() calls to be stored, and logged if the 
+     * Runnable throws an exception.
+     */
+    private boolean enableAsyncStackTraces;
+    
+    
     /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
@@ -671,6 +678,98 @@ public final class Display extends CN1Constants {
         impl.playDialogSound(type);
     }
 
+    private DebugRunnable currentEdtContext;
+    
+    private class EdtException extends RuntimeException {
+        private Throwable cause;
+        private EdtException parent;
+        public void setCause(Throwable t) {
+            this.cause = t;
+        }
+
+        public synchronized Throwable getCause() {
+            return cause;
+        }
+        
+        private void throwRoot(Throwable cause) {
+            EdtException root = this;
+            root.setCause(cause);
+            while (root.parent != null) {
+                root.parent.setCause(root);
+                root = root.parent;
+            }
+            throw root;
+        }
+        
+    }
+    
+    /**
+     * A wrapper around Runnable that records the stack trace so that
+     * if an exception occurs, it is easier to track it back to the original
+     * source.
+     */
+    private class DebugRunnable implements Runnable {
+        private final Runnable internal;
+        private final EdtException exceptionWrapper;
+        private final DebugRunnable parentContext;
+        
+        DebugRunnable(Runnable internal) {
+            this.internal = internal;
+            this.parentContext = currentEdtContext;
+            if (isEnableAsyncStackTraces()) {
+                exceptionWrapper = new EdtException();
+                if (parentContext != null) {
+                    exceptionWrapper.parent = parentContext.exceptionWrapper;
+                }
+            } else {
+                exceptionWrapper = null;
+            }
+        }
+        
+        @Override
+        public void run() {
+            if (exceptionWrapper != null) {
+                try {
+                    currentEdtContext = this;
+                    internal.run();
+                } catch (RuntimeException t) {
+                    exceptionWrapper.throwRoot(t);
+                }
+            } else {
+                internal.run();
+            }
+        }
+        
+    }
+    
+    
+    /**
+     * Checks if async stack traces are enabled.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @return Whether async stack traces are enabled.  
+     * @see #setEnableAsyncStackTraces(boolean) 
+     * @since 7.0
+     */
+    public boolean isEnableAsyncStackTraces() {
+        return enableAsyncStackTraces;
+    }
+
+    /**
+     * Enables or disables async stack traces.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * 
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @param enableAsyncStackTraces True to enable async stack traces.  
+     * @see #isEnableAsyncStackTraces() 
+     * @since 7.0
+     */
+    public void setEnableAsyncStackTraces(boolean enableAsyncStackTraces) {
+        this.enableAsyncStackTraces = enableAsyncStackTraces;
+    }
+    
     /**
      * Causes the runnable to be invoked on the event dispatch thread. This method
      * returns immediately and will not wait for the serial call to occur
@@ -681,7 +780,7 @@ public final class Display extends CN1Constants {
     public void callSerially(Runnable r){
         if(codenameOneRunning) {
             synchronized(lock) {
-                pendingSerialCalls.add(r);
+                pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
