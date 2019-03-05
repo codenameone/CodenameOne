@@ -109,6 +109,7 @@ import android.view.View.MeasureSpec;
 import android.webkit.*;
 import android.widget.*;
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -1076,6 +1077,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         HttpURLConnection.setFollowRedirects(false);
         CookieHandler.setDefault(null);
+        VideoCaptureConstraints.init(new AndroidVideoCaptureConstraintsCompiler());
     }
 
 
@@ -7122,7 +7124,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     String lastId = (String)pathandId.get(1);
                     Storage.getInstance().deleteStorageFile("imageUri");
                     clearMediaDB(lastId, path);
-                    callback.fireActionEvent(new ActionEvent(path));
+                    callback.fireActionEvent(new ActionEvent(addFile(path)));
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -7130,12 +7132,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (requestCode == CAPTURE_VIDEO) {
                 String path = (String) Storage.getInstance().readObject("videoUri");
                 Storage.getInstance().deleteStorageFile("videoUri");
-                callback.fireActionEvent(new ActionEvent(path));
+                callback.fireActionEvent(new ActionEvent(addFile(path)));
                 return;
             } else if (requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, getContext());
-                callback.fireActionEvent(new ActionEvent(path));
+                callback.fireActionEvent(new ActionEvent(addFile(path)));
                 return;
                 
             } else if (requestCode == OPEN_GALLERY_MULTI) {
@@ -7319,6 +7321,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void captureVideo(ActionListener response) {
+        captureVideo(null, response);
+    }
+    
+    @Override
+    public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture video in background mode");
         }
@@ -7339,8 +7346,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
+        if (cnst != null) {
+            switch (cnst.getQuality()) {
+                case VideoCaptureConstraints.QUALITY_LOW:
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 0);
+                    break;
+                case VideoCaptureConstraints.QUALITY_HIGH:
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+                    break;
+            }
+            
+            if (cnst.getMaxFileSize() > 0) {
+                intent.putExtra(MediaStore.EXTRA_SIZE_LIMIT, cnst.getMaxFileSize());
+            }
+            if (cnst.getMaxLength() > 0) {
+                intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, cnst.getMaxLength());
+            }
+        }
+        
 
         File newFile = getOutputMediaFile(true);
+        newFile.getParentFile().mkdirs();
+        newFile.getParentFile().setWritable(true, false);
         Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
 
         Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());

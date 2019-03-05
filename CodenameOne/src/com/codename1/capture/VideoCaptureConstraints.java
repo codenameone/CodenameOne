@@ -33,9 +33,9 @@ package com.codename1.capture;
  * 
  * <p>If {@link #isSupported() } is {@literal false}, then at least one of the constraints
  * is not supported by the system.  You can check support for a specific constraint using
- * {@link #isSizeSupported() } or {@link #isMaxLengthSupported() }.</p>
+ * {@link #isSizeSupported() }, {@link #isMaxFileSizeSupported() }, {@link #isQualitySupported() },  or {@link #isMaxLengthSupported() }.</p>
  * 
- * <h3>Example Usage:</h3>
+ * <h3>Example Using size and duration constraints:</h3>
  * 
  * <pre>{@code
  * // Create capture constraint 320x240, with max length 20 seconds
@@ -55,6 +55,28 @@ package com.codename1.capture;
  * }
  * }</pre>
  * 
+ * <h3>Example Using Quality:</h3>
+ * 
+ * <pre>{@code
+ * //
+ * VideoCaptureConstraints vcc = new VideoCaptureConstraints(VideoCaptureConstraints.QUALITY_LOW);
+ * if (vcc.isSupported()) {
+ *     // This platform supports a 'low quality' setting.
+ *     //  Low quality generally means a smaller file size.
+ * } else {
+ *     // Low quality constraint is not supported.
+ * }
+ * }</pre>
+ * 
+ * <h3>Platform Support Status</h3>
+ * <p><strong>Android</strong> {@link #preferredQuality(int) }, {@link #preferredMaxLength(int) }, 
+ * and {@link #preferredMaxFileSize(long) } natively.  It doesn't fully support specific widths and 
+ * heights, but if {@link #preferredWidth(int) }, and {@link #preferredHeight(int) } are supplied, it will
+ * translate these into either {@link #QUALITY_LOW}, or {@link #QUALITY_HIGH}.</p>
+ * 
+ * <p><strong>Javascript</strong> supports ....
+ * TODO  Add support for javascript and others </p>
+ * 
  * 
  * @author shannah
  * @since 7.0
@@ -62,6 +84,11 @@ package com.codename1.capture;
  * @see Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
  */
 public class VideoCaptureConstraints {
+    
+    public static final int QUALITY_LOW=1;
+    public static final int QUALITY_HIGH=2;
+    
+    
     
     /**
      * The compiler, which will be set by the implementation at initialization time.
@@ -90,10 +117,14 @@ public class VideoCaptureConstraints {
     private int maxLength;
     private int width;
     private int height;
+    private int quality;
+    private long maxFileSize;
     
     private int preferredMaxLength;
     private int preferredWidth;
     private int preferredHeight;
+    private int preferredQuality;
+    private long preferredMaxFileSize;
     
     boolean compiled;
     
@@ -116,6 +147,10 @@ public class VideoCaptureConstraints {
         this.height = toCopy.height;
         this.maxLength = toCopy.maxLength;
         this.compiled = toCopy.compiled;
+        this.quality = toCopy.quality;
+        this.preferredQuality = toCopy.preferredQuality;
+        this.maxFileSize = toCopy.maxFileSize;
+        this.preferredMaxFileSize = toCopy.preferredMaxFileSize;
     }
 
     /**
@@ -124,14 +159,35 @@ public class VideoCaptureConstraints {
      */
     @Override
     public String toString() {
-        return "VideoCaptureConstraints{"+getWidth()+"x"+getHeight()+" @ "+getMaxLength()+"s}";
+        return "VideoCaptureConstraints{"+getWidth()+"x"+getHeight()+" @ "+getMaxLength()+"s, "+ getQualityString()+" "+getMaxFileSizeString()+"}";
+    }
+    
+    private String getQualityString() {
+        switch (getQuality()) {
+            case QUALITY_LOW:
+                return "Low quality";
+            case QUALITY_HIGH:
+                return "High quality";
+        }
+        return "";
+    }
+    
+    private String getMaxFileSizeString() {
+        if (getMaxFileSize() > 0) {
+            return "<="+getMaxFileSize()+" bytes";
+        }
+        return "";
     }
 
     @Override
     public boolean equals(Object obj) {
         if (obj.getClass() == VideoCaptureConstraints.class) {
             VideoCaptureConstraints c = (VideoCaptureConstraints)obj;
-            return c.preferredHeight == preferredHeight && c.preferredWidth == preferredWidth && c.maxLength == maxLength;
+            return c.preferredHeight == preferredHeight && 
+                    c.preferredWidth == preferredWidth && 
+                    c.preferredMaxLength == preferredMaxLength && 
+                    c.preferredQuality == preferredQuality &&
+                    c.preferredMaxFileSize == preferredMaxFileSize;
         }
         return false;
     }
@@ -139,13 +195,21 @@ public class VideoCaptureConstraints {
     @Override
     public int hashCode() {
         int hash = 7;
-        hash = 29 * hash + this.maxLength;
+        hash = 29 * hash + this.preferredMaxLength;
         hash = 29 * hash + this.preferredWidth;
         hash = 29 * hash + this.preferredHeight;
+        hash = 29 * hash + this.preferredQuality;
+        hash = 29 * hash + (int)this.preferredMaxFileSize;
         return hash;
     }
     
-    
+    /**
+     * Creates a new constraint with the given quality constraint.
+     * @param quality The quality of the constraint.  Should be one of {@link #QUALITY_LOW} or {@link #QUALITY_HIGH}
+     */
+    public VideoCaptureConstraints(int quality) {
+        this.preferredQuality = quality;
+    }
     
     
     /**
@@ -158,6 +222,42 @@ public class VideoCaptureConstraints {
         this.preferredWidth = width;
         this.preferredHeight = height;
         this.preferredMaxLength = maxLength;
+    }
+    
+    /**
+     * Gets the maximum file size of the capture in bytes.
+     * @return The max file size.
+     * @see #preferredMaxFileSize(long) 
+     */
+    public long getMaxFileSize() {
+        build();
+        return maxFileSize;
+    }
+    
+    /**
+     * Sets the preferred max file size.
+     * @param size The max file size in bytes.
+     * @return Self for chaining
+     * @see #getMaxFileSize() 
+     * @see #isMaxFileSizeSupported() 
+     */
+    public VideoCaptureConstraints preferredMaxFileSize(long size) {
+        if (preferredMaxFileSize != size) {
+            preferredMaxFileSize = size;
+            compiled = false;
+        }
+        return this;
+    }
+    
+    /**
+     * Gets the preferred max file size.
+     * @return The preferred max file size, in bytes.
+     * @see #preferredMaxFileSize(long) 
+     * @see #getMaxFileSize() 
+     * @see #isMaxFileSizeSupported() 
+     */
+    public long getPreferredMaxFileSize() {
+        return preferredMaxFileSize;
     }
 
     /**
@@ -228,7 +328,7 @@ public class VideoCaptureConstraints {
      */
     public boolean isMaxLengthSupported() {
         build();
-        return maxLength == preferredMaxLength;
+        return maxLength == 0 || maxLength == preferredMaxLength;
     }
     
     
@@ -288,6 +388,7 @@ public class VideoCaptureConstraints {
      */
     public boolean isSizeSupported() {
         build();
+        if (preferredWidth == 0 && preferredHeight == 0) return true;
         return (width == preferredWidth && height == preferredHeight);
     }
 
@@ -341,6 +442,45 @@ public class VideoCaptureConstraints {
     }
     
     /**
+     * Gets the preferred quality of the recording. 
+     * @return  May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @see #preferredQuality(int) 
+     * @see #isQualitySupported() 
+     * @see #getQuality() 
+     */
+    public int getPreferredQuality() {
+        return preferredQuality;
+    }
+    
+    /**
+     * Gets the quality of the recording.
+     * @return  May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @see #getPreferredQuality() 
+     * @see #preferredQuality(int) 
+     * @see #isQualitySupported() 
+     */
+    public int getQuality() {
+        build();
+        return quality;
+    }
+    
+    /**
+     * Sets the preferred quality of the video recording.
+     * @param quality May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @return Self for chaining
+     * @see #getQuality() 
+     * @see #getPreferredQuality() 
+     * @see #isQualitySupported() 
+     */
+    public VideoCaptureConstraints preferredQuality(int quality) {
+        if (quality != preferredQuality) {
+            preferredQuality = quality;
+            compiled = false;
+        }
+        return this;
+    }
+    
+    /**
      * Builds the constraint.  This will defer to the platform's compiler to 
      * figure out the supported constraint values.
      * 
@@ -352,11 +492,15 @@ public class VideoCaptureConstraints {
             this.height = 0;
             this.width = 0;
             this.maxLength = 0;
+            this.quality = 0;
+            this.maxFileSize = 0;
         } else {
             VideoCaptureConstraints result = compiler.compile(this);
             width = result.preferredWidth;
             height = result.preferredHeight;
             maxLength = result.preferredMaxLength;
+            quality = result.preferredQuality;
+            maxFileSize = result.preferredMaxFileSize;
         }
         compiled = true;
         return this;
@@ -370,7 +514,29 @@ public class VideoCaptureConstraints {
      * @see #isMaxLengthSupported() 
      */
     public boolean isSupported() {
-        return isSizeSupported() && isMaxLengthSupported();
+        return isSizeSupported() && isMaxLengthSupported() && isQualitySupported() && isMaxFileSizeSupported();
+    }
+    
+    /**
+     * Checks if the preferred quality setting is supported.
+     * @return True if the preferred quality is not set (i.e. 0), or is supported by the platform.
+     * @see #getPreferredQuality() 
+     * @see #getQuality() 
+     * @see #preferredQuality(int) 
+     */
+    public boolean isQualitySupported() {
+        return preferredQuality == 0 || quality == preferredQuality;
+    }
+    
+    /**
+     * Checks if the max file size constraint is supported.
+     * @return true if the max file size constraint is supported, or the max file size constraint isn't set.
+     * @see #preferredMaxFileSize(long) 
+     * @see #getMaxFileSize() 
+     * @see #getPreferredMaxFileSize() 
+     */
+    public boolean isMaxFileSizeSupported() {
+        return preferredMaxFileSize == 0 || maxFileSize == preferredMaxFileSize;
     }
     
     /**
@@ -379,7 +545,7 @@ public class VideoCaptureConstraints {
      * @return True if this constraints is effectively null.
      */
     public boolean isNullConstraint() {
-        return getWidth() == 0 && getHeight() == 0 && getMaxLength() == 0;
+        return getWidth() == 0 && getHeight() == 0 && getMaxLength() == 0 && getQuality() == 0 && getMaxFileSize() == 0;
     }
     
 }
