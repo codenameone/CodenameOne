@@ -4823,17 +4823,23 @@ public class FontImage extends Image {
                     sel = new Style(sel);
                     sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
                     b.setRolloverIcon(FontImage.create("" + icon, sel));
+                } else {
+                    b.setRolloverIcon(null);
                 }
                 if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
                     pre = new Style(pre);
                     pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
                     b.setPressedIcon(FontImage.create("" + icon, pre));
                     b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
+                } else {
+                    b.setPressedIcon(null);
                 }
                 if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
                     dis = new Style(dis);
                     dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
                     b.setDisabledIcon(FontImage.create("" + icon, dis));
+                } else {
+                    b.setDisabledIcon(null);
                 }
             }
         }
