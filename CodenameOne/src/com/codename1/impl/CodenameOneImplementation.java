@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
@@ -5174,6 +5175,19 @@ public abstract class CodenameOneImplementation {
      */
     public void captureVideo(ActionListener response) {
     }
+    
+    /**
+     * Captures a video, and notifies with the data when available.  This version accepts
+     * capture constraints which may be used if the platform supports them.
+     * @param constraints Constraints for the capture.
+     * @param response Callback for the resulting video.
+     * @since 7.0
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        captureVideo(response);
+    }
+
 
     /**
      * Checks if the given gallery type is supported on this platform.
@@ -6086,6 +6100,7 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
