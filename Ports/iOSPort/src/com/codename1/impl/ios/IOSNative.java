@@ -333,7 +333,7 @@ public final class IOSNative {
     native void removeGeofencing(long clLocation, String id);
     
     // capture
-    native void captureCamera(boolean movie);
+    native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
     native long createAudioRecorder(String destinationFile);
     native void startAudioRecord(long peer);

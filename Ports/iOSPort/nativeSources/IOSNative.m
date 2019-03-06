@@ -3475,7 +3475,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 }
 
 UIPopoverController* popoverController;
-void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie) {
+void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
 #ifdef INCLUDE_CAMERA_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3494,6 +3494,10 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             
             if(movie) {
                 pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.movie", nil];
+                pickerController.videoQuality = quality;
+                if (duration > 0) {
+                    pickerController.videoMaximumDuration = duration;
+                }
             } else {
                 pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.image", nil];
             }

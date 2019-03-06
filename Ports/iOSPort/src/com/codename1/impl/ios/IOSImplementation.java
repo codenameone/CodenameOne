@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
@@ -207,6 +208,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(m instanceof Lifecycle) {
             life = (Lifecycle)m;
         }
+        VideoCaptureConstraints.init(new IOSVideoCaptureConstraintsCompiler());
     }
 
     public void setThreadPriority(Thread t, int p) {
@@ -2948,7 +2950,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(false);
+        nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
 
@@ -3069,15 +3071,51 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        captureVideo(null, response);
+    }
+        
+    /**
+     * Captures a video and notifies with the data when available
+     * @param response callback for the resulting video
+     */
+    public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
         }
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(true);
+        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst.getPreferredMaxLength());
         dropEvents = true;
     }
+    
+    private static int getUIPickerControllerQualityType(VideoCaptureConstraints cnst) {
+        if (cnst == null) {
+            return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+        int w = cnst.getWidth();
+        int h = cnst.getHeight();
+        if (w == 640 && h == 480) {
+            return 3; //UIImagePickerControllerQualityType640x480 = 3
+        }
+        if (w == 1280 && h == 720) {
+            return 4; //UIImagePickerControllerQualityTypeIFrame1280x720 = 4
+        }
+        if (w == 960 && h == 540) {
+            return 5; //UIImagePickerControllerQualityTypeIFrame960x540 = 5
+        }
+        int quality = cnst.getQuality();
+        switch (quality) {
+            case VideoCaptureConstraints.QUALITY_LOW:
+                return 2; //UIImagePickerControllerQualityTypeLow = 2
+            case VideoCaptureConstraints.QUALITY_HIGH:
+                return 0; //UIImagePickerControllerQualityTypeHigh = 0
+            default:
+                return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+    }
+    
+
 
     @Override
     public void openImageGallery(ActionListener response) {    
