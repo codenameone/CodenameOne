@@ -1898,6 +1898,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     return img;
 }
 
+EAGLView* lastFoundEaglView;
 /**
  * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
  * if there are peer components, and they are to be painted behind, then the view hierarchy
@@ -1906,13 +1907,30 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
  */
 -(EAGLView*) eaglView {
     if ([self.view class] == [EAGLView class]) {
+        lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
         
         if ([child class] == [EAGLView class]) {
+            lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
         }
+    }
+    if (lastFoundEaglView != nil && lastFoundEaglView.peerComponentsLayer != nil) {
+        // This is an edge case that occurs if we add a peer component for the first time while
+        // the app is in transition.  In this case, the new root would be added
+        // to the UITransitionView, and when the transition is complete, the 
+        // AutoLayoutView has the original EAGL view added to it, but our view controller
+        // would lose the reference to the eagl view.
+        // We need to re-do the re-rooting of the EAGL view and peer components layer in this case.
+        UIView* parent = [lastFoundEaglView superview];
+        UIView* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
+        [lastFoundEaglView removeFromSuperview];
+        [newRoot addSubview:lastFoundEaglView];
+        [parent addSubview:newRoot];
+        self.view = newRoot;
+        return lastFoundEaglView;
     }
     NSLog(@"EAGLView not found.  This is not good!!");
     return nil;
