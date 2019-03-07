@@ -2908,7 +2908,17 @@ public class Form extends Container {
     }
 
     private Component pressedCmp;
+    private Rectangle pressedCmpAbsBounds=new Rectangle();
     
+    private void setPressedCmp(Component cmp) {
+        pressedCmp = cmp;
+        if (cmp == null) {
+            pressedCmpAbsBounds.setBounds(0,0,0,0);
+        } else {
+            pressedCmpAbsBounds.setBounds(pressedCmp.getAbsoluteX(), pressedCmp.getAbsoluteY(), pressedCmp.getWidth(), pressedCmp.getHeight());
+        }
+        
+    }
     /**
      * {@inheritDoc}
      */
@@ -2919,7 +2929,7 @@ public class Form extends Container {
         }
         
         
-        pressedCmp = null;
+        setPressedCmp(null);
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
@@ -2972,7 +2982,7 @@ public class Form extends Container {
                     if (!isScrollWheeling) {
                         setFocused(leadParent);
                     }
-                    pressedCmp = cmp.getLeadComponent();
+                    setPressedCmp(cmp.getLeadComponent());
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2986,7 +2996,8 @@ public class Form extends Container {
                         if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
+                        
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -3000,7 +3011,7 @@ public class Form extends Container {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                    pressedCmp = cmp;
+                    setPressedCmp(cmp);
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
@@ -3026,7 +3037,7 @@ public class Form extends Container {
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -3334,8 +3345,10 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        Component origPressedCmp = pressedCmp;
+        boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
         rippleMotion = null;
-        pressedCmp = null;
+        setPressedCmp(null);
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane(formLayeredPane, x, y);
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -3410,6 +3423,17 @@ public class Form extends Container {
         if (dragged == null) {
             //if the pointer was released on the menu invoke the appropriate
             //soft button.
+            if (origPressedCmp != null && inOrigPressedCmpBounds) {
+                // This is a special case that occurs when the pointer press
+                // causes a drastic change in the layout (e.g. hiding the keyboard)
+                // This causes buttons to fail to fire their action events because
+                // the button is no longer under the pointer release event.
+                // We solve this by tracking the original location of the pressed component.
+                if (origPressedCmp.isEnabled()) {
+                    origPressedCmp.pointerReleased(x, y);
+                }
+                return;
+            }
             if (menuBar.contains(x, y)) {
                 Component cmp = menuBar.getComponentAt(x, y);
                 if (cmp != null && cmp.isEnabled()) {
