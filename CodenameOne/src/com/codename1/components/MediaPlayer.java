@@ -140,6 +140,10 @@ public class MediaPlayer extends Container {
      * the platform must support native video controls (iOS and Android) (See {@link Display#isNativeVideoPlayerControlsIncluded() }
      * to find out if current platform supports this; <strong>AND</strong> {@link #isHideNativeVideoControls() }
      * must be false.
+     * 
+     * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
+     * is called.  This will happen automatically if {@link #isAutoplay() } is true, or if {@link Media#play() }
+     * is called.</p>
      * @return True if this player uses native video controls.
      * @see #isHideNativeVideoControls() 
      * @see #setHideNativeVideoControls(boolean) 
@@ -153,6 +157,9 @@ public class MediaPlayer extends Container {
      * Shows the controls for this media player.  If the player is set to use 
      * native controls, then this will show the native controls.  Otherwise it
      * shows the lightweight controls.
+     * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
+     * is called.  This will happen automatically if {@link #isAutoplay() } is true, or if {@link Media#play() }
+     * is called.</p>
      */
     public void showControls() {
         if (!showControls) {
