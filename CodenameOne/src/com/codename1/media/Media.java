@@ -105,6 +105,9 @@ public interface Media {
     /**
      * Optional call that allows the caller to prepare the upcoming media player. This is useful
      * when streaming multiple streams one after another.
+     * 
+     * <p>Note: On some platforms (iOS), the poster frame and native embedded controls will not appear
+     * for the video until you call this method, otherwise.</p>
      */
     public void prepare();
     
