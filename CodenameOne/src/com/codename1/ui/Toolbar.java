@@ -2233,7 +2233,11 @@ public class Toolbar extends Container {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
                 Container bar = new Container();
-                bar.setUIID("StatusBar");
+                if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                    bar.setUIID("StatusBar", "StatusBarLandscape");
+                } else {
+                    bar.setUIID("StatusBar");
+                }
                 addComponent(BorderLayout.NORTH, bar);
             }
         }
