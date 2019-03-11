@@ -146,6 +146,12 @@ public class JSONParser implements JSONParseCallback {
     private Map<String, Object> state;
     private java.util.List<Object> parseStack;
     private String currentKey;
+    
+    /**
+     * If strict is set to false, then the parser will attempt to sanitize the JSON
+     * input before parsing.  I.e. it will accept invalid JSON, such as unquoted keys, etc..
+     */
+    private boolean strict = true;
     static class KeyStack extends Vector {
 		protected String peek() {
 			return (String)elementAt(0);
@@ -472,6 +478,9 @@ public class JSONParser implements JSONParseCallback {
         state = new LinkedHashMap<String, Object>();
         parseStack = new ArrayList<Object>();
         currentKey = null;
+        if (!strict) {
+            i = new CharArrayReader(JSONSanitizer.sanitize(Util.readToString(i)).toCharArray());
+        }
         parse(i, this);
         return state;
     }
@@ -489,6 +498,10 @@ public class JSONParser implements JSONParseCallback {
         state = new Hashtable();
         parseStack = new Vector();
         currentKey = null;
+        if (!strict) {
+            String cleaned = JSONSanitizer.sanitize(Util.readToString(i));
+            i = new CharArrayReader(cleaned.toCharArray());
+        }
         parse(i, this);
         return (Hashtable<String, Object>)state;
     }
@@ -535,6 +548,49 @@ public class JSONParser implements JSONParseCallback {
         parseStack.remove(parseStack.size() - 1);
     }
 
+    /**
+     * Checks if this JSON parser is in strict mode.  When in strict mode, which is the default,
+     * only valid JSON will be parsed.  If strict mode is disabled, then it will attempt to 
+     * sanitize the JSON input before parsing.  This can be handy if you want to parse structures
+     * that are *almost* JSON.  E.g. non-quoted keys, single-quotes on strings, unquoted strings. Etc.
+     * 
+     * @return True if strict mode is enabled.
+     * @since 7.0
+     * @see #setStrict(boolean) 
+     */
+    public boolean isStrict() {
+        return strict;
+    }
+    
+    /**
+     * Enables or disables strict mode.  Default is true.
+     * <p>When strict mode is disabled, the parser will sanitize the JSON input before parsing.  The effect
+     * is that it will be able to parse input that is json-ish.</p>
+     * <h3>Non-Strict Input</h3>
+     * The sanitizer takes JSON like content, and interprets it as JS eval
+     * would. Specifically, it deals with these non-standard constructs.
+     * <ul>
+     * <li>{@code '...'} Single quoted strings are converted to JSON strings.
+     * <li>{@code \xAB} Hex escapes are converted to JSON unicode escapes.
+     * <li>{@code \012} Octal escapes are converted to JSON unicode escapes.
+     * <li>{@code 0xAB} Hex integer literals are converted to JSON decimal
+     * numbers.
+     * <li>{@code 012} Octal integer literals are converted to JSON decimal
+     * numbers.
+     * <li>{@code +.5} Decimal numbers are coerced to JSON's stricter format.
+     * <li>{@code [0,,2]} Elisions in arrays are filled with {@code null}.
+     * <li>{@code [1,2,3,]} Trailing commas are removed.
+     * <li><code>{foo:"bar"}</code> Unquoted property names are quoted.
+     * <li><code>//comments</code> JS style line and block comments are removed.
+     * <li><code>(...)</code> Grouping parentheses are removed.
+     * </ul>
+     *
+     * @param strict True to enable strict mode, false to disable it.
+     * @see #isStrict() 
+     */
+    public void setStrict(boolean strict) {
+        this.strict = strict;
+    }
     /**
      * {@inheritDoc}
      */

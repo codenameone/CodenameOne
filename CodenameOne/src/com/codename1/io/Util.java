@@ -49,6 +49,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -193,6 +194,25 @@ public class Util {
     public static String readToString(InputStream i, String encoding) throws IOException {
         byte[] b = readInputStream(i);
         return new String(b, 0, b.length, encoding);
+    }
+    
+    /**
+     * Reads a reader to a string
+     * 
+     * @param i the input stream
+     * @param encoding the encoding of the stream
+     * @return a string
+     * @throws IOException thrown by the stream
+     * @since 7.0
+     */
+    public static String readToString(Reader reader) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        char[] buf = new char[1024];
+        int len;
+        while ((len = reader.read(buf)) != -1) {
+            sb.append(buf, 0, len);
+        }
+        return sb.toString();
     }
 
     /**
