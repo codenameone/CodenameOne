@@ -9554,13 +9554,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
 
             RenderScript rs = RenderScript.create(getContext());
-            ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-            Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
-            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
-            theIntrinsic.setRadius(radius);
-            theIntrinsic.setInput(tmpIn);
-            theIntrinsic.forEach(tmpOut);
-            tmpOut.copyTo(outputBitmap);
+            try {
+                ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+                Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+                Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+                theIntrinsic.setRadius(radius);
+                theIntrinsic.setInput(tmpIn);
+                theIntrinsic.forEach(tmpOut);
+                tmpOut.copyTo(outputBitmap);
+                tmpIn.destroy();
+                tmpOut.destroy();
+                theIntrinsic.destroy();
+            } finally {
+                rs.destroy();
+            }
 
             return new NativeImage(outputBitmap);
         } catch(Throwable t) {
