@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.io.CharArrayReader;
 import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 
 import com.codename1.io.Util;
 import static com.codename1.ui.ComponentSelector.$;
@@ -375,7 +376,8 @@ public class UIFragment {
             Element el = p.parse(new InputStreamReader(input));
             return new UIFragment(el);
         } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            Log.e(ex);
+            throw new RuntimeException(ex.getMessage());
         }
     }
     
@@ -390,7 +392,8 @@ public class UIFragment {
             Element el = p.parse(new CharArrayReader(xml.toCharArray()));
             return new UIFragment(el);
         } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            Log.e(ex);
+            throw new RuntimeException(ex.getMessage());
         }
     }
     
@@ -405,7 +408,8 @@ public class UIFragment {
             Element el = UINotationParser.parseJSONNotation(json);
             return new UIFragment(el);
         } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            Log.e(ex);
+            throw new RuntimeException(ex.getMessage());
         }
     }
     
