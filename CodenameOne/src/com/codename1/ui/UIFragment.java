@@ -36,7 +36,6 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.table.TableLayout;
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLParser;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -370,10 +369,14 @@ public class UIFragment {
      * @param input InputStream with XML content to parse
      * @return The corresponding template, or a RuntimeException if parsing failed.
      */
-    public static UIFragment parseXML(InputStream input) throws IOException {
-        XMLParser p = new XMLParser();
-        Element el = p.parse(new InputStreamReader(input));
-        return new UIFragment(el);
+    public static UIFragment parseXML(InputStream input) {
+        try {
+            XMLParser p = new XMLParser();
+            Element el = p.parse(new InputStreamReader(input));
+            return new UIFragment(el);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
     
     /**
@@ -381,10 +384,14 @@ public class UIFragment {
      * @param xml XML string describing a UI.
      * @return The corresponding template, or a RuntimeException if parsing failed.
      */
-    public static UIFragment parseXML(String xml) throws IOException {
-        XMLParser p = new XMLParser();
-        Element el = p.parse(new InputStreamReader(new ByteArrayInputStream(xml.getBytes("UTF-8"))));
-        return new UIFragment(el);
+    public static UIFragment parseXML(String xml) {
+        try {
+            XMLParser p = new XMLParser();
+            Element el = p.parse(new CharArrayReader(xml.toCharArray()));
+            return new UIFragment(el);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
     
     /**
@@ -393,9 +400,13 @@ public class UIFragment {
      * @return
      * @throws IOException 
      */
-    public static UIFragment parseJSON(String json) throws IOException {
-       Element el = UINotationParser.parseJSONNotation(json);
-       return new UIFragment(el);
+    public static UIFragment parseJSON(String json) {
+        try {
+            Element el = UINotationParser.parseJSONNotation(json);
+            return new UIFragment(el);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
     
     private UIFragment(Element el) {
