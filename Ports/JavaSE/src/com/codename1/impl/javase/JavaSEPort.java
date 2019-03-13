@@ -106,7 +106,6 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.CN1Constants;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -1876,7 +1875,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     final int newH = getHeight();
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            JavaSEPort.this.sizeChanged((int)(newW * retinaScale), (int)(newH * retinaScale));
+                            
+                            JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
+                            
                             Form f = Display.getInstance().getCurrent();
                             if (f != null) {
                                 f.revalidate();
