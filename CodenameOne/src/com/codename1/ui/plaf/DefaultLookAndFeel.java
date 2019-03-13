@@ -1366,7 +1366,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         Style style = ta.getStyle();
         int x = 0;
-        int cursorCharPosition = ta.getCursorPosition();//ta.getCursorX();        
+        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        
         Font f = style.getFont();
         int cursorX = 0;
         int xPos = 0;
