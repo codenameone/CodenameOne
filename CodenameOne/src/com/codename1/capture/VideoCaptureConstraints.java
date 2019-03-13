@@ -26,10 +26,11 @@ package com.codename1.capture;
  * Encapsulates constraints that can be used for capturing video. 
  * 
  * <p>You should set
- * the preferred constraints, then {@link #build() } the constraints to have the 
- * platform determine whether the constraints are supported.  If the constraints
- * are fully supported, then, {@link #isSupported() } will return true, and the resolved
- * constraints (height, width, maxLength) will match their preferred counterparts.  </p>
+ * the preferred constraints then if they are supported using {@link #isSupported()}, {@link #isSizeSupported()}, {@link #isQualitySupported() },
+ * {@link #isMaxLengthSupported()}, or {@link #isMaxFileSizeSupported() }.  If all of the constraints
+ * are supported, then, {@link #isSupported() } will return true, and the resolved
+ * constraints ({@link #getWidth() }, {@link #getHeight() }, {@link #getQuality() }, {@link #getMaxLength() },
+ * {@link #getMaxLength() }) will match their preferred counterparts.  </p>
  * 
  * <p>If {@link #isSupported() } is {@literal false}, then at least one of the constraints
  * is not supported by the system.  You can check support for a specific constraint using
