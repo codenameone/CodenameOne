@@ -28,13 +28,18 @@ import com.codename1.push.PushCallback;
 import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import java.awt.Desktop;
+import java.awt.EventQueue;
+import java.awt.Toolkit;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -55,12 +60,123 @@ public class Executor {
     private static Class c;
     private static Object app;
     
+    private final static boolean IS_MAC;
+    private final static boolean isWindows;
+    static {
+        String n = System.getProperty("os.name");
+        if (n != null && n.startsWith("Mac")) {
+            IS_MAC = true;
+            System.setProperty("apple.laf.useScreenMenuBar", "true");
+            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One GUIBuilder");
+            System.setProperty("apple.eawt.quitStrategy", "CLOSE_ALL_WINDOWS");
+        } else {
+            IS_MAC = false;
+        }
+        isWindows = File.separatorChar == '\\';        
+    }
     
+    /**
+     * Returns the Java version as an int value.
+     *
+     * @return the Java version as an int value (8, 9, etc.)
+     * @since 12130
+     */
+    private static int getJavaVersion() {
+        String version = System.getProperty("java.version");
+        if (version.startsWith("1.")) {
+            version = version.substring(2);
+        }
+        // Allow these formats:
+        // 1.8.0_72-ea
+        // 9-ea
+        // 9
+        // 9.0.1
+        int dotPos = version.indexOf('.');
+        int dashPos = version.indexOf('-');
+        return Integer.parseInt(version.substring(0,
+                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+    }
+    
+    static void setMacApplicationEventHandled(Object event, boolean handled) {
+        if (event != null) {
+            try {
+                Method setHandledMethod = event.getClass().getDeclaredMethod("setHandled", new Class[] { boolean.class });
+
+                setHandledMethod.invoke(event, new Object[] { Boolean.valueOf(handled) });
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
     
     public static void main(final String[] argv) throws Exception {
         if (JavaFXLoader.main(Executor.class, argv)) {
             return;
         }
+        
+        if(IS_MAC) {
+            
+            if (getJavaVersion() >= 9) {
+                // JDK9 replaces eawt with standard APIs
+                // https://bugs.openjdk.java.net/browse/JDK-8048731
+                if (Desktop.isDesktopSupported()) {
+                    try {
+                        Class quitHandlerClass = Class.forName("java.awt.desktop.QuitHandler");
+                        Method setQuitHandler = Desktop.class.getDeclaredMethod("setQuitHandler", new Class[]{ quitHandlerClass });
+                        Object quitProxy = Proxy.newProxyInstance(Executor.class.getClassLoader(), new Class[]{ quitHandlerClass }, new InvocationHandler() {
+                            public Object invoke(Object o, Method method, Object[] os) throws Throwable {
+                                if (method.getName().equals("handleQuitRequestWith")) {
+                                    Class quitResponseClass = Class.forName("java.awt.desktop.QuitResponse");
+                                    Method cancelQuit = quitResponseClass.getDeclaredMethod("cancelQuit", new Class[0]);
+                                    cancelQuit.invoke(os[1], new Object[0]);
+                                    exit();
+                                    
+                                }
+                                return null;
+                            }
+                        });
+                        setQuitHandler.invoke(Desktop.getDesktop(), new Object[]{quitProxy});
+                        
+
+
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    }
+                }
+                    
+            } else {
+            
+                try {
+                    Class applicationClass = Class.forName("com.apple.eawt.Application");
+
+                    Object macApp = applicationClass.getConstructor((Class[])null).newInstance((Object[])null);
+
+                    Class applicationListenerClass = Class.forName("com.apple.eawt.ApplicationListener");
+
+                    Method addListenerMethod = applicationClass.getDeclaredMethod("addApplicationListener", new Class[] { applicationListenerClass });
+
+                    Object proxy = Proxy.newProxyInstance(Executor.class.getClassLoader(), new Class[] { applicationListenerClass }, 
+                            new InvocationHandler() {
+                        public Object invoke(Object o, Method method, Object[] os) throws Throwable {
+                            if(method.getName().equals("handleQuit")) {
+                                setMacApplicationEventHandled(os[0], true);
+                                exit();
+                                return null;
+                            }
+                            
+                            return null;
+                        }
+                    });
+
+                    addListenerMethod.invoke(macApp, new Object[] { proxy });
+
+
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                }    
+            }
+        } 
+        
         setProxySettings();
         if (CSSWatcher.isSupported()) {
             CSSWatcher cssWatcher = new CSSWatcher();
@@ -556,6 +672,17 @@ public class Executor {
         g2.drawImage(img, 0, 0, w, h, null);
         g2.dispose();
         return resizedimage;
+    }
+    
+    private static void exit() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                stopApp();
+                destroyApp();
+                Display.getInstance().exitApplication();
+            }
+        });
+        
     }
     
 }
