@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
@@ -31,6 +32,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -111,8 +113,36 @@ public class NetworkManager {
     private Hashtable userHeaders;
     private boolean autoDetected;
     private static String autoDetectURL = "https://www.google.com/";
+    private int nextConnectionId;
     
     private NetworkManager() {
+    }
+    
+    /**
+     * Callback for native layer to check the certificates of a connection request.
+     * @param connectionId THe connection ID of the connection request to check.
+     * @return True if the certificates check out, or if the ConnectionRequest is not set
+     * to check certificates.
+     * 
+     * Currently this is only used by iOS.
+     * To use this method in other ports, you need to implement the {@link CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative() } to return true.
+     * 
+     * @see CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative()
+     * @deprecated For internal use only
+     */
+    static boolean checkCertificatesNativeCallback(int connectionId) {
+        ArrayList<NetworkThread> threads = new ArrayList<NetworkThread>();
+        synchronized(LOCK) {
+            for (NetworkThread nt : NetworkManager.getInstance().networkThreads) {
+                threads.add(nt);
+            }
+        }
+        for (NetworkThread nt : threads) {
+            if (nt.currentRequest.getId() == connectionId) {
+                return nt.currentRequest.checkCertificatesNativeCallback();
+            }
+        }
+        throw new RuntimeException("Could not find ConnectionRequest that response to native callback connection id="+connectionId);
     }
     
     void resetAPN() {
@@ -215,6 +245,7 @@ public class NetworkManager {
                         if(currentRequest.isKilled()){
                             continue;
                         }
+                        currentRequest.setId(nextConnectionId++);
                     }
                     if(userHeaders != null) {
                         Enumeration e = userHeaders.keys();
