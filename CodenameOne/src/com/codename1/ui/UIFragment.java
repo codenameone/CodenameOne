@@ -476,6 +476,9 @@ public class UIFragment {
         int len = children.size();
         for (int i=0; i<len; i++) {
             Element child = children.get(i);
+            if (child.isTextElement()) {
+                continue;
+            }
             String tagName = child.getTagName();
             
             Component cmp;
