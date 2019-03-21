@@ -81,6 +81,11 @@ public class MultipartRequest extends ConnectionRequest {
     private Vector ignoreEncoding = new Vector();
     
     /**
+     * Set to true to encode binary data as base 64
+     */
+    private boolean base64Binaries = true;
+    
+    /**
      * Special flag to keep input stream files open after they are read
      */
     private static boolean leaveInputStreamsOpen;
@@ -254,7 +259,11 @@ public class MultipartRequest extends ConnectionRequest {
                         length += value.toString().getBytes().length;
                     }
                 } else {
-                    length += Util.encodeBody((String)value).length();
+                    if(base64Binaries) {
+                        length += Util.encodeBody((String)value).length();
+                    } else {
+                        length += ((String)value).length();
+                    }
                 }
             } else {
                 if(value instanceof String[]) {
@@ -268,7 +277,11 @@ public class MultipartRequest extends ConnectionRequest {
                                 length += value.toString().getBytes().length;
                             }
                         } else {
-                            length += Util.encodeBody(s).length();
+                            if(base64Binaries) {
+                                length += Util.encodeBody(s).length();
+                            } else {
+                                length += s.length();
+                            }
                         }
                     }
                 } else {
@@ -319,7 +332,11 @@ public class MultipartRequest extends ConnectionRequest {
                 if(ignoreEncoding.contains(key)) {
                     writer.write((String)value);
                 } else {
-                    writer.write(Util.encodeBody((String)value));
+                    if(base64Binaries) {
+                        writer.write(Util.encodeBody((String)value));
+                    } else {
+                        writer.write((String)value);
+                    }
                 }
                 //writer.write(CRLF);
                 if(canFlushStream){
@@ -349,7 +366,11 @@ public class MultipartRequest extends ConnectionRequest {
                         if(ignoreEncoding.contains(key)) {
                             writer.write(s);
                         } else {
-                            writer.write(Util.encodeBody(s));
+                            if(base64Binaries) {
+                                writer.write(Util.encodeBody(s));
+                            } else {
+                                writer.write(s);
+                            }
                         }
                         //writer.write(CRLF);
                         if(canFlushStream){
@@ -450,5 +471,21 @@ public class MultipartRequest extends ConnectionRequest {
      */ 
     public static void setCanFlushStream(boolean flush){
         canFlushStream = flush;
+    }
+
+    /**
+     * Set to true to encode binary data as base 64
+     * @return the base64Binaries
+     */
+    public boolean isBase64Binaries() {
+        return base64Binaries;
+    }
+
+    /**
+     * Set to true to encode binary data as base 64
+     * @param base64Binaries the base64Binaries to set
+     */
+    public void setBase64Binaries(boolean base64Binaries) {
+        this.base64Binaries = base64Binaries;
     }
 }
