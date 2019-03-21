@@ -690,6 +690,8 @@ public final class IOSNative {
 
     native boolean isMultiGallerySelectSupported();
 
+    native void setConnectionId(long peer, int id);
+
     
 
      

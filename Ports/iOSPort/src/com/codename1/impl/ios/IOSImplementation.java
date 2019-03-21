@@ -6612,6 +6612,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     static class NetworkConnection extends InputStream {
+        private int id;
         private long peer;
         private boolean closed;
         private FileBackedOutputStream body;
@@ -6624,6 +6625,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         String error;
         public final Object LOCK = new Object();
         
+        public void setId(int id) {
+            this.id = id;
+            nativeInstance.setConnectionId(peer, id);
+        }
         
         public void setChunkedStreamingMode(int len) {
             nativeInstance.setChunkedStreamingMode(peer, len);
@@ -6891,7 +6896,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         NetworkConnection conn =  (NetworkConnection)connection;
-        conn.ensureConnection();
+        //conn.ensureConnection();
         return conn.getSSLCertificates(url);
     }
 
@@ -6899,6 +6904,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return true;
     }
+
+    /**
+     * Checking SSL certificates uses a native callback, instead of the direct approach
+     * which is used in other ports.
+     * @return 
+     */
+    @Override
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return true;
+    }
+    
+    
 
     /**
      * @inheritDoc
@@ -6969,6 +6986,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.setMethod(n.peer, "GET");
         }
     }
+
+    @Override
+    public void setConnectionId(Object connection, int id) {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.setId(id);
+    }
+    
+    
 
     /**
      * @inheritDoc

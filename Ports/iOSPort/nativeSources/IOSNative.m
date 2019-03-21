@@ -1674,6 +1674,13 @@ void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THR
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_setConnectionId___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT id) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    [impl setConnectionId:id];
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT mtd) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);

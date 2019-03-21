@@ -4487,6 +4487,23 @@ public abstract class CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return false;
     }
+    
+    /**
+     * SSL certificate checks must be performed via a callback from the native side,
+     * rather than explicitly checking as part of NetworkManager's connection
+     * flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
+     * explicitly, it forces the connection to be sent without a POST body.  Hence
+     * we need to let iOS do the check on the native side, and callback into Java
+     * to run the checkSSLCertificates method of the request.
+     * @return True if the platform requires a native callback fo check SSL certificates
+     */
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return false;
+    }
+    
+    public void setConnectionId(Object connection, int id) {
+        
+    }
 
     /**
      * Connects to a given URL, returns a connection object to be used with the implementation

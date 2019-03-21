@@ -70,8 +70,9 @@ import java.util.Vector;
  * <h3>Supported Attributes</h3>
  * 
  * <ul>
- * <li><strong>uiid</strong> - The UIID of the component.</li>
+ * <li><strong>uiid</strong> - The UIID of the component.  I.e. {@link Component#getUIID() }</li>
  * <li><strong>id</strong> - The ID of the component so that it can be retrieved using {@link #findById(java.lang.String) }</li>
+ * <li><strong>name</strong> - The name of the component (i.e. {@link Component#getName() }</li>
  * <li><strong>constraint</strong> - The layout constraint used for adding to
  * the parent. Supports north, south, east, west, center, when parent is
  * border</li>
@@ -444,6 +445,11 @@ public class UIFragment {
         if (id != null && id.length() > 0) {
             index.put(id, cmp);
         }
+        
+        String name = el.getAttribute("name");
+        if (name != null && name.length() > 0) {
+            cmp.setName(name);
+        }
     }
     
     private List<Element> getChildren(Element el) {
@@ -476,6 +482,9 @@ public class UIFragment {
         int len = children.size();
         for (int i=0; i<len; i++) {
             Element child = children.get(i);
+            if (child.isTextElement()) {
+                continue;
+            }
             String tagName = child.getTagName();
             
             Component cmp;
@@ -517,6 +526,9 @@ public class UIFragment {
             reset();
         }
         parameters.put(paramName, param);
+        if (param != null && param.getName() == null) {
+            param.setName(paramName);
+        }
         return this;
     }
     
@@ -667,7 +679,7 @@ public class UIFragment {
                     } else {
                         el.addChild(buildXMLFromJSONNotation(children));
                     }
-                    for (String key : new String[]{"uiid", "id", "class", "cols", "rows", "align", "valign"}) {
+                    for (String key : new String[]{"uiid", "id", "class", "cols", "rows", "align", "valign", "name"}) {
                         if (m.containsKey(key)) {
                             Object val = m.get(key);
                             if (val instanceof Double && ("cols".equals(key) || "rows".equals(key))) {
