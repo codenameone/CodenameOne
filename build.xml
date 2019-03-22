@@ -45,7 +45,7 @@
     </target>
 
 
-    <target name="samples" depends="javase">
+    <target name="samples" depends="javase" description="Browse and run samples">
         <ant dir="Samples" target="run" inheritAll="false" useNativeBasedir="true"/>
     </target>
 
