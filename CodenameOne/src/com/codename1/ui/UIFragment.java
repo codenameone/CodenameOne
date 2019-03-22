@@ -64,7 +64,17 @@ import java.util.Vector;
  * <li><strong>table</strong> - A container with layout=TableLayout.  Accepted attributes {@literal rows} and {@literal cols}.  May have zero or more nested {@literal <tr>} tags.
  * <li><strong>label</strong> - A Label</li>
  * <li><strong>button</strong> - A button</li>
+ * </ul>
  * 
+ * <h3>Layout Variant Tags</h3>
+ * 
+ * <p>BorderLayout and BoxLayout include some variant tags to customize their behaviour also:</p>
+ * 
+ * <ul>
+ *  <li><strong>borderAbs, borderAbsolute</strong> - BorderLayout with center absolute behaviour.  This is the same as <code>&lt;border behavior='absolute'/&gt;</code></li>
+ *  <li><strong>borderTotalBelow</strong> - BorderLayout with Total Below center behaviour. This is the same as <code>&lt;border behavior='totalBelow'/&gt;</code></li>
+ *  <li><strong>yBottomLast, ybl</strong> - BoxLayout with Y_BOTTOM_LAST setting.</li>
+ *  <li><strong>xNoGrow, xng</strong> - BoxLayout X with No Grow option.  This is the same as <code>&lt;x noGrow='true'/&gt;</code></li>
  * </ul>
  * 
  * <h3>Supported Attributes</h3>
@@ -80,6 +90,9 @@ import java.util.Vector;
  * grid or table.</li>
  * <li><strong>cols</strong> - Used by grid only. Represents number of columns
  * in grid or table.</li>
+ * <li><strong>behavior, behaviour</strong> - Used by Border Layout only.  Specifies the center behaviour.  Accepts values "scale", "absolute", and "totalBelow".</li>
+ * <li><strong>noGrow</strong> - Used by <code>&lt;x&gt;</code> only.  Specifies that BoxLayout should be X_AXIS_NO_GROW.  Accepts values "true" and "false".</li>
+ * <li><strong>bottomLast</strong> - Used by <code>&lt;y&gt;</code> only.  Specifies that BoxLayout should use Y_AXIS_BOTTOM_LAST option.  Accepts values "true" and "false"</li>
  * </ul>
  *
  * <h3>Example XML Notation</h3>
@@ -133,6 +146,17 @@ import java.util.Vector;
  *    <li><strong>Box Layout Y</strong> - {@code {y:[...]}}</li>
  *    <li><strong>Layered Layout</strong> - {@code {layered:[...]}}</li>
  *    <li><strong>Table Layout</strong> - {@code {table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]}}</li>
+ * </ul>
+ * 
+ * <p><strong>Layout Variants</strong></p>
+ * 
+ * <p>BoxLayout and BorderLayout include variant shorthands to customize their behaviour.</p>
+ * 
+ * <ul>
+ *  <li><strong>xNoGrow, xng</strong> - Same as {@code {x:[...], noGrow:true}}</li>
+ *  <li><strong>yBottomLast, ybl</strong> - Same as {@code {y:[...], bottomLast:true}}</li>
+ *  <li><strong>centerAbsolute, centerAbs, ca</strong> - Same as {@code {center:[...], behavior:absolute}}</li>
+ *  <li><strong>centerTotalBelow, ctb</strong> - Same as {@code {center:[...], behavior:totalBelow}}</li>
  * </ul>
  * 
  * <p><strong>Embedding Placeholders/Parameters</strong></p>
@@ -214,6 +238,30 @@ public class UIFragment {
      */
     public static class DefaultComponentFactory implements ComponentFactory {
 
+        private static int centerBehaviour(String behaviour) {
+            if ("scale".equalsIgnoreCase(behaviour)) {
+                return BorderLayout.CENTER_BEHAVIOR_SCALE;
+            }
+            if ("absolute".equalsIgnoreCase(behaviour)) {
+                return BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+            }
+            if ("center".equalsIgnoreCase(behaviour)) {
+                return BorderLayout.CENTER_BEHAVIOR_CENTER;
+            }
+            if ("totalBelow".equalsIgnoreCase(behaviour)) {
+                return BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW;
+            }
+            return BorderLayout.CENTER_BEHAVIOR_SCALE;
+        }
+        
+        private static boolean grow(String grow) {
+            if ("true".equalsIgnoreCase(grow)) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        
         private static int align(String align) {
             if ("left".equals(align)) {
                 return Component.LEFT;
@@ -240,17 +288,57 @@ public class UIFragment {
             return 0;
         }
         
+        private static boolean empty(Element el, String attName) {
+            String val = el.getAttribute(attName);
+            return val == null || val.length() == 0;
+        }
+        
         @Override
         public Component newComponent(Element el) {
             String name = el.getTagName().toLowerCase();
             if (name.startsWith("border")) {
-                return new Container(new BorderLayout());
+                BorderLayout l = new BorderLayout();
+                if (name.startsWith("borderabs")) {
+                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+                } else if (name.startsWith("borderscale")) {
+                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+                } else if (name.startsWith("bordertotalbelow")) {
+                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);
+                } else {
+                    if (!empty(el, "behaviour")) {
+                        l.setCenterBehavior(centerBehaviour(el.getAttribute("behaviour")));
+                    } else if (!empty(el, "behavior")) {
+                        l.setCenterBehavior(centerBehaviour(el.getAttribute("behavior")));
+                    }
+                }
+                System.out.println("Border behaviour is "+l.getCenterBehavior());
+                return new Container(l);
             }
-            if (name.equals("y")) {
-                return new Container(BoxLayout.y());
+            if (name.startsWith("y")) {
+                BoxLayout l;
+                if (name.startsWith("ybottom") || name.equals("ybl")) {
+                    l = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
+                } else {
+                    if ("true".equalsIgnoreCase(el.getAttribute("bottomLast"))) {
+                        l = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
+                    } else {
+                        l = new BoxLayout(BoxLayout.Y_AXIS);
+                    }
+                }
+                return new Container(l);
             }
-            if (name.equals("x")) {
-                return new Container(BoxLayout.x());
+            if (name.startsWith("x")) {
+                BoxLayout l;
+                if (name.startsWith("xnogrow") || name.equals("xng")) {
+                    l = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);
+                } else {
+                    if ("true".equalsIgnoreCase(el.getAttribute("noGrow")) || "false".equalsIgnoreCase(el.getAttribute("grow"))) {
+                        l = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);
+                    } else {
+                        l = new BoxLayout(BoxLayout.X_AXIS);
+                    }
+                }
+                return new Container(l);
             }
             if (name.equals("flow")) {
                 FlowLayout fl = new FlowLayout();
@@ -558,20 +646,75 @@ public class UIFragment {
         }
 
         private static boolean isBorderLayout(Map m) {
-            for (String key : new String[]{"north", "south", "east", "west", "overlay", "center", "n", "s", "e", "w", "c", "o"}) {
+            for (String key : BORDER_LAYOUT_KEYS) {
                 if (m.containsKey(key)) {
                     return true;
                 }
             }
             return false;
         }
+        private static final String[] ATTRIBUTES = new String[]{"uiid", "id", "class", "cols", "rows", "align", "valign", "name", "grow", "noGrow", "behaviour", "behavior", "bottomLast"};
+        private static final String[] BORDER_LAYOUT_CONSTRAINTS = new String[]{"north", "south", "east", "west", "overlay", "center"};
+        private static final String[] BORDER_LAYOUT_SINGLE_CHAR_ALIASES = new String[]{"n", "s", "e", "w", "c", "o"};
+        private static final String[] BORDER_LAYOUT_KEYS = new String[]{"north", "south", "east", "west", "overlay", "center", "n", "s", "e", "w", "c", "o", "centerAbsolute", "centerScale", "centerAbs", "centerTotalBelow", "ca", "cs", "ctb"};
+        private static final String[] BORDER_LAYOUT_CENTER_ALIASES = new String[]{"c", "centerAbsolute", "centerScale", "centerAbs", "centerTotalBelow", "ca", "cs", "ctb"};
+        private static void setBorderLayoutBehaviour(Map m) {
+            if (m.containsKey("behavior")) {
+                return;
+            }
+            if (m.containsKey("centerAbsolute") || m.containsKey("ca") || m.containsKey("centerAbs")) {
+                m.put("behavior", "absolute");
+                return;
+            }
+            if (m.containsKey("centerScale") || m.containsKey("cs")) {
+                m.put("behavior", "scale");
+                return;
+            }
+            if (m.containsKey("centerTotalBelow") || m.containsKey("ctb")) {
+                m.put("behavior", "totalBelow");
+                return;
+            }
+            
+            
+        }
 
         private static boolean isBoxLayoutX(Map m) {
-            return m.containsKey("x");
+            return m.containsKey("x") || m.containsKey("xng") || m.containsKey("xNoGrow");
+        }
+        
+        private static void setBoxLayoutXNoGrow(Map m) {
+            if (m.containsKey("xNoGrow")) {
+                m.put("x", m.get("xNoGrow"));
+                m.put("noGrow", "true");
+                return;
+            }
+            if (m.containsKey("xng")) {
+                m.put("x", m.get("xng"));
+                m.put("noGrow", "true");
+                return;
+            } 
+        }
+        
+        private static void setBoxLayoutYBottomLast(Map m) {
+            if (m.containsKey("yBottom")) {
+                m.put("y", m.get("yBottom"));
+                m.put("bottomLast", "true");
+                return;
+            }
+            if (m.containsKey("yBottomLast")) {
+                m.put("y", m.get("yBottomLast"));
+                m.put("bottomLast", "true");
+                return;
+            }
+            if (m.containsKey("ybl")) {
+                m.put("y", m.get("ybl"));
+                m.put("bottomLast", "true");
+                return;
+            }
         }
 
         private static boolean isBoxLayoutY(Map m) {
-            return m.containsKey("y");
+            return m.containsKey("y") || m.containsKey("yBottom") || m.containsKey("yBottomLast") || m.containsKey("ybl");
         }
 
         private static boolean isGridLayout(Map m) {
@@ -593,6 +736,7 @@ public class UIFragment {
 
         private static Element buildXMLFromJSONNotation(Object o) throws IOException {
             Element el = null;
+            //System.out.println("Building "+o);
             if (o instanceof Map) {
                 Map m = (Map)o;
                 if (m.get("root") != null) {
@@ -600,12 +744,16 @@ public class UIFragment {
                     return buildXMLFromJSONNotation(m.get("root"));
                 } else {
                     Object children = null;
+                    String key = null;
                     if (isBorderLayout(m)) {
+                        setBorderLayoutBehaviour(m);
                         el = new Element("border");
                     } else if (isBoxLayoutX(m)) {
+                        setBoxLayoutXNoGrow(m);
                         el = new Element("x");
                         children = m.get("x");
                     } else if (isBoxLayoutY(m)) {
+                        setBoxLayoutYBottomLast(m);
                         el = new Element("y");
                         children = m.get("y");
                     } else if (isGridLayout(m)) {
@@ -642,7 +790,7 @@ public class UIFragment {
                             }
                         }
                     } else if (isBorderLayout(m)){
-                        for (String constraint : new String[]{"n", "s", "e", "w", "c", "o"}) {
+                        for (String constraint : BORDER_LAYOUT_SINGLE_CHAR_ALIASES) {
                             if (m.containsKey(constraint)) {
                                 char c = constraint.charAt(0);
                                 switch (c) {
@@ -668,7 +816,15 @@ public class UIFragment {
                                 }
                             }
                         }
-                        for (String constraint : new String[]{"north", "south", "east", "west", "overlay", "center"}) {
+                        if (!m.containsKey("center")) {
+                            for (String constraint : BORDER_LAYOUT_CENTER_ALIASES) {
+                                if (m.containsKey(constraint)) {
+                                    m.put("center", m.get(constraint));
+                                    break;
+                                }
+                            }
+                        }
+                        for (String constraint : BORDER_LAYOUT_CONSTRAINTS) {
                             if (m.containsKey(constraint)) {
                                 Element north = buildXMLFromJSONNotation(m.get(constraint));
                                 north.setAttribute("constraint", constraint);
@@ -679,13 +835,13 @@ public class UIFragment {
                     } else {
                         el.addChild(buildXMLFromJSONNotation(children));
                     }
-                    for (String key : new String[]{"uiid", "id", "class", "cols", "rows", "align", "valign", "name"}) {
-                        if (m.containsKey(key)) {
-                            Object val = m.get(key);
-                            if (val instanceof Double && ("cols".equals(key) || "rows".equals(key))) {
+                    for (String k : ATTRIBUTES) {
+                        if (m.containsKey(k)) {
+                            Object val = m.get(k);
+                            if (val instanceof Double && ("cols".equals(k) || "rows".equals(k))) {
                                 val = ((Double)val).intValue();
                             }
-                            el.setAttribute(key, String.valueOf(val));
+                            el.setAttribute(k, String.valueOf(val));
                         }
                     }
                     
