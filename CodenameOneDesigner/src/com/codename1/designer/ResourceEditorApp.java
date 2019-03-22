@@ -372,8 +372,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
             }
             
             if(args[0].equalsIgnoreCase("-img")) {
-                java.awt.Container cnt = new java.awt.Container();
-                com.codename1.ui.Display.init(cnt);
+                
                 String imageName;
                 String fileName;
                 if(args.length == 3) {
@@ -389,19 +388,32 @@ public class ResourceEditorApp extends SingleFrameApplication {
                         return;
                     }
                 }
-                
+                File resourceFile = new File(args[1]);
                 File imageFile = new File(fileName);
                 if(!imageFile.exists()) {
                     System.out.println("File not found: " + imageFile.getAbsolutePath());
                     System.exit(1);
                     return;
                 }
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                CSSImageImporter cssImporter = new CSSImageImporter(resourceFile, imageFile, 0);
+                if (cssImporter.checkIfCSSProject()) {
+                    // CSS projects can't just import images into the res file.  They need to 
+                    // be added to the CSS file, and then have the resource file regenerated.
+                    cssImporter.doImportAndExit();
+                    System.exit(0);
+                    return;
+                }
+                
+                
+                
                 com.codename1.ui.Image img = ImageRGBEditor.createImageStatic(imageFile);
                 
                 boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
                 EditableResources.setXMLEnabled(isXMLEnabled);
                 EditableResources res = new EditableResources();
-                File resourceFile = new File(args[1]);
+                
                 res.openFileWithXMLSupport(resourceFile);
                 res.setImage(imageName, img);
                 try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
@@ -412,8 +424,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 return;
             }
             if(args[0].equalsIgnoreCase("-mimg")) {
-                java.awt.Container cnt = new java.awt.Container();
-                com.codename1.ui.Display.init(cnt);
+                
                 String fileName;
                 if(args.length == 4) {
                     fileName = args[3];
@@ -425,24 +436,31 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 }
                 String dpi = args[2];
                 int dpiInt = -1;
+                int sourceDpi = 0;
                 switch(dpi.toLowerCase()) {
                     case "high": 
                         dpiInt = 3;
+                        sourceDpi = 240;
                         break;
                     case "veryhigh": 
                         dpiInt = 4;
+                        sourceDpi = 320;
                         break;
                     case "hd": 
                         dpiInt = 5;
+                        sourceDpi = 480;
                         break;
                     case "560": 
                         dpiInt = 6;
+                        sourceDpi = 480;
                         break;
                     case "2hd": 
                         dpiInt = 7;
+                        sourceDpi = 640;
                         break;
                     case "4k": 
                         dpiInt = 8;
+                        sourceDpi = 720;
                         break;
                     default:
                         System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
@@ -456,11 +474,21 @@ public class ResourceEditorApp extends SingleFrameApplication {
                     System.exit(1);
                     return;
                 }
+                File resourceFile = new File(args[1]);
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                CSSImageImporter cssImporter = new CSSImageImporter(resourceFile, imageFile, sourceDpi);
+                if (cssImporter.checkIfCSSProject()) {
+                    cssImporter.doImportAndExit();
+                    System.exit(0);
+                    return;
+                }
+                
                 
                 boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
                 EditableResources.setXMLEnabled(isXMLEnabled);
                 EditableResources res = new EditableResources();
-                File resourceFile = new File(args[1]);
+                
                 res.openFileWithXMLSupport(resourceFile);
                 AddAndScaleMultiImage.generateImpl(new File[] {imageFile}, 
                         res, dpiInt);
