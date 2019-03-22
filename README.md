@@ -77,6 +77,16 @@ $ ant
 $ ant test-javase
 ~~~~
 
+**Running Samples**
+
+The Samples directory contains a growing set of sample applications.  These samples aren't meant to be demos, but rather samples of how to use APIs.
+
+You can launch the sample runner app from the command-line using:
+
+~~~
+$ ant samples
+~~~
+
 ## ParparVM
 Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
 
