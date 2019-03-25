@@ -69,6 +69,28 @@ import java.util.Map;
  * @see Display#invokeAndBlock(java.lang.Runnable) 
  */
 public class Dialog extends Form {
+
+    /**
+     * The default pointer out of bounds dispose behavior, notice that
+     * this only applies to dialogs and not popup dialogs where this is
+     * always true by default
+     * @return the defaultDisposeWhenPointerOutOfBounds
+     */
+    public static boolean isDefaultDisposeWhenPointerOutOfBounds() {
+        return defaultDisposeWhenPointerOutOfBounds;
+    }
+
+    /**
+     * The default pointer out of bounds dispose behavior, notice that
+     * this only applies to dialogs and not popup dialogs where this is
+     * always true by default
+     * @param aDefaultDisposeWhenPointerOutOfBounds the defaultDisposeWhenPointerOutOfBounds to set
+     */
+    public static void setDefaultDisposeWhenPointerOutOfBounds(
+        boolean aDefaultDisposeWhenPointerOutOfBounds) {
+        defaultDisposeWhenPointerOutOfBounds =
+            aDefaultDisposeWhenPointerOutOfBounds;
+    }
     /**
      * Indicates whether the dialog has been disposed
      */
@@ -180,7 +202,14 @@ public class Dialog extends Form {
      */
     private static boolean commandsAsButtons = true;
 
-    private boolean disposeWhenPointerOutOfBounds = false;
+    
+    /**
+     * The default pointer out of bounds dispose behavior, notice that 
+     * this only applies to dialogs and not popup dialogs where this is 
+     * always true by default
+     */
+    private static boolean defaultDisposeWhenPointerOutOfBounds = false;
+    private boolean disposeWhenPointerOutOfBounds = defaultDisposeWhenPointerOutOfBounds;
     private boolean pressedOutOfBounds;
     
     /**
@@ -797,6 +826,23 @@ public class Dialog extends Form {
      * center. 
      * 
      * @param title title for the dialog
+     * @param body text placed in the center of the dialog
+     * @param cmds commands that are added to the form any click on any command
+     * will dispose the form
+     * @return the command pressed by the user
+     */
+    public static Command show(String title, String body, Command... cmds) {
+        TextArea t = new TextArea(body, 3, 30);
+        t.setUIID("DialogBody");
+        t.setEditable(false);
+        return show(title, t, cmds);
+    }
+
+    /**
+     * Shows a modal dialog with the given component as its "body" placed in the
+     * center. 
+     * 
+     * @param title title for the dialog
      * @param body component placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
@@ -994,6 +1040,7 @@ public class Dialog extends Form {
     void onShowCompletedImpl() {
         pressedOutOfBounds = false;
         disposedDueToRotation = false;
+        setLightweightMode(false);
         onShowCompleted();
         if(isDisposed()) {
             disposeImpl();

@@ -70,7 +70,8 @@ public class AndroidKeyboard implements VirtualKeyboardInterface {
     }
 
     public boolean isVirtualKeyboardShowing() {
-        return InPlaceEditView.isEditing();
+        //return InPlaceEditView.isEditing();
+        return InPlaceEditView.isKeyboardShowing();
     }
 
     public void setInputType(int inputType) {

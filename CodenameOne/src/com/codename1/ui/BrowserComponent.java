@@ -35,6 +35,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.StringUtil;
@@ -1687,5 +1688,20 @@ public class BrowserComponent extends Container {
      */
     public boolean isDebugMode() {
         return getClientProperty("BrowserComponent.firebug") == Boolean.TRUE;
+    }
+    
+    /**
+     * This method creates a <a href="http://en.wikipedia.org/wiki/Data_URI_scheme">data URI</a>
+     * which allows developers creating HTML for local use to embed local images into the HTML by
+     * appending them as a URI. E.g. instead of referencing a file or URL just load the image data
+     * and place the contents of this string into the src attribute.
+     * <p>This is the easiest way to get an HTML with local images to work on all mobile platforms.
+     * @param data data of an image
+     * @param mime the mime type of the image e.g. image/png
+     * @return a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
+     * @since 6.0
+     */
+    public static String createDataURI(byte[] data, String mime) {
+        return "data:" + mime + ";base64," + Base64.encodeNoNewline(data);
     }
 }

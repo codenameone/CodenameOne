@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
@@ -156,7 +157,14 @@ public final class Display extends CN1Constants {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     
-
+    /**
+     * Enable Async stack traces.  This is disabled by default, but will cause
+     * stack traces of callSerially() calls to be stored, and logged if the 
+     * Runnable throws an exception.
+     */
+    private boolean enableAsyncStackTraces;
+    
+    
     /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
@@ -446,6 +454,7 @@ public final class Display extends CN1Constants {
     private boolean multiKeyMode;
     
     private ActionListener virtualKeyboardListener;
+    private EventDispatcher virtualKeyboardListeners;
     
     private int lastSizeChangeEventWH = -1;
 
@@ -669,6 +678,98 @@ public final class Display extends CN1Constants {
         impl.playDialogSound(type);
     }
 
+    private DebugRunnable currentEdtContext;
+    
+    private class EdtException extends RuntimeException {
+        private Throwable cause;
+        private EdtException parent;
+        public void setCause(Throwable t) {
+            this.cause = t;
+        }
+
+        public synchronized Throwable getCause() {
+            return cause;
+        }
+        
+        private void throwRoot(Throwable cause) {
+            EdtException root = this;
+            root.setCause(cause);
+            while (root.parent != null) {
+                root.parent.setCause(root);
+                root = root.parent;
+            }
+            throw root;
+        }
+        
+    }
+    
+    /**
+     * A wrapper around Runnable that records the stack trace so that
+     * if an exception occurs, it is easier to track it back to the original
+     * source.
+     */
+    private class DebugRunnable implements Runnable {
+        private final Runnable internal;
+        private final EdtException exceptionWrapper;
+        private final DebugRunnable parentContext;
+        
+        DebugRunnable(Runnable internal) {
+            this.internal = internal;
+            this.parentContext = currentEdtContext;
+            if (isEnableAsyncStackTraces()) {
+                exceptionWrapper = new EdtException();
+                if (parentContext != null) {
+                    exceptionWrapper.parent = parentContext.exceptionWrapper;
+                }
+            } else {
+                exceptionWrapper = null;
+            }
+        }
+        
+        @Override
+        public void run() {
+            if (exceptionWrapper != null) {
+                try {
+                    currentEdtContext = this;
+                    internal.run();
+                } catch (RuntimeException t) {
+                    exceptionWrapper.throwRoot(t);
+                }
+            } else {
+                internal.run();
+            }
+        }
+        
+    }
+    
+    
+    /**
+     * Checks if async stack traces are enabled.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @return Whether async stack traces are enabled.  
+     * @see #setEnableAsyncStackTraces(boolean) 
+     * @since 7.0
+     */
+    public boolean isEnableAsyncStackTraces() {
+        return enableAsyncStackTraces;
+    }
+
+    /**
+     * Enables or disables async stack traces.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * 
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @param enableAsyncStackTraces True to enable async stack traces.  
+     * @see #isEnableAsyncStackTraces() 
+     * @since 7.0
+     */
+    public void setEnableAsyncStackTraces(boolean enableAsyncStackTraces) {
+        this.enableAsyncStackTraces = enableAsyncStackTraces;
+    }
+    
     /**
      * Causes the runnable to be invoked on the event dispatch thread. This method
      * returns immediately and will not wait for the serial call to occur
@@ -679,7 +780,7 @@ public final class Display extends CN1Constants {
     public void callSerially(Runnable r){
         if(codenameOneRunning) {
             synchronized(lock) {
-                pendingSerialCalls.add(r);
+                pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
@@ -1094,7 +1195,7 @@ public final class Display extends CN1Constants {
      * @param text new text for the component
      */
     public void onEditingComplete(final Component c, final String text) {
-        if(!isEdt()) {
+        if(!isEdt() && codenameOneRunning) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     onEditingComplete(c, text);
@@ -2508,21 +2609,80 @@ public final class Display extends CN1Constants {
      * Boolean value.
      * 
      * @param l the listener 
-     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
+     * @deprecated Use {@link #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */
     public void setVirtualKeyboardListener(ActionListener l){
+        if (virtualKeyboardListener != null) {
+            removeVirtualKeyboardListener(l);
+        }
         virtualKeyboardListener = l;
+        addVirtualKeyboardListener(l);
     }
-
+    
     /**
      * Gets the VirtualKeyboardListener Objects of exists.
      * 
      * @return a Listener Object or null if not exists
-     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
+     * @deprecated Use {@link #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */ 
     public ActionListener getVirtualKeyboardListener() {
         return virtualKeyboardListener;
     }
+    
+    /**
+     * Adds a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * on hide.
+     * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
+     * is shown or hidden.</p>
+     * @param l The listener. 
+     * @see #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     * @since 6.0
+     */
+    public synchronized void addVirtualKeyboardListener(ActionListener l) {
+        if (virtualKeyboardListeners == null) {
+            virtualKeyboardListeners = new EventDispatcher();
+        }
+        virtualKeyboardListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * on hide.
+     * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
+     * is shown or hidden.</p>
+     * @param l The listener. 
+     * @see #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     * @since 6.0
+     */
+    public synchronized void removeVirtualKeyboardListener(ActionListener l) {
+        if (virtualKeyboardListeners != null) {
+            virtualKeyboardListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Fires a virtual keyboard show event.
+     * @param show 
+     * @since 6.0
+     */
+    public void fireVirtualKeyboardEvent(boolean show) {
+        if (virtualKeyboardListeners != null) {
+            virtualKeyboardListeners.fireActionEvent(new ActionEvent(show));
+        }
+    }
+    
+    /**
+     * Gets the invisible area under the Virtual Keyboard.
+     * @return Height of the VKB that overlaps the screen.
+     * @since 6.0
+     */
+    public int getInvisibleAreaUnderVKB() {
+        return impl.getInvisibleAreaUnderVKB();
+    }
+
+    
     
     /**
      * Returns the type of the input device one of:
@@ -2788,6 +2948,78 @@ public final class Display extends CN1Constants {
         impl.exit();
     }
 
+    /**
+     * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
+     * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
+     * to enter and exit full-screen - and query the current state.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     */
+    public boolean isFullScreenSupported() {
+        return impl.isFullScreenSupported();
+    }
+    
+    /**
+     * Try to enter full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
+     * if the app fails to enter full-screen mode.
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public boolean requestFullScreen() {
+        return impl.requestFullScreen();
+    }
+    
+    /**
+     * Try to exit full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
+     * if the app fails to exit full-screen mode.
+     * @see #requestFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public boolean exitFullScreen() {
+        return impl.exitFullScreen();
+    }
+    
+    /**
+     * Checks if the app is currently running in full-screen mode.
+     * @return {@literal true} if the app is currently in full-screen mode.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isFullScreenSupported() 
+     */
+    public boolean isInFullScreenMode() {
+        return impl.isInFullScreenMode();
+    }
+    
     /**
      * Shows a native Form/Canvas or some other heavyweight native screen
      *
@@ -3135,8 +3367,16 @@ public final class Display extends CN1Constants {
     /**
      * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
      * although some include a jad property allowing for this feature
+     * 
+     * <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @return true if lockOrientation  would work
+     * @see #lockOrientation(boolean) 
+     * @see #unlockOrientation() 
      */
     public boolean canForceOrientation() {
         return impl.canForceOrientation();
@@ -3145,8 +3385,16 @@ public final class Display extends CN1Constants {
     /**
      * On devices that return true for canForceOrientation() this method can lock the device orientation
      * either to portrait or landscape mode
+     * 
+     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @param portrait true to lock to portrait mode, false to lock to landscape mode
+     * @see #unlockOrientation() 
+     * @see #canForceOrientation() 
      */
     public void lockOrientation(boolean portrait) {
         impl.lockOrientation(portrait);
@@ -3154,6 +3402,15 @@ public final class Display extends CN1Constants {
 
     /**
      * This is the reverse method for lock orientation allowing orientation lock to be disabled
+     * 
+     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
+     * 
+     * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
+     * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
+     * 
+     * @see #lockOrientation(boolean) 
+     * @see #canForceOrientation() 
      */
     public void unlockOrientation() {
         impl.unlockOrientation();
@@ -3277,6 +3534,21 @@ hi.show();}</pre></noscript>
      */
     public void captureVideo(ActionListener response) {
         impl.captureVideo(response);
+    }
+    
+    /**
+     * Same as {@link #captureVideo(com.codename1.ui.events.ActionListener) }, except that it
+     * attempts to impose constraints on the capture.  Constraints include width, height, 
+     * and max length.  Not all platforms support capture constraints.  Use the {@link VideoCaptureConstraints#isSupported()}
+     * to see if a constraint is supported.  If constraints are not supported at all, then this method 
+     * will fall back to calling {@link #captureVideo(com.codename1.ui.events.ActionListener) }.
+     * @param constraints Capture constraints to use.
+     * @param response a callback Object to retrieve the file path
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        impl.captureVideo(constraints, response);
     }
     
     /**
@@ -3662,6 +3934,10 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @param toShare String to share.
      * @deprecated use the method share that accepts an image and mime type
      */
@@ -3674,6 +3950,9 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
      * 
      * @param text String to share.
      * @param image file path to the image or null
@@ -3690,6 +3969,9 @@ hi.show();}</pre></noscript>
      * a Sharing service can be: mail, sms, facebook, twitter,...
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
      * 
      * @param text String to share.
      * @param image file path to the image or null
@@ -4207,4 +4489,61 @@ hi.show();}</pre></noscript>
     public void setProjectBuildHint(String key, String value) {
         impl.setProjectBuildHint(key, value);
     }
+    
+    /**
+     * Checks to see if you can prompt the user to install the app on their homescreen.
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+     * previously prompted the user and they have declined, then this will return false.  
+     * 
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
+     * inside that method - or sometime after.</p>
+     * 
+     * <h3>Example</h3>
+     * <pre>{@code 
+     * onCanInstallOnHomescreen(()->{
+     *      if (canInstallOnHomescreen()) {
+     *           if (promptInstallOnHomescreen()) {
+     *               // User accepted installation
+     *           } else {
+     *               // user rejected installation
+     *           }
+     *      }
+     * });
+     * }</pre>
+     * 
+     * https://developers.google.com/web/fundamentals/app-install-banners/
+     * @return True if you are able to prompt the user to install the app on their homescreen.  
+     * @see #promptInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean canInstallOnHomescreen() {
+        return impl.canInstallOnHomescreen();
+    }
+    
+    /**
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
+     * javascript port. 
+     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
+     * {@literal false} if they reject it.
+     * @see #canInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean promptInstallOnHomescreen() {
+        return impl.promptInstallOnHomescreen();
+    }
+    
+    /**
+     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+     * Only relevant in the javascript port.
+     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
+     * the app on their homescreen.
+     */
+    public void onCanInstallOnHomescreen(Runnable r) {
+        impl.onCanInstallOnHomescreen(r);
+    }
+
+    
+
 }

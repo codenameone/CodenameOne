@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
@@ -4486,6 +4487,23 @@ public abstract class CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return false;
     }
+    
+    /**
+     * SSL certificate checks must be performed via a callback from the native side,
+     * rather than explicitly checking as part of NetworkManager's connection
+     * flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
+     * explicitly, it forces the connection to be sent without a POST body.  Hence
+     * we need to let iOS do the check on the native side, and callback into Java
+     * to run the checkSSLCertificates method of the request.
+     * @return True if the platform requires a native callback fo check SSL certificates
+     */
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return false;
+    }
+    
+    public void setConnectionId(Object connection, int id) {
+        
+    }
 
     /**
      * Connects to a given URL, returns a connection object to be used with the implementation
@@ -5174,6 +5192,19 @@ public abstract class CodenameOneImplementation {
      */
     public void captureVideo(ActionListener response) {
     }
+    
+    /**
+     * Captures a video, and notifies with the data when available.  This version accepts
+     * capture constraints which may be used if the platform supports them.
+     * @param constraints Constraints for the capture.
+     * @param response Callback for the resulting video.
+     * @since 7.0
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        captureVideo(response);
+    }
+
 
     /**
      * Checks if the given gallery type is supported on this platform.
@@ -6051,6 +6082,42 @@ public abstract class CodenameOneImplementation {
     public boolean isDatabaseCustomPathSupported() {
         return false;
     }
+
+    /**
+     * Attempt to enter full-screen mode.  Should be overridden by the 
+     * platform implementation.
+     * @return True if already in full-screen mode, or successfully entered full-screen mode.
+     */
+    public boolean requestFullScreen() {
+        return false;
+    }
+
+    /**
+     * Exit full-screen mode.
+     * @return True if already not in full-screen mode or successfully exited full-screen mode.
+     */
+    public boolean exitFullScreen() {
+        return false;
+    }
+    
+    /**
+     * Checks to see if the app is currently running in full-screen mode.
+     * @return True if the app is currently running in full-screen mode.
+     */
+    public boolean isInFullScreenMode() {
+        return false;
+    }
+
+    /**
+     * Checks if the platform supports full-screen mode.  If this returns true
+     * then a call to {@link #requestFullScreen() } should enter full-screen mode.
+     * @return 
+     */
+    public boolean isFullScreenSupported() {
+        return false;
+    }
+
+    
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
@@ -7607,4 +7674,59 @@ public abstract class CodenameOneImplementation {
     public void setProjectBuildHint(String key, String value) {
         throw new RuntimeException();
     }
+    
+    /**
+     * Checks to see if you can prompt the user to install the app on their homescreen.
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+     * previously prompted the user and they have declined, then this will return false.  
+     * 
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
+     * inside that method - or sometime after.</p>
+     * 
+     * <h3>Example</h3>
+     * <pre>{@code 
+     * onCanInstallOnHomescreen(()->{
+     *      if (canInstallOnHomescreen()) {
+     *           if (promptInstallOnHomescreen()) {
+     *               // User accepted installation
+     *           } else {
+     *               // user rejected installation
+     *           }
+     *      }
+     * });
+     * }</pre>
+     * 
+     * https://developers.google.com/web/fundamentals/app-install-banners/
+     * @return True if you are able to prompt the user to install the app on their homescreen.  
+     * @see #promptInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean canInstallOnHomescreen() {
+        return false;
+    }
+    
+    /**
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
+     * javascript port. 
+     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
+     * {@literal false} if they reject it.
+     * @see #canInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     */
+    public boolean promptInstallOnHomescreen() {
+        return false;
+    }
+    
+    /**
+     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+     * Only relevant in the javascript port.
+     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
+     * the app on their homescreen.
+     */
+    public void onCanInstallOnHomescreen(Runnable r) {
+        
+    }
+
 }

@@ -806,6 +806,8 @@ public abstract class LookAndFeel {
      * This method returns the MenuBar class.
      * 
      * @return the MenuBar class.
+     * @deprecated this is no longer supported, Toolbar should be used as 
+     * the extension point
      */
     public Class getMenuBarClass(){
         return menuBar;
@@ -815,6 +817,8 @@ public abstract class LookAndFeel {
      * Simple setter for the MenuBar Class
      * 
      * @param menuBar
+     * @deprecated this is no longer supported, Toolbar should be used as 
+     * the extension point
      */
     public void setMenuBarClass(Class menuBar) {
         this.menuBar = menuBar;

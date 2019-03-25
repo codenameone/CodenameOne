@@ -93,18 +93,21 @@ public interface Media {
     public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
             
     /**
-     * Starts playing the audio file
+     * Starts playing the media file
      */
     public void play();
 
     /**
-     * Pauses the playback of the audio file
+     * Pauses the playback of the media file
      */
     public void pause();
     
     /**
      * Optional call that allows the caller to prepare the upcoming media player. This is useful
      * when streaming multiple streams one after another.
+     * 
+     * <p>Note: On some platforms (iOS), the poster frame and native embedded controls will not appear
+     * for the video until you call this method, otherwise.</p>
      */
     public void prepare();
     

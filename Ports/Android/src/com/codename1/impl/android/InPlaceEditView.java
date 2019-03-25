@@ -613,33 +613,26 @@ public class InPlaceEditView extends FrameLayout{
         showVKB = show;
 
         final boolean showKeyboard = showVKB;
-        final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
-        if(listener != null){
-            Thread t = new Thread(new Runnable() {
+        //final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
+        //if(listener != null){
+        Thread t = new Thread(new Runnable() {
 
-                @Override
-                public void run() {
+            @Override
+            public void run() {
 
-                    //this is ugly but there is no real API to know if the
-                    //keyboard is opened or closed
-                    try {
-                        Thread.sleep(600);
-                    } catch (InterruptedException ex) {
-                    }
-
-                    Display.getInstance().callSerially(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            ActionEvent evt = new ActionEvent(showKeyboard);
-                            listener.actionPerformed(evt);
-                        }
-                    });
+                //this is ugly but there is no real API to know if the
+                //keyboard is opened or closed
+                try {
+                    Thread.sleep(600);
+                } catch (InterruptedException ex) {
                 }
-            });
-            t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
-            t.start();
-        }
+                Display.getInstance().fireVirtualKeyboardEvent(showKeyboard);
+
+            }
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
+        //}
 
         Log.d(TAG, "InputMethodManager returned " + Boolean.toString(result).toUpperCase());
     }
@@ -770,6 +763,8 @@ public class InPlaceEditView extends FrameLayout{
     //private TimerTask cursorTimerTask;
     private KeyListener defaultKeyListener;
     private int defaultMaxLines=-2;
+    private int defaultInputType;
+    private int defaultIMEOptions;
 
     /**
      * Start editing the given text-area
@@ -791,7 +786,26 @@ public class InPlaceEditView extends FrameLayout{
         int paddingLeft = textArea.paddingLeft;
         int paddingRight = textArea.paddingRight;
         int paddingBottom = textArea.paddingBottom;
-
+        
+        // An ugly hack to smooth over an apparent race condition where
+        // the lightweight textarea is not repainted after the native text field
+        // becomes visible - resulting in the hint still appearing while typing.
+        // https://github.com/codenameone/CodenameOne/issues/2629
+        // We just blindly repaint the textfield every 50ms for half a second
+        // to make sure it gets a repaint properly.
+        final TextArea fTextArea = textArea.textArea;
+        new Thread(new Runnable() {
+            public void run() {
+                for (int i=0; i< 10; i++) {
+                    com.codename1.io.Util.sleep(50);
+                    com.codename1.ui.CN.callSerially(new Runnable() {
+                        public void run() {
+                            fTextArea.repaint();
+                        }
+                    });
+                }
+            }
+        }).start();
         if (textArea.isTextField) {
             switch (textArea.getVerticalAlignment()) {
                 case Component.BOTTOM:
@@ -810,6 +824,8 @@ public class InPlaceEditView extends FrameLayout{
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
         if (!isEditedFieldSwitch) {
             mEditText = new EditView(activity, textArea.textArea, this, id);
+            defaultInputType = mEditText.getInputType();
+            defaultIMEOptions = mEditText.getImeOptions();
         } else {
             mEditText.switchToTextArea(textArea.textArea);
         }
@@ -950,6 +966,8 @@ public class InPlaceEditView extends FrameLayout{
                 defaultKeyListener = mEditText.getKeyListener();
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
+        } else {
+
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
@@ -1956,8 +1974,8 @@ public class InPlaceEditView extends FrameLayout{
             }
             
             this.mTextArea = other;
-            this.setInputType(0);
-            this.setImeOptions(0);
+            this.setInputType(defaultInputType);
+            this.setImeOptions(defaultIMEOptions);
             if (defaultKeyListener != null) {
                 setKeyListener(defaultKeyListener);
             }

@@ -417,6 +417,7 @@ public class UIManager {
         themeProps.put("TitleCommandLandscape.derive", "TitleCommand");
         themeProps.put("BackCommandLandscape.derive", "BackCommand");
         themeProps.put("TitleLandscape.derive", "Title");
+        themeProps.put("StatusBarLandscape.derive", "StatusBar");
         
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
             themeProps.put("TextFieldSearch.derive", "Title");
@@ -623,14 +624,28 @@ public class UIManager {
         }
         themeProps.put("ContentPane.sel#derive", "ContentPane");
 
+        if (installedTheme == null || !installedTheme.containsKey("PopupDialog.derive")) {
+            themeProps.put("PopupDialog.derive", "Dialog");
+        }
+        
+       
+        
         if(installedTheme == null || !installedTheme.containsKey("DialogContentPane.derive")) {
             themeProps.put("DialogContentPane.margin", "0,0,0,0");
             themeProps.put("DialogContentPane.padding", "0,0,0,0");
             themeProps.put("DialogContentPane.transparency", "0");
         }
+        
+        if(installedTheme == null || !installedTheme.containsKey("PopupContentPane.derive")) {
+            themeProps.put("PopupContentPane.derive", "DialogContentPane");
+        }
 
         if(installedTheme == null || !installedTheme.containsKey("DialogTitle.derive")) {
             themeProps.put("DialogTitle.align", centerAlign);
+        }
+        
+        if(installedTheme == null || !installedTheme.containsKey("PopupDialogTitle.derive")) {
+            themeProps.put("PopupDialogTitle.derive", "DialogTitle");
         }
 
         if(installedTheme == null || !installedTheme.containsKey("Form.derive")) {

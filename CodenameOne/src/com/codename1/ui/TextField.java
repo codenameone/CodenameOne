@@ -70,6 +70,7 @@ public class TextField extends TextArea {
     /**
      * Indicates that native text input should be used in text field when in place editing is supported by the platform
      * @return the useNativeTextInput
+     * @deprecated this API is no longer useful and should be avoided
      */
     public static boolean isUseNativeTextInput() {
         return useNativeTextInput;
@@ -78,6 +79,7 @@ public class TextField extends TextArea {
     /**
      * Indicates that native text input should be used in text field when in place editing is supported by the platform
      * @param aUseNativeTextInput the useNativeTextInput to set
+     * @deprecated this API is no longer useful and should be avoided
      */
     public static void setUseNativeTextInput(boolean aUseNativeTextInput) {
         useNativeTextInput = aUseNativeTextInput;

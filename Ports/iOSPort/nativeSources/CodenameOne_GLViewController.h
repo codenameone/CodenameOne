@@ -38,6 +38,7 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define ENABLE_WKWEBVIEW
 //#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
@@ -81,6 +82,8 @@
 #import "FBSDKAppInviteDialog.h"
 #endif
 #endif
+
+//#define CN1_HANDLE_UNIVERSAL_LINKS
 
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
@@ -242,4 +245,5 @@
 +(BOOL)isCurrentMutableTransformSet;
 
 +(CGAffineTransform) currentMutableTransform;
+-(void)updateCanvas:(BOOL)animated;
 @end

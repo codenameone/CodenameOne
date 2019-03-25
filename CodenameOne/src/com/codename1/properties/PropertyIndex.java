@@ -32,6 +32,9 @@ import com.codename1.processing.Result;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.util.Base64;
+import com.codename1.util.regex.StringReader;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -188,18 +192,33 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return user readable printout of the property values which is useful for debugging
      */
     public String toString() {
+        return toString(true);
+    }
+    
+    /**
+     * Returns a user readable printout of the property values which is useful for debugging
+     * 
+     * @param includeNewline true to indicate that newline characters should be included
+     * @return user readable printout of the property values which is useful for debugging
+     */
+    public String toString(boolean includeNewline) {
         StringBuilder b = new StringBuilder(name);
-        b.append(" : {\n");
+        b.append(" : {");
+        if(includeNewline) {
+            b.append('\n');
+        }
         for(PropertyBase p : this) {
             b.append(p.getName());
             b.append(" = ");
             b.append(p.toString());
-            b.append("\n");
+            if(includeNewline) {
+                b.append('\n');
+            }
         }
         b.append("}");
         return b.toString();
     }
-    
+
     /**
      * This is useful for JSON parsing, it allows converting JSON map data to objects
      * @param m the map
@@ -224,6 +243,60 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             al.add(o);
         }
         return al;
+    }
+    
+    /**
+     * Sets one of the builtin simple objects into a property
+     * @param p the property base
+     * @param val the object value
+     * @return true if successful
+     */
+    public boolean setSimpleObject(PropertyBase p, Object val) {
+        if(val == null) {
+            p.setImpl(null);
+            return true;
+        }
+        if(p.getGenericType() == null || p.getGenericType() == String.class) {
+            p.setImpl(val.toString());
+            return true;
+        }
+        if(p instanceof IntProperty) {
+            p.setImpl(Util.toIntValue(val));
+            return true;
+        } 
+        if(p instanceof BooleanProperty) {
+            p.setImpl(Util.toBooleanValue(val));
+            return true;
+        } 
+        if(p instanceof LongProperty) {
+            p.setImpl(Util.toLongValue(val));
+            return true;
+        } 
+        if(p instanceof FloatProperty) {
+            p.setImpl(Util.toFloatValue(val));
+            return true;
+        } 
+        if(p instanceof DoubleProperty) {
+            p.setImpl(Util.toDoubleValue(val));
+            return true;
+        } 
+        if(p.getGenericType() == Image.class || p.getGenericType() == EncodedImage.class) {
+            if(val instanceof Image) {
+                p.setImpl(val);                                    
+            } else {
+                if(val instanceof byte[]) {
+                    p.setImpl(EncodedImage.create((byte[])val));
+                } else {
+                    p.setImpl(EncodedImage.create(Base64.decode(((String)val).getBytes())));
+                }
+            }
+            return true;
+        }
+        if(p.getGenericType() == Date.class) {
+            p.setImpl(Util.toDateValue(val));
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -325,40 +398,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         }
                         continue;
                     } 
-                    if(p instanceof IntProperty) {
-                        p.setImpl(Util.toIntValue(val));
-                        continue;
-                    } 
-                    if(p instanceof BooleanProperty) {
-                        p.setImpl(Util.toBooleanValue(val));
-                        continue;
-                    } 
-                    if(p instanceof LongProperty) {
-                        p.setImpl(Util.toLongValue(val));
-                        continue;
-                    } 
-                    if(p instanceof FloatProperty) {
-                        p.setImpl(Util.toFloatValue(val));
-                        continue;
-                    } 
-                    if(p instanceof DoubleProperty) {
-                        p.setImpl(Util.toDoubleValue(val));
-                        continue;
-                    } 
-                    if(p.getGenericType() == Image.class || p.getGenericType() == EncodedImage.class) {
-                        if(val instanceof Image) {
-                            p.setImpl(val);                                    
-                        } else {
-                            if(val instanceof byte[]) {
-                                p.setImpl(EncodedImage.create((byte[])val));
-                            } else {
-                                p.setImpl(EncodedImage.create(Base64.decode(((String)val).getBytes())));
-                            }
-                        }
-                        continue;
-                    }
-                    if(p.getGenericType() == Date.class) {
-                        p.setImpl(Util.toDateValue(val));
+                    if(setSimpleObject(p, val)) {
                         continue;
                     }
                     p.setImpl(val);                
@@ -426,6 +466,107 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public String toJSON() {
         return Result.fromContent(toMapRepresentationImpl("jsonExclude")).toString();
+    }
+
+    /**
+     * Returns an element object mapping to the current object hierarchy similar
+     * to the map object
+     * @return an XML parser element
+     */
+    public Element asElement() {
+        return new PropertyXMLElement(this);
+    } 
+    
+    /**
+     * Converts the object to an XML representation
+     * @return an XML String
+     */
+    public String toXML() {
+        XMLWriter w = new XMLWriter(true);
+        return w.toXML(asElement());
+    }
+    
+    /**
+     * Toggles whether a given property should act as a text element for this 
+     * object
+     * @param p the property that should act as a text element
+     * @param t true to activate the text element false to remove it
+     */
+    public void setXmlTextElement(PropertyBase p, boolean t) {
+        if(t) {
+            p.putClientProperty("xmlTextElement", Boolean.TRUE);
+        } else {
+            p.putClientProperty("xmlTextElement", null);
+        }
+    }
+    
+    /**
+     * Toggles whether a given property should act as a text element for this 
+     * object
+     * @param p the property 
+     * @return true if this is a text element
+     */
+    public boolean isXmlTextElement(PropertyBase p) {
+        Boolean b = (Boolean)p.getClientProperty("xmlTextElement");
+        return b != null && b.booleanValue();
+    }
+
+    /**
+     * Returns the property that contains the XML text e.g. {@code <xmltag>property value</xmltag>}
+     * @return the property representing text XML or null if no such property was set
+     */
+    public PropertyBase getXmlTextElement() {
+        for(PropertyBase b : this) {
+            if(isXmlTextElement(b)) {
+                return b;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Converts the XML element to this object hierarchy
+     * @param e the element
+     */
+    public void fromXml(Element e) {
+        Hashtable atts = e.getAttributes();
+        if(atts != null) {
+            for(Object a : atts.keySet()) {
+                PropertyBase pb = get((String)a);
+                if(pb != null) {
+                    setSimpleObject(pb, atts.get(a));
+                }
+            }
+        }
+        int cc = e.getNumChildren();
+        for(int iter = 0 ; iter < cc ; iter++) {
+            Element chld = e.getChildAt(iter);
+            if(chld.isTextElement()) {
+                PropertyBase pt = getXmlTextElement();
+                if(pt != null) {
+                    String t = chld.getText();
+                    pt.setImpl(t);
+                }
+                continue;
+            }
+            PropertyBase pb = get(chld.getTagName());
+            Class cls = pb.getGenericType();
+            if(cls.isAssignableFrom(PropertyBusinessObject.class)) {
+                try {
+                    PropertyBusinessObject business = (PropertyBusinessObject)cls.newInstance();
+                    business.getPropertyIndex().fromXml(chld);
+                    if(pb instanceof ListProperty) {
+                        ((ListProperty)pb).add(business);
+                    } else {
+                        pb.setImpl(business);
+                    }
+                } catch(InstantiationException ex) {
+                    Log.e(ex);
+                } catch(IllegalAccessException ex) {
+                    Log.e(ex);
+                }
+            } 
+        }
     }
     
     /**
@@ -516,6 +657,23 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         } catch(Exception err) {
             Log.e(err);
             return null;
+        }
+    }
+
+    /**
+     * Populates the object from a JSON string
+     * @param jsonString the JSON String
+     */
+    public void fromJSON(String jsonString) {
+        try {
+            StringReader r = new StringReader(jsonString);
+            JSONParser jp = new JSONParser();
+            JSONParser.setUseBoolean(true);
+            JSONParser.setUseLongs(true);
+            populateFromMap(jp.parseJSON(r), parent.getClass());
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
         }
     }
     

@@ -81,7 +81,7 @@ public class Tree extends Container {
     private static Image folder;
     private static Image openFolder;
     private static Image nodeImage;
-    private int depthIndent = 15;
+    private int depthIndent = 2;
     private boolean multilineMode;
     
     /**
@@ -560,9 +560,7 @@ public class Tree extends Container {
                 cmp.setIcon(folder);
             }
         }
-        updateNodeComponentStyle(cmp.getSelectedStyle(), depth);
-        updateNodeComponentStyle(cmp.getUnselectedStyle(), depth);
-        updateNodeComponentStyle(cmp.getPressedStyle(), depth);
+        updateNodeComponentStyle(cmp.getAllStyles(), depth);
         return cmp;
     }
 
@@ -611,16 +609,15 @@ public class Tree extends Container {
             } else {
                 cmp.setIcon(folder);
             }
-            updateNodeComponentStyle(cmp.getSelectedStyle(), depth);
-            updateNodeComponentStyle(cmp.getUnselectedStyle(), depth);
-            updateNodeComponentStyle(cmp.getPressedStyle(), depth);
+            updateNodeComponentStyle(cmp.getAllStyles(), depth);
             return cmp;            
         }
         return createNodeComponent(node, depth);
     }
 
     private void updateNodeComponentStyle(Style s, int depth) {
-        s.setMargin(LEFT, depth * depthIndent);
+        s.setMarginUnit(Style.UNIT_TYPE_DIPS);
+        s.setMarginLeft(depth * depthIndent);
     }
 
     /**

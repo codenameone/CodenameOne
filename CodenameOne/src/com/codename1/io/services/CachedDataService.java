@@ -40,7 +40,9 @@ import java.io.InputStream;
 public class CachedDataService extends ConnectionRequest {
     private CachedData data = new CachedData();
     
-    private CachedDataService() {}
+    private CachedDataService() {
+        setReadResponseForErrors(false);
+    }
 
     /**
      * Makes sure the cached data class is properly registered as an externalizable. This must

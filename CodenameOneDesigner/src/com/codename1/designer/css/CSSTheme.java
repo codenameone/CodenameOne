@@ -1400,6 +1400,9 @@ public class CSSTheme {
     }
     
     public void updateResources() {
+        // TODO:  We need to remove stale theme entries
+        // https://github.com/codenameone/CodenameOne/issues/2698
+        
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
                 continue;
@@ -1415,7 +1418,6 @@ public class CSSTheme {
             String unselId = id;
             String pressedId = id+".press";
             String disabledId = id+".dis";
-            
             res.setThemeProperty(themeName, unselId+".padding", el.getThemePadding(unselectedStyles));
             res.setThemeProperty(themeName, unselId+".padUnit", el.getThemePaddingUnit(unselectedStyles));
             res.setThemeProperty(themeName, selId+"#padding", el.getThemePadding(selectedStyles));
@@ -2386,17 +2388,9 @@ public class CSSTheme {
         }
         
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
-            //System.out.println("Checking if we can achieve with background image generation "+styles);
             if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
-                //System.out.println("Failed test 1");
-                //System.out.println("unequalBorders? "+hasUnequalBorders());
-                //System.out.println("Has gradient? "+hasGradient());
-                //System.out.println("BorderLineOrNone? "+isBorderLineOrNone());
-                //System.out.println("Background Image URL: "+backgroundImageUrl);
                 return false;
             }
-            
-            
             
             String prefix = "cn1-border";
             String[] corners = new String[]{"top-left", "top-right", "bottom-left", "bottom-right"};
@@ -2411,25 +2405,9 @@ public class CSSTheme {
             }
             
             ScaledUnit val = null;
-            boolean topLeft=false;
-            boolean topRight = false;
-            boolean bottomLeft = false;
-            boolean bottomRight = false;
             for (String cornerStyle : radiusAtts) {
                 ScaledUnit u = (ScaledUnit)styles.get(cornerStyle);
                 if (u != null && u.getPixelValue() != 0) {
-                    if (cornerStyle.indexOf("top-left") != -1) {
-                        topLeft = true;
-                    }
-                    if (cornerStyle.indexOf("top-right") != -1) {
-                        topRight = true;
-                    }
-                    if (cornerStyle.indexOf("bottom-left") != -1) {
-                        bottomLeft = true;
-                    }
-                    if (cornerStyle.indexOf("bottom-right") != -1) {
-                        bottomRight = true;
-                    }
                     if (val != null && val.getPixelValue() != u.getPixelValue()) {
                         // We have more than one non-zero corner radius
                         //System.out.println("Failed corner test");
@@ -2438,13 +2416,6 @@ public class CSSTheme {
                     }
                     val = u;
                 }
-            }
-            
-            
-            if (topLeft != topRight || bottomLeft != bottomRight) {
-                // Resource files don't currently support topLeftMode, topRightMode, bottomLeftMode, and bottomRightMode
-                // so we need to fall back to image borders if the left and right have different radii
-                return false;
             }
             
             // All corners are the same, so we can proceed to the next step.
@@ -3728,6 +3699,8 @@ public class CSSTheme {
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER;
                 case "cn1-image-tile-halign-bottom" :
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM;
+                case "cn1-image-align-top":
+                    return Style.BACKGROUND_IMAGE_ALIGNED_TOP;
                 case "cn1-image-align-bottom" :
                     return Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
                 case "cn1-image-align-right" :
@@ -4484,11 +4457,15 @@ public class CSSTheme {
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             //System.out.println("TopLeftRadius is : "+topLeftRadius+" isZero? "+isZero(topLeftRadius));
             //System.out.println("BottomRight Radius is : "+bottomRightRadius+" isZero? "+isZero(bottomRightRadius));
-            if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
-                out.bottomOnlyMode(true);
-            } else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
-                out.topOnlyMode(true);
-            }
+            //if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
+            //    out.bottomOnlyMode(true);
+            //} else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
+            //    out.topOnlyMode(true);
+            //}
+            out.topLeftMode(!isZero(topLeftRadius));
+            out.topRightMode(!isZero(topRightRadius));
+            out.bottomRightMode(!isZero(bottomRightRadius));
+            out.bottomLeftMode(!isZero(bottomLeftRadius));
             
             
             
@@ -5115,6 +5092,7 @@ public class CSSTheme {
                                 case "cn1-image-tile-halign-top" :
                                 case "cn1-image-tile-halign-center" :
                                 case "cn1-image-tile-halign-bottom" :
+                                case "cn1-image-align-top" :
                                 case "cn1-image-align-bottom" :
                                 case "cn1-image-align-left" :
                                 case "cn1-image-align-right" :

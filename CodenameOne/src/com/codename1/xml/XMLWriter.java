@@ -79,6 +79,91 @@ public class XMLWriter {
     public void writeXML(Writer writer, Element element) throws IOException {
         writeXML(writer, element, new StringBuilder(), false);
     }
+    
+    /**
+     * returns the XML as a String
+     * @param element the element to write
+     * @return the XML as a String
+     */
+    public String toXML(Element element) {
+        StringBuilder writer = new StringBuilder();
+        toXML(writer, element, new StringBuilder(), false);
+        return writer.toString();
+    }
+
+    /**
+     * Writes the XML of an Element to a StringBuilder using a given starting
+     * indentation. Note: may output invalid XML if you created text Elements
+     * using un-escaped Strings.
+     *
+     * @param writer The StringBuilder that will contain the output
+     * @param element The element whose XML will be written.
+     * @param indentation A starting indentation for the given Element.
+     * @param isInline Whether or not the given element Element should be
+     * treated as part of in-line content.
+     */
+    private void toXML(StringBuilder writer, Element element, StringBuilder indentation, boolean isInline) {
+        if (!isInline) {
+            writer.append(indentation);
+        }
+
+        if (element.isTextElement()) {
+            writer.append(encodeIfRequired(element.getText()));
+        } else {
+            writer.append('<');
+            String elementName = encodeIfRequired(element.getTagName());
+            writer.append(elementName);
+
+            Hashtable attributes = element.getAttributes();
+            if (attributes != null) {
+                for (Enumeration keys = attributes.keys(); keys.hasMoreElements();) {
+                    String attributeKey = (String) keys.nextElement();
+                    String attributeValue = (String) attributes.get(attributeKey);
+                    writer.append(' ');
+                    writer.append(encodeIfRequired(attributeKey));
+                    writer.append("=\"");
+                    writer.append(encodeIfRequired(attributeValue));
+                    writer.append('"');
+                }
+            }
+
+            if (element.isEmpty()) {
+                writer.append(" />");
+            } else {
+                writer.append('>');
+
+                if (!isInline && !element.hasTextChild()) {
+                    writer.append('\n');
+                    indentation.append('\t');
+                    for (Object child : element) {
+                        if (child instanceof Element) {
+                            toXML(writer, (Element) child, indentation, isInline);
+                        } else {
+                            throw new IllegalStateException("Element contained child of invalid type");
+                        }
+                        writer.append('\n');
+                    }
+                } else {
+                    isInline = true;
+                    for (Object child : element) {
+                        if (child instanceof Element) {
+                            toXML(writer, (Element) child, null, isInline);
+                        } else {
+                            throw new IllegalStateException("Element contained child of invalid type");
+                        }
+                    }
+                }
+
+                if (!isInline) {
+                    indentation.deleteCharAt(indentation.length() - 1);
+                    writer.append(indentation.toString());
+                }
+                writer.append("</");
+                writer.append(elementName);
+                writer.append('>');
+            }
+        }
+    }
 
     /**
      * Writes the XML of an Element to a Writer using a given starting

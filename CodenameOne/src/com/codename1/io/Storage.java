@@ -168,6 +168,9 @@ public class Storage {
      * @return the input stream
      */
     public InputStream createInputStream(String name) throws IOException {
+        if (!exists(name)) {
+            throw new IOException("Storage key "+name+" does not exist");
+        }
         name = fixFileName(name);
         return Util.getImplementation().createStorageInputStream(name);
     }
@@ -262,7 +265,7 @@ public class Storage {
             d.close();
             cache.put(name, o);
             return o;
-        } catch(Exception err) {
+        } catch(Throwable err) {
             Log.e(err);
             if(Log.isCrashBound()) {
                 Log.sendLog();

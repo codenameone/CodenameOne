@@ -49,6 +49,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -193,6 +194,25 @@ public class Util {
     public static String readToString(InputStream i, String encoding) throws IOException {
         byte[] b = readInputStream(i);
         return new String(b, 0, b.length, encoding);
+    }
+    
+    /**
+     * Reads a reader to a string
+     * 
+     * @param i the input stream
+     * @param encoding the encoding of the stream
+     * @return a string
+     * @throws IOException thrown by the stream
+     * @since 7.0
+     */
+    public static String readToString(Reader reader) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        char[] buf = new char[1024];
+        int len;
+        while ((len = reader.read(buf)) != -1) {
+            sb.append(buf, 0, len);
+        }
+        return sb.toString();
     }
 
     /**
@@ -1446,7 +1466,8 @@ public class Util {
             return ((Boolean)val).booleanValue();
         }
         if(val instanceof String) {
-            return ((String)val).toLowerCase().startsWith("t");
+            String sl = ((String)val).toLowerCase();
+            return sl.startsWith("t") || sl.equals("1");
         }
         return toIntValue(val) != 0;
     }
@@ -1465,7 +1486,11 @@ public class Util {
             return ((Integer)number).intValue();
         }
         if(number instanceof String) {
-            return Integer.parseInt((String)number);
+            String n = (String)number;
+            if(n.length() == 0 || n.equals(" ")) {
+                return 0;
+            }
+            return Integer.parseInt(n);
         }
         if(number instanceof Double) {
             return ((Double)number).intValue();
@@ -1609,6 +1634,16 @@ public class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
     
+    private static SimpleDateFormat dateFormatter;
+    
+    /**
+     * Sets a custom formatter to use when toDateValue is invoked
+     * @param formatter the formatter to use
+     */
+    public static void setDateFormatter(SimpleDateFormat formatter) {
+        dateFormatter = formatter;
+    }
+    
     /**
      * Tries to convert an arbitrary object to a date
      * @param o an object that can be a string, number or date
@@ -1622,6 +1657,14 @@ public class Util {
             return (Date)o;
         }
         if(o instanceof String) {
+            if(dateFormatter != null) {
+                try {
+                    return dateFormatter.parse((String)o);
+                } catch(ParseException e) {
+                    // falls back to the default formatting
+                    Log.e(e);
+                }
+            }
             try {
                 return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String)o);
             } catch(ParseException e) {

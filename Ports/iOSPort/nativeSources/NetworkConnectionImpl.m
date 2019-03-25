@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #import "NetworkConnectionImpl.h"
+#import "com_codename1_io_NetworkManager.h"
 #import <UIKit/UIKit.h>
 #include "xmlvm.h"
 #include "CodenameOne_GLViewController.h"
@@ -106,7 +107,7 @@ int connections = 0;
 }
 
 - (void)addHeader:(NSString*)key value:(NSString*)value {
-    [request addValue:value forHTTPHeaderField:key];
+    [request setValue:value forHTTPHeaderField:key];
 }
 
 - (void)setBody:(void*)body size:(int)size {
@@ -165,7 +166,15 @@ int connections = 0;
         
     }
     sslCertificates = [[NSString stringWithString:certs] retain];
-    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
+    if (com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
+        [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
+    } else {
+        [challenge.sender cancelAuthenticationChallenge:challenge];
+    }
+}
+
+-(void)setConnectionId:(JAVA_INT)connId {
+    connectionId = connId;
 }
 
 - (NSString*) getFingerprint: (SecCertificateRef) cert {

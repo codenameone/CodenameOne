@@ -221,16 +221,18 @@ public class PeerComponent extends Component {
     }
     
     private void onPositionSizeChangeImpl() {
-        if(isInitialized() && getWidth() > 0 && getHeight() > 0) {
+        int w = getWidth();
+        int h = getHeight();
+        if(isInitialized() && w > 0 && h > 0) {
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             int x = getAbsoluteX() + scrollX;
             int y = getAbsoluteY() + scrollY;
-            if(x != lastPos.getX() || y != lastPos.getY() || getWidth() != lastPos.getSize().getWidth() || getHeight() != lastPos.getSize().getHeight()) {
+            if(x != lastPos.getX() || y != lastPos.getY() || w != lastPos.getSize().getWidth() || h != lastPos.getSize().getHeight()) {
                 lastPos.setX(x);
                 lastPos.setY(y);
-                lastPos.getSize().setWidth(getWidth());
-                lastPos.getSize().setHeight(getHeight());
+                lastPos.getSize().setWidth(w);
+                lastPos.getSize().setHeight(h);
                 onPositionSizeChange();
             }        
         }

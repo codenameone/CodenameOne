@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
@@ -102,6 +103,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
@@ -201,11 +203,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance = this;
         setUseNativeCookieStore(false);
         Display.getInstance().setTransitionYield(10);
-        Display.getInstance().setDefaultVirtualKeyboard(null);
+        Display.getInstance().setDefaultVirtualKeyboard(new IOSVirtualKeyboard(this));
         callback = (Runnable)m;
         if(m instanceof Lifecycle) {
             life = (Lifecycle)m;
         }
+        VideoCaptureConstraints.init(new IOSVideoCaptureConstraintsCompiler());
     }
 
     public void setThreadPriority(Thread t, int p) {
@@ -425,7 +428,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (areaUnderVKBOverride >= 0) {
             return areaUnderVKBOverride;
         }
-        if(isAsyncEditMode() && isEditingText()) {
+        if(isAsyncEditMode()) {
             return nativeInstance.getVKBHeight();
         }
         return 0;
@@ -535,41 +538,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
+    boolean keyboardShowing;
+    
     /**
      * Callback for native.  Called when keyboard is shown.  Used for async editing 
      * with formBottomPaddingEditingMode.
      */
     static void keyboardWillBeShown(){
+        instance.keyboardShowing = true;
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
             //final Component currentEditingFinal = instance.currentEditing;
-            if(current.isFormBottomPaddingEditingMode()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        if (current != null) {
-                            getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                            current.revalidate();
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    updateNativeTextEditorFrame();
-                                }
-                            });
-                        }
-                    }
-                });
-            } else {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        if (current != null) {
-                            if (instance.currentEditing != null) {
-                                instance.doNotHideTextEditorSemaphore++;
-                                try {
-                                    instance.currentEditing.requestFocus();
-                                } finally {
-                                    instance.doNotHideTextEditorSemaphore--;
-                                }
+            if (current != null) {
+                if(current.isFormBottomPaddingEditingMode()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (current != null) {
+                                getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                                getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                                 current.revalidate();
                                 Display.getInstance().callSerially(new Runnable() {
                                     public void run() {
@@ -577,23 +564,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                                     }
                                 });
                             }
-                            
                         }
-                    }
-                });
+                    });
+                } else {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (current != null) {
+                                if (instance.currentEditing != null) {
+                                    instance.doNotHideTextEditorSemaphore++;
+                                    try {
+                                        instance.currentEditing.requestFocus();
+                                    } finally {
+                                        instance.doNotHideTextEditorSemaphore--;
+                                    }
+                                    current.revalidate();
+                                    Display.getInstance().callSerially(new Runnable() {
+                                        public void run() {
+                                            updateNativeTextEditorFrame();
+                                        }
+                                    });
+                                }
+
+                            }
+                        }
+                    });
+                }
             }
         }
         
-        if (Display.getInstance().getVirtualKeyboardListener() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
-                    if (l != null) {
-                        l.actionPerformed(new ActionEvent(true));
-                    }
-                }
-            });
-        }
+        Display.getInstance().fireVirtualKeyboardEvent(true);
     }
     
     /**
@@ -601,6 +600,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * with formBottomPaddingEditingMode.
      */
     static void keyboardWillBeHidden(){
+        instance.keyboardShowing = false;
         Display.getInstance().callSerially(new Runnable(){
 
             @Override
@@ -622,16 +622,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
         });
-        if (Display.getInstance().getVirtualKeyboardListener() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
-                    if (l != null) {
-                        l.actionPerformed(new ActionEvent(false));
-                    }
-                }
-            });
-        }
+        Display.getInstance().fireVirtualKeyboardEvent(false);
     }
     
     public void setCurrentForm(Form f) {
@@ -2959,7 +2950,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(false);
+        nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
 
@@ -3080,15 +3071,51 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        captureVideo(null, response);
+    }
+        
+    /**
+     * Captures a video and notifies with the data when available
+     * @param response callback for the resulting video
+     */
+    public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
         }
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(true);
+        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst.getPreferredMaxLength());
         dropEvents = true;
     }
+    
+    private static int getUIPickerControllerQualityType(VideoCaptureConstraints cnst) {
+        if (cnst == null) {
+            return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+        int w = cnst.getWidth();
+        int h = cnst.getHeight();
+        if (w == 640 && h == 480) {
+            return 3; //UIImagePickerControllerQualityType640x480 = 3
+        }
+        if (w == 1280 && h == 720) {
+            return 4; //UIImagePickerControllerQualityTypeIFrame1280x720 = 4
+        }
+        if (w == 960 && h == 540) {
+            return 5; //UIImagePickerControllerQualityTypeIFrame960x540 = 5
+        }
+        int quality = cnst.getQuality();
+        switch (quality) {
+            case VideoCaptureConstraints.QUALITY_LOW:
+                return 2; //UIImagePickerControllerQualityTypeLow = 2
+            case VideoCaptureConstraints.QUALITY_HIGH:
+                return 0; //UIImagePickerControllerQualityTypeHigh = 0
+            default:
+                return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+    }
+    
+
 
     @Override
     public void openImageGallery(ActionListener response) {    
@@ -4971,6 +4998,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    public static long getFontPeer(NativeFont font) {
+        return font.peer;
+    }
+    
     class NativeFont {
         long peer;
         int style;
@@ -5106,6 +5137,27 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
+        if (Boolean.TRUE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
+            final String[] res = new String[1];
+            final boolean[] complete = new boolean[1];
+            nativeInstance.browserExecuteAndReturnStringCallback(get(browserPeer), javaScript, new SuccessCallback<String>() {
+                @Override
+                public void onSucess(String value) {
+                    synchronized(complete) {
+                        res[0] = value;
+                        complete[0] = true;
+                        complete.notify();
+                    }
+                }
+                
+            });
+            while (!complete[0]) {
+                synchronized(complete) {
+                    Util.wait(complete);
+                }
+            }
+            return res[0];
+        }
         if(Display.getInstance().isEdt()) {
             final String[] result = new String[1];
 
@@ -5334,7 +5386,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        long browserPeer = nativeInstance.createBrowserComponent(browserComponent);
+        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
+        if (useWKWebView && browserComponent instanceof Component) {
+            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.TRUE);
+        }
+        long browserPeer = useWKWebView ? 
+                nativeInstance.createWKBrowserComponent(browserComponent) : 
+                nativeInstance.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
         nativeInstance.releasePeer(browserPeer);
         return pc;
@@ -6128,12 +6186,16 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setAntiAliased(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliased(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliased(a);
     }
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliasedText(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliasedText(a);
     }
 
     /*@Override
@@ -6550,6 +6612,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     static class NetworkConnection extends InputStream {
+        private int id;
         private long peer;
         private boolean closed;
         private FileBackedOutputStream body;
@@ -6562,6 +6625,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         String error;
         public final Object LOCK = new Object();
         
+        public void setId(int id) {
+            this.id = id;
+            nativeInstance.setConnectionId(peer, id);
+        }
         
         public void setChunkedStreamingMode(int len) {
             nativeInstance.setChunkedStreamingMode(peer, len);
@@ -6829,7 +6896,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         NetworkConnection conn =  (NetworkConnection)connection;
-        conn.ensureConnection();
+        //conn.ensureConnection();
         return conn.getSSLCertificates(url);
     }
 
@@ -6837,6 +6904,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return true;
     }
+
+    /**
+     * Checking SSL certificates uses a native callback, instead of the direct approach
+     * which is used in other ports.
+     * @return 
+     */
+    @Override
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return true;
+    }
+    
+    
 
     /**
      * @inheritDoc
@@ -6907,6 +6986,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.setMethod(n.peer, "GET");
         }
     }
+
+    @Override
+    public void setConnectionId(Object connection, int id) {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.setId(id);
+    }
+    
+    
 
     /**
      * @inheritDoc
@@ -7807,6 +7894,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             instance.life.applicationWillEnterForeground();
         }
         
+    }
+    
+    /**
+     * Called by the application delegate's <a href="https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content/handling_universal_links?language=objc">universal links handler</a>.
+     * This will stop the app, set the AppArg, and then start the app again.
+     * @param url 
+     */
+    public static void applicationReceivedUniversalLink(String url) {
+        applicationDidEnterBackground();
+        if(Display.getInstance() != null) {
+            Display.getInstance().setProperty("AppArg", url);
+        }
+        applicationWillEnterForeground();
     }
     
     public static void performBackgroundFetch() {

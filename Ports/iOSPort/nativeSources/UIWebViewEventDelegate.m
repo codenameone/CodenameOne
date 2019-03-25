@@ -44,6 +44,7 @@ extern int connections;
     return self;
 }
 
+
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
      if ([error code] != NSURLErrorCancelled) {
         com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(CN1_THREAD_GET_STATE_PASS_ARG c, [error code]);
@@ -54,10 +55,13 @@ extern int connections;
      }
 }
 
+
 - (void)webViewDidStartLoad:(UIWebView *)webView {
      connections++;
      [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
 }
+
+
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
     JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG request.URL.absoluteString.UTF8String));
@@ -85,5 +89,49 @@ extern int connections;
 #endif
     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.request.URL.absoluteString.UTF8String));
 }
+
+
+#ifdef ENABLE_WKWEBVIEW
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+         connections--;
+     if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+     }
+#ifdef CN1_USE_JAVASCRIPTCORE
+         // SUCKS!!  WKWebView is out of process so we can't access Javascript context directly anymore.
+         // So we have to do browser navigation callbacks the old fashioned way.
+#endif
+    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.URL.absoluteString.UTF8String));
+}
+
+
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+    JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG navigationAction.request.URL.absoluteString.UTF8String));
+    if(result) {
+        decisionHandler(WKNavigationActionPolicyAllow);
+        com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG navigationAction.request.URL.absoluteString.UTF8String));
+    } else {
+        decisionHandler(WKNavigationActionPolicyCancel);
+    }
+    
+}
+
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
+    connections++;
+    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+}
+
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    if ([error code] != NSURLErrorCancelled) {
+        com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(CN1_THREAD_GET_STATE_PASS_ARG c, [error code]);
+    }
+    connections--;
+    if(connections < 1) {
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+    }
+}
+
+#endif
+
 
 @end

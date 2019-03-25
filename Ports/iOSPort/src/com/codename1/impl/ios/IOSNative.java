@@ -27,6 +27,7 @@ import com.codename1.payment.Product;
 import com.codename1.social.GoogleImpl;
 import com.codename1.social.LoginCallback;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.SuccessCallback;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Vector;
@@ -194,8 +195,12 @@ public final class IOSNative {
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);
+    
+    // Creates a UIWebView
     native long createBrowserComponent(Object bc);
-
+    
+    // Creates a WKWebView
+    native long createWKBrowserComponent(Object browserComponent);
     native void setBrowserPage(long browserPeer, String html, String baseUrl);
 
     native void setBrowserURL(long browserPeer, String url);
@@ -209,6 +214,7 @@ public final class IOSNative {
     native void browserClearHistory(long browserPeer);
 
     native void browserExecute(long browserPeer, String javaScript);
+    native void browserExecuteAndReturnStringCallback(long browserPeer, String javaScript, SuccessCallback<String> callback);
     native String browserExecuteAndReturnString(long browserPeer, String javaScript);
     
     native void browserForward(long browserPeer);
@@ -327,7 +333,7 @@ public final class IOSNative {
     native void removeGeofencing(long clLocation, String id);
     
     // capture
-    native void captureCamera(boolean movie);
+    native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
     native long createAudioRecorder(String destinationFile);
     native void startAudioRecord(long peer);
@@ -683,6 +689,10 @@ public final class IOSNative {
     native void firePushCompletionHandler();
 
     native boolean isMultiGallerySelectSupported();
+
+    native void setConnectionId(long peer, int id);
+
+    
 
      
 

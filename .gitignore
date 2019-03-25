@@ -50,3 +50,11 @@ node_modules
 /tests/core/nbproject/private/
 /tests/core/dist/
 /tests/core/build/
+/tests/signin-demo/nbproject/private/
+/Ports/J2ME/nbproject/private/
+/Ports/CLDC11/nbproject/private/
+/Ports/Android/CompatLibs/nbproject/private/
+/Ports/UWP/nbproject/private/
+/Ports/CLDC11/build/
+/Ports/CLDC11/dist/
+/Samples/SampleProjectTemplate/nbproject/private/

@@ -250,7 +250,32 @@ public class CN extends  CN1Constants {
         return Display.impl.extractHardRef(o);
     }
 
+    /**
+     * Checks if async stack traces are enabled.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @return Whether async stack traces are enabled.  
+     * @see #setEnableAsyncStackTraces(boolean) 
+     * @since 7.0
+     */
+    public static boolean isEnableAsyncStackTraces() {
+        return Display.getInstance().isEnableAsyncStackTraces();
+    }
     
+    /**
+     * Enables or disables async stack traces.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * 
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @param enable True to enable async stack traces.  
+     * @see #isEnableAsyncStackTraces() 
+     * @since 7.0
+     */
+    public static void setEnableAsyncStackTraces(boolean enable) {
+        Display.getInstance().setEnableAsyncStackTraces(enable);
+    }
     
     /**
      * This method allows us to manipulate the drag started detection logic.
@@ -558,6 +583,78 @@ public class CN extends  CN1Constants {
     public static boolean isPortrait() {
         return Display.impl.isPortrait();
     }
+    
+    /**
+     * Try to enter full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
+     * if the app fails to enter full-screen mode.
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public static boolean requestFullScreen() {
+        return Display.impl.requestFullScreen();
+    }
+    
+    /**
+     * Try to exit full-screen mode if the platform supports it.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * 
+     * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
+     * if the app fails to exit full-screen mode.
+     * @see #requestFullScreen() 
+     * @see #isInFullScreenMode() 
+     * @see #isFullScreenSupported() 
+     * @since 6.0
+     */
+    public static boolean exitFullScreen() {
+        return Display.impl.exitFullScreen();
+    }
+    
+    /**
+     * Checks if the app is currently running in full-screen mode.
+     * @return {@literal true} if the app is currently in full-screen mode.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isFullScreenSupported() 
+     */
+    public static boolean isInFullScreenMode() {
+        return Display.impl.isInFullScreenMode();
+    }
+    
+    /**
+     * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
+     * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
+     * to enter and exit full-screen - and query the current state.
+     * 
+     * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
+     * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
+     * for a list of browsers that support full-screen.</p>
+     * 
+     * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @since 6.0
+     * @see #requestFullScreen() 
+     * @see #exitFullScreen() 
+     * @see #isInFullScreenMode() 
+     */
+    public static boolean isFullScreenSupported() {
+        return Display.impl.isFullScreenSupported();
+    }
 
     /**
      * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
@@ -696,6 +793,9 @@ public class CN extends  CN1Constants {
      * This method is implemented if isNativeShareSupported() returned true for 
      * a specific platform.
      * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @param text String to share.
      * @param image file path to the image or null
      * @param mimeType type of the image or null if no image to share
@@ -706,6 +806,10 @@ public class CN extends  CN1Constants {
     
     /**
      * Indicates if the underlying platform supports sharing capabilities
+     * 
+     * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
+     * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
+     * 
      * @return true if the underlying platform handles share.
      */
     public static boolean isNativeShareSupported(){
@@ -1256,4 +1360,62 @@ public class CN extends  CN1Constants {
      public static String getCachesDir() {
         return FileSystemStorage.getInstance().getCachesDir();
      }
+     
+     /**
+     * Checks to see if you can prompt the user to install the app on their homescreen.
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+     * previously prompted the user and they have declined, then this will return false.  
+     * 
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
+     * inside that method - or sometime after.</p>
+     * 
+     * <h3>Example</h3>
+     * <pre>{@code 
+     * onCanInstallOnHomescreen(()->{
+     *      if (canInstallOnHomescreen()) {
+     *           if (promptInstallOnHomescreen()) {
+     *               // User accepted installation
+     *           } else {
+     *               // user rejected installation
+     *           }
+     *      }
+     * });
+     * }</pre>
+     * 
+     * https://developers.google.com/web/fundamentals/app-install-banners/
+     * @return True if you are able to prompt the user to install the app on their homescreen.  
+     * @see #promptInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     * @since 6.0
+     */
+    public static boolean canInstallOnHomescreen() {
+        return Display.impl.canInstallOnHomescreen();
+    }
+    
+    /**
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
+     * javascript port. 
+     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
+     * {@literal false} if they reject it.
+     * @see #canInstallOnHomescreen() 
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     * @since 6.0
+     */
+    public static boolean promptInstallOnHomescreen() {
+        return Display.impl.promptInstallOnHomescreen();
+    }
+    
+    /**
+     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+     * Only relevant in the javascript port.
+     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
+     * the app on their homescreen.
+     * @since 6.0
+     */
+    public static void onCanInstallOnHomescreen(Runnable r) {
+        Display.impl.onCanInstallOnHomescreen(r);
+    }
+
 }

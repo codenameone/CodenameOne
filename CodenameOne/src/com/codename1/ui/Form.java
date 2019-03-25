@@ -356,7 +356,11 @@ public class Form extends Container {
         if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
             Button bar = new Button();
             bar.setShowEvenIfBlank(true);
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             bar.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -369,7 +373,11 @@ public class Form extends Container {
             return bar;
         } else {
             Container bar = new Container();
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             return bar;
         }
     }
@@ -1993,10 +2001,19 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     void deinitializeImpl() {
-        try {
-            setCurrentInputDevice(null);
-        } catch (Exception ex) {
-            Log.e(ex);
+        if (!comboLock) {
+            // Some input devices are compound widgets that contain
+            // comboboxes.  If those comboboxes are selected, then
+            // it shows the combobox popup (which is a Dialog) which will 
+            // denitialize the form.  We don't want this to trigger the 
+            // input device change (which may close the input device).
+            // Specifically this is to fix an issue with the Calendar picker
+            // https://groups.google.com/d/msgid/codenameone-discussions/b8e198a4-3dd1-4feb-81a1-456188e81d92%40googlegroups.com?utm_medium=email&utm_source=footer
+            try {
+                setCurrentInputDevice(null);
+            } catch (Exception ex) {
+                Log.e(ex);
+            }
         }
         super.deinitializeImpl();
         animMananger.flush();
@@ -2891,7 +2908,17 @@ public class Form extends Container {
     }
 
     private Component pressedCmp;
+    private Rectangle pressedCmpAbsBounds=new Rectangle();
     
+    private void setPressedCmp(Component cmp) {
+        pressedCmp = cmp;
+        if (cmp == null) {
+            pressedCmpAbsBounds.setBounds(0,0,0,0);
+        } else {
+            pressedCmpAbsBounds.setBounds(pressedCmp.getAbsoluteX(), pressedCmp.getAbsoluteY(), pressedCmp.getWidth(), pressedCmp.getHeight());
+        }
+        
+    }
     /**
      * {@inheritDoc}
      */
@@ -2902,7 +2929,7 @@ public class Form extends Container {
         }
         
         
-        pressedCmp = null;
+        setPressedCmp(null);
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
@@ -2955,7 +2982,7 @@ public class Form extends Container {
                     if (!isScrollWheeling) {
                         setFocused(leadParent);
                     }
-                    pressedCmp = cmp.getLeadComponent();
+                    setPressedCmp(cmp.getLeadComponent());
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2969,7 +2996,8 @@ public class Form extends Container {
                         if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
+                        
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -2983,7 +3011,7 @@ public class Form extends Container {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                    pressedCmp = cmp;
+                    setPressedCmp(cmp);
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
@@ -3009,7 +3037,7 @@ public class Form extends Container {
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -3317,8 +3345,10 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        Component origPressedCmp = pressedCmp;
+        boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
         rippleMotion = null;
-        pressedCmp = null;
+        setPressedCmp(null);
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane(formLayeredPane, x, y);
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -3393,6 +3423,17 @@ public class Form extends Container {
         if (dragged == null) {
             //if the pointer was released on the menu invoke the appropriate
             //soft button.
+            if (origPressedCmp != null && inOrigPressedCmpBounds) {
+                // This is a special case that occurs when the pointer press
+                // causes a drastic change in the layout (e.g. hiding the keyboard)
+                // This causes buttons to fail to fire their action events because
+                // the button is no longer under the pointer release event.
+                // We solve this by tracking the original location of the pressed component.
+                if (origPressedCmp.isEnabled()) {
+                    origPressedCmp.pointerReleased(x, y);
+                }
+                return;
+            }
             if (menuBar.contains(x, y)) {
                 Component cmp = menuBar.getComponentAt(x, y);
                 if (cmp != null && cmp.isEnabled()) {
@@ -3537,6 +3578,7 @@ public class Form extends Container {
      * 
      * @param cmd the Form command to be added
      * @param offset position in which the command is added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd, int offset) {
         menuBar.addCommand(cmd, offset);
@@ -3546,6 +3588,7 @@ public class Form extends Container {
      * A helper method to check the amount of commands within the form menu
      * 
      * @return the number of commands
+     * @deprecated Please use {@link Toolbar#getComponentCount()} or similar methods
      */
     public int getCommandCount() {
         return menuBar.getCommandCount();
@@ -3571,6 +3614,7 @@ public class Form extends Container {
      * and a Menu will be added with all the remain Commands.
      * 
      * @param cmd the Form command to be added
+     * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
     public void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);

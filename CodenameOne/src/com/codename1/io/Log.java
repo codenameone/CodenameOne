@@ -414,6 +414,22 @@ public class Log {
         }
     }
     
+    /**
+     * Deletes the current log file
+     */
+    public static void deleteLog() {
+        if(instance.output != null) {
+            Util.cleanup(instance.output);
+        }
+        if(instance.getFileURL() == null) {
+            Storage.getInstance().deleteStorageFile("CN1Log__$");
+        } else {
+            if(FileSystemStorage.getInstance().exists(instance.getFileURL())) {
+                FileSystemStorage.getInstance().delete(instance.getFileURL());
+            } 
+        }
+    }
+    
     private Writer getWriter() throws IOException {
         if(output == null) {
             output = createWriter();

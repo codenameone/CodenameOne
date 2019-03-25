@@ -67,6 +67,7 @@ public class PickerComponent extends InputComponent {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_STRINGS);
         p.picker.setStrings(values);
+        p.picker.setSelectedString(values[0]);
         return p;
     }
     

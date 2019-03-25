@@ -50,6 +50,7 @@ using Windows.UI.Composition;
 using Microsoft.Graphics.Canvas.UI.Composition;
 using Microsoft.Graphics.Canvas.Brushes;
 using java.util;
+using com.codename1.capture;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -532,6 +533,7 @@ namespace com.codename1.impl
             }
             Display.getInstance().setTransitionYield(0);
             setDragStartPercentage(3);
+            VideoCaptureConstraints.init(new VideoCaptureConstraintsCompiler());
         }
 
 
@@ -2183,7 +2185,43 @@ namespace com.codename1.impl
             capture(response, CameraCaptureUIMode.Video);
         }
 
+        public override void captureVideo(VideoCaptureConstraints constraints, ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Video, constraints);
+        }
+
         private void capture(ActionListener response, CameraCaptureUIMode mode)
+        {
+            capture(response, mode, null);
+        }
+
+        class VideoCaptureConstraintsCompiler : VideoCaptureConstraints.Compiler
+        {
+            public VideoCaptureConstraints compile(VideoCaptureConstraints vcc)
+            {
+                VideoCaptureConstraints res = new VideoCaptureConstraints();
+                int w = vcc.getPreferredWidth();
+                int h = vcc.getPreferredHeight();
+                int q = vcc.getPreferredQuality();
+                if (q == 0 && h != 0 && w != 0)
+                {
+                    if (h < 480)
+                    {
+                        q = VideoCaptureConstraints.QUALITY_LOW;
+                    } else if (h >= 1080)
+                    {
+                        q = VideoCaptureConstraints.QUALITY_HIGH;
+                    }
+                }
+                res.preferredQuality(q);
+                res.preferredMaxLength(vcc.getPreferredMaxLength());
+
+
+                return res;
+            }
+        }
+
+        private void capture(ActionListener response, CameraCaptureUIMode mode, VideoCaptureConstraints cnst)
         {
 #if WINDOWS_PHONE_APP
             openGaleriaCamera();
@@ -2207,7 +2245,47 @@ namespace com.codename1.impl
                     {
                         
                         dialog.VideoSettings.Format = CameraCaptureUIVideoFormat.Mp4;
-                        dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                        if (cnst != null)
+                        {
+                            switch (cnst.getQuality())
+                            {
+                                case VideoCaptureConstraints.QUALITY_LOW:
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.LowDefinition;
+                                    break;
+                                case VideoCaptureConstraints.QUALITY_HIGH:
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                                    break;
+                                default:
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                                    break;
+                            }
+                            if (cnst.getMaxLength() != 0)
+                            {
+                                int duration = cnst.getMaxLength();
+
+                                dialog.VideoSettings.MaxDurationInSeconds = duration;
+
+                            }
+                            if (cnst.getQuality() == 0 && cnst.getWidth() != 0 && cnst.getHeight() != 0)
+                            {
+                                int w = cnst.getWidth();
+                                int h = cnst.getHeight();
+                                if (w < 640 && h < 480)
+                                {
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.LowDefinition;
+                                } else if (w < 1920 && h < 1080)
+                                {
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.StandardDefinition;
+                                } else
+                                {
+                                    dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                                }
+                            }
+                        } else
+                        {
+                            dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                        }
+                        
                     }
                     
                     StorageFile photo = await dialog.CaptureFileAsync(mode);
@@ -2269,16 +2347,18 @@ namespace com.codename1.impl
 
         public bool isTempFile(string path)
         {
-            return path.StartsWith("tmp://");
+            return path.StartsWith("tmp://") || path.Contains("/tmp://") || path.Contains(":tmp://");
         }
 
         public StorageFile getTempFile(string path)
         {
-            if (!path.StartsWith("tmp://"))
+            if (!isTempFile(path))
             {
                 return null;
             }
-            path = path.Substring(6);
+            path = path.StartsWith("tmp://") ? 
+                path.Substring(6) : path.Contains("/tmp://") ?
+                path.Substring(7 + path.IndexOf("/tmp://")) : path.Substring(7 + path.IndexOf(":tmp://"));
             if (path.IndexOf("-") < 0)
             {
                 return null;
@@ -4845,6 +4925,42 @@ namespace com.codename1.impl
             }
 
             return canvasPath;
+        }
+
+        public override bool isScreenLockSupported()
+        {
+            return true;
+        }
+
+        private Windows.System.Display.DisplayRequest _displayRequest;
+
+        
+
+        public override void lockScreen()
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+               if (_displayRequest == null)
+                {
+                    _displayRequest = new Windows.System.Display.DisplayRequest();
+                    _displayRequest.RequestActive();
+                }
+
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public override void unlockScreen()
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (_displayRequest != null)
+                {
+                    _displayRequest.RequestRelease();
+                    _displayRequest = null;
+                    
+                }
+
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
         }
     }
 }// end of namespace: com.codename1.impl

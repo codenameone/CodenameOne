@@ -224,6 +224,21 @@ static void installSignalHandlers() {
     return YES;
 }
 
+#ifdef CN1_HANDLE_UNIVERSAL_LINKS
+// https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
+// https://github.com/codenameone/CodenameOne/issues/2677
+- (BOOL)application:(UIApplication *)application
+        continueUserActivity:(NSUserActivity *)userActivity
+        restorationHandler:(void (^)(NSArray *))restorationHandler {
+    if ([NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
+        JAVA_OBJECT url = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
+        com_codename1_impl_ios_IOSImplementation_applicationReceivedUniversalLink___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG url);
+        return YES;
+    }
+    return NO;
+}
+#endif
+
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
     JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
@@ -306,10 +321,15 @@ static void installSignalHandlers() {
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
+    
     /*
      Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
      */
     com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
+    if (vc != nil) {
+        [vc updateCanvas:YES];
+    }
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application

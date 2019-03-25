@@ -62,6 +62,7 @@
 #include "java_util_Hashtable.h"
 #include "com_codename1_ui_Image.h"
 #include "com_codename1_impl_ios_IOSImplementation_NativeImage.h"
+#include "com_codename1_util_SuccessCallback.h"
 #import "SocketImpl.h"
 #import "com_codename1_ui_geom_Rectangle.h"
 #import <MobileCoreServices/MobileCoreServices.h>
@@ -76,7 +77,12 @@
 #include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
-
+#ifdef ENABLE_WKWEBVIEW
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
+#import <WebKit/WebKit.h>
+#define supportsWKWebKit
+#endif
+#endif
 #ifdef INCLUDE_ZOOZ
 #import "ZooZ.h"
 #endif
@@ -1668,6 +1674,13 @@ void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THR
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_setConnectionId___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT id) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    [impl setConnectionId:id];
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_setMethod___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT mtd) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1887,8 +1900,8 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 #else
         JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
 #endif
-        data[0] = (JAVA_INT)s.width;
-        data[1] = (JAVA_INT)s.height;
+        data[0] = (JAVA_INT)(s.width * scaleValue);
+        data[1] = (JAVA_INT)(s.height * scaleValue);
         POOL_END();
     });
 }
@@ -2301,12 +2314,60 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
     com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
     return (JAVA_LONG)((BRIDGE_CAST void*)r);
 }
+#ifdef supportsWKWebKit
+WKWebView* com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
+#endif
+JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_Object_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
+#ifdef supportsWKWebKit
+    if (@available(iOS 8, *)) {
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+            config.allowsInlineMediaPlayback = YES;
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+            UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
+            
+    #ifndef CN1_USE_ARC
+            [com_codename1_impl_ios_IOSNative_createWKBrowserComponent retain];
+    #endif
+        });
+        id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
+        com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
+        return (JAVA_LONG)((BRIDGE_CAST void*)r);
+    } else {
+        return (JAVA_LONG)0;
+    }
+#else
+    return com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(threadStateData, instanceObject, obj);
+#endif
+}
+
+BOOL isWKWebView(JAVA_LONG peer) {
+#ifdef supportsWKWebKit
+    NSObject *o = (BRIDGE_CAST NSObject*)((void *)peer);
+    return (isIOS8() && [o isKindOfClass:[WKWebView class]]);
+#else
+    return NO;
+#endif
+}
 
 void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w loadHTMLString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w loadHTMLString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
+#endif
+            
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w loadHTMLString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
+        }
         POOL_END();
     });
 }
@@ -2326,9 +2387,17 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
 void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        
-        w.scalesPageToFit=enabled;
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+#endif
+
+            //w.allows=enabled;
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+
+            w.scalesPageToFit=enabled;
+        }
         
         POOL_END();
     });
@@ -2337,10 +2406,19 @@ void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_T
 void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        
-        w.scrollView.scrollEnabled = enabled;
-        w.scrollView.bounces = enabled;
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+
+            w.scrollView.scrollEnabled = enabled;
+            w.scrollView.bounces = enabled;
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+
+            w.scrollView.scrollEnabled = enabled;
+            w.scrollView.bounces = enabled;
+        }
         
         POOL_END();
     });
@@ -2349,11 +2427,21 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-        NSURL* nu = [NSURL URLWithString:str];
-        NSURLRequest* r = [NSURLRequest requestWithURL:nu];
-        [w loadRequest:r];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+            NSURL* nu = [NSURL URLWithString:str];
+            NSURLRequest* r = [NSURLRequest requestWithURL:nu];
+            [w loadRequest:r];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+            NSURL* nu = [NSURL URLWithString:str];
+            NSURLRequest* r = [NSURLRequest requestWithURL:nu];
+            [w loadRequest:r];
+        }
         POOL_END();
     });
 }
@@ -2361,21 +2449,41 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url, JAVA_OBJECT keys, JAVA_OBJECT values) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-        NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+            NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
 
-        JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
-        JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
-        int count = ((JAVA_ARRAY)keys)->length;
+            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
+            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+            int count = ((JAVA_ARRAY)keys)->length;
 
-        for(int iter = 0 ; iter < count ; iter++) {
-            NSString* k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG keyData[iter]);
-            NSString* v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG valueData[iter]);
-            [request setValue:v forHTTPHeaderField:k];
+            for(int iter = 0 ; iter < count ; iter++) {
+                NSString* k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG keyData[iter]);
+                NSString* v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG valueData[iter]);
+                [request setValue:v forHTTPHeaderField:k];
+            }
+
+            [w loadRequest:request];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+            NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
+
+            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
+            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+            int count = ((JAVA_ARRAY)keys)->length;
+
+            for(int iter = 0 ; iter < count ; iter++) {
+                NSString* k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG keyData[iter]);
+                NSString* v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG valueData[iter]);
+                [request setValue:v forHTTPHeaderField:k];
+            }
+
+            [w loadRequest:request];
         }
-        
-        [w loadRequest:request];
         POOL_END();
     });
 }
@@ -2383,8 +2491,15 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
 void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w goBack];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w goBack];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w goBack];
+        }
         POOL_END();
     });
 }
@@ -2392,8 +2507,15 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_
 void com_codename1_impl_ios_IOSNative_browserStop___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w stopLoading];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w stopLoading];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w stopLoading];
+        }
         POOL_END();
     });
 }
@@ -2402,26 +2524,122 @@ void com_codename1_impl_ios_IOSNative_browserClearHistory___long(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript) {
-    if ([NSThread isMainThread]) {
-        POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
-        POOL_END();
+    if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+        if ([NSThread isMainThread]) {
+            POOL_BEGIN();
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            
+            [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                if (error != nil) {
+                    NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                }
+            }];
+            POOL_END();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                POOL_BEGIN();
+                WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            
+                [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                    if (error != nil) {
+                        NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                    }
+                }];
+                POOL_END();
+            });
+        }
+#endif
     } else {
-        dispatch_async(dispatch_get_main_queue(), ^{
+        if ([NSThread isMainThread]) {
             POOL_BEGIN();
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
             POOL_END();
-        });
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                POOL_BEGIN();
+                UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+                [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+                POOL_END();
+            });
+        }
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_browserExecuteAndReturnStringCallback___long_java_lang_String_com_codename1_util_SuccessCallback(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript, JAVA_OBJECT callback) {
+    if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+        if ([NSThread isMainThread]) {
+            POOL_BEGIN();
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            
+            [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                if (error != nil) {
+                    NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                } else {
+                    NSString *res = [NSString stringWithFormat:@"%@", result];
+                    if (callback != JAVA_NULL) {
+                        com_codename1_util_SuccessCallback_onSucess___java_lang_Object(threadStateData, callback, fromNSString(threadStateData, res));
+                    }
+                }
+            }];
+            POOL_END();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                POOL_BEGIN();
+                WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            
+                [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                    if (error != nil) {
+                        NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                    } else {
+                        NSString *res = [NSString stringWithFormat:@"%@", result];
+                        if (callback != JAVA_NULL) {
+                            com_codename1_util_SuccessCallback_onSucess___java_lang_Object(threadStateData, callback, fromNSString(threadStateData, res));
+                        }
+                    }
+                    
+                }];
+                POOL_END();
+            });
+        }
+#endif
+    } else {
+        if ([NSThread isMainThread]) {
+            POOL_BEGIN();
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            NSString * res = [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+            if (callback != JAVA_NULL) {
+                com_codename1_util_SuccessCallback_onSucess___java_lang_Object(threadStateData, callback, fromNSString(threadStateData, res));
+            }
+            POOL_END();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                POOL_BEGIN();
+                UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+                NSString * res = [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+                if (callback != JAVA_NULL) {
+                    com_codename1_util_SuccessCallback_onSucess___java_lang_Object(threadStateData, callback, fromNSString(threadStateData, res));
+                }
+                POOL_END();
+            });
+        }
     }
 }
 
 void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w goForward];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w goForward];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w goForward];
+        }
         POOL_END();
     });
 }
@@ -2430,8 +2648,15 @@ JAVA_BOOLEAN booleanResponse = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        booleanResponse = [w canGoBack];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            booleanResponse = [w canGoBack];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            booleanResponse = [w canGoBack];
+        }
         POOL_END();
     });
     return booleanResponse;
@@ -2440,8 +2665,15 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_S
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        booleanResponse = [w canGoForward];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            booleanResponse = [w canGoForward];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            booleanResponse = [w canGoForward];
+        }
         POOL_END();
     });
     return booleanResponse;
@@ -2450,8 +2682,15 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREA
 void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        [w reload];
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w reload];
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            [w reload];
+        }
         POOL_END();
     });
 }
@@ -2460,9 +2699,16 @@ JAVA_OBJECT returnString;
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        NSString* theTitle = [w stringByEvaluatingJavaScriptFromString:@"document.title"];
-        returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG theTitle);
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.title);
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            NSString* theTitle = [w stringByEvaluatingJavaScriptFromString:@"document.title"];
+            returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG theTitle);
+        }
         POOL_END();
     });
     return returnString;
@@ -2471,8 +2717,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_S
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.request.URL.absoluteString);
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.URL.absoluteString);
+#endif
+        } else {
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.request.URL.absoluteString);
+        }
         POOL_END();
     });
     return returnString;
@@ -3229,7 +3482,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 }
 
 UIPopoverController* popoverController;
-void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie) {
+void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
 #ifdef INCLUDE_CAMERA_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3248,6 +3501,10 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             
             if(movie) {
                 pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.movie", nil];
+                pickerController.videoQuality = quality;
+                if (duration > 0) {
+                    pickerController.videoMaximumDuration = duration;
+                }
             } else {
                 pickerController.mediaTypes = [NSArray arrayWithObjects:@"public.image", nil];
             }
@@ -5605,21 +5862,26 @@ void com_codename1_impl_ios_IOSNative_zoozPurchase___double_java_lang_String_jav
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT javaScript){
-    if ([NSThread isMainThread]) {
-        POOL_BEGIN();
-        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-        JAVA_OBJECT out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
-        POOL_END();
-        return out;
+    if (isWKWebView(peer)) {
+        NSLog(@"browserExecuteAndReturnString not supported for WKWebView");
+        return JAVA_NULL;
     } else {
-        __block JAVA_OBJECT out;
-        dispatch_sync(dispatch_get_main_queue(), ^{
+        if ([NSThread isMainThread]) {
             POOL_BEGIN();
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
-            out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+            JAVA_OBJECT out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
             POOL_END();
-        });
-        return out;
+            return out;
+        } else {
+            __block JAVA_OBJECT out;
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                POOL_BEGIN();
+                UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+                out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
+                POOL_END();
+            });
+            return out;
+        }
     }
 }
 

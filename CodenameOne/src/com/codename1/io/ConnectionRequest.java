@@ -73,6 +73,7 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class ConnectionRequest implements IOProgressListener {
+    
     /**
      * A critical priority request will "push" through the queue to the highest point
      * regardless of anything else and ignoring anything that is not in itself of
@@ -191,6 +192,11 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     /**
+     * Connection ID.  Can be used for callbacks from native layer.
+     */
+    private int id;
+    
+    /**
      * The default value for the cacheMode property see {@link #getCacheMode()}
      */
     private static CachingMode defaultCacheMode = CachingMode.OFF;
@@ -204,6 +210,22 @@ public class ConnectionRequest implements IOProgressListener {
      * a 404 error if data isn't available
      */
     private CachingMode cacheMode = defaultCacheMode;
+    
+    /**
+     * Connection ID used for callbacks from native layer
+     * @param id 
+     */
+    void setId(int id) {
+        this.id = id;
+    }
+    
+    /**
+     * Connection ID used for callbacks from native layer.
+     * @return 
+     */
+    int getId() {
+        return id;
+    }
     
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
@@ -443,9 +465,11 @@ public class ConnectionRequest implements IOProgressListener {
      * @param connection the connection object
      */
     protected void initConnection(Object connection) {
+        
         timeSinceLastUpdate = System.currentTimeMillis();
         CodenameOneImplementation impl = Util.getImplementation();
         impl.setPostRequest(connection, isPost());
+        impl.setConnectionId(connection, id);
 
         if(getUserAgent() != null) {
             impl.setHeader(connection, "User-Agent", getUserAgent());
@@ -589,7 +613,50 @@ public class ConnectionRequest implements IOProgressListener {
             root = FileSystemStorage.getInstance().getAppHomePath()+ "cn1ConCache/";
         }
         FileSystemStorage.getInstance().mkdir(root);
-        return root + Base64.encodeNoNewline(createRequestURL().getBytes()).replace('/', '-').replace('+', '_');
+        String fileName = Base64.encodeNoNewline(createRequestURL().getBytes()).replace('/', '-').replace('+', '_');
+        
+        // limit file name length for portability: https://stackoverflow.com/questions/54644088/why-is-codenameone-rest-giving-me-file-name-too-long-error
+        if(fileName.length() > 255) {
+            String s = fileName.substring(0, 248);
+            int checksum = 0;
+            for(int iter = 248 ; iter < fileName.length() ; iter++) {
+                checksum += fileName.charAt(iter);
+            }
+            fileName = s + checksum;
+        } 
+        
+        return root + fileName;
+    }
+    
+    /**
+     * This callback is used internally to check SSL certificates, only on platforms that require
+     * native callbacks for checking SSL certs.  Currently only iOS requires this.
+     * @param req The ConnectionRequest to check SSL certificates for.
+     * @return True if the certificates checkout OK, or if the request doesn't require SSL cert checks.
+     * @deprecated For internal use only.
+     * @see NetworkManager#checkCertificatesNativeCallback(int) 
+     */
+    boolean checkCertificatesNativeCallback() {
+        if (!Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
+            //throw new RuntimeException("checkCertificates() can only be explicitly called on platforms that require native callbacks for checking certificates.");
+            return true;
+        }
+        if (!checkSSLCertificates) {
+            // If the request doesn't require checking SSL certificates, then this returns true.
+            // meaning that it checks out OK.
+            return true;
+        }
+        try {
+            checkSSLCertificates(getSSLCertificates());
+            if (shouldStop()) {
+                return false;
+            }
+            return true;
+        } catch (IOException ex) {
+            Log.e(ex);
+            return false;
+        }
+        
     }
     
     /**
@@ -662,7 +729,11 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                 }
             }
-            if (checkSSLCertificates && canGetSSLCertificates()) {
+            if (checkSSLCertificates && canGetSSLCertificates() && 
+                    // For iOS only... it needs to use a callback from native code
+                    // for checking the SSL certificates - otherwise it will send
+                    // empty POST bodies.
+                    !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
                 checkSSLCertificates(sslCertificates);
                     if(shouldStop()) {

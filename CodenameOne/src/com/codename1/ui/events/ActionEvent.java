@@ -159,7 +159,9 @@ public class ActionEvent {
             /**
              * Fired when a component drag is finished
              */
-            DragFinished
+            DragFinished,
+            
+            Change
             } ;
     private Type trigger;
     
