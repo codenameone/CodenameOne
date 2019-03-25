@@ -207,10 +207,83 @@ public class Sample {
         //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("-Dnb.internal.action.name=run");
         cmd.add("run");
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.inheritIO();
+        Process p = pb.start();
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
+    public File getConfigDir(SamplesContext context) {
+        return new File(context.getConfigDir(), name);
+    }
+    
+    public File getRunPropertiesFile(SamplesContext context) {
+        return new File(getConfigDir(context), "codenameone_settings.properties");
+    }
+    
+    public Properties getRunProperties(SamplesContext context) throws IOException {
+        Properties props = new Properties();
+        Properties globals = context.getGlobalBuildProperties();
+        for (String key : globals.stringPropertyNames()) {
+            props.put(key, globals.getProperty(key));
+        }
+        File configFile = getRunPropertiesFile(context);
+        if (configFile.exists()) {
+            Properties p = new Properties();
+            try (FileInputStream fis = new FileInputStream(configFile)) {
+                p.load(fis);
+            }
+            for (String key : p.stringPropertyNames()) {
+                props.put(key, p.getProperty(key));
+            }
+        }
+        return props;
+    }
+            
+    
+    private void applyRunProperties(SamplesContext context, List<String> cmd) throws IOException {
+        Properties props = getRunProperties(context);
+        for (String key : props.stringPropertyNames()) {
+            cmd.add("-D"+key+"="+props.getProperty(key));
+        }
+    }
+    
+    public int runJavascript(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+    
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("run-war");
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.inheritIO();
+        Process p = pb.start();
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
+    public int buildIOSDebug(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+    
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("build-for-ios-device");
+        System.out.println("Running command: "+cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
         Process p = pb.start();
@@ -252,6 +325,8 @@ public class Sample {
             return false;
         }
     }
+
+    
     
             
 }

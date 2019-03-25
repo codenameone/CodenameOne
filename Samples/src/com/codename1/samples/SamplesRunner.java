@@ -8,7 +8,10 @@ package com.codename1.samples;
 import com.codename1.samples.SamplesPanel.Delegate;
 import java.awt.Desktop;
 import java.awt.EventQueue;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Properties;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -58,11 +61,22 @@ public class SamplesRunner implements SamplesPanel.Delegate {
             }
         }).start();
     }
+    
+    @Override
+    public void launchJSSample(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.runJavascript(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
 
     @Override
     public void createNewSample() {
         String name = JOptionPane.showInputDialog(view, "Enter a sample name", "MySample");
-        if (name.isEmpty()) {
+        if (name == null || name.isEmpty()) {
             return;
         }
         try {
@@ -135,5 +149,63 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         currentSearch = newSearch;
         updateSearch();
     }
+
+    @Override
+    public void editGlobalBuildHints() {
+        ctx.getConfigDir().mkdirs();
+        File configFile = ctx.getGlobalBuildPropertiesFile();
+        if (!configFile.exists()) {
+            try (FileOutputStream fos = new FileOutputStream(configFile)) {
+                Properties props = ctx.getGlobalBuildProperties();
+                props.store(fos, "Add your custom codenameone_settings.properties key/value pairs to be used for building samples");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                
+            }
+        }
+        try {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().edit(configFile);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void editBuildHints(Sample sample) {
+        sample.getConfigDir(ctx).mkdirs();
+        
+        File configFile = sample.getRunPropertiesFile(ctx);
+        if (!configFile.exists()) {
+            try (FileOutputStream fos = new FileOutputStream(configFile)) {
+                Properties props = sample.getRunProperties(ctx);
+                props.store(fos, "Add your custom codenameone_settings.properties key/value pairs to be used for building this sample");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                
+            }
+        }
+        try {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().edit(configFile);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void launchIOSDebug(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildIOSDebug(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+    
     
 }

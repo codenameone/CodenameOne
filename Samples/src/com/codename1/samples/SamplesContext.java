@@ -6,6 +6,7 @@
 package com.codename1.samples;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
@@ -14,6 +15,35 @@ import java.util.Properties;
  * @author shannah
  */
 public class SamplesContext {
+
+    /**
+     * @return the configDir
+     */
+    public File getConfigDir() {
+        return configDir;
+    }
+
+    /**
+     * @param configDir the configDir to set
+     */
+    public void setConfigDir(File configDir) {
+        this.configDir = configDir;
+    }
+    
+    public File getGlobalBuildPropertiesFile() {
+        return new File(configDir, "codenameone_settings.properties");
+    }
+    
+    public Properties getGlobalBuildProperties() throws IOException {
+        Properties out = new Properties();
+        File buildProps = getGlobalBuildPropertiesFile();
+        if (buildProps.exists()) {
+            try (FileInputStream fis = new FileInputStream(buildProps)) {
+                out.load(fis);
+            }
+        }
+        return out;
+    }
 
     public static SamplesContext createSystemContext() {
         System.out.println(System.getProperties());
@@ -195,6 +225,8 @@ public class SamplesContext {
     private File cn1LibsDir=new File("../../CodenameOneLibs");
 
     private File sampleProjectTemplateDir=new File("SampleProjectTemplate");
+    private File configDir = new File("config");
+    
     private String ant="ant";
     private File cldcProjectDir=new File("../Ports/CLDC11");
     private File codenameOneProjectDir=new File("../CodenameOne");

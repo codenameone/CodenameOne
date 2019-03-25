@@ -8,8 +8,12 @@ package com.codename1.samples;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.FlowLayout;
+import java.awt.Point;
 import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -21,6 +25,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
@@ -59,9 +64,15 @@ public class SamplesPanel extends JPanel {
     
     public static interface Delegate {
         public void launchSample(Sample sample);
+        public void launchJSSample(Sample sample);
         public void createNewSample();
         public void viewSource(Sample sample);
         public void searchChanged(String newSearch);
+        public void editGlobalBuildHints();
+
+        public void editBuildHints(Sample sample);
+
+        public void launchIOSDebug(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -116,27 +127,79 @@ public class SamplesPanel extends JPanel {
         }
     }
     
+    private void preventDoubleClick(JButton btn) {
+        btn.setEnabled(false);
+        btn.repaint();
+        javax.swing.Timer timer = new javax.swing.Timer(5000, e->{
+           btn.setEnabled(true);
+           btn.repaint();
+        });
+        timer.start();
+    }
+    
     private JComponent createCell(Sample sample) {
         JPanel wrapper = new JPanel(new BorderLayout());
         JLabel name = new JLabel(sample.getName());
-        JButton launch = new JButton("Launch Sample");
+        JButton launch = new JButton("Launch");
+        launch.setToolTipText("Run this sample in the Codename One simulator");
         launch.addActionListener(e->{
+            preventDoubleClick(launch);
             if (delegate != null) {
                 delegate.launchSample(sample);
             }
         });
         JButton viewSource = new JButton("View Source");
         viewSource.addActionListener(e->{
+            preventDoubleClick(viewSource);
             if (delegate != null) {
                 delegate.viewSource(sample);
             }
         });
+        JMenuItem launchJS = new JMenuItem("Launch JS");
+        launchJS.setToolTipText("Build and run sample in web browser.  This will take 1 to 2 minutes to complete the build.");
+        launchJS.addActionListener(e->{
+            //preventDoubleClick(launchJS);
+            if (delegate != null) {
+                delegate.launchJSSample(sample);
+            }
+        });
         
+        JMenuItem launchIOS = new JMenuItem("Launch Send iOS Debug Build");
+        launchIOS.setToolTipText("Send iOS debug build.");
+        launchIOS.addActionListener(e->{
+            if (delegate != null) {
+                delegate.launchIOSDebug(sample);
+            }
+        });
+        
+        JMenuItem editBuildHints = new JMenuItem("Edit Build Hints");
+        editBuildHints.setToolTipText("Edit the custom build hints for this sample.  E.g. certificates, etc...");
+        editBuildHints.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editBuildHints(sample);
+            }
+        });
+        
+        JButton more = new JButton("More...");
+        JPopupMenu moreMenu = new JPopupMenu("More...");
+        more.addActionListener(e->{
+            EventQueue.invokeLater(()->{
+                Point p = more.getLocationOnScreen();
+                moreMenu.show(more, 0, 0);
+                moreMenu.setLocation(p.x, p.y+more.getHeight());
+            });
+            
+        });
+        moreMenu.add(launchJS);
+        moreMenu.add(launchIOS);
+        moreMenu.addSeparator();
+        moreMenu.add(editBuildHints);
         
         JPanel buttons = new JPanel(new FlowLayout());
         buttons.setOpaque(false);
         buttons.add(viewSource);
         buttons.add(launch);
+        buttons.add(more);
         
         wrapper.add(buttons, BorderLayout.EAST);
         
@@ -158,9 +221,20 @@ public class SamplesPanel extends JPanel {
                 delegate.createNewSample();
             }
         });
+        
+        JMenuItem editGlobalBuildHints = new JMenuItem("Edit Global Build Hints");
+        editGlobalBuildHints.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editGlobalBuildHints();
+            }
+        });
+        
         JMenu fileMenu = new JMenu("File");
         fileMenu.add(addSample);
+        fileMenu.add(editGlobalBuildHints);
         menu.add(fileMenu);
+        
+        
         return menu;
         
         

@@ -76,7 +76,10 @@
         </delete>
     </target>
 
+    
     <target name="build-for-ios-device" depends="clean,copy-ios-override,copy-libs,jar,clean-override">
+        <property name="ios.debug.targetType" value="iphone"/>
+        <echo message="Building iOS for target ${ios.debug.targetType}"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -87,7 +90,7 @@
             vendor="${codename1.vendor}"
             subtitle="${codename1.secondaryTitle}"
             
-            targetType="iphone"
+            targetType="${ios.debug.targetType}"
             certificate="${codename1.ios.debug.certificate}"
             certPassword="${codename1.ios.debug.certificatePassword}"
             provisioningProfile="${codename1.ios.debug.provision}"
