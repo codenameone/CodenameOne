@@ -67,6 +67,21 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
     
     @Override
+    public void sendWindowsDesktopBuild(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.sendWindowsDesktopBuild(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            Process p = sample.getThreadLocalProcess();
+            if (p != null) {
+                view.removeProcess(p);
+            }
+        }).start();
+    }
+    
+    @Override
     public void launchJSSample(Sample sample) {
         new Thread(()->{
             try {
@@ -230,6 +245,8 @@ public class SamplesRunner implements SamplesPanel.Delegate {
             }
         }
     }
+
+    
 
     
     

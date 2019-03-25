@@ -78,6 +78,8 @@ public class SamplesPanel extends JPanel {
         public void launchIOSDebug(Sample sample);
 
         public void stopProcess(Process p, String name);
+
+        public void sendWindowsDesktopBuild(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -169,11 +171,19 @@ public class SamplesPanel extends JPanel {
             }
         });
         
-        JMenuItem launchIOS = new JMenuItem("Launch Send iOS Debug Build");
+        JMenuItem launchIOS = new JMenuItem("Send iOS Debug Build");
         launchIOS.setToolTipText("Send iOS debug build.");
         launchIOS.addActionListener(e->{
             if (delegate != null) {
                 delegate.launchIOSDebug(sample);
+            }
+        });
+        
+        JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build");
+        winDesktopBuild.setToolTipText("Send Windows desktop build.");
+        winDesktopBuild.addActionListener(e->{
+            if (delegate != null) {
+                delegate.sendWindowsDesktopBuild(sample);
             }
         });
         
@@ -197,6 +207,7 @@ public class SamplesPanel extends JPanel {
         });
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
+        moreMenu.add(winDesktopBuild);
         moreMenu.addSeparator();
         moreMenu.add(editBuildHints);
         
