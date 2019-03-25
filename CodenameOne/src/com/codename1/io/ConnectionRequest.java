@@ -638,7 +638,8 @@ public class ConnectionRequest implements IOProgressListener {
      */
     boolean checkCertificatesNativeCallback() {
         if (!Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
-            throw new RuntimeException("checkCertificates() can only be explicitly called on platforms that require native callbacks for checking certificates.");
+            //throw new RuntimeException("checkCertificates() can only be explicitly called on platforms that require native callbacks for checking certificates.");
+            return true;
         }
         if (!checkSSLCertificates) {
             // If the request doesn't require checking SSL certificates, then this returns true.

@@ -113,7 +113,7 @@ public class NetworkManager {
     private Hashtable userHeaders;
     private boolean autoDetected;
     private static String autoDetectURL = "https://www.google.com/";
-    private int nextConnectionId;
+    private int nextConnectionId=1;
     
     private NetworkManager() {
     }
@@ -133,16 +133,25 @@ public class NetworkManager {
     static boolean checkCertificatesNativeCallback(int connectionId) {
         ArrayList<NetworkThread> threads = new ArrayList<NetworkThread>();
         synchronized(LOCK) {
-            for (NetworkThread nt : NetworkManager.getInstance().networkThreads) {
-                threads.add(nt);
+            if (INSTANCE == null || INSTANCE.networkThreads == null) {
+                return true;
+            }
+
+            for (NetworkThread nt : INSTANCE.networkThreads) {
+                if (nt != null) {
+                    threads.add(nt);
+                }
             }
         }
         for (NetworkThread nt : threads) {
+            if (nt.currentRequest == null) {
+                continue;
+            }
             if (nt.currentRequest.getId() == connectionId) {
                 return nt.currentRequest.checkCertificatesNativeCallback();
             }
         }
-        throw new RuntimeException("Could not find ConnectionRequest that response to native callback connection id="+connectionId);
+        return true;
     }
     
     void resetAPN() {
@@ -246,6 +255,9 @@ public class NetworkManager {
                             continue;
                         }
                         currentRequest.setId(nextConnectionId++);
+                        if (nextConnectionId > 2000000000) {
+                            nextConnectionId = 1;
+                        }
                     }
                     if(userHeaders != null) {
                         Enumeration e = userHeaders.keys();
