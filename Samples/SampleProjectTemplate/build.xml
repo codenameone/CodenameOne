@@ -347,6 +347,8 @@
     </target>
 
     <target name="build-for-javascript" depends="clean,copy-javascript-override,copy-libs,jar,clean-override">
+        <property name="javascript.targetType" value="javascript"/>
+        <echo message="Building iOS for target ${javascript.targetType}"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -357,7 +359,7 @@
             vendor="${codename1.vendor}"
             subtitle="${codename1.secondaryTitle}"
             
-            targetType="javascript"
+            targetType="${javascript.targetType}"
             automated="${automated}"
             />
     </target>    

@@ -14,6 +14,8 @@ import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.HashMap;
+import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -24,6 +26,7 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
@@ -73,6 +76,8 @@ public class SamplesPanel extends JPanel {
         public void editBuildHints(Sample sample);
 
         public void launchIOSDebug(Sample sample);
+
+        public void stopProcess(Process p, String name);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -214,7 +219,7 @@ public class SamplesPanel extends JPanel {
     }
     
     private JMenuBar createMenuBar() {
-        JMenuBar menu = new JMenuBar();
+        menu = new JMenuBar();
         JMenuItem addSample = new JMenuItem("Create New Sample");
         addSample.addActionListener(e->{
             if (delegate != null) {
@@ -254,4 +259,57 @@ public class SamplesPanel extends JPanel {
         return dlg;
         
     }
+    
+    private JMenuBar menu;
+    private JMenu processMenu;
+    private Map<Process, JMenuItem> runningProcessMap = new HashMap<Process, JMenuItem>();
+    
+    
+    private void updateProcessMenu() {
+        if (processMenu == null) {
+            processMenu = new JMenu("Running Processes");
+            menu.add(processMenu);
+        }
+        processMenu.removeAll();
+        for (Process p : runningProcessMap.keySet()) {
+            processMenu.add(runningProcessMap.get(p));
+        }
+        revalidate();
+        repaint();
+        processMenu.revalidate();
+        processMenu.repaint();
+    }
+    
+    public void addProcess(Process p, String name) {
+        if (!EventQueue.isDispatchThread()) {
+            EventQueue.invokeLater(()->{
+                addProcess(p, name);
+            });
+            
+            return;
+        }
+        
+        JMenuItem jmi = new JMenuItem(name);
+        jmi.addActionListener(e->{
+            if (delegate != null) {
+                delegate.stopProcess(p, name);
+            }
+        });
+        runningProcessMap.put(p, jmi);
+        updateProcessMenu();
+    }
+    
+    public void removeProcess(Process p) {
+        if (!EventQueue.isDispatchThread()) {
+            EventQueue.invokeLater(()->{
+                removeProcess(p);
+            });
+            
+            return;
+        }
+        runningProcessMap.remove(p);
+        updateProcessMenu();
+    }
+    
+    
 }

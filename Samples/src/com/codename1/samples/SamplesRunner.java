@@ -59,6 +59,10 @@ public class SamplesRunner implements SamplesPanel.Delegate {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
+            Process p = sample.getThreadLocalProcess();
+            if (p != null) {
+                view.removeProcess(p);
+            }
         }).start();
     }
     
@@ -66,9 +70,16 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     public void launchJSSample(Sample sample) {
         new Thread(()->{
             try {
-                sample.runJavascript(ctx);
+                sample.runJavascript(ctx, p->{
+                    view.addProcess(p, sample.getName());
+                });
+                
             } catch (Exception ex) {
                 ex.printStackTrace();
+            }
+            Process p = sample.getThreadLocalProcess();
+            if (p != null) {
+                view.removeProcess(p);
             }
         }).start();
     }
@@ -204,6 +215,20 @@ public class SamplesRunner implements SamplesPanel.Delegate {
                 ex.printStackTrace();
             }
         }).start();
+    }
+
+    @Override
+    public void stopProcess(Process p, String name) {
+        int res = JOptionPane.showConfirmDialog(view, "Stop process "+name+"?");
+        if (res == JOptionPane.OK_OPTION) {
+            try {
+                p.destroy();
+                JOptionPane.showMessageDialog(view, "Process has been stopped");
+                view.removeProcess(p);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
     }
 
     

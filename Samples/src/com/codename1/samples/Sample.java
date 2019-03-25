@@ -215,6 +215,7 @@ public class Sample {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
         Process p = pb.start();
+        setThreadLocalProcess(p);
         int result = p.waitFor();
        
         return result;
@@ -255,7 +256,9 @@ public class Sample {
         }
     }
     
-    public int runJavascript(SamplesContext context) throws IOException, InterruptedException {
+    
+    
+    public int runJavascript(SamplesContext context, ProcessCallback callback) throws IOException, InterruptedException {
         syncChangesToBuildDir(context);
         //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
         List<String> cmd = new ArrayList<>();
@@ -264,10 +267,16 @@ public class Sample {
     
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("clean");
         cmd.add("run-war");
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
+        
         Process p = pb.start();
+        setThreadLocalProcess(p);
+        if (callback != null) {
+            callback.processWillStart(p);
+        }
         int result = p.waitFor();
        
         return result;
@@ -287,6 +296,7 @@ public class Sample {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
         Process p = pb.start();
+        setThreadLocalProcess(p);
         int result = p.waitFor();
        
         return result;
@@ -326,6 +336,15 @@ public class Sample {
         }
     }
 
+    ThreadLocal<Process> threadLocalProcess = new ThreadLocal();
+    
+    public Process getThreadLocalProcess() {
+        return threadLocalProcess.get();
+    }
+    
+    private void setThreadLocalProcess(Process p) {
+        threadLocalProcess.set(p);
+    }
     
     
             
