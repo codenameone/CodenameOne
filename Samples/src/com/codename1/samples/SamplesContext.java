@@ -30,13 +30,13 @@ public class SamplesContext {
         this.configDir = configDir;
     }
     
-    public File getGlobalBuildPropertiesFile() {
+    public File getGlobalPrivateCodenameOneSettingsFile() {
         return new File(configDir, "codenameone_settings.properties");
     }
     
-    public Properties getGlobalBuildProperties() throws IOException {
+    public Properties getGlobalPrivateCodenameOneSettingsProperties() throws IOException {
         Properties out = new Properties();
-        File buildProps = getGlobalBuildPropertiesFile();
+        File buildProps = getGlobalPrivateCodenameOneSettingsFile();
         if (buildProps.exists()) {
             try (FileInputStream fis = new FileInputStream(buildProps)) {
                 out.load(fis);

@@ -5,6 +5,8 @@
  */
 package com.codename1.samples;
 
+import static com.codename1.samples.PropertiesUtil.loadProperties;
+import static com.codename1.samples.PropertiesUtil.saveProperties;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.FileInputStream;
@@ -103,8 +105,10 @@ public class Sample {
     
     private static long lastModifiedRecursive(File dir) throws IOException  {
         long mtime = dir.lastModified();
-        for (File child : dir.listFiles()) {
-            mtime = Math.max(lastModifiedRecursive(child), mtime);
+        if (dir.isDirectory()) {
+            for (File child : dir.listFiles()) {
+                mtime = Math.max(lastModifiedRecursive(child), mtime);
+            }
         }
         return mtime;
     }
@@ -113,6 +117,49 @@ public class Sample {
         copyDir(context.getSampleProjectTemplateDir(), getBuildProjectDir(context));
     }
     
+    public File getPublicCodenameOneSettingsFile(SamplesContext context) {
+        return new File(getJavaFile(context).getParentFile(), "codenameone_settings.properties");
+    }
+    
+    public File getThemeCSSFile(SamplesContext context) {
+        return new File(getCSSDir(context), "theme.css");
+    }
+    
+    /**
+     * Converts a project to CSS
+     * @param context
+     * @throws IOException 
+     */
+    public void activateCSS(SamplesContext context) throws IOException {
+        getCSSDir(context).mkdirs();
+        if (!getThemeCSSFile(context).exists()) {
+            FileUtil.writeStringToFile("#Constants {\n" +
+                "    includeNativeBool: true; \n" +
+                "}",
+                    getThemeCSSFile(context));
+        }
+        
+        Properties props = loadProperties(getPublicCodenameOneSettingsFile(context));
+        props.setProperty("codename1.cssTheme", "true");
+        saveProperties(props, getPublicCodenameOneSettingsFile(context));
+        
+    }
+    
+    public boolean isCSSProject(SamplesContext context) throws IOException {
+        return getThemeCSSFile(context).exists() 
+                && "true".equals(loadProperties(getPublicCodenameOneSettingsFile(context)).getProperty("codename1.cssTheme"));
+    }
+    
+    /**
+     * Refreshes the CSS in a project that is already running.
+     * @param context
+     * @throws IOException 
+     */
+    public void refreshCSS(SamplesContext context) throws IOException {
+        syncChangesToBuildDir(context);
+    }
+    
+
     private void copyJavaFileToBuildDir(SamplesContext context) throws IOException {
         File dest = getJavaFileInBuildDir(context);
         dest.getParentFile().mkdirs();
@@ -127,6 +174,11 @@ public class Sample {
         copyFile(context.getCodenameOneBuildClientJar(), new File(getBuildProjectDir(context), "CodeNameOneBuildClient.jar"));
     }
     
+    /**
+     * Synchronize any changes in the sample into the sample's project.
+     * @param context
+     * @throws IOException 
+     */
     private void syncChangesToBuildDir(SamplesContext context) throws IOException {
         context.getBuildDir().mkdirs();
         if (!getBuildProjectDir(context).exists()) {
@@ -134,8 +186,11 @@ public class Sample {
             updateBuildProjectProperties(context);
             updateBuildProjectSettings(context);
             copyCodenameOneBuildClient(context);
+            updateCodenameOneSettings(context);
             
         }
+        syncCodenameOneSettings(context);
+        
         if (!getJavaFileInBuildDir(context).exists() || getJavaFileInBuildDir(context).lastModified() < getJavaFile(context).lastModified()) {
             copyJavaFileToBuildDir(context);
         }
@@ -147,29 +202,81 @@ public class Sample {
         
     }
     
+    private void syncCodenameOneSettings(SamplesContext context) throws IOException {
+        if (isCodenameOneSettingsChanged(context)) {
+            updateCodenameOneSettings(context);
+        }
+        
+    }
+    
+    private void updateCodenameOneSettings(SamplesContext context) throws IOException {
+        Properties props = new Properties();
+        for (File f : new File[]{
+            getSampleProjectCodenameOneSettingsFile(context),
+            getPublicCodenameOneSettingsFile(context),
+            context.getGlobalPrivateCodenameOneSettingsFile(),
+            getPrivateCodenameOneSettingsFile(context)
+            
+        }) {
+            if (f.exists()) {
+                Properties tmp = loadProperties(f);
+                for (String key : tmp.stringPropertyNames()) {
+                    props.setProperty(key, tmp.getProperty(key));
+                }
+            }
+        }
+        saveProperties(props, getSampleProjectCodenameOneSettingsFile(context));
+        
+    }
+    
+    private boolean isCodenameOneSettingsChanged(SamplesContext context) throws IOException {
+        File projectCodenameOneSettings = getSampleProjectCodenameOneSettingsFile(context);
+        for (File f : new File[]{
+            getPublicCodenameOneSettingsFile(context),
+            getPrivateCodenameOneSettingsFile(context),
+            context.getGlobalPrivateCodenameOneSettingsFile()
+        }) {
+            if (f.exists() && f.lastModified() > projectCodenameOneSettings.lastModified()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    
+    /**
+     * Gets the nbproject/project.properties file from the sample project
+     * @param context
+     * @return 
+     */
     private File getSampleProjectPropertiesFile(SamplesContext context) {
         return new File(getBuildProjectDir(context), "nbproject" + File.separator + "project.properties");
     }
     
-    private File getSampleProjectSettingsFile(SamplesContext context) {
+    /**
+     * Gets the codenameone_settings.properties file from the sample project.
+     * @param context
+     * @return 
+     */
+    private File getSampleProjectCodenameOneSettingsFile(SamplesContext context) {
         return new File(getBuildProjectDir(context), "codenameone_settings.properties");
     }
     
     private Properties loadBuildProjectProperties(SamplesContext context) throws IOException {
-        Properties props = new Properties();
-        try (FileInputStream fis = new FileInputStream(getSampleProjectPropertiesFile(context))) {
-            props.load(fis);
-        }
-        return props;
+        return loadProperties(getSampleProjectPropertiesFile(context));
     }
     
-    private Properties loadBuildProjectSettings(SamplesContext context) throws IOException {
-        Properties props = new Properties();
-        try (FileInputStream fis = new FileInputStream(getSampleProjectSettingsFile(context))) {
-            props.load(fis);
-        }
-        return props;
+    /**
+     * Loads the codenameone_settings.properties file from the sample project.
+     * @param context
+     * @return
+     * @throws IOException 
+     */
+    private Properties loadSampleProjectCodenameOneSettings(SamplesContext context) throws IOException {
+        return loadProperties(getSampleProjectCodenameOneSettingsFile(context));
     }
+    
+    
     
     private void saveBuildProjectProperties(SamplesContext context, Properties props) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(getSampleProjectPropertiesFile(context))) {
@@ -178,7 +285,7 @@ public class Sample {
     }
     
     private void saveBuildProjectSettings(SamplesContext context, Properties props) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(getSampleProjectSettingsFile(context))) {
+        try (FileOutputStream fos = new FileOutputStream(getSampleProjectCodenameOneSettingsFile(context))) {
             props.store(fos, "Updated settings");
         }
     }
@@ -196,7 +303,7 @@ public class Sample {
     }
     
     private void updateBuildProjectSettings(SamplesContext context) throws IOException {
-        Properties props = loadBuildProjectSettings(context);
+        Properties props = loadSampleProjectCodenameOneSettings(context);
         props.setProperty("codename1.mainName", getName());
         props.setProperty("codename1.displayName", getName());
         saveBuildProjectSettings(context, props);
@@ -221,39 +328,22 @@ public class Sample {
         return result;
     }
     
-    public File getConfigDir(SamplesContext context) {
+    public File getPrivateConfigDir(SamplesContext context) {
         return new File(context.getConfigDir(), name);
     }
     
-    public File getRunPropertiesFile(SamplesContext context) {
-        return new File(getConfigDir(context), "codenameone_settings.properties");
+    public File getPrivateCodenameOneSettingsFile(SamplesContext context) {
+        return new File(getPrivateConfigDir(context), "codenameone_settings.properties");
     }
     
-    public Properties getRunProperties(SamplesContext context) throws IOException {
-        Properties props = new Properties();
-        Properties globals = context.getGlobalBuildProperties();
-        for (String key : globals.stringPropertyNames()) {
-            props.put(key, globals.getProperty(key));
-        }
-        File configFile = getRunPropertiesFile(context);
-        if (configFile.exists()) {
-            Properties p = new Properties();
-            try (FileInputStream fis = new FileInputStream(configFile)) {
-                p.load(fis);
-            }
-            for (String key : p.stringPropertyNames()) {
-                props.put(key, p.getProperty(key));
-            }
-        }
-        return props;
-    }
+    
             
     
     private void applyRunProperties(SamplesContext context, List<String> cmd) throws IOException {
-        Properties props = getRunProperties(context);
-        for (String key : props.stringPropertyNames()) {
-            cmd.add("-D"+key+"="+props.getProperty(key));
-        }
+        //Properties props = buildEffectiveCodenameOneSettings(context);
+        //for (String key : props.stringPropertyNames()) {
+        //    cmd.add("-D"+key+"="+props.getProperty(key));
+        //}
     }
     
     
@@ -342,6 +432,12 @@ public class Sample {
         }
         try {
             String text = FileUtil.readFileToString(getJavaFile(ctx));
+            if (getThemeCSSFile(ctx).exists()) {
+                text += "\n" + FileUtil.readFileToString(getThemeCSSFile(ctx));
+            }
+            if (getPublicCodenameOneSettingsFile(ctx).exists()) {
+                text += "\n" + FileUtil.readFileToString(getPublicCodenameOneSettingsFile(ctx));
+            }
             for (String word : searchTerm.split(" ")) {
                 if (!text.contains(word)) {
                     //System.out.println("Text does not contain "+word);

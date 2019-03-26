@@ -73,13 +73,19 @@ public class SamplesPanel extends JPanel {
         public void searchChanged(String newSearch);
         public void editGlobalBuildHints();
 
-        public void editBuildHints(Sample sample);
+        public void editPrivateBuildHints(Sample sample);
 
         public void launchIOSDebug(Sample sample);
 
         public void stopProcess(Process p, String name);
 
         public void sendWindowsDesktopBuild(Sample sample);
+
+        public void editPublicBuildHints(Sample sample);
+
+        public void editCSSFile(Sample sample);
+
+        public void refreshCSS(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -187,11 +193,35 @@ public class SamplesPanel extends JPanel {
             }
         });
         
-        JMenuItem editBuildHints = new JMenuItem("Edit Build Hints");
-        editBuildHints.setToolTipText("Edit the custom build hints for this sample.  E.g. certificates, etc...");
-        editBuildHints.addActionListener(e->{
+        JMenuItem editPrivateBuildHints = new JMenuItem("Edit Private Build Hints");
+        editPrivateBuildHints.setToolTipText("Edit the private custom build hints for this sample.");
+        editPrivateBuildHints.addActionListener(e->{
             if (delegate != null) {
-                delegate.editBuildHints(sample);
+                delegate.editPrivateBuildHints(sample);
+            }
+        });
+        
+        JMenuItem editPublicBuildHints = new JMenuItem("Edit Public Build Hints");
+        editPublicBuildHints.setToolTipText("Edit the public custom build hints for this sample.");
+        editPublicBuildHints.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editPublicBuildHints(sample);
+            }
+        });
+        
+        JMenuItem editCSS = new JMenuItem("Edit CSS File");
+        editCSS.setToolTipText("Edit the CSS file for this sample.");
+        editCSS.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editCSSFile(sample);
+            }
+        });
+        
+        JMenuItem refreshCSS = new JMenuItem("Refresh CSS File");
+        refreshCSS.setToolTipText("Update the CSS file in the currently running sample.  This should update the styles in the sample automatically.  May take a few seconds.");
+        refreshCSS.addActionListener(e->{
+            if (delegate != null) {
+                delegate.refreshCSS(sample);
             }
         });
         
@@ -209,7 +239,10 @@ public class SamplesPanel extends JPanel {
         moreMenu.add(launchIOS);
         moreMenu.add(winDesktopBuild);
         moreMenu.addSeparator();
-        moreMenu.add(editBuildHints);
+        moreMenu.add(editPrivateBuildHints);
+        moreMenu.add(editPublicBuildHints);
+        moreMenu.add(editCSS);
+        moreMenu.add(refreshCSS);
         
         JPanel buttons = new JPanel(new FlowLayout());
         buttons.setOpaque(false);

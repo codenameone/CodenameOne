@@ -612,7 +612,7 @@
     </target>
     
     <target name="-cn1-compile-css" if="codename1.cssTheme">
-        <java jar="${user.home}/.codenameone/designer_1.jar" failonerror="true">
+        <java jar="${user.home}/.codenameone/designer_1.jar" failonerror="true" fork="true">
             <jvmarg value="-Dcli=true"/>
             <arg value="-css"/>
             <arg file="css/theme.css"/>

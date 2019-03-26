@@ -5,6 +5,7 @@
  */
 package com.codename1.samples;
 
+import static com.codename1.samples.PropertiesUtil.saveProperties;
 import com.codename1.samples.SamplesPanel.Delegate;
 import java.awt.Desktop;
 import java.awt.EventQueue;
@@ -179,10 +180,10 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     @Override
     public void editGlobalBuildHints() {
         ctx.getConfigDir().mkdirs();
-        File configFile = ctx.getGlobalBuildPropertiesFile();
+        File configFile = ctx.getGlobalPrivateCodenameOneSettingsFile();
         if (!configFile.exists()) {
             try (FileOutputStream fos = new FileOutputStream(configFile)) {
-                Properties props = ctx.getGlobalBuildProperties();
+                Properties props = ctx.getGlobalPrivateCodenameOneSettingsProperties();
                 props.store(fos, "Add your custom codenameone_settings.properties key/value pairs to be used for building samples");
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -199,14 +200,14 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
 
     @Override
-    public void editBuildHints(Sample sample) {
-        sample.getConfigDir(ctx).mkdirs();
+    public void editPrivateBuildHints(Sample sample) {
+        sample.getPrivateConfigDir(ctx).mkdirs();
         
-        File configFile = sample.getRunPropertiesFile(ctx);
+        File configFile = sample.getPrivateCodenameOneSettingsFile(ctx);
         if (!configFile.exists()) {
-            try (FileOutputStream fos = new FileOutputStream(configFile)) {
-                Properties props = sample.getRunProperties(ctx);
-                props.store(fos, "Add your custom codenameone_settings.properties key/value pairs to be used for building this sample");
+            
+            try {
+                saveProperties(new Properties(), configFile);
             } catch (Exception ex) {
                 ex.printStackTrace();
                 
@@ -220,6 +221,61 @@ public class SamplesRunner implements SamplesPanel.Delegate {
             ex.printStackTrace();
         }
     }
+    
+    @Override
+    public void editPublicBuildHints(Sample sample) {
+        sample.getPrivateConfigDir(ctx).mkdirs();
+        
+        File configFile = sample.getPublicCodenameOneSettingsFile(ctx);
+        if (!configFile.exists()) {
+            
+            try {
+                saveProperties(new Properties(), configFile);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                
+            }
+        }
+        try {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().edit(configFile);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+    
+    @Override
+    public void editCSSFile(Sample sample) {
+        try {
+            if (!sample.isCSSProject(ctx)) {
+                int res = JOptionPane.showConfirmDialog(view, "This sample doesn't currently use CSS. Activate CSS now?", "Activate CSS?", JOptionPane.YES_NO_OPTION);
+                if (res == JOptionPane.YES_OPTION) {
+                    sample.activateCSS(ctx);
+                } else {
+                    return;
+                }
+            }
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().edit(sample.getThemeCSSFile(ctx));
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void refreshCSS(Sample sample) {
+        try {
+            if (sample.isCSSProject(ctx)) {
+                sample.refreshCSS(ctx);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
 
     @Override
     public void launchIOSDebug(Sample sample) {
@@ -247,7 +303,9 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
 
     
+    
 
+    
     
     
 }
