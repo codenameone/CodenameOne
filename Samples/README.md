@@ -48,5 +48,15 @@ NOTE: Remember to use the full property name for build hints, e.g. include prefi
 
 ### Editing Per-Sample Build hints
 
-In the row for a particular sample, press the "More..." button, then select "Edit Build Hints".  This will open the build hints file (located in config/SAMPLE_NAME/codenameone_settings.properties).
+You can specify both public and private build hints for each sample.  A public build hint is considered a necessary part of the sample and will have the same value no matter who is building it.  Private build hints are stored inside the "config" directory, and contain build hints that should not be shared with other users, such as passwords, provisioning profiles, and certificates.
+
+To edit private build hints for a particular sample, press the "More..." button, then select "Edit Private Build Hints".  This will open the build hints file (located in config/SAMPLE_NAME/codenameone_settings.properties).  Similarly, selecting "Edit Public Build Hints" will open the public build hints file for editing.
+
+## Using CSS In Samples
+
+Samples can use CSS for styling also.  You can edit the CSS file for a sample by clicking "More..." > "Edit CSS File" next to the sample.  This will open the CSS file for editing.
+
+You can also "live reload" the styles in your running sample by selecting "More..." > "Refresh CSS" next to the sample.
+
+
 
