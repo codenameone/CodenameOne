@@ -82,6 +82,22 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }).start();
     }
     
+     @Override
+    public void sendMacDesktopBuild(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.sendMacDesktopBuild(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            Process p = sample.getThreadLocalProcess();
+            if (p != null) {
+                view.removeProcess(p);
+            }
+        }).start();
+    }
+
+    
     @Override
     public void launchJSSample(Sample sample) {
         new Thread(()->{
@@ -302,6 +318,7 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }
     }
 
+   
     
     
 

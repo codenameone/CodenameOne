@@ -86,6 +86,8 @@ public class SamplesPanel extends JPanel {
         public void editCSSFile(Sample sample);
 
         public void refreshCSS(Sample sample);
+
+        public void sendMacDesktopBuild(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -193,6 +195,14 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenuItem macDesktopBuild = new JMenuItem("Send Mac Desktop Build");
+        macDesktopBuild.setToolTipText("Send Mac desktop build.");
+        macDesktopBuild.addActionListener(e->{
+            if (delegate != null) {
+                delegate.sendMacDesktopBuild(sample);
+            }
+        });
+        
         JMenuItem editPrivateBuildHints = new JMenuItem("Edit Private Build Hints");
         editPrivateBuildHints.setToolTipText("Edit the private custom build hints for this sample.");
         editPrivateBuildHints.addActionListener(e->{
@@ -238,6 +248,7 @@ public class SamplesPanel extends JPanel {
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
         moreMenu.add(winDesktopBuild);
+        moreMenu.add(macDesktopBuild);
         moreMenu.addSeparator();
         moreMenu.add(editPrivateBuildHints);
         moreMenu.add(editPublicBuildHints);

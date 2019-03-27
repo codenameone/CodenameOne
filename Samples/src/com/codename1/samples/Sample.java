@@ -412,6 +412,26 @@ public class Sample {
         return result;
     }
     
+    public int sendMacDesktopBuild(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+    
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("build-for-mac-os-x-desktop");
+        System.out.println("Running command: "+cmd);
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.inheritIO();
+        Process p = pb.start();
+        setThreadLocalProcess(p);
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
     
     public void save(SamplesContext ctx, String javaSourceContent) throws IOException {
         getJavaFile(ctx).getParentFile().mkdirs();

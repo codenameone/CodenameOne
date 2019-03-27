@@ -432,6 +432,7 @@
     </target>
 
     <target name="build-for-mac-os-x-desktop" depends="clean,copy-desktop-override,copy-libs,jar,clean-override">
+        <property name="desktop_macosx.targetType" value="desktop_macosx"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -443,7 +444,7 @@
             subtitle="${codename1.secondaryTitle}"
             certificate="${codename1.desktop.mac.certificate}"
             certPassword="${codename1.desktop.mac.certificatePassword}"
-            targetType="desktop_macosx"
+            targetType="${desktop_macosx.targetType}"
             automated="${automated}"
             />
         <delete>
