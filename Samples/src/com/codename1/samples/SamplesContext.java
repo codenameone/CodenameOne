@@ -48,6 +48,10 @@ public class SamplesContext {
     public static SamplesContext createSystemContext() {
         System.out.println(System.getProperties());
         SamplesContext ctx = new SamplesContext();
+        if (IS_WINDOWS) {
+            System.out.println(System.getenv());
+            ctx.setAnt("ant.bat");
+        }
         return ctx;
     }
     
@@ -123,6 +127,7 @@ public class SamplesContext {
 
    
     private static final boolean IS_MAC;
+    private static final boolean IS_WINDOWS="\\".equals(File.separator);
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
