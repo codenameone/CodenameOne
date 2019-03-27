@@ -1868,7 +1868,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         getParent().setSize(topSize);
                         getParent().doLayout();
                     }
-                    
+                    setSize((int)topSize.getWidth(), (int)topSize.getHeight());
                     canvas.setForcedSize(new Dimension(getWidth(), getHeight()));
                     
                     final int newW = getWidth();
