@@ -21,6 +21,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EditableResourcesForCSS;
 import com.codename1.ui.util.EditableResources;
 import java.io.ByteArrayInputStream;
+import java.io.CharArrayReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -6095,11 +6096,15 @@ public class CSSTheme {
             System.setProperty("org.w3c.css.sac.parser", "org.w3c.flute.parser.Parser");
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
-            
-            source.setCharacterStream(new InputStreamReader(stream, "UTF-8"));
+            String stringContents = Util.readToString(stream);
+            //System.out.println("Contents before: "+stringContents);
+            stringContents = stringContents.replaceAll("([\\(\\W])(--[a-zA-Z0-9\\-]+)", "$1cn1$2");
+            //System.out.println("Contents after: "+stringContents);
+            source.setCharacterStream(new CharArrayReader(stringContents.toCharArray()));
             source.setURI(uri.toString());
             source.setEncoding("UTF-8");
             ParserFactory parserFactory = new ParserFactory();
+            
             Parser parser = parserFactory.makeParser();
             final CSSTheme theme = new CSSTheme();
             theme.baseURL = uri;
@@ -6124,7 +6129,7 @@ public class CSSTheme {
             });
             //parser.setLocale(Locale.getDefault());
             parser.setDocumentHandler(new DocumentHandler() {
-                
+                Map<String,LexicalUnit> variables = new HashMap<>();
                 SelectorList currSelectors;
                 FontFace currFontFace;
                 //double currentTargetDpi = 320;
@@ -6208,7 +6213,34 @@ public class CSSTheme {
                 
                 @Override
                 public void property(String string, LexicalUnit lu, boolean bln) throws CSSException {
-                    
+                    if (string.startsWith("cn1--")) {
+                        System.out.println("Registering variable "+string+" with value "+lu);
+                        variables.put(string, lu);
+                        return;
+                    }
+                    if (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "var".equals(lu.getFunctionName())) {
+                        
+                        LexicalUnit parameters = lu.getParameters();
+                        String varname = parameters.getStringValue();
+                        System.out.println("Found variable property: "+varname);
+                        if (variables.containsKey(varname)) {
+                            property(string, variables.get(varname), bln);
+                            return;
+                        } else {
+                            parameters = parameters.getNextLexicalUnit();
+                            if (parameters != null && parameters.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                                parameters = parameters.getNextLexicalUnit();
+                            }
+                            if (parameters != null) {
+                                property(string, parameters, bln);
+                                return;
+                            } else {
+                                System.err.println("Reference to variable "+string+" not found.  Skipping property");
+                                return;
+                            }
+                        }
+                        
+                    }
                     lu = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
                     if (currFontFace != null) {
                         switch (string) {

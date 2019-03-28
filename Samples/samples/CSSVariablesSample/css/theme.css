@@ -1,0 +1,22 @@
+/* Demonstrates the use of CSS variables.
+  Conforms to spec at https://developer.mozilla.org/en-US/docs/Web/CSS/var
+  
+  RFE https://github.com/codenameone/CodenameOne/issues/2709
+*/
+#Constants {
+    includeNativeBool: true; 
+    --main-bg-color: pink;
+    --main-fg-color: blue;
+}
+
+Cnt1 {
+    background-color: var(--main-bg-color, blue);
+    color: var(--main-fg-color, green);
+    
+}
+
+Cnt2 {
+    background-color: var(--missing-bg-color, green);
+
+}
+
