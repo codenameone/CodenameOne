@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.stream.Stream;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
@@ -62,6 +63,11 @@ public class Sample {
     
     private File getBuildSrcDir(SamplesContext context) {
         return new File(getBuildProjectDir(context), "src");
+    }
+    
+    private File getBuildLibDir(SamplesContext context) {
+        return new File(getBuildProjectDir(context), "lib");
+        
     }
     
     private File getCSSDir(SamplesContext context) {
@@ -155,7 +161,7 @@ public class Sample {
      * @param context
      * @throws IOException 
      */
-    public void refreshCSS(SamplesContext context) throws IOException {
+    public void refreshCSS(SamplesContext context) throws IOException, InterruptedException {
         syncChangesToBuildDir(context);
     }
     
@@ -179,7 +185,7 @@ public class Sample {
      * @param context
      * @throws IOException 
      */
-    private void syncChangesToBuildDir(SamplesContext context) throws IOException {
+    private void syncChangesToBuildDir(SamplesContext context) throws IOException, InterruptedException {
         context.getBuildDir().mkdirs();
         if (!getBuildProjectDir(context).exists()) {
             copySampleProjectToBuildDir(context);
@@ -190,6 +196,8 @@ public class Sample {
             
         }
         syncCodenameOneSettings(context);
+        Properties settings = getAggregatedCodenameOneSettings(context);
+        installDependencies(context, settings);
         
         if (!getJavaFileInBuildDir(context).exists() || getJavaFileInBuildDir(context).lastModified() < getJavaFile(context).lastModified()) {
             copyJavaFileToBuildDir(context);
@@ -207,6 +215,25 @@ public class Sample {
             updateCodenameOneSettings(context);
         }
         
+    }
+    
+    private Properties getAggregatedCodenameOneSettings(SamplesContext context) throws IOException {
+        Properties props = new Properties();
+        for (File f : new File[]{
+            getSampleProjectCodenameOneSettingsFile(context),
+            getPublicCodenameOneSettingsFile(context),
+            context.getGlobalPrivateCodenameOneSettingsFile(),
+            getPrivateCodenameOneSettingsFile(context)
+            
+        }) {
+            if (f.exists()) {
+                Properties tmp = loadProperties(f);
+                for (String key : tmp.stringPropertyNames()) {
+                    props.setProperty(key, tmp.getProperty(key));
+                }
+            }
+        }
+        return props;
     }
     
     private void updateCodenameOneSettings(SamplesContext context) throws IOException {
@@ -483,7 +510,89 @@ public class Sample {
     }
 
     
+    public Dependencies getDependencies(SamplesContext context) throws IOException {
+        Dependencies out = new Dependencies();
+        try (FileInputStream fis = new FileInputStream(getJavaFile(context))) {
+            Scanner scanner = new Scanner(fis, "UTF-8");
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (!line.startsWith("//require ")) {
+                    return out;
+                }
+                String libName = line.substring(line.indexOf(" ")+1).trim();
+                Dependency dep = new Dependency(libName);
+                out.add(dep);
+            }
+        }
+        return out;
+    }
     
+    private File getBuildProjectLib(SamplesContext context, Dependency dep) {
+        return new File(getBuildLibDir(context), dep.getFile(context).getName());
+    }
+    
+    public boolean installDependencies(SamplesContext context, Properties props) throws IOException, InterruptedException {
+        boolean updated = false;
+        for (Dependency dep : getDependencies(context)) {
+            if (installDependency(context, dep, props)) {
+                updated = true;
+            }
+        }
+        if (updated) {
+            List<String> cmd = new ArrayList<>();
+            cmd.add(context.getAnt());
+            applyRunProperties(context, cmd);
+
+            cmd.add("-f");
+            cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+            cmd.add("refresh-libs");
+            cmd.add("clean");
+            cmd.add("jar");
+            System.out.println("Running command: "+cmd);
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.inheritIO();
+            Process p = pb.start();
+            setThreadLocalProcess(p);
+            int result = p.waitFor();
+            if (result != 0) {
+                throw new RuntimeException("Failed to build project");
+            }
+
+            
+        }
+        return updated;
+        
+    }
+    
+    public boolean installDependency(SamplesContext context, Dependency dep, Properties props) throws IOException, InterruptedException {
+        File src = null;
+        boolean updated = false;
+        if (props.getProperty(dep.getName()+".projectDir", null) != null) {
+            File projectDir = new File(props.getProperty(dep.getName()+".projectDir", null));
+            if (projectDir.exists() && new File(projectDir, "build.xml").exists()) {
+                dep.setProjectDir(projectDir);
+                int res = dep.buildProject(context);
+                if (res != 0) {
+                    throw new RuntimeException("Failed to build library project "+dep.getName()+" at "+projectDir);
+                }
+                src = new File(projectDir, "dist" + File.separator + dep.getName()+".cn1lib");
+            }
+        }
+        if (src == null) {
+            src = dep.getFile(context);
+            dep.update(context);
+        }
+        
+        File dest = getBuildProjectLib(context, dep);
+        
+        if (!dest.exists() || src.lastModified() > dest.lastModified()) {
+            dest.getParentFile().mkdirs();
+            FileUtil.copy(src, dest);
+            updated = true;
+        }
+        return updated;
+        
+    }
     
             
 }

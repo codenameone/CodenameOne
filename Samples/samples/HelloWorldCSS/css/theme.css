@@ -2,7 +2,7 @@
     includeNativeBool: true; 
 }
 
-Label {
+Label.pres {
     color:red;
 }
 

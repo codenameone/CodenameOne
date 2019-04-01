@@ -223,6 +223,9 @@ public class SamplesContext {
         return samples;
     }
     
+    public File getLibrariesDir() {
+        return librariesDir;
+    }
     
     
     private File srcDir=new File("samples");
@@ -236,6 +239,7 @@ public class SamplesContext {
     private File cldcProjectDir=new File("../Ports/CLDC11");
     private File codenameOneProjectDir=new File("../CodenameOne");
     private File javaSEProjectDir=new File("../Ports/JavaSE");
+    private File librariesDir=new File(new File(System.getProperty("java.io.tmpdir")), "cn1libs");
     private SampleList samples;
     
     
