@@ -58,5 +58,21 @@ Samples can use CSS for styling also.  You can edit the CSS file for a sample by
 
 You can also "live reload" the styles in your running sample by selecting "More..." > "Refresh CSS" next to the sample.
 
+## Using Libraries (cn1libs) in Samples
+
+Some samples (e.g. [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java) depend on cn1libs in order build/run. If the cn1lib is available in the [CodenameOneLibs](https://github.com/codenameone/CodenameOneLibs) project, then it can be added as a sample dependency by adding the following to the beginning of the sample's Java source file:
+
+~~~~
+//require TheCN1libName
+~~~~
+
+E.g. Check out the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java).  It declares a dependency on the CameraKitCodenameOne.cn1lib with the following directive:
+
+~~~~
+//require CameraKitCodenameOne
+~~~~
+
+That's all there is to it.  The library will be automatically downloaded into the build project when you do a launch or build.
+
 
 
