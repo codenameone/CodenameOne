@@ -9,6 +9,7 @@ import static com.codename1.samples.PropertiesUtil.saveProperties;
 import com.codename1.samples.SamplesPanel.Delegate;
 import java.awt.Desktop;
 import java.awt.EventQueue;
+import java.awt.FileDialog;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.Properties;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 /**
@@ -303,6 +305,21 @@ public class SamplesRunner implements SamplesPanel.Delegate {
             }
         }).start();
     }
+    
+    @Override
+    public void launchAndroid(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildAndroid(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+   
+    
+    
 
     @Override
     public void stopProcess(Process p, String name) {
@@ -318,8 +335,30 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }
     }
 
-   
-    
+    @Override
+    public void exportAsNetbeansProject(Sample sample) {
+        FileDialog fileSelector = new FileDialog((JFrame)SwingUtilities.getWindowAncestor(view), "Select Destination");
+        fileSelector.setMode(FileDialog.SAVE);
+        fileSelector.setVisible(true);
+        String selectedFile = fileSelector.getFile();
+        if (selectedFile == null) {
+            return;
+        }
+        File f = new File(new File(fileSelector.getDirectory()), selectedFile);
+        System.out.println(f);
+        new Thread(()->{
+            try {
+                sample.exportAsNetbeansProject(ctx, f);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(view, ex.getMessage(), "Export Failed", JOptionPane.ERROR_MESSAGE);
+
+            }
+        }).start();
+        
+        
+    }
+
     
 
     

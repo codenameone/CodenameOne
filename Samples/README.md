@@ -74,5 +74,32 @@ E.g. Check out the [CameraKitSample](https://github.com/codenameone/CodenameOne/
 
 That's all there is to it.  The library will be automatically downloaded into the build project when you do a launch or build.
 
+### Building against Local Library Project
+
+If you are developing a sample that uses a library that you are still developing, then you can tell the SamplesRunner to use your local codename one library project instead of the version in CodenameOneLibs repository.  
+
+
+In the "More..." menu for the sample, select "Edit Private Build Hints".
+
+Then, add the following: 
+
+~~~~
+[LIBRARYNAME].projectDir=/path/to/library/project
+~~~~
+
+For example, in my local copy of the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java), I have the following in my private build hints.
+
+~~~~
+CameraKitCodenameOne.projectDir=/path/to/CameraKitCodenameOne
+~~~~
+
+Where /path/to/CameraKitCodenameOne is where I have the CameraKitCodenameOne library project.
+
+## Exporting a Sample as a Project
+
+You can export any sample as a self-contained Netbeans project by pressing "More..." > "Export" > "Netbeans" in the row for the sample.  This will prompt you for the location to save the project.  You can then open the project in Netbeans.
+
+
+
 
 

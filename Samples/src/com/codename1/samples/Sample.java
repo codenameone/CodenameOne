@@ -119,6 +119,16 @@ public class Sample {
         return mtime;
     }
     
+    public void exportAsNetbeansProject(SamplesContext context, File destDir) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        if (destDir.exists()) {
+            throw new IOException("Destination directory "+destDir+" already exists.  Please choose a destination that doesn't exist yet");
+            
+        }
+        copyDir(getBuildProjectDir(context), destDir);
+        
+    }
+    
     private void copySampleProjectToBuildDir(SamplesContext context) throws IOException {
         copyDir(context.getSampleProjectTemplateDir(), getBuildProjectDir(context));
     }
@@ -191,12 +201,14 @@ public class Sample {
             copySampleProjectToBuildDir(context);
             updateBuildProjectProperties(context);
             updateBuildProjectSettings(context);
+            updateBuildProjectXml(context);
             copyCodenameOneBuildClient(context);
             updateCodenameOneSettings(context);
             
         }
         syncCodenameOneSettings(context);
         Properties settings = getAggregatedCodenameOneSettings(context);
+        System.out.println("Settings: "+settings);
         installDependencies(context, settings);
         
         if (!getJavaFileInBuildDir(context).exists() || getJavaFileInBuildDir(context).lastModified() < getJavaFile(context).lastModified()) {
@@ -317,6 +329,14 @@ public class Sample {
         }
     }
     
+    private void updateBuildProjectXml(SamplesContext context) throws IOException {
+        File nbproject = new File(getBuildProjectDir(context), "nbproject");
+        File projectXml = new File(nbproject, "project.xml");
+        String text = FileUtil.readFileToString(projectXml);
+        text = text.replace("<name>SampleProjectTemplate</name>", "<name>"+name+"</name>");
+        FileUtil.writeStringToFile(text, projectXml);
+    }
+    
     private void updateBuildProjectProperties(SamplesContext context) throws IOException {
         Properties props = loadBuildProjectProperties(context);
         props.setProperty("application.title", getName());
@@ -409,6 +429,26 @@ public class Sample {
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device");
+        System.out.println("Running command: "+cmd);
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.inheritIO();
+        Process p = pb.start();
+        setThreadLocalProcess(p);
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
+    public int buildAndroid(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+    
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("build-for-android-device");
         System.out.println("Running command: "+cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
