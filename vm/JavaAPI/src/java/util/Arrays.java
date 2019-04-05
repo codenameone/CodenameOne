@@ -3865,35 +3865,61 @@ public class Arrays {
     }
     
     public static boolean[] copyOf(boolean[] original) {
-        return copyOfRange(new boolean[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static boolean[] copyOf(boolean[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static char[] copyOf(char[] original) {
-        return copyOfRange(new char[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static char[] copyOf(char[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static double[] copyOf(double[] original) {
-        return copyOfRange(new double[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    public static double[] copyOf(double[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static float[] copyOf(float[] original) {
-        return copyOfRange(new float[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    public static float[] copyOf(float[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static long[] copyOf(long[] original) {
-        return copyOfRange(new long[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static long[] copyOf(long[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static int[] copyOf(int[] original) {
-        return copyOfRange(new int[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static int[] copyOf(int[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static byte[] copyOf(byte[] original) {
-        return copyOfRange(new byte[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static byte[] copyOf(byte[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
     }
     
     public static short[] copyOf(short[] original) {
-        return copyOfRange(new short[original.length], 0, original.length);
+        return copyOfRange(original, 0, original.length);
     }
     
     public static <T,U> T[] copyOfRange(U[] original,

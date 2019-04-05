@@ -88,6 +88,10 @@ public class SamplesPanel extends JPanel {
         public void refreshCSS(Sample sample);
 
         public void sendMacDesktopBuild(Sample sample);
+
+        public void launchAndroid(Sample sample);
+
+        public void exportAsNetbeansProject(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -187,6 +191,14 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenuItem launchAndroid = new JMenuItem("Send Android Build");
+        launchAndroid.setToolTipText("Send Android build.");
+        launchAndroid.addActionListener(e->{
+            if (delegate != null) {
+                delegate.launchAndroid(sample);
+            }
+        });
+        
         JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build");
         winDesktopBuild.setToolTipText("Send Windows desktop build.");
         winDesktopBuild.addActionListener(e->{
@@ -235,6 +247,18 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenu export = new JMenu("Export as...");
+        export.setToolTipText("Export this sample as an IDE project");
+        
+        JMenuItem exportNB = new JMenuItem("Netbeans");
+        exportNB.setToolTipText("Export this sample as a Netbeans project");
+        exportNB.addActionListener(e->{
+            if (delegate != null) {
+                delegate.exportAsNetbeansProject(sample);
+            }
+        });
+        export.add(exportNB);
+        
         JButton more = new JButton("More...");
         JPopupMenu moreMenu = new JPopupMenu("More...");
         more.addActionListener(e->{
@@ -247,13 +271,17 @@ public class SamplesPanel extends JPanel {
         });
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
+        moreMenu.add(launchAndroid);
         moreMenu.add(winDesktopBuild);
         moreMenu.add(macDesktopBuild);
         moreMenu.addSeparator();
         moreMenu.add(editPrivateBuildHints);
         moreMenu.add(editPublicBuildHints);
+        moreMenu.addSeparator();
         moreMenu.add(editCSS);
         moreMenu.add(refreshCSS);
+        moreMenu.addSeparator();
+        moreMenu.add(export);
         
         JPanel buttons = new JPanel(new FlowLayout());
         buttons.setOpaque(false);

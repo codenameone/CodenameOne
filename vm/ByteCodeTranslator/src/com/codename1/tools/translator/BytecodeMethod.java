@@ -250,6 +250,16 @@ public class BytecodeMethod implements SignatureSet {
         	}
         return newway;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        appendFunctionPointer(sb);
+        return sb.toString();
+    }
+    
+    
+    
     
     private Hashtable<String,SignatureSet> usedSigs;
     

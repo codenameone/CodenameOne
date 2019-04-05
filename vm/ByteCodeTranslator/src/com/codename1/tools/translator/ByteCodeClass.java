@@ -145,44 +145,60 @@ public class ByteCodeClass {
     public static void markDependencies(List<ByteCodeClass> lst) {
         mainClass.markDependent(lst);
         for(ByteCodeClass bc : lst) {
+            if (bc.marked) {
+                continue;
+            }
             if(bc.clsName.equals("java_lang_Boolean")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_String")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Integer")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Byte")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Short")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Character")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Thread")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Long")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Double")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_lang_Float")) {
                 bc.markDependent(lst);
+                continue;
             }
             if(bc.clsName.equals("java_text_DateFormat")) {
                 bc.markDependent(lst);
+                continue;
             }
-            if(!bc.marked && bc.isUsedByNative()){
+            if(bc.isUsedByNative()){
                 bc.markDependent(lst);
+                continue;
             }
-            if(!bc.marked && saveUnitTests && bc.isUnitTest) {
+            if(saveUnitTests && bc.isUnitTest) {
                 bc.markDependent(lst);
+                continue;
             }
         }
         
@@ -270,6 +286,9 @@ public class ByteCodeClass {
         exportsClassesInterfaces.clear();
         dependsClassesInterfaces.add("java_lang_NullPointerException");
         setBaseClass(baseClass);
+        if (isAnnotation) {
+            dependsClassesInterfaces.add("java_lang_annotation_Annotation");
+        }
         for(String s : baseInterfaces) {
             s = s.replace('/', '_').replace('$', '_');
             if(!dependsClassesInterfaces.contains(s)) {
@@ -365,10 +384,6 @@ public class ByteCodeClass {
         
         for(String s : dependsClassesInterfaces) {
             if (exportsClassesInterfaces.contains(s)) {
-                continue;
-            }
-            if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
-                    s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
                 continue;
             }
             b.append("#include \"");
@@ -1120,10 +1135,15 @@ public class ByteCodeClass {
         b.append("#include \"cn1_globals.h\"\n");
         
         for(String s : exportsClassesInterfaces) {
+            /*
             if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
                     s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
                 continue;
             }
+            */
+            //if (isAnnotation) {
+            //    continue;
+            //}
             b.append("#include \"");
             b.append(s);
             b.append(".h\"\n");

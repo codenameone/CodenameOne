@@ -58,5 +58,48 @@ Samples can use CSS for styling also.  You can edit the CSS file for a sample by
 
 You can also "live reload" the styles in your running sample by selecting "More..." > "Refresh CSS" next to the sample.
 
+## Using Libraries (cn1libs) in Samples
+
+Some samples (e.g. [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java) depend on cn1libs in order build/run. If the cn1lib is available in the [CodenameOneLibs](https://github.com/codenameone/CodenameOneLibs) project, then it can be added as a sample dependency by adding the following to the beginning of the sample's Java source file:
+
+~~~~
+//require TheCN1libName
+~~~~
+
+E.g. Check out the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java).  It declares a dependency on the CameraKitCodenameOne.cn1lib with the following directive:
+
+~~~~
+//require CameraKitCodenameOne
+~~~~
+
+That's all there is to it.  The library will be automatically downloaded into the build project when you do a launch or build.
+
+### Building against Local Library Project
+
+If you are developing a sample that uses a library that you are still developing, then you can tell the SamplesRunner to use your local codename one library project instead of the version in CodenameOneLibs repository.  
+
+
+In the "More..." menu for the sample, select "Edit Private Build Hints".
+
+Then, add the following: 
+
+~~~~
+[LIBRARYNAME].projectDir=/path/to/library/project
+~~~~
+
+For example, in my local copy of the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java), I have the following in my private build hints.
+
+~~~~
+CameraKitCodenameOne.projectDir=/path/to/CameraKitCodenameOne
+~~~~
+
+Where /path/to/CameraKitCodenameOne is where I have the CameraKitCodenameOne library project.
+
+## Exporting a Sample as a Project
+
+You can export any sample as a self-contained Netbeans project by pressing "More..." > "Export" > "Netbeans" in the row for the sample.  This will prompt you for the location to save the project.  You can then open the project in Netbeans.
+
+
+
 
 
