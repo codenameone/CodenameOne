@@ -33,9 +33,11 @@ import java.io.IOException;
 public class AndroidCursor implements Cursor, Row{
     
     private android.database.Cursor c;
+    private int last_read_column_index = -1;
     
     public AndroidCursor(android.database.Cursor c) {
         this.c = c;
+        this.last_read_column_index = -1;
     }
     
     @Override
@@ -90,37 +92,54 @@ public class AndroidCursor implements Cursor, Row{
 
     @Override
     public byte[] getBlob(int index) throws IOException {
+        last_read_column_index = index;
         return c.getBlob(index);
     }
 
     @Override
     public double getDouble(int index) throws IOException {
+        last_read_column_index = index;
         return c.getDouble(index);
     }
 
     @Override
     public float getFloat(int index) throws IOException {
+        last_read_column_index = index;
         return c.getFloat(index);
     }
 
     @Override
     public int getInteger(int index) throws IOException {
+        last_read_column_index = index;
         return c.getInt(index);
     }
 
     @Override
     public long getLong(int index) throws IOException {
+        last_read_column_index = index;
         return c.getLong(index);
     }
 
     @Override
     public short getShort(int index) throws IOException {
+        last_read_column_index = index;
         return c.getShort(index);
     }
 
     @Override
     public String getString(int index) throws IOException {
+        last_read_column_index = index;
         return c.getString(index);
+    }
+    
+    public boolean isNull(int index) throws IOException {
+         return c.isNull(index);
+    }
+    
+    @Override
+    public Boolean wasNull() throws IOException {
+        if (last_read_column_index<0){return true;}
+        return c.isNull(last_read_column_index);
     }
 
     @Override

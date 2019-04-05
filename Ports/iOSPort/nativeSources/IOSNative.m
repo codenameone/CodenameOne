@@ -5310,6 +5310,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
 }
 #endif // NEW_CODENAME_ONE_VM
 
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return (sqlite3_column_type((sqlite3_stmt*)statement, col) == SQLITE_NULL);
+}
+
+
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
     sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
     return sqlite3_column_count(stmt);
