@@ -2892,8 +2892,15 @@ public class Form extends Container {
         }
     }
     
-    // https://github.com/codenameone/CodenameOne/issues/2352
-    private boolean resumeDragAfterScrolling(int x, int y) {
+    /**
+     * This method fixes <a href="https://github.com/codenameone/CodenameOne/issues/2352">this tensile drag issue</a>. 
+     * However, this might be undesireable in some cases and so this method
+     * can be overriden to return false in some cases.
+     * @param x the x position of a pointer press operation
+     * @param y the y position of a pointer press operation
+     * @return true if drag should be resumed and false otherwise
+     */
+    protected boolean resumeDragAfterScrolling(int x, int y) {
         Component cmp = getComponentAt(x, y);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
             cmp = cmp.getParent();
