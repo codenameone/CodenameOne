@@ -618,6 +618,16 @@ public class Sample {
                 src = new File(projectDir, "dist" + File.separator + dep.getName()+".cn1lib");
             }
         }
+        if (props.getProperty("cn1.library.path", null) != null) {
+            for (String libPath : props.getProperty("cn1.library.path").split(File.pathSeparator)) {
+                File libDir = new File(libPath);
+                File f = new File(libDir, dep.getFile(context).getName());
+                if (f.exists()) {
+                    System.out.println("Using cn1lib at "+f);
+                    src = f;
+                }
+            }
+        }
         if (src == null) {
             src = dep.getFile(context);
             dep.update(context);
