@@ -157,6 +157,15 @@ import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
 import javax.net.ssl.HttpsURLConnection;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineEvent;
+import javax.sound.sampled.LineListener;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.TargetDataLine;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
@@ -10047,12 +10056,228 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public Media createMediaRecorder(String path, String mime) throws IOException {
+    public String[] getAvailableRecordingMimeTypes() {
+        if (isMP3EncodingSupported()) {
+            return new String[]{"audio/mp3", "audio/wav"};
+        } else {
+            return new String[]{"audio/wav"};
+        }
+    }
+
+    private boolean isMP3EncodingSupported() {
+        try {
+            Class.forName("com.codename1.media.javase.MP3Encoder");
+        } catch (ClassNotFoundException ex) {
+            return false;
+        }
+        return FileEncoder.getEncoder("audio/wav", "audio/mp3") != null;
+    }
+    
+    @Override
+    public Media createMediaRecorder(final String path, String mime) throws IOException {
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
-        }        
-        throw new IOException("Not supported on Simulator");
+        }
+        if (mime == null) {
+            if (path.endsWith(".wav") || path.endsWith(".WAV")) {
+                mime = "audio/wav";
+            } else if (path.endsWith(".mp3") || path.endsWith(".MP3")) {
+                mime = "audio/mp3";
+            }
+        }
+        if (mime == null) {
+            mime = getAvailableRecordingMimeTypes()[0];
+        }
+        boolean foundMimetype = false;
+        for (String mt : getAvailableRecordingMimeTypes()) {
+            if (mt.equalsIgnoreCase(mime)) {
+                foundMimetype = true;
+                break;
+            }
+            
+            
+        }
+        
+        if (!foundMimetype) {
+            throw new IOException("Mimetype "+mime+" not supported on this platform.  Use getAvailableMimetypes() to find out what is supported");
+        }
+        final File file = new File(unfile(path));
+        if (!file.getParentFile().exists()) {
+            throw new IOException("Cannot write file "+path+" because the parent directory does not exist.");
+        }
+        File tmpFile = file;
+        if (!"audio/wav".equalsIgnoreCase(mime) && !(tmpFile.getName().endsWith(".wav") || tmpFile.getName().endsWith(".WAV"))) {
+            tmpFile = new File(tmpFile.getParentFile(), tmpFile.getName()+".wav");
+        }
+        final File fTmpFile = tmpFile;
+        final String fMime = mime;
+        return new Media() {
+            java.io.File wavFile = fTmpFile;
+            File outFile = file;
+            AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
+            javax.sound.sampled.TargetDataLine line;
+            boolean recording;
+            
+            javax.sound.sampled.AudioFormat getAudioFormat() {
+                float sampleRate = 44100;
+                int sampleSizeInBits = 8;
+                int channels = 2;
+                boolean signed = true;
+                boolean bigEndian = true;
+                javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,
+                                                     channels, signed, bigEndian);
+                return format;
+            }
+            @Override
+            public void play() {
+                try {
+                    AudioFormat format = getAudioFormat();
+                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
+                    // checks if system supports the data line
+                    if (!AudioSystem.isLineSupported(info)) {
+                        throw new RuntimeException("Audio format not supported on this platform");
+                    }
+                    line = (TargetDataLine) AudioSystem.getLine(info);
+                    line.open(format);
+                    line.start();   // start capturing
+
+                    
+
+                    recording = true;
+                    // start recording
+                    new Thread(new Runnable() {
+                        public void run() {
+                            try {
+                                AudioInputStream ais = new AudioInputStream(line);
+                                AudioSystem.write(ais, fileType, wavFile);
+                            } catch (IOException ioe) {
+                                throw new RuntimeException(ioe);
+                            }
+                        }
+                    }).start();
+                    
+               } catch (LineUnavailableException ex) {
+                                throw new RuntimeException(ex);
+                }     
+
+                
+            }
+
+            @Override
+            public void pause() {
+                if (!recording) {
+                    return;
+                }
+                recording = false;
+                
+               
+                line.stop();
+                line.close();
+                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                    try {
+                        System.out.println("Encoding to mp3");
+                        FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
+                        wavFile.delete();
+                    } catch (Throwable ex) {
+                        com.codename1.io.Log.e(ex);
+                        throw new RuntimeException(ex);
+                    }
+                }
+                
+            }
+            
+
+            @Override
+            public void prepare() {
+                
+            }
+
+            @Override
+            public void cleanup() {
+                if (recording) {
+                    pause();
+                }
+                recording = false;
+                try {
+                    line.stop();
+                    line.close();
+                    line = null;
+                } catch (Throwable t){}
+            }
+
+            @Override
+            public int getTime() {
+                return (int)(line.getMicrosecondPosition() / 1000l);
+            }
+
+            @Override
+            public void setTime(int time) {
+                
+            }
+
+            @Override
+            public int getDuration() {
+                return (int)(line.getMicrosecondPosition() / 1000l);
+            }
+
+            @Override
+            public void setVolume(int vol) {
+                
+            }
+
+            @Override
+            public int getVolume() {
+                return 100;
+            }
+
+            @Override
+            public boolean isPlaying() {
+                return recording;
+            }
+
+            @Override
+            public Component getVideoComponent() {
+                return null;
+            }
+
+            @Override
+            public boolean isVideo() {
+                return false;
+            }
+
+            @Override
+            public boolean isFullScreen() {
+                return false;
+            }
+
+            @Override
+            public void setFullScreen(boolean fullScreen) {
+                
+            }
+
+            @Override
+            public void setNativePlayerMode(boolean nativePlayer) {
+                
+            }
+
+            @Override
+            public boolean isNativePlayerMode() {
+                return false;
+            }
+
+            @Override
+            public void setVariable(String key, Object value) {
+                
+            }
+
+            @Override
+            public Object getVariable(String key) {
+                return null;
+            }
+            
+        };
     }
     private com.codename1.ui.util.ImageIO imIO;
 
