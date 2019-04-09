@@ -2967,8 +2967,39 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
+void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
+    // Recipient.
+    NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
+
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)recipients)->data;
+    int recipientCount = ((JAVA_ARRAY)recipients)->length;
+
+    for(int iter = 0 ; iter < recipientCount ; iter++) {
+        [recipientsArray addObject:toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[iter])];
+    }
+    
+    NSString *recipientsStr = [recipientsArray componentsJoinedByString:@","];
+    [recipientsArray release];
+    NSString *nSubject = subject != JAVA_NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
+    nSubject = [NSString stringWithFormat:@"?subject=%@", nSubject];
+    NSString *nBody = content != JAVA_NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : nil;
+    nBody = [NSString stringWithFormat:@"&body=%@", nBody];
+    NSString *email = [NSString stringWithFormat:@"mailto:%@%@%@", recipientsStr, nSubject, nBody];
+    email = [email stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSLog(@"email: %@", email);
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:email]];
+    });
+    
+}
+
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+    
+    if (![MFMailComposeViewController canSendMail]) {
+        launchMailAppOnDevice(recipients, subject, content);
+        return;
+    }                                                                                                                                                                        JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
     retainCN1(CN1_THREAD_STATE_PASS_ARG recipients);
     retainCN1(CN1_THREAD_STATE_PASS_ARG subject);
     retainCN1(CN1_THREAD_STATE_PASS_ARG content);
