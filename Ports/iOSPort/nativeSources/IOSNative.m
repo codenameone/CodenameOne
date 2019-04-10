@@ -2999,7 +2999,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     if (![MFMailComposeViewController canSendMail]) {
         launchMailAppOnDevice(recipients, subject, content);
         return;
-    }                                                                                                                                                                        JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+    }                                                                                                                                                                        
     retainCN1(CN1_THREAD_STATE_PASS_ARG recipients);
     retainCN1(CN1_THREAD_STATE_PASS_ARG subject);
     retainCN1(CN1_THREAD_STATE_PASS_ARG content);
