@@ -22,6 +22,9 @@
  */
 
 package java.lang;
+
+import java.io.PrintWriter;
+
 /**
  * The Throwable class is the superclass of all errors and exceptions in the Java language. Only objects that are instances of this class (or of one of its subclasses) are thrown by the Java Virtual Machine or can be thrown by the Java throw statement. Similarly, only this class or one of its subclasses can be the argument type in a catch clause.
  * Instances of two subclasses, Error and Exception, are conventionally used to indicate that exceptional situations have occurred. Typically, these instances are freshly created in the context of the exceptional situation so as to include relevant information (such as stack trace data).
@@ -34,6 +37,7 @@ public class Throwable{
     private String message;
     private Throwable cause;
     private String stack;
+    private java.util.List<Throwable> suppressed;
     
     
     /**
@@ -100,6 +104,14 @@ public class Throwable{
         }
     }
     
+    public void printStackTrace(PrintWriter s) {
+        s.println(stack);
+        if (cause != null) {
+            s.println("Caused by ");
+            cause.printStackTrace(s);
+        }
+    }
+    
     
     public StackTraceElement[] getStackTrace() {
         return new StackTraceElement[0];
@@ -118,5 +130,30 @@ public class Throwable{
     public java.lang.String toString(){
         return getClass().getName() + ": " + message;
     }
+    
+    public final void addSuppressed(Throwable exception){
+        if (exception == this) {
+            throw new IllegalArgumentException("Throwable cannot suppress itself");
+        }
+        if (exception == null) {
+            throw new NullPointerException("null exception cannot be added suppressed");
+        }
+        if (suppressed == null) {
+            suppressed = new java.util.ArrayList<Throwable>();
+        }
+        suppressed.add(exception);
+    }
+    public final Throwable[] getSuppressed() {
+        if (suppressed == null) {
+            return new Throwable[0];
+        }
+        return suppressed.toArray(new Throwable[suppressed.size()]);
+    }
+    
+    public String getLocalizedMessage() {
+        return message;
+    }
+    
+    
 
 }

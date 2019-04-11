@@ -30,13 +30,13 @@ public class SamplesContext {
         this.configDir = configDir;
     }
     
-    public File getGlobalBuildPropertiesFile() {
+    public File getGlobalPrivateCodenameOneSettingsFile() {
         return new File(configDir, "codenameone_settings.properties");
     }
     
-    public Properties getGlobalBuildProperties() throws IOException {
+    public Properties getGlobalPrivateCodenameOneSettingsProperties() throws IOException {
         Properties out = new Properties();
-        File buildProps = getGlobalBuildPropertiesFile();
+        File buildProps = getGlobalPrivateCodenameOneSettingsFile();
         if (buildProps.exists()) {
             try (FileInputStream fis = new FileInputStream(buildProps)) {
                 out.load(fis);
@@ -48,6 +48,10 @@ public class SamplesContext {
     public static SamplesContext createSystemContext() {
         System.out.println(System.getProperties());
         SamplesContext ctx = new SamplesContext();
+        if (IS_WINDOWS) {
+            System.out.println(System.getenv());
+            ctx.setAnt("ant.bat");
+        }
         return ctx;
     }
     
@@ -123,6 +127,7 @@ public class SamplesContext {
 
    
     private static final boolean IS_MAC;
+    private static final boolean IS_WINDOWS="\\".equals(File.separator);
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
@@ -218,6 +223,9 @@ public class SamplesContext {
         return samples;
     }
     
+    public File getLibrariesDir() {
+        return librariesDir;
+    }
     
     
     private File srcDir=new File("samples");
@@ -231,6 +239,7 @@ public class SamplesContext {
     private File cldcProjectDir=new File("../Ports/CLDC11");
     private File codenameOneProjectDir=new File("../CodenameOne");
     private File javaSEProjectDir=new File("../Ports/JavaSE");
+    private File librariesDir=new File(new File(System.getProperty("java.io.tmpdir")), "cn1libs");
     private SampleList samples;
     
     

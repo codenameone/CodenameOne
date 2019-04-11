@@ -328,6 +328,7 @@
     </target>
     
     <target name="build-for-android-device" depends="clean,copy-android-override,copy-libs,jar,clean-override">
+        <property name="android.targetType" value="android"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -338,7 +339,7 @@
             vendor="${codename1.vendor}"
             subtitle="${codename1.secondaryTitle}"
             
-            targetType="android"
+            targetType="${android.targetType}"
             keystoreAlias="${codename1.android.keystoreAlias}"
             keystore="${codename1.android.keystore}"
             certPassword="${codename1.android.keystorePassword}"
@@ -432,6 +433,7 @@
     </target>
 
     <target name="build-for-mac-os-x-desktop" depends="clean,copy-desktop-override,copy-libs,jar,clean-override">
+        <property name="desktop_macosx.targetType" value="desktop_macosx"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -443,7 +445,7 @@
             subtitle="${codename1.secondaryTitle}"
             certificate="${codename1.desktop.mac.certificate}"
             certPassword="${codename1.desktop.mac.certificatePassword}"
-            targetType="desktop_macosx"
+            targetType="${desktop_macosx.targetType}"
             automated="${automated}"
             />
         <delete>
@@ -533,7 +535,7 @@
             encoding="${source.encoding}"
             source="1.8"
             target="1.8"
-            classpath="${run.classpath}:${build.classes.dir}">
+            classpath="${run.classpath}:${build.classes.dir}:lib/impl/native/javase">
             <src path="native/javase"/>
             <src path="lib/impl/native/javase"/>
         </javac>
@@ -612,7 +614,7 @@
     </target>
     
     <target name="-cn1-compile-css" if="codename1.cssTheme">
-        <java jar="${user.home}/.codenameone/designer_1.jar" failonerror="true">
+        <java jar="${user.home}/.codenameone/designer_1.jar" failonerror="true" fork="true">
             <jvmarg value="-Dcli=true"/>
             <arg value="-css"/>
             <arg file="css/theme.css"/>

@@ -73,13 +73,25 @@ public class SamplesPanel extends JPanel {
         public void searchChanged(String newSearch);
         public void editGlobalBuildHints();
 
-        public void editBuildHints(Sample sample);
+        public void editPrivateBuildHints(Sample sample);
 
         public void launchIOSDebug(Sample sample);
 
         public void stopProcess(Process p, String name);
 
         public void sendWindowsDesktopBuild(Sample sample);
+
+        public void editPublicBuildHints(Sample sample);
+
+        public void editCSSFile(Sample sample);
+
+        public void refreshCSS(Sample sample);
+
+        public void sendMacDesktopBuild(Sample sample);
+
+        public void launchAndroid(Sample sample);
+
+        public void exportAsNetbeansProject(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -179,6 +191,14 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenuItem launchAndroid = new JMenuItem("Send Android Build");
+        launchAndroid.setToolTipText("Send Android build.");
+        launchAndroid.addActionListener(e->{
+            if (delegate != null) {
+                delegate.launchAndroid(sample);
+            }
+        });
+        
         JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build");
         winDesktopBuild.setToolTipText("Send Windows desktop build.");
         winDesktopBuild.addActionListener(e->{
@@ -187,13 +207,57 @@ public class SamplesPanel extends JPanel {
             }
         });
         
-        JMenuItem editBuildHints = new JMenuItem("Edit Build Hints");
-        editBuildHints.setToolTipText("Edit the custom build hints for this sample.  E.g. certificates, etc...");
-        editBuildHints.addActionListener(e->{
+        JMenuItem macDesktopBuild = new JMenuItem("Send Mac Desktop Build");
+        macDesktopBuild.setToolTipText("Send Mac desktop build.");
+        macDesktopBuild.addActionListener(e->{
             if (delegate != null) {
-                delegate.editBuildHints(sample);
+                delegate.sendMacDesktopBuild(sample);
             }
         });
+        
+        JMenuItem editPrivateBuildHints = new JMenuItem("Edit Private Build Hints");
+        editPrivateBuildHints.setToolTipText("Edit the private custom build hints for this sample.");
+        editPrivateBuildHints.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editPrivateBuildHints(sample);
+            }
+        });
+        
+        JMenuItem editPublicBuildHints = new JMenuItem("Edit Public Build Hints");
+        editPublicBuildHints.setToolTipText("Edit the public custom build hints for this sample.");
+        editPublicBuildHints.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editPublicBuildHints(sample);
+            }
+        });
+        
+        JMenuItem editCSS = new JMenuItem("Edit CSS File");
+        editCSS.setToolTipText("Edit the CSS file for this sample.");
+        editCSS.addActionListener(e->{
+            if (delegate != null) {
+                delegate.editCSSFile(sample);
+            }
+        });
+        
+        JMenuItem refreshCSS = new JMenuItem("Refresh CSS File");
+        refreshCSS.setToolTipText("Update the CSS file in the currently running sample.  This should update the styles in the sample automatically.  May take a few seconds.");
+        refreshCSS.addActionListener(e->{
+            if (delegate != null) {
+                delegate.refreshCSS(sample);
+            }
+        });
+        
+        JMenu export = new JMenu("Export as...");
+        export.setToolTipText("Export this sample as an IDE project");
+        
+        JMenuItem exportNB = new JMenuItem("Netbeans");
+        exportNB.setToolTipText("Export this sample as a Netbeans project");
+        exportNB.addActionListener(e->{
+            if (delegate != null) {
+                delegate.exportAsNetbeansProject(sample);
+            }
+        });
+        export.add(exportNB);
         
         JButton more = new JButton("More...");
         JPopupMenu moreMenu = new JPopupMenu("More...");
@@ -207,9 +271,17 @@ public class SamplesPanel extends JPanel {
         });
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
+        moreMenu.add(launchAndroid);
         moreMenu.add(winDesktopBuild);
+        moreMenu.add(macDesktopBuild);
         moreMenu.addSeparator();
-        moreMenu.add(editBuildHints);
+        moreMenu.add(editPrivateBuildHints);
+        moreMenu.add(editPublicBuildHints);
+        moreMenu.addSeparator();
+        moreMenu.add(editCSS);
+        moreMenu.add(refreshCSS);
+        moreMenu.addSeparator();
+        moreMenu.add(export);
         
         JPanel buttons = new JPanel(new FlowLayout());
         buttons.setOpaque(false);

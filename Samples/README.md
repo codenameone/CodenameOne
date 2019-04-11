@@ -48,5 +48,58 @@ NOTE: Remember to use the full property name for build hints, e.g. include prefi
 
 ### Editing Per-Sample Build hints
 
-In the row for a particular sample, press the "More..." button, then select "Edit Build Hints".  This will open the build hints file (located in config/SAMPLE_NAME/codenameone_settings.properties).
+You can specify both public and private build hints for each sample.  A public build hint is considered a necessary part of the sample and will have the same value no matter who is building it.  Private build hints are stored inside the "config" directory, and contain build hints that should not be shared with other users, such as passwords, provisioning profiles, and certificates.
+
+To edit private build hints for a particular sample, press the "More..." button, then select "Edit Private Build Hints".  This will open the build hints file (located in config/SAMPLE_NAME/codenameone_settings.properties).  Similarly, selecting "Edit Public Build Hints" will open the public build hints file for editing.
+
+## Using CSS In Samples
+
+Samples can use CSS for styling also.  You can edit the CSS file for a sample by clicking "More..." > "Edit CSS File" next to the sample.  This will open the CSS file for editing.
+
+You can also "live reload" the styles in your running sample by selecting "More..." > "Refresh CSS" next to the sample.
+
+## Using Libraries (cn1libs) in Samples
+
+Some samples (e.g. [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java) depend on cn1libs in order build/run. If the cn1lib is available in the [CodenameOneLibs](https://github.com/codenameone/CodenameOneLibs) project, then it can be added as a sample dependency by adding the following to the beginning of the sample's Java source file:
+
+~~~~
+//require TheCN1libName
+~~~~
+
+E.g. Check out the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java).  It declares a dependency on the CameraKitCodenameOne.cn1lib with the following directive:
+
+~~~~
+//require CameraKitCodenameOne
+~~~~
+
+That's all there is to it.  The library will be automatically downloaded into the build project when you do a launch or build.
+
+### Building against Local Library Project
+
+If you are developing a sample that uses a library that you are still developing, then you can tell the SamplesRunner to use your local codename one library project instead of the version in CodenameOneLibs repository.  
+
+
+In the "More..." menu for the sample, select "Edit Private Build Hints".
+
+Then, add the following: 
+
+~~~~
+[LIBRARYNAME].projectDir=/path/to/library/project
+~~~~
+
+For example, in my local copy of the [CameraKitSample](https://github.com/codenameone/CodenameOne/blob/master/Samples/samples/CameraKitSample/CameraKitSample.java), I have the following in my private build hints.
+
+~~~~
+CameraKitCodenameOne.projectDir=/path/to/CameraKitCodenameOne
+~~~~
+
+Where /path/to/CameraKitCodenameOne is where I have the CameraKitCodenameOne library project.
+
+## Exporting a Sample as a Project
+
+You can export any sample as a self-contained Netbeans project by pressing "More..." > "Export" > "Netbeans" in the row for the sample.  This will prompt you for the location to save the project.  You can then open the project in Netbeans.
+
+
+
+
 

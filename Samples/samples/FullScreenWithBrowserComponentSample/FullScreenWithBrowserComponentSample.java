@@ -33,9 +33,13 @@ public class FullScreenWithBrowserComponentSample {
         BrowserForm() {
             super(new BorderLayout());
             add(BorderLayout.CENTER, bc);
-            Button b = new Button("Exit Fullscreen");
+            Button b = new Button("Toggle Fullscreen");
             b.addActionListener(e->{
-                Display.getInstance().exitFullScreen();
+                if (Display.getInstance().isInFullScreenMode()) {
+                    Display.getInstance().exitFullScreen();
+                } else {
+                    Display.getInstance().requestFullScreen();
+                }
             });
             add(BorderLayout.SOUTH, b);
         }
