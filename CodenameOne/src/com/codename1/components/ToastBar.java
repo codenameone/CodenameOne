@@ -27,6 +27,7 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import static com.codename1.ui.Component.CENTER;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -37,7 +38,6 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -284,6 +284,7 @@ public class ToastBar {
                     public void run() {
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
+                                timer.cancel();
                                 timer = null;
                                 Status.this.clear();
                             }
@@ -583,10 +584,10 @@ public class ToastBar {
                 if (!oldText.equals(l.getText())) {
 
                     
-                    if (s.getUiid() != null) {
-                        c.setUIID(s.getUiid());
-                    } else if (defaultUIID != null) {
+                    if (defaultUIID != null) {
                         c.setUIID(defaultUIID);
+                    } else if (s.getUiid() != null) {
+                        c.setUIID(s.getUiid());
                     }
                     
                     if (c.isVisible()) {
@@ -606,11 +607,12 @@ public class ToastBar {
                         } else {
                             newLabel.setUIID(c.label.getUIID());
                         }
-                        if (s.getUiid() != null) {
-                            c.setUIID(s.getUiid());
-                        } else if (defaultUIID != null) {
+                        
+                         if (defaultUIID != null) {
                             c.setUIID(defaultUIID);
-                        }
+                        } else if (s.getUiid() != null) {
+                            c.setUIID(s.getUiid());
+                        } 
                         newLabel.setWidth(c.label.getWidth());
                         
                         newLabel.setText(l.getText());
@@ -622,7 +624,8 @@ public class ToastBar {
                         // are stuck in blocking mode between them and the label just got discarded see:
                         // https://stackoverflow.com/questions/46172993/codename-one-toastbar-nullpointerexception
                         if(c.label.getParent() != null) {
-                            c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
+                            //c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
+                            c.label.getParent().replaceAndWait(c.label, newLabel, null);
                             c.label = newLabel;
 
                             if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {
@@ -638,11 +641,11 @@ public class ToastBar {
                         } else if (defaultMessageUIID != null) {
                             c.label.setUIID(defaultMessageUIID);
                         }
-                        if (s.getUiid() != null) {
-                            c.setUIID(s.getUiid());
-                        } else if (defaultUIID != null) {
+                         if (defaultUIID != null) {
                             c.setUIID(defaultUIID);
-                        }
+                        } else if (s.getUiid() != null) {
+                            c.setUIID(s.getUiid());
+                        } 
                         c.label.setText(l.getText());
                         //c.label.setColumns(l.getText().length()+1);
                         //c.label.setRows(l.getText().length()+1);
