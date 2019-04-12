@@ -163,11 +163,13 @@ public class AutoCompleteTextField extends TextField {
      * Causes the popup UI to show
      */
     public void showPopup() {
-        requestFocus();
-        int m = minimumLength;
-        minimumLength = 0;
-        setText(getText());
-        minimumLength = m;
+        if(shouldShowPopup()) {
+            requestFocus();
+            int m = minimumLength;
+            minimumLength = 0;
+            setText(getText());
+            minimumLength = m;
+        }
     }
     
     void setParentText(String text) {
@@ -349,16 +351,18 @@ public class AutoCompleteTextField extends TextField {
         l.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                pickedText = (String) l.getSelectedItem();
-                setParentText(pickedText);
-                fireActionEvent();
-                // relaunch text editing if we are still editing
-                if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
-                    Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                if(shouldShowPopup()) {
+                    pickedText = (String) l.getSelectedItem();
+                    setParentText(pickedText);
+                    fireActionEvent();
+                    // relaunch text editing if we are still editing
+                    if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
+                        Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                    }
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    f.repaint();
                 }
-                popup.setVisible(false);
-                popup.setEnabled(false);
-                f.repaint();
             }
         });
         
@@ -479,13 +483,21 @@ public class AutoCompleteTextField extends TextField {
         }
     }
 
+    /**
+     * Callback that allows subclasses to block the popup from showing
+     * @return true to allow the popup if applicable, false to block it
+     */
+    protected boolean shouldShowPopup() {
+        return true;
+    }
+    
     class FormPointerListener implements ActionListener {
 
         public void actionPerformed(final ActionEvent evt) {
             final Form f = getComponentForm();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             
-            boolean canOpenPopup = true;
+            boolean canOpenPopup = shouldShowPopup();
             
             for (int i = 0; i < layered.getComponentCount(); i++) {
                 Container wrap = (Container) layered.getComponentAt(i);
