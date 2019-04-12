@@ -49,6 +49,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
+import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
@@ -4945,6 +4946,10 @@ public abstract class CodenameOneImplementation {
      * @return the separator char
      */
     public abstract char getFileSystemSeparator();
+    
+    public String getLineSeparator() {
+        return "\n";
+    }
 
     /**
      * Indicates whether looking up an access point is supported by this device
@@ -6118,7 +6123,6 @@ public abstract class CodenameOneImplementation {
     }
 
     
-
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {
@@ -7381,7 +7385,7 @@ public abstract class CodenameOneImplementation {
             }
         }
     }
-
+        
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
@@ -7400,7 +7404,7 @@ public abstract class CodenameOneImplementation {
                 return drawLabelString(nativeGraphics, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
         }
     }
-
+    
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
@@ -7421,7 +7425,7 @@ public abstract class CodenameOneImplementation {
 
         return drawnW;
     }
-
+    
     private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
         if (length * charWidth < width) {
             return true;

@@ -808,6 +808,10 @@ public final class Display extends CN1Constants {
         }
     }
 
+    public String getLineSeparator() {
+        return impl.getLineSeparator();
+    }
+    
     /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.

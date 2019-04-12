@@ -28,6 +28,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
+import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -225,6 +226,16 @@ public abstract class LookAndFeel {
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawLabel(Graphics g, Label l);
+    
+    /**
+     * Calculates the text selection spans for a given label
+     * @param sel TextSelection instance
+     * @param l Label
+     * @return A span representing the positions of characters in the label
+     * @since 7.0
+     * @see TextSelection
+     */
+    public abstract Span calculateLabelSpan(TextSelection sel, Label l);
 
     /**
      * Invoked for drawing a list widget

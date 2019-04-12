@@ -161,7 +161,9 @@ public class ActionEvent {
              */
             DragFinished,
             
-            Change
+            Change,
+            
+            LongPointerPress
             } ;
     private Type trigger;
     

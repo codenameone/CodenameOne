@@ -79,6 +79,8 @@ public class Form extends Container {
     static int rippleX;
     static int rippleY;
     
+    private TextSelection textSelection;
+    
     ArrayList<Component> buttonsAwatingRelease;
     
     private VirtualInputDevice currentInputDevice;
@@ -214,6 +216,18 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+    
+    /**
+     * Gets TextSelection support for this form.
+     * @return The text selection support for this form.
+     * @since 7.0
+     */
+    public TextSelection getTextSelection() {
+        if (textSelection == null) {
+            textSelection = new TextSelection(getContentPane());
+        }
+        return textSelection;
     }
     
     /**
@@ -2440,6 +2454,13 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 if (focused.hasLead) {

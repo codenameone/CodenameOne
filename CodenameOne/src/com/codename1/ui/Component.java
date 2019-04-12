@@ -27,6 +27,7 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
 import com.codename1.ui.geom.Rectangle;
@@ -446,6 +447,7 @@ public class Component implements Animation, StyleListener, Editable {
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
     EventDispatcher dragFinishedListeners;
+    EventDispatcher longPressListeners;
     boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
@@ -4558,6 +4560,13 @@ public class Component implements Animation, StyleListener, Editable {
      * 
      */
     public void longPointerPress(int x, int y) {
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
     }
 
     /**
@@ -4597,6 +4606,16 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public boolean isTensileDragEnabled() {
         return tensileDragEnabled;
+    }
+    
+    /**
+     * Returns text selection support object for this component.  Only used by 
+     * components that support text selection (e.g. Labels, un-editable text fields, etc..).
+     * @return 
+     * @since 7.0
+     */
+    public TextSelectionSupport getTextSelectionSupport() {
+        return null;
     }
 
     boolean isScrollDecelerationMotionInProgress() {
@@ -4800,6 +4819,19 @@ public class Component implements Animation, StyleListener, Editable {
         }
         pointerPressedListeners.addListener(l);
     }
+    
+    /**
+     * Adds a listener to the pointer event
+     *
+     * @param l callback to receive pointer events
+     * @since 7.0
+     */
+    public void addLongPressListener(ActionListener l) {
+        if (longPressListeners == null) {
+            longPressListeners = new EventDispatcher();
+        }
+        longPressListeners.addListener(l);
+    }
 
     /**
      * Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing 
@@ -4836,6 +4868,18 @@ public class Component implements Animation, StyleListener, Editable {
     public void removePointerPressedListener(ActionListener l) {
         if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Removes the listener from the pointer event
+     *
+     * @param l callback to remove
+     * @since 7.0
+     */
+    public void removeLongPressListener(ActionListener l) {
+        if (longPressListeners != null) {
+            longPressListeners.removeListener(l);
         }
     }
     
