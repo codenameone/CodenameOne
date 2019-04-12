@@ -323,6 +323,12 @@ public class TableLayout extends Layout {
     private static final Constraint H_SPAN_CONSTRAINT = new Constraint();
     private static final Constraint V_SPAN_CONSTRAINT = new Constraint();
     private static final Constraint VH_SPAN_CONSTRAINT = new Constraint();
+    static {
+    	H_SPAN_CONSTRAINT.spanHorizontal = 0;
+    	V_SPAN_CONSTRAINT.spanVertical = 0;
+    	VH_SPAN_CONSTRAINT.spanHorizontal = 0;
+    	VH_SPAN_CONSTRAINT.spanVertical = 0;
+    }
 
     private static int defaultColumnWidth = -1;
     private static int defaultRowHeight = -1;
@@ -550,7 +556,7 @@ public class TableLayout extends Layout {
                 for(int c = 0 ; c < clen ; c++) {
                     Constraint con = tablePositions[r * columns + c];
                     int conX, conY, conW, conH;
-                    if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
+                    if(con != null && con.spanHorizontal>0 && con.spanVertical>0) {
                         Style componentStyle = con.parent.getStyle();
                         int leftMargin = componentStyle.getMarginLeft(parent.isRTL());
                         int topMargin = componentStyle.getMarginTop();
@@ -695,7 +701,7 @@ public class TableLayout extends Layout {
             Constraint c = tablePositions[iter * columns + column];
 
             //ignore "virtual" cells (i.e. cells that are part of a merge)
-            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanHorizontal > 1) {
+            if(c == null || c.spanHorizontal<1 || c.spanVertical<1) {
                 continue;
             }
             
@@ -727,7 +733,7 @@ public class TableLayout extends Layout {
         {
             Constraint c = tablePositions[row * columns + iter];
 
-            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanVertical > 1) {
+            if(c == null || c.spanHorizontal<1 || c.spanVertical<1) {
                 continue;
             }
 
@@ -876,14 +882,14 @@ public class TableLayout extends Layout {
                     if((sh > 0 || sv > 0) && rows > con.actualRow + sv &&
                             columns > con.actualColumn + sh) {
                         if(tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] == null) {
-                            if(con.spanHorizontal > 1) {
-                                if(con.spanVertical > 1) {
+                            if(sh > 0) {
+                                if(sv > 0) {
                                     tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = VH_SPAN_CONSTRAINT;
                                 } else {
-                                    tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = V_SPAN_CONSTRAINT;
+                                    tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = H_SPAN_CONSTRAINT;
                                 }
                             } else {
-                                tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = H_SPAN_CONSTRAINT;
+                                tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = V_SPAN_CONSTRAINT;
                             }
                         }
                     }
@@ -995,7 +1001,7 @@ public class TableLayout extends Layout {
         int count = comps.size();
         for(int iter = 0 ; iter < count ; iter++) {
             Constraint con = (Constraint)comps.elementAt(iter);
-            if(con == H_SPAN_CONSTRAINT || con == V_SPAN_CONSTRAINT || con == VH_SPAN_CONSTRAINT) {
+            if(con.spanHorizontal<1 || con.spanVertical<1) {
                 continue;
             }
             Component c = con.parent;
