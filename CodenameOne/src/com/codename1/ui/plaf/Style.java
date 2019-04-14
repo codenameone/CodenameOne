@@ -359,7 +359,8 @@ public class Style {
     private Image bgImage;
     float[] padding = new float[4];
     float[] margin = new float[4];
-
+    private float[] cached_margin = null; //used to cache margin values when hidding a component
+    
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
@@ -1330,6 +1331,45 @@ public class Style {
             firePropertyChanged(MARGIN);
         }
     }
+    
+    
+    /**
+     * @deprecated 
+     * Used when hidding a component. Do not call this directly
+     */
+    public void setNullMargins() {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.setNullMargins();
+    		}
+    		return;
+    	}
+    	//else
+    	cached_margin = new float[4];
+    	System.arraycopy(margin, 0, cached_margin, 0, margin.length);
+    	setMargin(0, 0, 0, 0);
+    }
+    
+    
+    /**
+     * @deprecated 
+     * Used when unhidding a component. Do not call this directly
+     */
+    public void restoreCachedMargins() {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.restoreCachedMargins();
+    		}
+    		return;
+    	}
+    	//else
+    	if (cached_margin!=null) {
+    		setMargin(cached_margin[0], cached_margin[1], cached_margin[2], cached_margin[3]);
+    		cached_margin = null;
+    	}
+    }
+    
+    
 
     /**
      * Sets the Style Margin

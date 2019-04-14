@@ -6778,16 +6778,18 @@ public class Component implements Animation, StyleListener, Editable {
         if(b) {
             if(!sizeRequestedByUser) {
                 if(changeMargin) {
-                    getAllStyles().setMargin(0, 0, 0, 0);
+                	getAllStyles().setNullMargins();
+                    //getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
             }
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
-                    setUIID(getUIID());
-                }
+            	getAllStyles().restoreCachedMargins();
+//                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
+//                    setUIID(getUIID());
+//                }
             }
         }
     }
