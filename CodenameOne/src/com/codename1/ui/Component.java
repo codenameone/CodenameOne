@@ -6778,15 +6778,15 @@ public class Component implements Animation, StyleListener, Editable {
         if(b) {
             if(!sizeRequestedByUser) {
                 if(changeMargin) {
-                	getAllStyles().setNullMargins();
-                    //getAllStyles().setMargin(0, 0, 0, 0);
+                	getAllStyles().cacheMargins(false); //if a margins cache already exists because the component is already hidden it would be kept else it would be created
+                    getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
             }
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-            	getAllStyles().restoreCachedMargins();
+            	getAllStyles().restoreCachedMargins(); //restore margins to the values they had before the component being hidden and flush the margins cache
 //                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
 //                    setUIID(getUIID());
 //                }

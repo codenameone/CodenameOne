@@ -1334,26 +1334,31 @@ public class Style {
     
     
     /**
-     * @deprecated 
-     * Used when hidding a component. Do not call this directly
+     * Store current margin values into a cache that could be restored with restoreCachedMargins()
+     * @parma override: if true, margins would be cached even if a a previous cache already exists. If false, margins would be cached only if no cache already exists
+     * Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache. 
+     * 			So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
+     * 			And do not use on an hidden component either or unhidding this component might result in unexpected results
      */
-    public void setNullMargins() {
+    public void cacheMargins(boolean override) {
     	if(proxyTo != null) {
     		for(Style s : proxyTo) {
-    			s.setNullMargins();
+    			s.cacheMargins(override);
     		}
     		return;
     	}
     	//else
-    	cached_margin = new float[4];
-    	System.arraycopy(margin, 0, cached_margin, 0, margin.length);
-    	setMargin(0, 0, 0, 0);
-    }
+    	if (override || cached_margin == null) {
+	    	cached_margin = new float[4];
+	    	System.arraycopy(margin, 0, cached_margin, 0, margin.length);
+    	}
+	}
     
     
     /**
-     * @deprecated 
-     * Used when unhidding a component. Do not call this directly
+     * Restore cached margins and flush the margins cache
+     * Warning: this method is used internally when unhidding a component with the Component.setHidden(false) method
+     * 			Do not use it on an hidden component or it would result into unexpected results when unhidding this component
      */
     public void restoreCachedMargins() {
     	if(proxyTo != null) {
@@ -1363,13 +1368,25 @@ public class Style {
     		return;
     	}
     	//else
-    	if (cached_margin!=null) {
+    	if (cached_margin != null) {
     		setMargin(cached_margin[0], cached_margin[1], cached_margin[2], cached_margin[3]);
     		cached_margin = null;
     	}
     }
     
-    
+   
+   /**
+    * Flush the margins cache if one exists 
+    */
+   public void flushMarginsCache() {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.flushMarginsCache();
+    		}
+    		return;
+    	}
+    	cached_margin = null;
+    }
 
     /**
      * Sets the Style Margin
