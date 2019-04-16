@@ -63,7 +63,6 @@ import com.codename1.ui.util.ImageIO;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
-import com.sun.org.apache.bcel.internal.generic.AALOAD;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
