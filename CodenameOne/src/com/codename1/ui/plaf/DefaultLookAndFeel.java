@@ -842,8 +842,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         for (int i = 0; i < line; i++) {
             Span rowSpan = sel.newSpan(ta);
             int x = ta.getX() + leftPadding;
-            int y = Math.max(ta.getY() +  topPadding +
-                    (ta.getRowsGap() + fontHeight) * i, lastRowBottom);
+            int y = ta.getY() +  topPadding +
+                    (ta.getRowsGap() + fontHeight) * i;
+            int adjustedY = Math.max(y, lastRowBottom);
+            int yDiff = adjustedY - y;
+            y = adjustedY;
+            
             //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
                 
                 String rowText = (String) ta.getTextAt(i);
@@ -874,14 +878,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         displayText = displayText.substring(0, displayText.length() - 3);
                     }
                     //g.drawString(displayText + "...", x, y ,ta.getStyle().getTextDecoration()); 
-                    append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f));
+                    append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f) - yDiff);
                     lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
                     rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                     out.add(rowSpan);
                     return out;
                 }else{            
                     //g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
-                    append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f));
+                    append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);
                     lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
                     rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                     out.add(rowSpan);
