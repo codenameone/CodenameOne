@@ -2218,7 +2218,7 @@ public class TextArea extends Component {
                             break;
                         }
                     }
-                    System.out.println("Text is ["+getText().substring(startPos, endPos)+"]");
+                    
                     return sp.subspan(startPos, endPos);
                 }
 
