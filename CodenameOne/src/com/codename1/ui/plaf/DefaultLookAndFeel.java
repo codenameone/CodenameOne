@@ -43,6 +43,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Rectangle;
@@ -787,7 +788,115 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public void drawList(Graphics g, List l) {
     }
+    
+    private int getSelectionHeight(Font f) {
+        return f.getHeight() + (int)(f.getHeight() * 0.2);
+        //return f.getHeight() + f.getDescent();
+    }
+    
+    private void append(TextSelection sel, Component l, Span span, String text, Font f, int posOffset, int x, int y, int h) {
+        int len = text.length();
+        int xPos = 0;
+        int curPos = 1;
+        //int h = f.getHeight() + (int)(f.getHeight() * 0.25);
+        //y -= (int)(f.getHeight() * 0.25);
+        //int tx = l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX();
+        //int ty = l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY();
+        while (curPos <= len) {
+            int newXpos = f.stringWidth(text.substring(0, curPos));
+            Char next = sel.newChar(posOffset + curPos-1, x + xPos, y, newXpos - xPos, h);
+            span.add(next);
+            xPos = newXpos;
+            curPos++;
+        }
+    }
 
+    @Override
+    public Spans calculateTextAreaSpan(TextSelection sel, TextArea ta) {
+        Spans out = sel.newSpans();
+        //setFG(g, ta);
+        //Span out = sel.newSpan(ta);
+        int line = ta.getLines();
+        //int oX = g.getClipX();
+        //int oY = g.getClipY();
+        //int oWidth = g.getClipWidth();
+        //int oHeight = g.getClipHeight();
+        Font f = ta.getStyle().getFont();
+        int fontHeight = f.getHeight();
+
+        int align = reverseAlignForBidi(ta);
+
+        int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());
+        int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());
+        int topPadding = ta.getStyle().getPaddingTop();
+        switch (ta.getVerticalAlignment()) {
+            case Component.CENTER :
+                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line)/2);
+                break;
+            case Component.BOTTOM :
+                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line));
+        }
+        //boolean shouldBreak = false;
+        int posOffset = 0;
+        int lastRowBottom = 0;
+        for (int i = 0; i < line; i++) {
+            Span rowSpan = sel.newSpan(ta);
+            int x = ta.getX() + leftPadding;
+            int y = Math.max(ta.getY() +  topPadding +
+                    (ta.getRowsGap() + fontHeight) * i, lastRowBottom);
+            //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
+                
+                String rowText = (String) ta.getTextAt(i);
+                //display ******** if it is a password field
+                String displayText = "";
+                if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
+                    int rlen = rowText.length();
+                    for (int j = 0; j < rlen; j++) {
+                        displayText += passwordChar;
+                    }
+                } else {
+                    displayText = rowText;
+                }
+                posOffset = ta.getText().indexOf(rowText, posOffset);
+                switch(align) {
+                    case Component.RIGHT:
+                		x = ta.getX() + ta.getWidth() - rightPadding - f.stringWidth(displayText);
+                        break;
+                    case Component.CENTER:
+                        x+= (ta.getWidth()-leftPadding-rightPadding-f.stringWidth(displayText))/2;
+                        break;
+                }
+                //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
+                //if this is the last line to display and there is more content and isEndsWith3Points() is true
+                //add "..." at the last row
+                if(ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line){
+                    if(displayText.length() > 3){
+                        displayText = displayText.substring(0, displayText.length() - 3);
+                    }
+                    //g.drawString(displayText + "...", x, y ,ta.getStyle().getTextDecoration()); 
+                    append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f));
+                    lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
+                    rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+                    out.add(rowSpan);
+                    return out;
+                }else{            
+                    //g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
+                    append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f));
+                    lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
+                    rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+                    out.add(rowSpan);
+                }
+                posOffset += displayText.length();
+                //shouldBreak = true;
+            //}else{
+            //    if(shouldBreak){
+            //        break;
+            //    }
+            //}
+        }
+        return out;
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -1622,6 +1731,114 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return displayText;
     }
     
+    public Spans calculateTextFieldSpan(TextSelection sel, TextArea ta) {
+        //setFG(g, ta);
+        Span out = sel.newSpan(ta);
+        // display ******** if it is a password field
+        String displayText = getTextFieldString(ta);
+
+        Style style = ta.getStyle();
+        int x = 0;
+        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        
+        Font f = style.getFont();
+        int cursorX = 0;
+        int xPos = 0;
+        
+        int align = reverseAlignForBidi(ta);
+        int displayX = 0;
+
+        String inputMode = ta.getInputMode();
+        int inputModeWidth = f.stringWidth(inputMode);
+
+        // QWERTY devices don't quite have an input mode hide it also when we have a VK
+        if(!Display.getInstance().platformUsesInputMode() || ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {
+            inputMode = "";
+            inputModeWidth = 0;
+        }
+        if (ta.isSingleLineTextArea()) {
+            // there is currently no support for CENTER aligned text fields
+            if (align == Component.LEFT) {
+                if (cursorCharPosition > 0) {
+                    cursorCharPosition = Math.min(displayText.length(), 
+                        cursorCharPosition);
+                    xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));
+                    cursorX = ta.getX() + style.getPaddingLeft(ta.isRTL()) + xPos;
+
+                    // no point in showing the input mode when there is only one input mode...
+                    if (inputModeWidth > 0 && ta.getInputModeOrder() != null && ta.getInputModeOrder().length == 1) {
+                        inputModeWidth = 0;
+                    }
+                    if (ta.isEnableInputScroll()) {
+                        if (ta.getWidth() > (f.getHeight() * 2) && cursorX >= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL())) {
+                            if (x + xPos >= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2) {
+                                x=ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2 - xPos - 1;
+                            }
+                        }
+                    }
+                }
+                displayX = ta.getX() + x + style.getPaddingLeft(ta.isRTL());
+            } else {
+                x = 0;
+                cursorX = getTextFieldCursorX(ta);
+                int baseX = ta.getX() + style.getPaddingLeftNoRTL() + inputModeWidth;
+                int endX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL();
+
+                if (cursorX < baseX) {
+                    x = baseX - cursorX;
+                } else {
+                    if (cursorX > endX) {
+                        x = endX - cursorX;
+                    }
+                }
+
+                displayX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL() - style.getPaddingLeftNoRTL() - f.stringWidth(displayText) + x;
+            }
+
+            //int cx = g.getClipX();
+            //int cy = g.getClipY();
+            //int cw = g.getClipWidth();
+            //int ch = g.getClipHeight();
+            //int clipx = ta.getX() + style.getPaddingLeft(ta.isRTL());
+            //int clipw = ta.getWidth() - style.getPaddingLeft(ta.isRTL()) - style.getPaddingRight(ta.isRTL());
+            //g.pushClip();
+            //g.clipRect(clipx, cy, clipw, ch);
+
+            //int xOffset = 0;
+            //int len = displayText.length();
+            //int charH = f.getHeight();
+            int h = getSelectionHeight(f);
+            switch(ta.getVerticalAlignment()) {
+                case Component.BOTTOM:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), style.getTextDecoration());
+                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - h, h);
+                   // c = sel.newChar(i, charX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), charW , charH);
+                    break;
+                case Component.CENTER:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, charW, charH);
+                    append(sel, ta, out, displayText, f, 0, displayX,  ta.getY() + ta.getHeight() / 2  - h / 2, h);
+                    break;
+                default:
+                    //g.drawString(displayText, displayX, ta.getY() + style.getPaddingTop(), style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + style.getPaddingTop(), charW, charH);
+                    append(sel, ta, out, displayText, f, 0, displayX,  ta.getY() + style.getPaddingTop(), h);
+                    break;
+            }
+            
+            
+            //g.setClip(cx, cy, cw, ch);
+            //g.popClip();
+            out = out.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+            Spans spansOut = sel.newSpans();
+            spansOut.add(out);
+            return spansOut;
+            
+        } else {
+            //drawTextArea(g, ta);
+            return calculateTextAreaSpan(sel, ta);
+        }
+        
+    }
     
     
     /**

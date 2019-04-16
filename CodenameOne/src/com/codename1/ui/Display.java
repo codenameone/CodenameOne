@@ -1730,6 +1730,15 @@ public final class Display extends CN1Constants {
     }
     
     /**
+     * Checks if the last mouse press was a right click.
+     * @return True if the last mouse press was a right click.
+     * @since 7.0
+     */
+    public boolean isRightMouseButtonDown() {
+        return impl.isRightMouseButtonDown();
+    }
+    
+    /**
      * Checks if shift key is currently down.  Only relevant for desktop ports.
      * @return 
      */

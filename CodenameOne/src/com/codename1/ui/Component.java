@@ -687,6 +687,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     protected Component() {
         initLaf(getUIManager());
+        setCursor(DEFAULT_CURSOR);
     }
     
     /**
