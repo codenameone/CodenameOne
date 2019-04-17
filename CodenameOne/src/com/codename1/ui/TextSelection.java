@@ -503,13 +503,24 @@ public class TextSelection {
             Span out = new Span(component);
             if (withFlow) {
                 if (y < getBounds().getY() && y + h > getBounds().getY() + getBounds().getHeight()/2) {
+                    // Selection starts above and covers full height of the span
+                    // In this case select the whole line
                     int newX = getBounds().getX();
-                    int newW = w + x - newX;
+                    int newW = Math.max(0, getBounds().getWidth());
                     x = newX;
                     w = newW;
-                } 
-                if (y < getBounds().getY() + getBounds().getHeight() && y + h > getBounds().getY() + getBounds().getHeight() + CN.convertToPixels(2)) {
-                    w = getBounds().getX() + getBounds().getWidth() - x;
+                } else if (y < getBounds().getY() && y + h > getBounds().getY() && y+h <= getBounds().getY() + getBounds().getHeight()) {
+                    // Selection starts above the span, and vertically ends somewhere in the span.
+                    // In this case, we select from the beginning of the line to the span box
+                    int newX = getBounds().getX();
+                    int newW = Math.max(0, x+w-newX);
+                    x = newX;
+                    w = newW;
+                    
+                } else if (y < getBounds().getY() + getBounds().getHeight() && y + h > getBounds().getY() + getBounds().getHeight() + CN.convertToPixels(2)) {
+                    // Selection starts inside vertically inside the span, and covers below.
+                    // In this case select from selection start to end of line.
+                    w = Math.max(0, getBounds().getX() + getBounds().getWidth() - x);
                 }
             }
             for (Char c : chars) {
