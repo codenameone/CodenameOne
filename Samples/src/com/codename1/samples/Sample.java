@@ -349,10 +349,24 @@ public class Sample {
         
     }
     
+    private File getIOSCertsDir(SamplesContext context) {
+        return new File(getPrivateConfigDir(context), "iosCerts");
+    }
+    
+    private File getIOSCert(SamplesContext context, String name) {
+        return new File(getIOSCertsDir(context), name);
+    }
+    
     private void updateBuildProjectSettings(SamplesContext context) throws IOException {
         Properties props = loadSampleProjectCodenameOneSettings(context);
         props.setProperty("codename1.mainName", getName());
         props.setProperty("codename1.displayName", getName());
+        props.setProperty("codename1.ios.debug.certificate", getIOSCert(context, "development_certificate.p12").getAbsolutePath());
+        props.setProperty("codename1.ios.debug.certificatePassword", "password");
+        props.setProperty("codename1.ios.debug.provision", getIOSCert(context, "development_provisioning_profile.mobileprovision").getAbsolutePath());
+        props.setProperty("codename1.ios.release.certificate", getIOSCert(context, "appstore_certificate.p12").getAbsolutePath());
+        props.setProperty("codename1.ios.release.certificatePassword", "password");
+        props.setProperty("codename1.ios.release.provision", getIOSCert(context, "production_provisioning_profile.mobileprovision").getAbsolutePath());
         saveBuildProjectSettings(context, props);
     }
     
@@ -429,6 +443,26 @@ public class Sample {
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device");
+        System.out.println("Running command: "+cmd);
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.inheritIO();
+        Process p = pb.start();
+        setThreadLocalProcess(p);
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
+    public int buildIOSRelease(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+    
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("build-for-ios-device-release");
         System.out.println("Running command: "+cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
