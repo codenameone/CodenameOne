@@ -2096,6 +2096,15 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Checks if last mouse press was a right click.
+     * @return True if last mouse press was a right click.
+     * @since 7.0
+     */
+    public boolean isRightMouseButtonDown() {
+        return false;
+    }
+    
+    /**
      * Checks whether the alt key is currently down.  Only relevant on desktop ports.
      * @return 
      */
@@ -6120,6 +6129,126 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isFullScreenSupported() {
         return false;
+    }
+
+    /**
+     * Initializes text selection.  This provides an opportunity for the native
+     * platform to register listeners on text selection to ensure that it works.
+     * 
+     * Implementations that implement this method should also implement {@link #deinitializeTextSelection(com.codename1.ui.TextSelection) }
+     * @param aThis 
+     * @see #deinitializeTextSelection(com.codename1.ui.TextSelection) 
+     * @since 7.0
+     */
+    public void initializeTextSelection(TextSelection aThis) {
+        
+    }
+
+    /**
+     * Deinitializes text selection.
+     * @param aThis 
+     * @see #initializeTextSelection(com.codename1.ui.TextSelection) 
+     * @since 7.0
+     */
+    public void deinitializeTextSelection(TextSelection aThis) {
+        
+    }
+
+    /**
+     * Creates the native side of a {@link com.codename1.ui.HeavyButton}.  A HeavyButton
+     * is a button that has a native button displayed over top of it.  It is primarily used
+     * in the Javascript port where some functions can only be executed as a direct result
+     * of user interaction.
+     * @param aThis The lightweight button for which a heavy peer is created
+     * @return Native peer.  Format chosen by implementation.
+     * @since 7.0
+     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     */
+    public Object createHeavyButton(Button aThis) {
+        return null;
+    }
+
+    /**
+     * Adds an action listener which will be run in response to the native button's
+     * click event.  {@link ActionListener#actionPerformed(com.codename1.ui.events.ActionEvent) } will
+     * be executed on the native UI thread, not the EDT.
+     * @param peer The peer.  
+     * @param l The action listener.
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @see #removeHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void addHeavyActionListener(Object peer, ActionListener l) {
+        
+    }
+
+    /**
+     * Removes a heavy action listener from a heavy button.
+     * @param peer THe heavy button peer.
+     * @param l The action listener.
+     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public void removeHeavyActionListener(Object peer, ActionListener l) {
+        
+    }
+
+    /**
+     * Updates the bounds of the native heavy button to match the bounds of the lightweight button.
+     * @param peer The heavy peer.
+     * @param x The absolute X coordinate of the light peer.
+     * @param y The absolute Y coordinate of the light peer.
+     * @param width The width of the light peer.
+     * @param height The height of the light peer.
+     * @since 7.0
+     */
+    public void updateHeavyButtonBounds(Object peer, int x, int y, int width, int height) {
+        
+    }
+
+    /**
+     * Initializes a heavy button.  This is called whenever the light peer's initComponent() method is called.
+     * It should add the heavy button to the native UI hierarchy.
+     * @param peer The heavy peer.
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public void initHeavyButton(Object peer) {
+        
+    }
+
+    /**
+     * Deinitializes a heavy button.  This is called whenever the light peer's deinitialize() method is called.  It
+     * should remove the heavy button from the native UI hierarchy.
+     * 
+     * @param peer The heavy peer.
+     * @since 7.0
+     * @see #initHeavyButton(java.lang.Object) 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     */
+    public void deinitializeHeavyButton(Object peer) {
+        
+    }
+
+    /**
+     * Checks whether the current platform requires a heavy button for copy to clipboard functionality to work.
+     * This will be true on the Javascript port.
+     * @return 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public boolean requiresHeavyButtonForCopyToClipboard() {
+        return false;
+    }
+
+    /**
+     * Copies the current text selection to the clipboard.
+     * @param sel The current TextSelection instance for the current form.
+     * @since 7.0
+     */
+    public void copySelectionToClipboard(TextSelection sel) {
+        copyToClipboard(sel.getSelectionAsText());
     }
 
     

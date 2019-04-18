@@ -92,6 +92,8 @@ public class SamplesPanel extends JPanel {
         public void launchAndroid(Sample sample);
 
         public void exportAsNetbeansProject(Sample sample);
+
+        public void launchIOSRelease(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -191,6 +193,14 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenuItem launchIOSRelease = new JMenuItem("Send iOS Release Build");
+        launchIOSRelease.setToolTipText("Send iOS release build.");
+        launchIOSRelease.addActionListener(e->{
+            if (delegate != null) {
+                delegate.launchIOSRelease(sample);
+            }
+        });
+        
         JMenuItem launchAndroid = new JMenuItem("Send Android Build");
         launchAndroid.setToolTipText("Send Android build.");
         launchAndroid.addActionListener(e->{
@@ -271,6 +281,7 @@ public class SamplesPanel extends JPanel {
         });
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
+        moreMenu.add(launchIOSRelease);
         moreMenu.add(launchAndroid);
         moreMenu.add(winDesktopBuild);
         moreMenu.add(macDesktopBuild);
@@ -296,7 +307,9 @@ public class SamplesPanel extends JPanel {
         
         wrapper.setBackground(Color.white);
         wrapper.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
-        wrapper.setMaximumSize(new Dimension(10000, launch.getPreferredSize().height * 2));
+        Dimension launchPrefSize = launch.getPreferredSize();
+        wrapper.setMaximumSize(new Dimension(10000, launchPrefSize.height * 2));
+        int foo = 5;
         return wrapper;
         
     }

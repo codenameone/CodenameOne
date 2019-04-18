@@ -272,6 +272,7 @@ public class Button extends Label {
             putClientProperty("cn1$origText", text);
             super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
         } 
+        setCursor(HAND_CURSOR);
     }
     
     /**

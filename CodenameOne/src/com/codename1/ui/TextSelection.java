@@ -28,7 +28,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionEvent.Type;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.EventDispatcher;
@@ -41,6 +40,22 @@ import java.util.TreeSet;
 /**
  * Text selection support for Codename One applications.  The class provides a light-weight text selection 
  * implementation, allowing users to select and copy text from a form. 
+ * 
+ * <h2>Enabling Text Selection</h2>
+ * 
+ * <p>Text selection needs to be enabled on a per-form basis.</p>
+ * <p>
+ * <pre>{@code 
+ * myForm.getTextSelection().setEnabled(true);
+ * }</pre>
+ * </p>
+ * 
+ * <p>If text selection is enabled on a form, then non-editable text fields and text areas will allow text
+ * selection by default.  Labels and SpanLabels have text selection disabled by default, but can be enabled using 
+ * {@link Label#setTextSelectionEnabled(boolean) }, and {@link SpanLabel#setTextSelectionEnabled(boolean)} respectively.
+ * Similarly text selection can be disabled on TextFields and TextAreas using {@link TextArea#setTextSelectionEnabled(boolean) }.</p>
+ * 
+ * 
  * @author shannah
  * @since 7.0
  */
@@ -134,7 +149,7 @@ public class TextSelection {
      * @return The default trigger type for text selection.
      */
     public static TextSelectionTrigger getDefaultTextSelectionTrigger() {
-        return TextSelectionTrigger.LongPress;
+        return Display.impl.isDesktop() ? TextSelectionTrigger.Press : TextSelectionTrigger.LongPress;
     }
     
     
@@ -451,8 +466,13 @@ public class TextSelection {
          */
         public void add(Char character) {
             boundsDirty = true;
-            startPos = Math.min(startPos, character.pos);
-            endPos = Math.max(endPos-1, character.pos)+1;
+            if (chars.isEmpty()) {
+                startPos = character.pos;
+                endPos = character.pos+1;
+            } else {
+                startPos = Math.min(startPos, character.pos);
+                endPos = Math.max(endPos-1, character.pos)+1;
+            }
             chars.add(character);
         }
         
@@ -483,13 +503,24 @@ public class TextSelection {
             Span out = new Span(component);
             if (withFlow) {
                 if (y < getBounds().getY() && y + h > getBounds().getY() + getBounds().getHeight()/2) {
+                    // Selection starts above and covers full height of the span
+                    // In this case select the whole line
                     int newX = getBounds().getX();
-                    int newW = w + x - newX;
+                    int newW = Math.max(0, getBounds().getWidth());
                     x = newX;
                     w = newW;
-                }
-                if (y < getBounds().getY() + getBounds().getHeight()/2 && y + h > getBounds().getY() + getBounds().getHeight() + CN.convertToPixels(2)) {
-                    w = getBounds().getX() + getBounds().getWidth() - x;
+                } else if (y < getBounds().getY() && y + h > getBounds().getY() && y+h <= getBounds().getY() + getBounds().getHeight()) {
+                    // Selection starts above the span, and vertically ends somewhere in the span.
+                    // In this case, we select from the beginning of the line to the span box
+                    int newX = getBounds().getX();
+                    int newW = Math.max(0, x+w-newX);
+                    x = newX;
+                    w = newW;
+                    
+                } else if (y < getBounds().getY() + getBounds().getHeight() && y + h > getBounds().getY() + getBounds().getHeight() + CN.convertToPixels(2)) {
+                    // Selection starts inside vertically inside the span, and covers below.
+                    // In this case select from selection start to end of line.
+                    w = Math.max(0, getBounds().getX() + getBounds().getWidth() - x);
                 }
             }
             for (Char c : chars) {
@@ -743,7 +774,45 @@ public class TextSelection {
             sb.append("}");
             return sb.toString();
         }
+
+        public Spans getIntersection(Rectangle bounds, boolean b) {
+            Spans out = new Spans();
+            for (Span span : spans) {
+                out.add(span.getIntersection(bounds, b));
+            }
+            return out;
+        }
+
+        public boolean isEmpty() {
+            for (Span span : spans) {
+                if (!span.isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public Char charAt(int x, int y) {
+            for (Span span : spans) {
+                Char c = span.charAt(x, y);
+                if (c != null) {
+                    return c;
+                }
+            }
+            return null;
+        }
         
+        
+        public Span spanOfCharAt(int x, int y) {
+            for (Span span : spans) {
+                Char c = span.charAt(x, y);
+                if (c != null) {
+                    return span;
+                }
+            }
+            return null;
+        }
+                
         
         
     }
@@ -822,46 +891,18 @@ public class TextSelection {
         return false;
     }
     
+    private boolean shouldCoverToEndOfLine(Span span, Rectangle bounds) {
+        int spy = span.getBounds().getY();
+        int sph = span.getBounds().getHeight();
+        boolean shouldCoverToEndOfLine = spy + 2*sph/3 > bounds.getY() && spy+sph <= bounds.getY() + bounds.getHeight();
+        if (shouldCoverToEndOfLine) {
+            return true;
+        }
+        return false;
+    }
+    
     
     private SelectionMask selectionMask;
-    
-    private ActionListener longPressListener = new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent evt) {
-            
-            Component cmp = ((Container)root).getComponentAt(evt.getX(), evt.getY());
-            if (cmp == null) {
-                return;
-            }
-            TextSelectionSupport st = cmp.getTextSelectionSupport();
-            if (st != null) {
-                
-                if (!st.isTextSelectionEnabled(TextSelection.this) || !st.isTextSelectionTriggerEnabled(TextSelection.this)) {
-                    return;
-                }
-                Span selSpan = st.triggerSelectionAt(TextSelection.this, evt.getX(), evt.getY());
-                if (selSpan == null) {
-                    return;
-                }
-                Rectangle sel = selSpan.getBounds();
-                selectedBounds.setBounds(sel.getX(), sel.getY(), sel.getWidth(), sel.getHeight());
-                update();
-                if (selectionMask == null) {
-                    selectionMask = new SelectionMask();
-                    Container layeredPane = root.getComponentForm().getLayeredPane(TextSelection.class, true);
-                    layeredPane.add(selectionMask);
-                    
-                }
-                root.getComponentForm().revalidate();
-                
-                
-            }
-            
-            
-            
-        }
-        
-    };
     
     /**
      * The listener that handles all of the pointer events to update the selections.
@@ -874,10 +915,14 @@ public class TextSelection {
         private int ONE_MM = CN.convertToPixels(1);
         @Override
         public void actionPerformed(final ActionEvent evt) {
+            if (ignoreEvents || Display.getInstance().isRightMouseButtonDown()) {
+                return;
+            }
             if (trigger == TextSelectionTrigger.Press) {
                 if (evt.getEventType() == ActionEvent.Type.PointerPressed) {
                     selectedBounds.setBounds(-1, -1, 0, 0);
                     update();
+                    textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                     if (selectionMask != null) {
                         selectionMask.remove();
                         getLayeredPane().remove();
@@ -892,7 +937,7 @@ public class TextSelection {
                         return;
                     }
                     selectionRoot = findSelectionRoot(cmp);
-                    System.out.println("SelectionRoot ="+selectionRoot);
+                    //System.out.println("SelectionRoot ="+selectionRoot);
                     startX = startX - selectionRoot.getAbsoluteX();
                     startY = startY - selectionRoot.getAbsoluteY();
                     TextSelectionSupport ts = cmp.getTextSelectionSupport();
@@ -1034,10 +1079,11 @@ public class TextSelection {
                         inSelectionDrag = false;
                         update();
                         root.getComponentForm().revalidate();
+                        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                     }
                 } else {
                     if (evt.getEventType() == ActionEvent.Type.LongPointerPress) {
-                        System.out.println("In long press");
+                        //System.out.println("In long press");
                         Component cmp = ((Container)root).getComponentAt(evt.getX(), evt.getY());
                         if (cmp == null) {
                             return;
@@ -1053,7 +1099,7 @@ public class TextSelection {
 
                             int y = evt.getY() - selectionRoot.getAbsoluteY();
                             Span selSpan = st.triggerSelectionAt(TextSelection.this, x, y);
-                            System.out.println(selSpan);
+                            //System.out.println(selSpan);
                             if (selSpan == null) {
                                 return;
                             }
@@ -1061,6 +1107,7 @@ public class TextSelection {
                             Rectangle sel = selSpan.getBounds();
                             selectedBounds.setBounds(sel.getX(), sel.getY(), sel.getWidth(), sel.getHeight());
                             update();
+                            textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                             if (selectionMask == null) {
                                 selectionMask = new SelectionMask();
                                 Container layeredPane = getLayeredPane();
@@ -1089,6 +1136,7 @@ public class TextSelection {
                         }
                         selectedBounds.setBounds(-1, -1, 0, 0);
                         update();
+                        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                         if (selectionMask != null) {
                             selectionMask.remove();
                             getLayeredPane().remove();
@@ -1111,18 +1159,21 @@ public class TextSelection {
             this.enabled = enabled;
             Component f = root.getComponentForm();
             if (enabled) {
-
+                Form form = f.getComponentForm();
+                form.setEnableCursors(true);
                 f.addPointerPressedListener(pressListener);
                 f.addPointerDraggedListener(pressListener);
                 f.addPointerReleasedListener(pressListener);
                 f.addDragFinishedListener(pressListener);
                 f.addLongPressListener(pressListener);
+                Display.impl.initializeTextSelection(this);
             } else {
                 f.removePointerPressedListener(pressListener);
                 f.removePointerDraggedListener(pressListener);
                 f.removePointerReleasedListener(pressListener);
                 f.removeDragFinishedListener(pressListener);
                 f.addLongPressListener(pressListener);
+                Display.impl.deinitializeTextSelection(this);
             }
         }
     }
@@ -1249,8 +1300,8 @@ public class TextSelection {
     }
     
     private class SelectionMenu extends Container implements ActionListener  {
-        Button copy = new Button("Copy");
-        Button selectAll = new Button("Select All");
+        Button copy = new HeavyButton("Copy");
+        Button selectAll = new HeavyButton("Select All");
         
         SelectionMenu() {
             $(this).selectAllStyles()
@@ -1416,7 +1467,8 @@ public class TextSelection {
      * Copies the current selection to the system clipboard.
      */
     public void copy() {
-        Display.impl.copyToClipboard(getSelectionAsText());
+        //Display.impl.copyToClipboard(getSelectionAsText());
+        Display.impl.copySelectionToClipboard(this);
     }
     
     /**
@@ -1433,6 +1485,17 @@ public class TextSelection {
         selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());
         update();
         selectionRoot.getComponentForm().revalidateWithAnimationSafety();
+        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
+    }
+    
+    /**
+     * This flag can be set to cause text selection to ignore pointer events which might cause
+     * the selection to get lost or changed.  This is used internally when a context menu is displayed
+     * so that clicking on the context menu doesn't cause the current text selection to be lost.
+     * @param ignore 
+     */
+    public void setIgnoreEvents(boolean ignore) {
+        ignoreEvents = ignore;
     }
     
     private Component root;
@@ -1446,6 +1509,7 @@ public class TextSelection {
     // The nearest scrollable parent of the component that triggered a text
     // selection event. 
     private Component selectionRoot;
+    private boolean ignoreEvents;
     
     
     

@@ -1141,8 +1141,32 @@ public class Label extends Component {
         this.autoSizeMode = autoSizeMode;
     }
     
+    /**
+     * Enables text selection on this label.  Text selection must also be enabled on the Form in order to
+     * text selection to be activated.
+     * @param enabled 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @see Form#getTextSelection() 
+     * @see TextSelection#setEnabled(boolean) 
+     * @since 7.0
+     */
     public void setTextSelectionEnabled(boolean enabled) {
         this.textSelectionEnabled = enabled;
+        if (enabled) {
+            setCursor(Component.TEXT_CURSOR);
+        }
+    }
+    
+    /**
+     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
+     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
+     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
+     * @return 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @since 7.0
+     */
+    public boolean isTextSelectionEnabled() {
+        return textSelectionEnabled;
     }
     
     private Span span;
@@ -1218,9 +1242,12 @@ public class Label extends Component {
 
                 @Override
                 public String getTextForSpan(TextSelection sel, Span span) {
-                    int offset = Math.min(getText().length()-1, Math.max(0, span.getStartPos()));
-                    int length = Math.min(getText().length(), Math.max(0, span.getEndPos() - offset));
-                    return getText().substring(offset, length);
+                    int offset = span.getStartPos();
+                    offset = Math.max(0, offset);
+                    offset = Math.min(getText().length()-1, offset);
+                    int end = span.getEndPos();
+                    end = Math.min(getText().length(), end);
+                    return getText().substring(offset, end);
                     
                 }
                 

@@ -1092,6 +1092,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isRightMouseButtonDown() {
+        if (lastInputEvent != null) {
+            if (lastInputEvent instanceof MouseEvent) {
+                MouseEvent me = (MouseEvent) lastInputEvent;
+                return SwingUtilities.isRightMouseButton(me);
+            }
+        }
+        return false;
+    }
+
+    
+    
+    @Override
     public boolean isShiftKeyDown() {
         if (lastInputEvent != null) {
             return lastInputEvent.isShiftDown();

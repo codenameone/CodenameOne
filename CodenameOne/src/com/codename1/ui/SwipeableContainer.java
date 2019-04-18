@@ -333,6 +333,14 @@ public class SwipeableContainer extends Container {
             }
             final int x = evt.getX();
             final int y = evt.getY();
+            Form f = getComponentForm();
+            if (f == null) {
+                return;
+            }
+            Component cmp = f.getComponentAt(x, y);
+            if (!contains(cmp)) {
+                return;
+            }
             if (!waitForRelease && !topWrapper.contains(x, y)) {
                 return;
             }

@@ -26,6 +26,8 @@ package com.codename1.ui;
 import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -421,6 +423,7 @@ public class TextArea extends Component {
         }
         this.rows = rows;
         this.columns = columns;
+        setCursor(Component.TEXT_CURSOR);
     }
 
     /**
@@ -572,7 +575,9 @@ public class TextArea extends Component {
         return -1;
     }
 
-    
+    private void updateCursor() {
+        setCursor(isEditable() || isTextSelectionEnabled() ? TEXT_CURSOR : DEFAULT_CURSOR);
+    }
     
     /**
      * Sets this text area to be editable or readonly
@@ -581,6 +586,7 @@ public class TextArea extends Component {
      */
     public void setEditable(boolean b) {
         editable = b;
+        updateCursor();
     }
 
     /**
@@ -1223,12 +1229,12 @@ public class TextArea extends Component {
     public void setRowsGap(int rowsGap) {
         this.rowsGap = rowsGap;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        
+
         if(Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
@@ -2101,5 +2107,135 @@ public class TextArea extends Component {
         return isEditing() || super.shouldRenderComponentSelection();
     }
     
+    /**
+     * Calculates the spans for the the given text selection.  This should generally
+     * just delegate to the appropriate method in the look and feel for performing the
+     * layout calculation.
+     * @param sel The TextSelection
+     * @return 
+     * @since 7.0
+     */
+    protected Spans calculateTextSelectionSpan(TextSelection sel) {
+        return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);
+    }
+    
+    private boolean textSelectionEnabled;
+    
+    /**
+     * Enables text selection on this TextArea.  Text selection must also be enabled on the Form in order to
+     * text selection to be activated.
+     * @param enabled 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @see Form#getTextSelection() 
+     * @see TextSelection#setEnabled(boolean) 
+     * @since 7.0
+     */
+    public void setTextSelectionEnabled(boolean enabled) {
+        this.textSelectionEnabled = enabled;
+        updateCursor();
+    }
+    
+    /**
+     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
+     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
+     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
+     * @return 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @since 7.0
+     */
+    public boolean isTextSelectionEnabled() {
+        return textSelectionEnabled;
+    }
+    
+    
+    private TextSelection.Spans span;
+    private TextSelection.TextSelectionSupport textSelectionSupport;
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public TextSelection.TextSelectionSupport getTextSelectionSupport() {
+        if (textSelectionSupport == null) {
+            textSelectionSupport = new TextSelection.TextSelectionSupport() {
+                @Override
+                public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
+                    span = calculateTextSelectionSpan(sel);
+                    if (span == null) {
+                        return sel.newSpans();
+                    }
+                    
+                    TextSelection.Spans result = span.getIntersection(bounds, true);
+                    TextSelection.Spans out = sel.newSpans();
+                    out.add(result);
+                    return out;
+                            
+                }
+
+                @Override
+                public boolean isTextSelectionEnabled(TextSelection sel) {
+                    return (!isEditable() && textSelectionEnabled)|| (isEditable() && !isEnabled());
+                }
+
+                @Override
+                public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
+                    return (!isEditable() && textSelectionEnabled)|| (isEditable() && !isEnabled());
+                }
+
+                @Override
+                public TextSelection.Span triggerSelectionAt(TextSelection sel, int x, int y) {
+                    span = getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);
+                    if (span.isEmpty()) {
+                        return null;
+                    }
+                    TextSelection.Char charAtPoint = span.charAt(x, y);
+                    if (charAtPoint == null) {
+                        return null;
+                    }
+                    Span sp = span.spanOfCharAt(x, y);
+                    int startPos = charAtPoint.getPosition();
+                    int endPos = charAtPoint.getPosition()+1;
+                    String dividers = " \t\r\n-.;";
+                    
+                    while (startPos > sp.first().getPosition()) {
+                        if (dividers.indexOf(TextArea.this.getText().substring(startPos, startPos+1)) < 0) {
+                            startPos--;
+                        } else {
+                            if (startPos < sp.last().getPosition()) {
+                                startPos++;
+                            }
+                            break;
+                        }
+                    }
+                    
+                    while (endPos < sp.last().getPosition()+1) {
+                        if (dividers.indexOf(TextArea.this.getText().substring(endPos-1, endPos))<0) {
+                            endPos++;
+                        } else {
+                            if (endPos > sp.first().getPosition()) {
+                                endPos--;
+                            }
+                            break;
+                        }
+                    }
+                    
+                    return sp.subspan(startPos, endPos);
+                }
+
+                @Override
+                public String getTextForSpan(TextSelection sel, TextSelection.Span span) {
+                    int offset = span.getStartPos();
+                    offset = Math.max(0, offset);
+                    offset = Math.min(getText().length()-1, offset);
+                    int end = span.getEndPos()+1;
+                    end = Math.min(getText().length(), end);
+                    return getText().substring(offset, end);
+                    
+                }
+                
+            };
+        }
+        return textSelectionSupport;
+    };
 
 }

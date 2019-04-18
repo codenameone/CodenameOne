@@ -209,6 +209,7 @@
 
     
     <target name="build-for-ios-device-release" depends="clean,copy-ios-override,copy-libs,jar,clean-override">
+         <property name="ios.release.targetType" value="iphone"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -220,7 +221,7 @@
             subtitle="${codename1.secondaryTitle}"
             appStoreBuild="true"
             production="true"
-            targetType="iphone"
+            targetType="${ios.release.targetType}"
             certificate="${codename1.ios.release.certificate}"
             certPassword="${codename1.ios.release.certificatePassword}"
             provisioningProfile="${codename1.ios.release.provision}"

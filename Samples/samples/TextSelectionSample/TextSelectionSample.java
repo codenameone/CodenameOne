@@ -1,6 +1,7 @@
 package com.codename1.samples;
 
 
+import com.codename1.components.SpanLabel;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -16,6 +17,7 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.ui.CN;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.plaf.Border;
@@ -60,6 +62,9 @@ public class TextSelectionSample {
         Form hi = new Form("Hi World", BoxLayout.y());
         hi.setScrollableY(false);
         TextSelection sel = hi.getTextSelection();
+        sel.addTextSelectionListener(e->{
+            //System.out.println("Text selection has changed");
+        });
         
         sel.setEnabled(true);
         Label label = new Label("This label should be selectable");
@@ -77,6 +82,23 @@ public class TextSelectionSample {
         cnt.setPreferredH(CN.convertToPixels(5));
         cnt.setPreferredW(CN.convertToPixels(20));
         
+        TextArea ta = new TextArea();
+        ta.setText("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.");
+        ta.setEnabled(false);
+        ta.setRows(6);
+        hi.add(ta);
+        
+        SpanLabel sl = new SpanLabel();
+        sl.setText(ta.getText());
+        sl.setTextSelectionEnabled(true);
+        hi.add(sl);
+        
+        
+        TextField tf = new TextField();
+        tf.setText("Hello World.  This is a test field");
+        tf.setEnabled(false);
+        hi.add(tf);
+        
         Label l = new Label("This is a test with some long text to see if this works.  It should just flow when it runs out of space");
         l.setTextSelectionEnabled(true);
         cnt.add(l);
@@ -91,6 +113,7 @@ public class TextSelectionSample {
         }
         hi.add(cnt);
         hi.add(cntY);
+        
         $(cnt, cntY).selectAllStyles().setMarginMillimeters(4);
         
         

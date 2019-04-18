@@ -307,6 +307,20 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
     
     @Override
+    public void launchIOSRelease(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildIOSRelease(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+    
+
+    
+    @Override
     public void launchAndroid(Sample sample) {
         new Thread(()->{
             try {
@@ -360,7 +374,6 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
 
     
-
     
     
     
