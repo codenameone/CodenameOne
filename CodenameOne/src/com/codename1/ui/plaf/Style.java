@@ -359,7 +359,8 @@ public class Style {
     private Image bgImage;
     float[] padding = new float[4];
     float[] margin = new float[4];
-
+    private float[] cached_margin = null; //used to cache margin values when hidding a component
+    
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
@@ -1329,6 +1330,62 @@ public class Style {
             modifiedFlag |= MARGIN_MODIFIED;
             firePropertyChanged(MARGIN);
         }
+    }
+    
+    
+    /**
+     * Store current margin values into a cache that could be restored with restoreCachedMargins()
+     * @parma override: if true, margins would be cached even if a a previous cache already exists. If false, margins would be cached only if no cache already exists
+     * Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache. 
+     * 			So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
+     * 			And do not use on an hidden component either or unhidding this component might result in unexpected results
+     */
+    public void cacheMargins(boolean override) {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.cacheMargins(override);
+    		}
+    		return;
+    	}
+    	//else
+    	if (override || cached_margin == null) {
+	    	cached_margin = new float[4];
+	    	System.arraycopy(margin, 0, cached_margin, 0, margin.length);
+    	}
+	}
+    
+    
+    /**
+     * Restore cached margins and flush the margins cache
+     * Warning: this method is used internally when unhidding a component with the Component.setHidden(false) method
+     * 			Do not use it on an hidden component or it would result into unexpected results when unhidding this component
+     */
+    public void restoreCachedMargins() {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.restoreCachedMargins();
+    		}
+    		return;
+    	}
+    	//else
+    	if (cached_margin != null) {
+    		setMargin(cached_margin[0], cached_margin[1], cached_margin[2], cached_margin[3]);
+    		cached_margin = null;
+    	}
+    }
+    
+   
+   /**
+    * Flush the margins cache if one exists 
+    */
+   public void flushMarginsCache() {
+    	if(proxyTo != null) {
+    		for(Style s : proxyTo) {
+    			s.flushMarginsCache();
+    		}
+    		return;
+    	}
+    	cached_margin = null;
     }
 
     /**
