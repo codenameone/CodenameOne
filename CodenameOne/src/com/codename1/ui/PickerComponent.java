@@ -44,7 +44,10 @@ import java.util.Date;
 public class PickerComponent extends InputComponent {
     private final Picker picker = createPickerInstance();
     
-    private PickerComponent() {
+    /**
+     * Allows subclassing the picker component for customization
+     */
+    protected PickerComponent() {
         initInput();
         picker.setTickerEnabled(false);
     }

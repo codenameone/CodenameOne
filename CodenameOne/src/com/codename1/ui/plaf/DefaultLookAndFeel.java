@@ -493,7 +493,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.TOP:
                     x = x + (cmpWidth - (preserveSpaceForState + leftPadding +
                             rightPadding +
-                            Math.max(((icon != null) ? icon.getWidth() + l.getGap() : 0),
+                            Math.max(((icon != null) ? icon.getWidth() : 0),
                             l.getStringWidth(font)))) / 2;
                     if(!opposite){
                         x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);

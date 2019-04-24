@@ -1845,7 +1845,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         case Label.TOP:
                             x = x + (cmpWidth - (preserveSpaceForState + leftPadding
                                     + rightPadding
-                                    + Math.max(((icon != null) ? iconWidth + gap : 0),
+                                    + Math.max(((icon != null) ? iconWidth : 0),
                                             stringWidth))) / 2;
                             x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
                             y = y + (cmpHeight - (topPadding

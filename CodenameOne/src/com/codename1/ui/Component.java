@@ -6823,6 +6823,7 @@ public class Component implements Animation, StyleListener, Editable {
         if(b) {
             if(!sizeRequestedByUser) {
                 if(changeMargin) {
+                	getAllStyles().cacheMargins(false); //if a margins cache already exists because the component is already hidden it would be kept else it would be created
                     getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
@@ -6830,9 +6831,10 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
-                    setUIID(getUIID());
-                }
+            	getAllStyles().restoreCachedMargins(); //restore margins to the values they had before the component being hidden and flush the margins cache
+//                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
+//                    setUIID(getUIID());
+//                }
             }
         }
     }

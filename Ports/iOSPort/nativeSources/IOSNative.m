@@ -8656,7 +8656,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 case 0: /* Label.TOP: */
                     x = x + (cmpWidth - (preserveSpaceForState + leftPadding
                                          + rightPadding
-                                         + MAX(((icon != JAVA_NULL) ? iconWidth + gap : 0),
+                                         + MAX(((icon != JAVA_NULL) ? iconWidth : 0),
                                                     stringWidth))) / 2;
                     x = MAX(x, cmpX + leftPadding + preserveSpaceForState);
                     y = y + (cmpHeight - (topPadding
