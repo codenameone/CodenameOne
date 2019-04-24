@@ -43,6 +43,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -2029,6 +2030,12 @@ public class Form extends Container {
                 Log.e(ex);
             }
         }
+        if (getParent() != null) {
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.deregisterAnimated(this);
+            }
+        }
         super.deinitializeImpl();
         animMananger.flush();
         buttonsAwatingRelease = null;
@@ -2045,7 +2052,34 @@ public class Form extends Container {
             Display.impl.setNativeCommands(menuBar.getCommands());
         }
         if (getParent() != null) {
-            getParent().getComponentForm().registerAnimated(this);
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.registerAnimated(this);
+                if (pointerPressedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerPressedListeners.getListenerCollection()) {
+                        f.addPointerPressedListener(l);
+                    }
+                    pointerPressedListeners = null;
+                }
+                if (pointerDraggedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerDraggedListeners.getListenerCollection()) {
+                        f.addPointerDraggedListener(l);
+                    }
+                    pointerDraggedListeners = null;
+                }
+                if (pointerReleasedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerReleasedListeners.getListenerCollection()) {
+                        f.addPointerReleasedListener(l);
+                    }
+                    pointerReleasedListeners = null;
+                }
+                if (longPressListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)longPressListeners.getListenerCollection()) {
+                        f.addLongPressListener(l);
+                    }
+                    longPressListeners = null;
+                }
+            }
         }
     }
 
