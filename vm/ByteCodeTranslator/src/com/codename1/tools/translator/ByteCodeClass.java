@@ -495,7 +495,9 @@ public class ByteCodeClass {
                 .append(", ")
                 .append(isAnonymous?"JAVA_TRUE":"0")
                 .append(", ")
-                .append(isAnnotation?"JAVA_TRUE":"0");
+                .append(isAnnotation?"JAVA_TRUE":"0")
+                .append(", ")
+                .append(getArrayClazz(1));
         
         
         b.append("};\n\n");
@@ -550,7 +552,7 @@ public class ByteCodeClass {
             b.append(", JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, ");
 
             // new instance function pointer and vtable 
-            b.append("0, 0, 0, 0, 0, 0, 0\n};\n\n");
+            b.append("0, 0, 0, 0, 0, 0, 0, "+getArrayClazz(iter+1)+"\n};\n\n");
         }
 
         staticFieldList = new ArrayList<ByteCodeField>();
@@ -1709,6 +1711,14 @@ public class ByteCodeClass {
 
     void setIsEnum(boolean b) {
         this.isEnum = b;
+    }
+
+    private String getArrayClazz(int dim) {
+        if((arrayTypes.contains(dim + "_" + clsName) )) {
+            return "&class_array"+dim+"__"+clsName;
+        } else {
+            return "0";
+        }
     }
 
     
