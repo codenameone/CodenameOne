@@ -420,6 +420,7 @@ public class Log {
     public static void deleteLog() {
         if(instance.output != null) {
             Util.cleanup(instance.output);
+            instance.output = null;
         }
         if(instance.getFileURL() == null) {
             Storage.getInstance().deleteStorageFile("CN1Log__$");

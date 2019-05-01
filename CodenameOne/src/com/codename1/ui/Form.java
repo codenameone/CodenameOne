@@ -1588,6 +1588,78 @@ public class Form extends Container {
         contentPane.removeComponent(cmp);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchy(int duration) {
+        contentPane.animateHierarchy(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyAndWait(int duration) {
+        contentPane.animateHierarchyAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFade(int duration, int startingOpacity) {
+        contentPane.animateHierarchyFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFadeAndWait(int duration,
+        int startingOpacity) {
+        contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayout(int duration) {
+        contentPane.animateLayout(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutAndWait(int duration) {
+        contentPane.animateLayoutAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFade(int duration, int startingOpacity) {
+        contentPane.animateLayoutFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFadeAndWait(int duration, int startingOpacity) {
+        contentPane.animateLayoutFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayout(int duration, int opacity, Runnable callback) {
+        contentPane.animateUnlayout(duration, opacity, callback);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayoutAndWait(int duration, int opacity) {
+        contentPane.animateUnlayoutAndWait(duration, opacity);
+    }
+    
+    
     final void addComponentToForm(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
