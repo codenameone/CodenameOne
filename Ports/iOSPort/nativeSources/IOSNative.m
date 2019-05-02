@@ -5395,6 +5395,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE
 }
 
 NSLocale *currentLocale = NULL;
+NSLocale *deviceLocale = NULL;
+
+NSLocale* cn1DeviceLocale() {
+    if (deviceLocale == NULL) {
+        deviceLocale = [NSLocale localeWithLocaleIdentifier:[[NSLocale preferredLanguages] objectAtIndex:0] ];
+    }
+    return deviceLocale;
+}
 
 void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG instanceObject, JAVA_OBJECT localeStr) {
     POOL_BEGIN();
@@ -5403,7 +5411,7 @@ void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_ST
         [currentLocale release];
     }
 #endif
-    currentLocale = [[NSLocale alloc] initWithLocaleIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG localeStr)];
+    currentLocale = cn1DeviceLocale();
     POOL_END();
 }
 
@@ -5416,7 +5424,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MU
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
+    
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithInt:i]]);
     POOL_END();
@@ -5432,6 +5443,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(CN1_THREAD_ST
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
@@ -5449,6 +5462,8 @@ JAVA_DOUBLE com_codename1_impl_ios_IOSNative_parseDouble___java_lang_String(CN1_
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG d);
@@ -5466,6 +5481,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(CN1_THREAD_
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
@@ -5482,6 +5499,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterMediumStyle];
@@ -5499,6 +5518,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(CN1_THREAD_S
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterShortStyle];
@@ -5516,6 +5537,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(CN1_THREAD_ST
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterLongStyle];
@@ -5534,6 +5557,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(CN1_THR
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterMediumStyle];
@@ -5552,6 +5577,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(CN1_THRE
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterShortStyle];
@@ -5570,6 +5597,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STAT
 #endif
     if (currentLocale != NULL) {
         formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
     }
     JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter currencyCode]);
     POOL_END();
