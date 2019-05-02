@@ -4690,6 +4690,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private EditingInProgress editingInProgress;
     private Component currentlyEditingField;
     
+    private Process tabTipProcess;
+    
     /**
      * @inheritDoc
      */
@@ -4879,9 +4881,63 @@ public class JavaSEPort extends CodenameOneImplementation {
             tf.setFont(fallback);
         }
         setCaretPosition(tf, getText(tf).length());
+        
+        
+        // Windows Tablet Show Virtual Keyboard
+        // REf https://stackoverflow.com/a/25783041/2935174
+        final String sysroot = System.getenv("SystemRoot");
+        String tabTipExe = "C:\\Program Files\\Common Files\\microsoft shared\\ink\\TabTip.exe";
+        
+        final boolean useTabTip = "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
+        if (new File(tabTipExe).exists()) {
+            try {
+
+                if (useTabTip) {
+                    //System.out.println("Opening TabTip");
+                    ProcessBuilder pb = new ProcessBuilder("cmd", "/c", tabTipExe);
+                    tabTipProcess = pb.start();
+                } else {
+                    //System.out.println("Opening OSK");
+                    ProcessBuilder pb = new ProcessBuilder(sysroot + "/system32/osk.exe");
+                    tabTipProcess = pb.start();
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to open VKB: " + e.getMessage());
+            }
+
+            tf.addFocusListener(new FocusListener() {
+                @Override
+                public void focusLost(FocusEvent arg0) {
+                    //System.out.println("Lost focus...");
+                    try {
+                        if (tabTipProcess != null) {
+                            tabTipProcess.destroy();
+                        } 
+                    } catch (Exception ex){}
+                    try {
+                        if (useTabTip) {
+                            Runtime.getRuntime().exec("cmd /c taskkill /IM TabTip.exe");
+                        } else {
+                            Runtime.getRuntime().exec("cmd /c taskkill /IM osk.exe");
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Problem closing VKB: " + e.getMessage());
+                    }
+                }
+
+                @Override
+                public void focusGained(FocusEvent arg0) {
+
+                }
+            });
+        }
+
+        
         tf.requestFocus();
         tf.setSelectionStart(0);
         tf.setSelectionEnd(0);
+
+
         class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener, EditingInProgress {
             private final JTextComponent textCmp;
             private final JComponent swingComponentToRemove;
@@ -4946,6 +5002,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             public void focusGained(FocusEvent e) {
                 setCaretPosition(tf, getText(tf).length());
+                
+                
             }
 
             public void focusLost(FocusEvent e) {
