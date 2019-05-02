@@ -316,7 +316,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 alignment == 3 ? NSTextAlignmentRight : NSTextAlignmentLeft;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
-            
+            utf.tintColor = UIColorFromRGB(color, 255);
             if(hintString != nil) {
                 utf.placeholder = hintString;
             }
@@ -509,6 +509,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
             [utv setTextColor:UIColorFromRGB(color, 255)];
+            utv.tintColor = UIColorFromRGB(color, 255);
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;

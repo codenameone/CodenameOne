@@ -4846,6 +4846,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
+        swingT.setCaretColor(new Color(cmp.getUnselectedStyle().getFgColor()));
         final javax.swing.text.JTextComponent tf = swingT;
         if (keyCode > 0) {
             text += ((char) keyCode);
