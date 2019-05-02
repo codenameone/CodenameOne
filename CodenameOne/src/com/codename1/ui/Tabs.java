@@ -1005,7 +1005,23 @@ public class Tabs extends Container {
      * @param swipeActivated
      */
     public void setSwipeActivated(boolean swipeActivated) {
-        this.swipeActivated = swipeActivated;
+        if(this.swipeActivated != swipeActivated) {
+            this.swipeActivated = swipeActivated;
+            if(isInitialized()) {
+                Form form = this.getComponentForm();
+                if (form != null) {
+                    if(swipeActivated) {
+                        form.addPointerPressedListener(press);
+                        form.addPointerReleasedListener(release);
+                        form.addPointerDraggedListener(drag);
+                    } else {
+                        form.removePointerPressedListener(press);
+                        form.removePointerReleasedListener(release);
+                        form.removePointerDraggedListener(drag);
+                    }
+                }
+            }
+        }
     }
 
     private void initTabsFocus(){
