@@ -321,11 +321,11 @@ public class DateFormatSymbols implements Cloneable {
                 cal.set(Calendar.DAY_OF_MONTH, 15);
                 for (int i=0; i<len; i++) {
                     cal.set(Calendar.MONTH, i);
-                    String fmt = l10n.formatDateShortStyle(cal.getTime());
+                    String fmt = l10n.formatDateLongStyle(cal.getTime());
                     try {
-                        platformLocalizedShortMonths[i] = extractMonthName(fmt);
+                        platformLocalizedShortMonths[i] = extractMonthName(fmt).substring(0, 3);
                     } catch (ParseException ex) {
-                        platformLocalizedShortMonths[i] = MONTHS[i];
+                        platformLocalizedShortMonths[i] = MONTHS[i].substring(0, 3);
                     }
                 }
             }
