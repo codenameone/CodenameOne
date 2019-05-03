@@ -52,6 +52,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -679,6 +680,10 @@ public final class Display extends CN1Constants {
     }
 
     private DebugRunnable currentEdtContext;
+
+    
+    
+    
     
     private class EdtException extends RuntimeException {
         private Throwable cause;
@@ -3271,6 +3276,19 @@ public final class Display extends CN1Constants {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
+    
+    /**
+     * Creates media asynchronously.
+     *
+     * @param uri the platform specific location for the sound
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @since 7.0
+     */
+    public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
+        return impl.createMediaAsync(uri, video, onCompletion);
+    }
+
 
     /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
@@ -3306,6 +3324,11 @@ public final class Display extends CN1Constants {
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return impl.createMedia(stream, mimeType, onCompletion);
+    }
+
+    public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+        return impl.createMediaAsync(stream, mimeType, onCompletion);
+        
     }
 
 
@@ -4445,6 +4468,21 @@ hi.show();}</pre></noscript>
      */ 
     public Media createBackgroundMedia(String uri) throws IOException{
         return impl.createBackgroundMedia(uri);
+    }
+    
+    /**
+     * Creates an audio media that can be played in the background.  This call is
+     * asynchronous, so that it will return perhaps before the media object is ready.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media or null if background playing is not supported on the platform
+     * 
+     */ 
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        return impl.createBackgroundMediaAsync(uri);
     }
 
     /**
