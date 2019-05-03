@@ -116,7 +116,9 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.SuccessCallback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -7488,6 +7490,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         return super.createBackgroundMedia(uri);
     }
+
+    @Override
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        AsyncResource<Media> out = new AsyncResource<Media>();
+        
+        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
+        }
+        
+        return super.createBackgroundMediaAsync(uri);
+    }
+    
+    
     
     
     
@@ -7729,6 +7745,65 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
     }
+
+    @Override
+    public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
+        }
+        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
+            out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
+            return out;
+        }
+        
+        if(uriAddress.startsWith("file:")) {
+            uriAddress = unfile(uriAddress);
+        }
+        final String uri = uriAddress;
+        if (!fxExists) {
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
+            System.out.println(msg);
+            out.error(new IOException(msg));
+            return out;
+        }
+        java.awt.Container cnt = canvas.getParent();
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                out.error(new RuntimeException("Could not find canvas.  Cannot create media"));
+                return out;
+            }
+        }
+
+        final java.awt.Container c = cnt;
+
+        //final Media[] media = new Media[1];
+        final Exception[] err = new Exception[1];
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
+        //mediaContainer = m;
+        Platform.runLater(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
+                        String mimeType = "video/mp4";
+                        new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion, out);
+                        return;
+                    }
+
+                   new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion, out);
+                } catch (Exception ex) {
+                    out.error(ex);
+                }
+            }
+        });
+        return out;
+    }
+    
+    
     
     /**
      * Plays the sound in the given URI which is partially platform specific.
@@ -7740,22 +7815,49 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(String uriAddress, final boolean isVideo, final Runnable onCompletion) throws IOException {
-        
+        AsyncResource<Media> res = createMediaAsync(uriAddress, isVideo, onCompletion);
+        try {
+            return res.get();
+        } catch (Throwable t) {
+            Throwable cause = t.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException)cause;
+            }
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException)cause;
+            }
+            throw new IOException(cause);
+        }
+    }
+
+    
+    /**
+     * Plays the sound in the given stream
+     *
+     * @param stream the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @param onCompletion invoked when the audio file finishes playing, may be
+     * null
+     * @return a handle that can be used to control the playback of the audio
+     * @throws java.io.IOException if the URI access fails
+     */
+    @Override
+    public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
         }
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
+             out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
+            return out;
         }
         
-        if(uriAddress.startsWith("file:")) {
-            uriAddress = unfile(uriAddress);
-        }
-        final String uri = uriAddress;
         if (!fxExists) {
             String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            System.out.println(msg);
-            throw new IOException(msg);
+            //System.out.println(msg);
+            out.error(new IOException(msg));
+            return out;
         }
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
@@ -7764,50 +7866,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
         }
-
         final java.awt.Container c = cnt;
 
-        final Media[] media = new Media[1];
-        final Exception[] err = new Exception[1];
+        //final Media[] media = new Media[1];
+        //final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         //mediaContainer = m;
+
         Platform.runLater(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
-                        String mimeType = "video/mp4";
-                        media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion);
-                        return;
-                    }
-
-                    media[0] = new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion);
+                    new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion, out);
                 } catch (Exception ex) {
-                    err[0] = ex;
+                    out.error(ex);
                 }
             }
         });
 
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while (media[0] == null && err[0] == null) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            }
-        });
-        if (err[0] != null) {
-            throw new IOException(err[0]);
-        }
-        return media[0];
-
+        return out;
     }
-
+    
     /**
      * Plays the sound in the given stream
      *
@@ -7819,61 +7899,18 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(final InputStream stream, final String mimeType, final Runnable onCompletion) throws IOException {
-
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
-        }
-        
-        if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            System.out.println(msg);
-            throw new IOException(msg);
-        }
-        java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof JFrame)) {
-            cnt = cnt.getParent();
-            if (cnt == null) {
-                return null;
+        try {
+            return createMediaAsync(stream, mimeType, onCompletion).get();
+        } catch (Throwable t) {
+            t = t.getCause();
+            if (t instanceof IOException) {
+                throw (IOException)t;
+            } else if (t instanceof RuntimeException) {
+                throw (RuntimeException)t;
+            } else {
+                throw new IOException(t);
             }
         }
-        final java.awt.Container c = cnt;
-
-        final Media[] media = new Media[1];
-        final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        //mediaContainer = m;
-
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    media[0] = new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion);
-                } catch (Exception ex) {
-                    err[0] = ex;
-                }
-            }
-        });
-
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while (media[0] == null && err[0] == null) {
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            }
-        });
-        if (err[0] != null) {
-            throw new IOException(err[0]);
-        }
-        return media[0];
     }
 
     @Override
@@ -9471,7 +9508,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean playing = false;
         private boolean nativePlayerMode;
         
-        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             if (onCompletion != null) {
                 addCompletionHandler(onCompletion);
             }
@@ -9512,6 +9549,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     uri = temp.toURI().toURL().toExternalForm();
                 }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                player.setOnReady(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.complete(CodenameOneMediaPlayer.this);
+                        }
+                    }
+                });
                 player.setOnPaused(new Runnable() {
                     public void run() {
                         playing = false;
@@ -9527,14 +9571,27 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (isVideo) {
                     videoPanel = fx;
                 }
+                player.setOnError(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.error(player.errorProperty().get());
+                        } else {
+                            Log.e(player.errorProperty().get());
+                        }
+                    }
+                });
 
             } catch (Exception ex) {
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
+                if (callback != null) {
+                    callback.error(ex);
+                } else {
+                    ex.printStackTrace();
+                    throw new RuntimeException(ex);
+                }
             }
         }
 
-        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             String suffix = "";
             if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
                 suffix = ".mp3";
@@ -9589,6 +9646,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
+                player.setOnReady(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.complete(CodenameOneMediaPlayer.this);
+                        }
+                    }
+                });
                 player.setOnPaused(new Runnable() {
                     public void run() {
                         playing = false;
@@ -9603,10 +9667,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (isVideo) {
                     videoPanel = fx;
                 }
+                player.setOnError(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.error(player.errorProperty().get());
+                        } else {
+                            Log.e(player.errorProperty().get());
+                        }
+                    }
+                });
 
             } catch (Exception ex) {
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
+                if (callback != null) {
+                    callback.error(ex);
+                } else {
+                    ex.printStackTrace();
+                    throw new RuntimeException(ex);
+                }
             }
         }
 

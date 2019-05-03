@@ -60,6 +60,7 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
@@ -3718,6 +3719,29 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Creates media asynchronously.
+     * @param uri the platform specific location for the sound
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @see #createMedia(java.lang.String, boolean, java.lang.Runnable) 
+     */
+    public AsyncResource<Media> createMediaAsync(final String uri, final boolean video, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        CN.scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.complete(createMedia(uri, video, onCompletion));
+                } catch (IOException ex) {
+                    out.error(ex);
+                }
+            }
+        });
+        return out;
+    }
+
+    
+    /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
      * 
      * @param media The media to add the callback to.
@@ -3747,9 +3771,36 @@ public abstract class CodenameOneImplementation {
      * @param onCompletion invoked when the audio file finishes playing, may be null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
+     * @see #createMediaAsync(java.io.InputStream, java.lang.String, java.lang.Runnable) 
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return null;
+    }
+    
+    /**
+     * Creates media asynchronously.
+     *
+     * @param stream the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @see #createMedia(java.io.InputStream, java.lang.String, java.lang.Runnable) 
+     * @since 7.0
+     */
+    public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        CN.scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.complete(createMedia(stream, mimeType, onCompletion));
+                } catch (Throwable t) {
+                    out.error(t);
+                }
+            }
+            
+        });
+        return out;
     }
     
     /**
@@ -3785,6 +3836,43 @@ public abstract class CodenameOneImplementation {
         }
         return createMedia(uri, false, null);
     }
+    
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * This is run asynchronously so that this call does not block.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
+        
+        if (uri.startsWith("jar://")) {
+            final AsyncResource<Media> out = new AsyncResource<Media>();
+        
+            CN.scheduleBackgroundTask(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        out.complete(createBackgroundMedia(uri));
+                    } catch (IOException ex) {
+                        out.error(ex);
+                    }
+                }
+
+            });
+            return out;
+        } else {
+            return createMediaAsync(uri, false, null);
+        }
+    }
+
+    
 
     /**
      * Creates a soft/weak reference to an object that allows it to be collected
@@ -6250,6 +6338,11 @@ public abstract class CodenameOneImplementation {
     public void copySelectionToClipboard(TextSelection sel) {
         copyToClipboard(sel.getSelectionAsText());
     }
+
+    
+
+    
+  
 
     
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
