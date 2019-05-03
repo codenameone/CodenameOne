@@ -77,7 +77,7 @@ public class MediaManager {
      * 
      * @since 7.0
      */ 
-    public static AsyncResource<Media> createBackgroundMediaAsync(String uri) throws IOException {
+    public static AsyncResource<Media> createBackgroundMediaAsync(String uri) {
         return Display.getInstance().createBackgroundMediaAsync(uri);
     }
     
