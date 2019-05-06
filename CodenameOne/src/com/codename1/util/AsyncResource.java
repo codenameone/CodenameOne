@@ -88,6 +88,9 @@ public class AsyncResource<V> extends Observable  {
         if (done && error == null) {
             return value;
         }
+        if (done && error != null) {
+            throw new AsyncExecutionException(error);
+        }
         final boolean[] complete = new boolean[1];
         Observer observer = new Observer() { public void update(Observable obj,Object arg){
             if (isDone()) {
@@ -307,6 +310,7 @@ public class AsyncResource<V> extends Observable  {
         this.value = value;
         done = true;
         setChanged();
+        notifyObservers();
         if (successCallback != null) {
             successCallback.onSucess(value);
         }
@@ -321,6 +325,7 @@ public class AsyncResource<V> extends Observable  {
         this.error = t;
         done = true;
         setChanged();
+        notifyObservers();
         if (errorCallback != null) {
             errorCallback.onSucess(error);
         }
