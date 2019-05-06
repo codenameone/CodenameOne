@@ -6276,6 +6276,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
         } else {
             datePickerView = [[UIDatePicker alloc] initWithFrame:CGRectMake(0, 40, 0, 0)];
         }
+        datePickerView.locale = cn1DeviceLocale();
         switch(type) {
             case 1:
                 datePickerView.datePickerMode = UIDatePickerModeDate;
