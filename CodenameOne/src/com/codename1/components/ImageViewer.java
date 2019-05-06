@@ -367,7 +367,6 @@ public class ImageViewer extends Component {
      */
     @Override
     public void pointerDragged(int x, int y) {
-        System.out.println("Dragging");
         // could be a pan
         float distanceX = ((float)pressX - x) / getZoom();
         float distanceY = ((float)pressY - y) / getZoom();
@@ -495,7 +494,6 @@ public class ImageViewer extends Component {
         imageX = (int)(s.getPaddingLeftNoRTL()+ (width - imageDrawWidth) * panPositionX);
         imageY = (int)(s.getPaddingTop() + (height - imageDrawHeight) * panPositionY);
         cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
-        System.out.println(cropBox);
     }
     
     /**
