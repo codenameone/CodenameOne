@@ -127,5 +127,10 @@ public class BBRow implements Row{
             throw new IOException(ex.getMessage());
         }
     }
+	
+	public Boolean wasNull() throws IOException{
+		//might be possible to test if null with getObject(int index) but usure so should be tested. meanwhile just return null (=not implemented)
+		return null;
+	}
     
 }

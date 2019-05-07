@@ -266,6 +266,19 @@ public class SECursor implements Cursor, Row{
             throw new IOException(ex.getMessage());
         }
     }
+    
+    public Boolean wasNull()throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
+        try {
+            return resultSet.wasNull();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+    
 
     public int getColumnCount() throws IOException {
         if(closed) {

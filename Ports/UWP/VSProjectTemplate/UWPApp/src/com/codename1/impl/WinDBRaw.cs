@@ -9,7 +9,8 @@ namespace com.codename1.impl
     {
         sqlite3_stmt stmt;
         private int pos=-1;
-
+		private bool null_last_read_value=true;
+		
         public WinDBRawCursor(sqlite3_stmt stmt)
         {
             this.stmt = stmt;
@@ -104,38 +105,55 @@ namespace com.codename1.impl
 
         public int getInteger(int i)
         {
+			this.null_last_read_value = isNull(i);
             return raw.sqlite3_column_int(stmt, i);
         }
 
         public string getString(int i)
         {
+			this.null_last_read_value = isNull(i);
             return raw.sqlite3_column_text(stmt, i);
         }
 
         public double getDouble(int i)
         {
+			this.null_last_read_value = isNull(i);
             return raw.sqlite3_column_double(stmt, i);
         }
 
         public byte[] getBlob(int i)
         {
+			this.null_last_read_value = isNull(i);
             return raw.sqlite3_column_blob(stmt, i);
         }
 
         public float getFloat(int i)
         {
+			this.null_last_read_value = isNull(i);
             return (float)raw.sqlite3_column_double(stmt, i);
         }
 
         public long getLong(int i)
         {
+			this.null_last_read_value = isNull(i);
             return raw.sqlite3_column_int64(stmt, i);
         }
 
         public short getShort(int i)
         {
+			this.null_last_read_value = isNull(i);
             return (short)raw.sqlite3_column_int(stmt, i);
         }
+		
+		private bool isNull(int i)
+		{
+			return (raw.sqlite3_column_type(stmt, i) == raw.SQLITE_NULL); //return (stmt.column_type(i) == raw.SQLITE_NULL);
+		}
+		
+		public bool? wasNull() 
+		{
+			return this.null_last_read_value;
+		}
     }
 
     class WinDBRaw : com.codename1.db.Database 
