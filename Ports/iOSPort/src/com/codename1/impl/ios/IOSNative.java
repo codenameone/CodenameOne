@@ -76,8 +76,8 @@ public final class IOSNative {
     native void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
-    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height);
-    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height);
+    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);

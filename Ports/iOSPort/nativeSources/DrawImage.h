@@ -37,9 +37,11 @@
     int width;
     int height;
     GLUIImage* img;
+    int renderingHints;
 }
 
 -(id)initWithArgs:(int)a xpos:(int)xpos ypos:(int)ypos i:(GLUIImage*)i w:(int)w h:(int)h;
 -(void)execute;
+-(void)setRenderingHints:(JAVA_INT)hints;
 
 @end
