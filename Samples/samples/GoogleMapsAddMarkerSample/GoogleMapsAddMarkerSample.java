@@ -38,7 +38,7 @@ import com.codename1.ui.plaf.Style;
  * of building native mobile applications using Java.
  */
 public class GoogleMapsAddMarkerSample {
-    private static final String JS_API_KEY = "AIzaSyDpB3cA5z7gwHdhuag53rYMbBnYe_kmTu0";
+    private static final String JS_API_KEY = "AIzaSyDpB3cxxxxxxxxxxx53rYMbBnYe_kmTu0";
     private Form current;
     private Resources theme;
 
