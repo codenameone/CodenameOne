@@ -91,7 +91,7 @@ public class Label extends Component {
     private EventDispatcher textBindListeners = null;
     private boolean shouldLocalize = true;
     private boolean showEvenIfBlank = false;
-    private int shiftMillimeters = 1;
+    private float shiftMillimeters = 0.25f;
     private int stringWidthUnselected = -1;
     
     private boolean autoSizeMode;
@@ -828,12 +828,12 @@ public class Label extends Component {
         if(tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()){
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
-                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters);
                 if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
                     shiftText = getStringWidth(getStyle().getFont()); 
                 }
             }else{
-                shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                shiftText += Display.getInstance().convertToPixels(shiftMillimeters);
                 if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
                     shiftText = -getStringWidth(getStyle().getFont()); 
                 }
@@ -1047,11 +1047,21 @@ public class Label extends Component {
     }
 
     /**
-     * Returns the number of millimeters that should be shifted in tickering
+     * Returns the number of millimeters that should be shifted in tickering rounded to nearest int.
      * 
      * @return the shiftMillimeters
+     * @deprecated Use {@link #getShiftMillimetersF() }
      */
     public int getShiftMillimeters() {
+        return (int)Math.round(shiftMillimeters);
+    }
+    
+    /**
+     * Returns the number of millimeters that should be shifted in tickering as a float.
+     * @return 
+     * @since 7.0
+     */
+    public float getShiftMillimetersF() {
         return shiftMillimeters;
     }
 
@@ -1061,6 +1071,16 @@ public class Label extends Component {
      * @param shiftMillimeters the shiftMillimeters to set
      */
     public void setShiftMillimeters(int shiftMillimeters) {
+        this.shiftMillimeters = shiftMillimeters;
+    }
+    
+    /**
+     * Sets the millimeters that should be shifted in tickering as a float.
+     * 
+     * @param shiftMillimeters the shiftMillimeters to set
+     * @since 7.0
+     */
+    public void setShiftMillimeters(float shiftMillimeters) {
         this.shiftMillimeters = shiftMillimeters;
     }
 
