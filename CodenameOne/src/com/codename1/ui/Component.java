@@ -4000,6 +4000,19 @@ public class Component implements Animation, StyleListener, Editable {
         return Math.sqrt(disx * disx + disy * disy);
     }
 
+    private boolean inPinch;
+    
+    /**
+     * To be implemented by subclasses interested in being notified when a pinch zoom has
+     * ended (i.e the user has removed one of their fingers, but is still dragging).
+     * @param x The x-coordinate of the remaining finger in the drag.  (Absolute)
+     * @param y The y-coordinate of the remaining finger in the drag. (Absolute)
+     * @since 7.0
+     */
+    protected void pinchReleased(int x, int y) {
+        
+    }
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
@@ -4017,7 +4030,16 @@ public class Component implements Animation, StyleListener, Editable {
             }
             double scale = currentDis / pinchDistance;
             if (pinch((float)scale)) {
+                inPinch = true;
                 return;
+            }
+        } else {
+            if (inPinch) {
+                // if we were in a pinch zoom, but the user
+                // removes a finger, then we need a way to signal to the component
+                // that the pinch portion is over
+                inPinch = false;
+                pinchReleased(x[0], y[0]);
             }
         }
         pointerDragged(x[0], y[0]);
@@ -4501,6 +4523,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerPressed(int[] x, int[] y) {
+        inPinch = false;
         dragActivated = false;
         pointerPressed(x[0], y[0]);
         scrollOpacity = 0xff;
@@ -4578,6 +4601,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerReleased(int x, int y) {
+        if (inPinch) {
+            inPinch = false;
+        }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);

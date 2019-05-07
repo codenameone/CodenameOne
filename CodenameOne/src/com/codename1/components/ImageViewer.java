@@ -360,6 +360,14 @@ public class ImageViewer extends Component {
             return;
         }
     }
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+        pressX = x;
+        pressY = y;
+        currentZoom = zoom;
+    }
+    
     
     
     /**
