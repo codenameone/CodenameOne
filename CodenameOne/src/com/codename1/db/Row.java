@@ -101,4 +101,15 @@ public interface Row {
      * @throws IOException 
      */
     public String getString(int index)throws IOException;
+    
+    
+    
+    /**
+     * Reports whether the last column read had a value of SQL NULL. 
+     * Note that you must first call one of the getter methods on a column to try to read its value and then call the method wasNull to see if the value read was SQL NULL.
+     * 
+     * @return true if the last column value read was SQL NULL and false otherwise. If the targeted platform do not support this feature it returns null (meaning we don't now if the latest read value was SQL NULL or not)
+     * @throws IOException 
+     */
+    public Boolean wasNull()throws IOException;
 }

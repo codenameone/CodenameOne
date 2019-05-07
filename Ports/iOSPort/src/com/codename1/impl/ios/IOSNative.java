@@ -397,6 +397,7 @@ public final class IOSNative {
     native long sqlCursorValueAtColumnLong(long statement, int col);
     native short sqlCursorValueAtColumnShort(long statement, int col);
     native String sqlCursorValueAtColumnString(long statement, int col);
+    native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
     
     native int sqlCursorGetColumnCount(long statementPeer);
     
