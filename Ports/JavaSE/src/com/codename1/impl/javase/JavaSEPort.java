@@ -1578,10 +1578,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private int getCode(java.awt.event.KeyEvent evt) {
             int code = evt.getKeyCode();
-            if(code >= 'A' && code <= 'Z') {
-                return evt.getKeyChar();
+            switch (code) {
+                case KeyEvent.VK_UP:
+                    return GAME_KEY_CODE_UP;
+                case KeyEvent.VK_DOWN:
+                    return GAME_KEY_CODE_DOWN;
+                case KeyEvent.VK_LEFT:
+                    return GAME_KEY_CODE_LEFT;
+                case KeyEvent.VK_RIGHT:
+                    return GAME_KEY_CODE_RIGHT;
+                case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_ENTER:
+                    return GAME_KEY_CODE_FIRE;
             }
-            return getCode(code);
+            char c = evt.getKeyChar();
+            if(c == java.awt.event.KeyEvent.CHAR_UNDEFINED) {
+                return evt.getKeyCode();
+            }
+            return c;
         }
 
         private int getCode(int k) {
