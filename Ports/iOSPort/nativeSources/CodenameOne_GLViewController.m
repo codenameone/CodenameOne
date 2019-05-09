@@ -329,7 +329,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 if((constraint & 0x200000) == 0x200000) {
                     utf.autocapitalizationType = UITextAutocapitalizationTypeSentences;
                 } else {
-                    utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                    // UPPERCASE
+                    if((constraint & 0x800000) == 0x800000) {
+                        utf.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+                    } else {
+                        utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                    }
                 }
             }
             

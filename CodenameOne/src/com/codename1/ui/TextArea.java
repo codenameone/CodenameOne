@@ -183,6 +183,11 @@ public class TextArea extends Component {
      */
     public static final int USERNAME = 0x400000;
     
+    /**
+     * This flag is a hint to the implementation that the text in this 
+     * field should be upper case
+     */
+    public static final int UPPERCASE = 0x800000;
     
              
     /**
