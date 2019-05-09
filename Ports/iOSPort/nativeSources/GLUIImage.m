@@ -44,6 +44,14 @@ extern int nextPowerOf2(int val);
     return img;
 }
 
+-(int)getTextureWidth {
+    return textureWidth;
+}
+
+-(int)getTextureHeight {
+    return textureHeight;
+}
+
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
     if(textureName == 0) {
         textureWidth = texWidth;

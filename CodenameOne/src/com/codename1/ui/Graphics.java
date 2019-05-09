@@ -59,6 +59,16 @@ public final class Graphics {
     private float scaleX = 1, scaleY = 1;
     
     /**
+     * Rendering hint to indicate that the context should prefer to render
+     * primitives in a quick way, at the cost of quality, if there is an 
+     * expensive operation.
+     * @see #setRenderingHints(int) 
+     * @see #getRenderingHints() 
+     * @since 7.0
+     */
+    public static final int RENDERING_HINT_FAST=1;
+    
+    /**
      * Constructing new graphics with a given javax.microedition.lcdui.Graphics 
      * @param g an implementation dependent native graphics instance
      */
@@ -628,6 +638,8 @@ public final class Graphics {
             drawImage(img.scaled(w, h), x, y);
         }
     }
+    
+    
     
     void drawImageWH(Object nativeImage, int x, int y, int w ,int h) {
         impl.drawImage(nativeGraphics, nativeImage, x + xTranslate, y + yTranslate, w, h);
@@ -1319,5 +1331,25 @@ public final class Graphics {
             clearRectImpl(peer.getAbsoluteX(), peer.getAbsoluteY(), peer.getWidth(), peer.getHeight());
         }
         
-    }    
+    }   
+    
+    /**
+     * Sets rendering hints for this context.
+     * @param hints int of rendering hints produced by logical AND on all applicable hints.
+     * @see #RENDERING_HINT_FAST
+     * @see #getRenderingHints() 
+     * @since 7.0
+     */
+    public void setRenderingHints(int hints) {
+        impl.setRenderingHints(nativeGraphics, hints);
+    }
+    
+    /**
+     * Gets the current rendering hints for this context.
+     * @see #RENDERING_HINT_FAST
+     * @return The rendering hints.
+     */
+    public int getRenderingHints() {
+        return impl.getRenderingHints(nativeGraphics);
+    }
 }

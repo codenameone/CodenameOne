@@ -76,8 +76,8 @@ public final class IOSNative {
     native void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
-    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height);
-    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height);
+    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
@@ -397,6 +397,7 @@ public final class IOSNative {
     native long sqlCursorValueAtColumnLong(long statement, int col);
     native short sqlCursorValueAtColumnShort(long statement, int col);
     native String sqlCursorValueAtColumnString(long statement, int col);
+    native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
     
     native int sqlCursorGetColumnCount(long statementPeer);
     

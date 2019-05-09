@@ -6339,6 +6339,30 @@ public abstract class CodenameOneImplementation {
         copyToClipboard(sel.getSelectionAsText());
     }
 
+    /**
+     * Sets the rendering hints for a graphics context.
+     * @param nativeGraphics The native graphics context
+     * @param hints Hints
+     * @see Graphics#RENDERING_HINT_FAST
+     * @since 7.0
+     */
+    public void setRenderingHints(Object nativeGraphics, int hints) {
+        
+    }
+
+    /**
+     * Gets the rendering hints for this graphics context
+     * @param nativeGraphics The native graphics context.
+     * @return The current rendering hints.
+     * @since 7.0
+     * @see Graphics#RENDERING_HINT_FAST
+     */
+    public int getRenderingHints(Object nativeGraphics) {
+        return 0;
+    }
+
+    
+
     
 
     

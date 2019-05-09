@@ -773,7 +773,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y) {
 }
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height);
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints);
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
@@ -786,7 +786,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
 #endif
@@ -816,7 +816,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
 #endif
@@ -1117,7 +1117,7 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
-(void* peer, int alpha, int x, int y, int width, int height) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1545,12 +1545,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];

@@ -341,6 +341,7 @@ public class ImageViewer extends Component {
     @Override
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
+        isPinchZooming = false;
         if(panPositionX > 1) {
             if(panPositionX >= 1 + swipeThreshold && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
@@ -360,6 +361,15 @@ public class ImageViewer extends Component {
             return;
         }
     }
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+        pressX = x;
+        pressY = y;
+        currentZoom = zoom;
+        isPinchZooming = false;
+    }
+    
     
     
     /**
@@ -367,7 +377,6 @@ public class ImageViewer extends Component {
      */
     @Override
     public void pointerDragged(int x, int y) {
-        System.out.println("Dragging");
         // could be a pan
         float distanceX = ((float)pressX - x) / getZoom();
         float distanceY = ((float)pressY - y) / getZoom();
@@ -428,11 +437,14 @@ public class ImageViewer extends Component {
         updatePositions();
     }
     
+    private boolean isPinchZooming;
+    
     /**
      * {@inheritDoc}
      */
     @Override
     protected boolean pinch(float scale) {
+        isPinchZooming = true;
         zoom = currentZoom * scale;
         if(zoom < MIN_ZOOM) {
             zoom = MIN_ZOOM;
@@ -495,7 +507,6 @@ public class ImageViewer extends Component {
         imageX = (int)(s.getPaddingLeftNoRTL()+ (width - imageDrawWidth) * panPositionX);
         imageY = (int)(s.getPaddingTop() + (height - imageDrawHeight) * panPositionY);
         cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
-        System.out.println(cropBox);
     }
     
     /**
@@ -668,7 +679,11 @@ public class ImageViewer extends Component {
             Style s = getStyle();
             int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (panPositionX * -1);
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
             if (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos()) {
                 Image left = getImageLeft();
                 if(swipePlaceholder != null) {
@@ -678,7 +693,11 @@ public class ImageViewer extends Component {
                 }
                 ratio = ratio - width;
                 imageAspectCalc(left);
+                if (isPinchZooming) {
+                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+                }
                 g.drawImage(left, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);            
+                g.setRenderingHints(0);
             }
             return;
         }
@@ -686,7 +705,11 @@ public class ImageViewer extends Component {
             Style s = getStyle();
             int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (1 - panPositionX);
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
             if (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos()) {
                 Image right = getImageRight();
                 if(swipePlaceholder != null) {
@@ -696,13 +719,21 @@ public class ImageViewer extends Component {
                 }
                 ratio = ratio + width;
                 imageAspectCalc(right);
+                if (isPinchZooming) {
+                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+                }
                 g.drawImage(right, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
+                g.setRenderingHints(0);
             }
             return;
         }
         // can happen in the GUI builder
         if(image != null) {
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
         }
     }
     

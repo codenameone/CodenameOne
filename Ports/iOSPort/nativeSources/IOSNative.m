@@ -201,10 +201,10 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableIm
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
-(void* peer, int alpha, int x, int y, int width, int height);
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height);
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
 (void* peer, int alpha, int x, int y, int width, int height);
@@ -944,20 +944,20 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int]
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl((void *)n1, alpha, n2, n3, n4, n5);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints);
     POOL_END();
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int]
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((void *)n1, alpha, n2, n3, n4, n5);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints);
     POOL_END();
     //XMLVM_END_WRAPPER
 }
@@ -5340,6 +5340,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
     return xmlvm_create_UTF8_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
 }
 #endif // NEW_CODENAME_ONE_VM
+
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return (sqlite3_column_type((sqlite3_stmt*)statement, col) == SQLITE_NULL);
+}
+
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
     sqlite3_stmt *stmt = (sqlite3_stmt*)statement;

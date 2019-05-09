@@ -299,7 +299,7 @@ public class Picker extends Button {
                     evt.consume();
                     return;
                 }
-                if (useLightweightPopup && isLightweightModeSupportedForType(type)) {
+                if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
                     return;

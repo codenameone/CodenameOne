@@ -1793,6 +1793,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.nativeDrawImage(nm.peer, ng.alpha, x, y, nm.width, nm.height);
     }
 
+    
+    
+    @Override
+    public void setRenderingHints(Object nativeGraphics, int hints) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        ng.setRenderingHints(hints);
+    }
+
+    @Override
+    public int getRenderingHints(Object nativeGraphics) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        return ng.renderingHints;
+    }
+    
+    
+    
+    
+
     // -------------------------------------------------------------------------
     // METHODS FOR DRAWING SHAPES AND TRANSFORMATIONS
     // -------------------------------------------------------------------------
@@ -2250,11 +2268,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     // END SHAPES AND TRANSFORMATION CODE
     
-    private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height) {
-        nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height);
+    private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+        nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
     }
-    private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height) {
-        nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height);
+    private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+        nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height, renderingHints);
     }
 
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
@@ -4005,6 +4023,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean antialiasedSet;
         private boolean antialiasedText;
         private boolean antialiasedTextSet;
+        int renderingHints;
         
         boolean isAntiAliasingSupported() {
             return true;
@@ -4385,7 +4404,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
-            nativeDrawImageMutable(peer, alpha, x, y, width, height);
+            nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
         }
         
         
@@ -4605,6 +4624,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             } finally {
                 GeneralPath.recycle(path);
             }
+        }
+
+        private void setRenderingHints(int hints) {
+            renderingHints = hints;
+        }
+        
+        private int getRenderingHints() {
+            return renderingHints;
         }
 
         
@@ -4832,7 +4859,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
-            nativeDrawImageGlobal(peer, alpha, x, y, width, height);
+            nativeDrawImageGlobal(peer, alpha, x, y, width, height, renderingHints);
         }
 
         @Override

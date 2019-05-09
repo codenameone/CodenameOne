@@ -58,7 +58,7 @@ public class ImageViewerSample2778 {
             current.show();
             return;
         }
-        String imageURL = "https://image.shutterstock.com/z/stock-photo-headshot-of-middle-age-business-woman-in-studio-isolated-on-grey-421423189.jpg";
+        String imageURL = "https://upload.wikimedia.org/wikipedia/commons/f/f5/Steve_Jobs_Headshot_2010-CROP2.jpg";
         Form hi = new Form("Hi World", new BorderLayout());
         ImageViewer viewer = new ImageViewer();
         Button getCroppedImage = new Button("Get Crop");
