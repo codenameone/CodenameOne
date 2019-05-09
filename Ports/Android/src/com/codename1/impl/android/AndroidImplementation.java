@@ -4231,6 +4231,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             return true;
                                         }
                                 }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyDown(keyCode, event);
+                                }
                                 return super.onKeyDown(keyCode, event);
                             }
 
@@ -4245,6 +4251,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
                                             return true;
                                         }
+                                }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyUp(keyCode, event);
                                 }
                                 return super.onKeyUp(keyCode, event);
                             }
