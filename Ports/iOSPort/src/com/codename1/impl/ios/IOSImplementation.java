@@ -378,7 +378,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public static void foldKeyboard() {
         if(instance.isAsyncEditMode()) {
-            final Component cmp = Display.getInstance().getCurrent().getFocused();
+            Form f = Display.getInstance().getCurrent();
+            
+            final Component cmp = f == null ? null : f.getFocused();
             instance.callHideTextEditor();
             nativeInstance.foldVKB();
 
