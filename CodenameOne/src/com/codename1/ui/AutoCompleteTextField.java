@@ -298,6 +298,9 @@ public class AutoCompleteTextField extends TextField {
 
     private void removePopup() {
         Form f = getComponentForm();
+        if (f == null && popup != null) {
+            f = popup.getComponentForm();
+        }
         if (f != null) {
             Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             Container parent = popup.getParent();
