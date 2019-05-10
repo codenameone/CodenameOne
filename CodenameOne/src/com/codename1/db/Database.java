@@ -266,4 +266,40 @@ public abstract class Database {
      */
     public abstract Cursor executeQuery(String sql) throws IOException;
     
+    /**
+     * Checks if the last value accessed from a given row was null.  Not all platforms
+     * support wasNull().  If the platform does not support it, this will just return false.
+     * 
+     * <p>Check {@link #supportsWasNull(com.codename1.db.Row) } to see if the platform supports
+     * wasNull().</p>
+     * 
+     * <p>Currently wasNull() is supported on UWP, iOS, Android, and JavaSE (Simulator).</p>
+     * @param row The row to check.
+     * @return True if the last value accessed was null.
+     * @throws IOException 
+     * @since 7.0
+     * @see RowExt#wasNull() 
+     * @see #supportsWasNull(com.codename1.db.Row) 
+     */
+    public static boolean wasNull(Row row) throws IOException {
+        if (row instanceof RowExt) {
+            return ((RowExt)row).wasNull();
+        }
+        return false;
+    }
+    
+    /**
+     * Checks to see if the given row supports {@link #wasNull(com.codename1.db.Row) }.
+     * @param row The row to check.
+     * @return True if the row supports wasNull().
+     * @throws IOException 
+     * @since 7.0
+     * @see #wasNull(com.codename1.db.Row) 
+     * @see RowExt#wasNull() 
+     * 
+     */
+    public static boolean supportsWasNull(Row row) throws IOException {
+        return row instanceof RowExt;
+    }
+    
 }

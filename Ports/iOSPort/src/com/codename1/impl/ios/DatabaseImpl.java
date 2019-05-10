@@ -25,6 +25,7 @@ package com.codename1.impl.ios;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
+import com.codename1.db.RowExt;
 import java.io.IOException;
 
 /**
@@ -110,7 +111,7 @@ class DatabaseImpl extends Database {
         return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null));
     }
 
-    class CursorImpl implements Cursor, Row {
+    class CursorImpl implements Cursor, RowExt {
         private long peer;
         private int position = -1;
         private boolean null_last_read_value = true;
@@ -283,7 +284,8 @@ class DatabaseImpl extends Database {
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
         }
         
-        public Boolean wasNull() throws IOException {
+        @Override
+        public boolean wasNull() throws IOException {
             return null_last_read_value;
         }
         

@@ -5,7 +5,7 @@ using SQLitePCL;
 
 namespace com.codename1.impl
 {
-    class WinDBRawCursor : com.codename1.db.Cursor, com.codename1.db.Row
+    class WinDBRawCursor : com.codename1.db.Cursor, com.codename1.db.RowExt
     {
         sqlite3_stmt stmt;
         private int pos=-1;
@@ -150,7 +150,7 @@ namespace com.codename1.impl
 			return (raw.sqlite3_column_type(stmt, i) == raw.SQLITE_NULL); //return (stmt.column_type(i) == raw.SQLITE_NULL);
 		}
 		
-		public bool? wasNull() 
+		public bool wasNull() 
 		{
 			return this.null_last_read_value;
 		}

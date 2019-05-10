@@ -156,7 +156,7 @@ public class ThreadSafeDatabase extends Database {
         });
     }
 
-    private class RowWrapper implements Row {
+    private class RowWrapper implements RowExt {
         private Row underlyingRow;
         public RowWrapper(Row underlyingRow) {
             this.underlyingRow = underlyingRow;
@@ -219,12 +219,12 @@ public class ThreadSafeDatabase extends Database {
         }
         
         
-        public Boolean wasNull()throws IOException{
-             return null;/*return (Boolean)invokeWithException(new RunnableWithResponseOrIOException() {
+        public boolean wasNull()throws IOException{
+             return (Boolean)invokeWithException(new RunnableWithResponseOrIOException() {
                 public Object run() throws IOException {
-                    return underlyingRow.wasNull();
+                    return Database.wasNull(underlyingRow);
                 }
-            }); */
+            });
         }
     }
     
