@@ -220,11 +220,11 @@ public class ThreadSafeDatabase extends Database {
         
         
         public Boolean wasNull()throws IOException{
-             return (Boolean)invokeWithException(new RunnableWithResponseOrIOException() {
+             return null;/*return (Boolean)invokeWithException(new RunnableWithResponseOrIOException() {
                 public Object run() throws IOException {
                     return underlyingRow.wasNull();
                 }
-            }); 
+            }); */
         }
     }
     

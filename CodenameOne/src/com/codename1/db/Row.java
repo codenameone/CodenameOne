@@ -111,5 +111,5 @@ public interface Row {
      * @return true if the last column value read was SQL NULL and false otherwise. If the targeted platform do not support this feature it returns null (meaning we don't now if the latest read value was SQL NULL or not)
      * @throws IOException 
      */
-    public Boolean wasNull()throws IOException;
+    //public Boolean wasNull()throws IOException;
 }

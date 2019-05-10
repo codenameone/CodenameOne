@@ -136,7 +136,6 @@ public class AndroidCursor implements Cursor, Row{
          return c.isNull(index);
     }
     
-    @Override
     public Boolean wasNull() throws IOException {
         if (last_read_column_index<0){return true;}
         return c.isNull(last_read_column_index);

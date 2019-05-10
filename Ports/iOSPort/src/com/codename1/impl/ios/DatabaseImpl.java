@@ -283,7 +283,6 @@ class DatabaseImpl extends Database {
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
         }
         
-        @Override
         public Boolean wasNull() throws IOException {
             return null_last_read_value;
         }
