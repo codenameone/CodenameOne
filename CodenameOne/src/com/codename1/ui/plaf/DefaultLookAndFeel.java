@@ -40,6 +40,10 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.TextSelection;
+import com.codename1.ui.TextSelection.Char;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Rectangle;
@@ -386,6 +390,239 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     public void drawLabel(Graphics g, Label l) {
         drawComponent(g, l, l.getMaskedIcon(), null, 0);
     }
+    
+    public Span calculateLabelSpan(TextSelection sel, Label l) {
+        Image icon = l.getMaskedIcon();
+        Image stateIcon = null;
+        int preserveSpaceForState = 0;
+        //setFG(g, l);
+
+        int gap = l.getGap();
+        int stateIconSize = 0;
+        int stateIconYPosition = 0;
+        String text = l.getText();
+        Style style = l.getStyle();
+        int cmpX = l.getX();
+        int cmpY = l.getY();
+        int cmpHeight = l.getHeight();
+        int cmpWidth = l.getWidth();
+
+        boolean rtl = l.isRTL();
+        int leftPadding = style.getPaddingLeft(rtl);
+        int rightPadding = style.getPaddingRight(rtl);
+        int topPadding = style.getPaddingTop();
+        int bottomPadding = style.getPaddingBottom();
+        
+        Font font = style.getFont();
+        int fontHeight = 0;
+        if (text == null) {
+            text = "";
+        }
+        if(text.length() > 0){
+            fontHeight = font.getHeight();
+        }
+        
+        int x = cmpX + leftPadding;
+        int y = cmpY + topPadding;
+        boolean opposite = false;
+        if (stateIcon != null) {
+            stateIconSize = stateIcon.getWidth(); //square image width == height
+            preserveSpaceForState = stateIconSize + gap;
+            stateIconYPosition = cmpY + topPadding
+                    + (cmpHeight - topPadding
+                    - bottomPadding) / 2 - stateIconSize / 2;
+            int tX = cmpX;
+            if (((Button) l).isOppositeSide()) {
+                if (rtl) {
+                    tX += leftPadding;
+                } else {
+                    tX = tX + cmpWidth - leftPadding - stateIconSize;
+                }
+                cmpWidth -= leftPadding - stateIconSize;
+                preserveSpaceForState = 0;
+                opposite = true;
+            } else {
+                x = cmpX + leftPadding + preserveSpaceForState;
+                if (rtl) {
+                    tX = tX + cmpWidth - leftPadding - stateIconSize;
+                } else {
+                    tX += leftPadding;
+                }
+            }
+
+            //g.drawImage(stateIcon, tX, stateIconYPosition);
+        }
+
+        //default for bottom left alignment
+        int align = reverseAlignForBidi(l, style.getAlignment());
+
+        int textPos= reverseAlignForBidi(l, l.getTextPosition());
+
+        //set initial x,y position according to the alignment and textPosition
+        if (align == Component.LEFT) {
+            switch (textPos) {
+                case Label.LEFT:
+                case Label.RIGHT:
+                    y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? icon.getHeight() : 0), fontHeight))) / 2;
+                    break;
+                case Label.BOTTOM:
+                case Label.TOP:
+                    y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
+                    break;
+            }
+        } else if (align == Component.CENTER) {
+            switch (textPos) {
+                case Label.LEFT:
+                case Label.RIGHT:
+                    x = x + (cmpWidth - (preserveSpaceForState +
+                            leftPadding +
+                            rightPadding +
+                            ((icon != null) ? icon.getWidth() + l.getGap() : 0) +
+                            l.getStringWidth(font))) / 2;
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
+                    y = y + (cmpHeight - (topPadding +
+                            bottomPadding +
+                            Math.max(((icon != null) ? icon.getHeight() : 0),
+                            fontHeight))) / 2;
+                    break;
+                case Label.BOTTOM:
+                case Label.TOP:
+                    x = x + (cmpWidth - (preserveSpaceForState + leftPadding +
+                            rightPadding +
+                            Math.max(((icon != null) ? icon.getWidth() : 0),
+                            l.getStringWidth(font)))) / 2;
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
+                    y = y + (cmpHeight - (topPadding +
+                            bottomPadding +
+                            ((icon != null) ? icon.getHeight() + gap : 0) +
+                            fontHeight)) / 2;
+                    break;
+            }
+        } else if (align == Component.RIGHT) {
+            switch (textPos) {
+                case Label.LEFT:
+                case Label.RIGHT:
+                    x = cmpX + cmpWidth - rightPadding -
+                            ( ((icon != null) ? (icon.getWidth() + gap) : 0) +
+                            l.getStringWidth(font));
+                    if(l.isRTL()) {
+                        if(!opposite){
+                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
+                        }else{
+                            x = Math.min(x - preserveSpaceForState, cmpX + leftPadding);                        
+                        }
+                    } else {
+                        if(!opposite){
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        }else{
+                            x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                        
+                        }
+                    }
+                    y = y + (cmpHeight - (topPadding +
+                            bottomPadding +
+                            Math.max(((icon != null) ? icon.getHeight() : 0),
+                            fontHeight))) / 2;
+                    break;
+                case Label.BOTTOM:
+                case Label.TOP:
+                    x = cmpX + cmpWidth - rightPadding -
+                             (Math.max(((icon != null) ? (icon.getWidth()) : 0),
+                            l.getStringWidth(font)));
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
+                    
+                    y = y + (cmpHeight - (topPadding +
+                            bottomPadding +
+                            ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
+                    break;
+            }
+        }
+
+
+        int textSpaceW = cmpWidth - rightPadding - leftPadding;
+
+        if (icon != null && (textPos == Label.RIGHT || textPos == Label.LEFT)) {
+            textSpaceW = textSpaceW - icon.getWidth();
+        }
+
+        if (stateIcon != null) {
+            textSpaceW = textSpaceW - stateIconSize;
+        } else {
+            textSpaceW = textSpaceW - preserveSpaceForState;
+        }
+
+        if (icon == null) { // no icon only string 
+            return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
+        } else {
+            int strWidth = l.getStringWidth(font);
+            int iconWidth = icon.getWidth();
+            int iconHeight = icon.getHeight();
+            int iconStringWGap;
+            int iconStringHGap;
+
+            switch (textPos) {
+                case Label.LEFT:
+                    if (iconHeight > fontHeight) {
+                        iconStringHGap = (iconHeight - fontHeight) / 2;
+                        return calculateSpanForLabelStringValign(sel, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                    } else {
+                        iconStringHGap = (fontHeight - iconHeight) / 2;
+                        //strWidth = drawLabelString(l, text, x, y, textSpaceW);
+                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
+                        //g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
+                    }
+
+                case Label.RIGHT:
+                    if (iconHeight > fontHeight) {
+                        iconStringHGap = (iconHeight - fontHeight) / 2;
+                        //g.drawImage(icon, x, y);
+                        return calculateSpanForLabelStringValign(sel, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                    } else {
+                        iconStringHGap = (fontHeight - iconHeight) / 2;
+                        //g.drawImage(icon, x, y + iconStringHGap);
+                        return calculateSpanForLabelString(sel, l, text, x + iconWidth + gap, y, textSpaceW);
+                    }
+
+                case Label.BOTTOM:
+                    if (iconWidth > strWidth) { //center align the smaller
+
+                        iconStringWGap = (iconWidth - strWidth) / 2;
+                        //g.drawImage(icon, x, y);
+                        return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);
+                    } else {
+                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
+                        //g.drawImage(icon, x + iconStringWGap, y);
+                        
+                        return calculateSpanForLabelString(sel, l, text, x, y + iconHeight + gap, textSpaceW);
+                    }
+
+                case Label.TOP:
+                    if (iconWidth > strWidth) { //center align the smaller
+
+                        iconStringWGap = (iconWidth - strWidth) / 2;
+                        return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y, textSpaceW);
+                        //g.drawImage(icon, x, y + fontHeight + gap);
+                    } else {
+                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
+                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
+                        //g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
+                    }
+
+            }
+        }
+        return sel.newSpan(l);
+    }
 
     /**
      * {@inheritDoc}
@@ -551,7 +788,119 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public void drawList(Graphics g, List l) {
     }
+    
+    private int getSelectionHeight(Font f) {
+        return f.getHeight() + (int)(f.getHeight() * 0.2);
+        //return f.getHeight() + f.getDescent();
+    }
+    
+    private void append(TextSelection sel, Component l, Span span, String text, Font f, int posOffset, int x, int y, int h) {
+        int len = text.length();
+        int xPos = 0;
+        int curPos = 1;
+        //int h = f.getHeight() + (int)(f.getHeight() * 0.25);
+        //y -= (int)(f.getHeight() * 0.25);
+        //int tx = l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX();
+        //int ty = l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY();
+        while (curPos <= len) {
+            int newXpos = f.stringWidth(text.substring(0, curPos));
+            Char next = sel.newChar(posOffset + curPos-1, x + xPos, y, newXpos - xPos, h);
+            span.add(next);
+            xPos = newXpos;
+            curPos++;
+        }
+    }
 
+    @Override
+    public Spans calculateTextAreaSpan(TextSelection sel, TextArea ta) {
+        Spans out = sel.newSpans();
+        //setFG(g, ta);
+        //Span out = sel.newSpan(ta);
+        int line = ta.getLines();
+        //int oX = g.getClipX();
+        //int oY = g.getClipY();
+        //int oWidth = g.getClipWidth();
+        //int oHeight = g.getClipHeight();
+        Font f = ta.getStyle().getFont();
+        int fontHeight = f.getHeight();
+
+        int align = reverseAlignForBidi(ta);
+
+        int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());
+        int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());
+        int topPadding = ta.getStyle().getPaddingTop();
+        switch (ta.getVerticalAlignment()) {
+            case Component.CENTER :
+                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line)/2);
+                break;
+            case Component.BOTTOM :
+                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line));
+        }
+        //boolean shouldBreak = false;
+        int posOffset = 0;
+        int lastRowBottom = 0;
+        for (int i = 0; i < line; i++) {
+            Span rowSpan = sel.newSpan(ta);
+            int x = ta.getX() + leftPadding;
+            int y = ta.getY() +  topPadding +
+                    (ta.getRowsGap() + fontHeight) * i;
+            int adjustedY = Math.max(y, lastRowBottom);
+            int yDiff = adjustedY - y;
+            y = adjustedY;
+            
+            //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
+                
+                String rowText = (String) ta.getTextAt(i);
+                //display ******** if it is a password field
+                String displayText = "";
+                if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
+                    int rlen = rowText.length();
+                    for (int j = 0; j < rlen; j++) {
+                        displayText += passwordChar;
+                    }
+                } else {
+                    displayText = rowText;
+                }
+                posOffset = ta.getText().indexOf(rowText, posOffset);
+                switch(align) {
+                    case Component.RIGHT:
+                		x = ta.getX() + ta.getWidth() - rightPadding - f.stringWidth(displayText);
+                        break;
+                    case Component.CENTER:
+                        x+= (ta.getWidth()-leftPadding-rightPadding-f.stringWidth(displayText))/2;
+                        break;
+                }
+                //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
+                //if this is the last line to display and there is more content and isEndsWith3Points() is true
+                //add "..." at the last row
+                if(ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line){
+                    if(displayText.length() > 3){
+                        displayText = displayText.substring(0, displayText.length() - 3);
+                    }
+                    //g.drawString(displayText + "...", x, y ,ta.getStyle().getTextDecoration()); 
+                    append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f) - yDiff);
+                    lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
+                    rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+                    out.add(rowSpan);
+                    return out;
+                }else{            
+                    //g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
+                    append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);
+                    lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
+                    rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+                    out.add(rowSpan);
+                }
+                posOffset += displayText.length();
+                //shouldBreak = true;
+            //}else{
+            //    if(shouldBreak){
+            //        break;
+            //    }
+            //}
+        }
+        return out;
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -1203,6 +1552,18 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceW);
         }
     }
+    
+    private Span calculateSpanForLabelStringValign(TextSelection sel, Label l, String str, int x, int y,
+            int iconStringHGap, int iconHeight, int textSpaceW, int fontHeight) {
+        switch (l.getVerticalAlignment()) {
+            case Component.TOP:
+                return calculateSpanForLabelString(sel, l, str, x, y, textSpaceW);
+            case Component.CENTER:
+                return calculateSpanForLabelString(sel, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW);
+            default:
+                return calculateSpanForLabelString(sel, l, str, x, y + iconStringHGap, textSpaceW);
+        }
+    }
 
     /**
      * Implements the drawString for the text component and adjust the valign
@@ -1234,6 +1595,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         //g.popClip();
 
         return drawnW;
+    }
+    
+    private Span calculateSpanForLabelString(TextSelection sel, Label l, String text, int x, int y, int textSpaceW) {
+        Style style = l.getStyle();
+
+        
+
+        if (l.isTickerRunning()) {
+            Font font = style.getFont();
+            if (l.getShiftText() > 0) {
+                if (l.getShiftText() > textSpaceW) {
+                    l.setShiftText(x - l.getX() - l.getStringWidth(font));
+                }
+            } else if (l.getShiftText() + l.getStringWidth(font) < 0) {
+                l.setShiftText(textSpaceW);
+            }
+        }
+        return calculateSpanForLabelText(sel, l, text, x, y, textSpaceW);
+
     }
 
     /**
@@ -1355,6 +1735,116 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return displayText;
     }
     
+    public Spans calculateTextFieldSpan(TextSelection sel, TextArea ta) {
+        //setFG(g, ta);
+        Span out = sel.newSpan(ta);
+        // display ******** if it is a password field
+        String displayText = getTextFieldString(ta);
+
+        Style style = ta.getStyle();
+        int x = 0;
+        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        
+        Font f = style.getFont();
+        int cursorX = 0;
+        int xPos = 0;
+        
+        int align = reverseAlignForBidi(ta);
+        int displayX = 0;
+
+        String inputMode = ta.getInputMode();
+        int inputModeWidth = f.stringWidth(inputMode);
+
+        // QWERTY devices don't quite have an input mode hide it also when we have a VK
+        if(!Display.getInstance().platformUsesInputMode() || ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {
+            inputMode = "";
+            inputModeWidth = 0;
+        }
+        if (ta.isSingleLineTextArea()) {
+            // there is currently no support for CENTER aligned text fields
+            if (align == Component.LEFT) {
+                if (cursorCharPosition > 0) {
+                    cursorCharPosition = Math.min(displayText.length(), 
+                        cursorCharPosition);
+                    xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));
+                    cursorX = ta.getX() + style.getPaddingLeft(ta.isRTL()) + xPos;
+
+                    // no point in showing the input mode when there is only one input mode...
+                    if (inputModeWidth > 0 && ta.getInputModeOrder() != null && ta.getInputModeOrder().length == 1) {
+                        inputModeWidth = 0;
+                    }
+                    if (ta.isEnableInputScroll()) {
+                        if (ta.getWidth() > (f.getHeight() * 2) && cursorX >= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL())) {
+                            if (x + xPos >= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2) {
+                                x=ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2 - xPos - 1;
+                            }
+                        }
+                    }
+                }
+                displayX = ta.getX() + x + style.getPaddingLeft(ta.isRTL());
+            } else {
+                x = 0;
+                cursorX = getTextFieldCursorX(ta);
+                int baseX = ta.getX() + style.getPaddingLeftNoRTL() + inputModeWidth;
+                int endX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL();
+
+                if (cursorX < baseX) {
+                    x = baseX - cursorX;
+                } else {
+                    if (cursorX > endX) {
+                        x = endX - cursorX;
+                    }
+                }
+
+                displayX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL() - style.getPaddingLeftNoRTL() - f.stringWidth(displayText) + x;
+            }
+
+            //int cx = g.getClipX();
+            //int cy = g.getClipY();
+            //int cw = g.getClipWidth();
+            //int ch = g.getClipHeight();
+            //int clipx = ta.getX() + style.getPaddingLeft(ta.isRTL());
+            //int clipw = ta.getWidth() - style.getPaddingLeft(ta.isRTL()) - style.getPaddingRight(ta.isRTL());
+            //g.pushClip();
+            //g.clipRect(clipx, cy, clipw, ch);
+
+            //int xOffset = 0;
+            //int len = displayText.length();
+            //int charH = f.getHeight();
+            int h = getSelectionHeight(f);
+            switch(ta.getVerticalAlignment()) {
+                case Component.BOTTOM:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), style.getTextDecoration());
+                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - h, h);
+                   // c = sel.newChar(i, charX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), charW , charH);
+                    break;
+                case Component.CENTER:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, charW, charH);
+                    append(sel, ta, out, displayText, f, 0, displayX,  ta.getY() + ta.getHeight() / 2  - h / 2, h);
+                    break;
+                default:
+                    //g.drawString(displayText, displayX, ta.getY() + style.getPaddingTop(), style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + style.getPaddingTop(), charW, charH);
+                    append(sel, ta, out, displayText, f, 0, displayX,  ta.getY() + style.getPaddingTop(), h);
+                    break;
+            }
+            
+            
+            //g.setClip(cx, cy, cw, ch);
+            //g.popClip();
+            out = out.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
+            Spans spansOut = sel.newSpans();
+            spansOut.add(out);
+            return spansOut;
+            
+        } else {
+            //drawTextArea(g, ta);
+            return calculateTextAreaSpan(sel, ta);
+        }
+        
+    }
+    
+    
     /**
      * {@inheritDoc}
      */
@@ -1366,7 +1856,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         Style style = ta.getStyle();
         int x = 0;
-        int cursorCharPosition = ta.getCursorPosition();//ta.getCursorX();        
+        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        
         Font f = style.getFont();
         int cursorX = 0;
         int xPos = 0;
@@ -1860,5 +2350,69 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
+    }
+
+   
+    public Span calculateSpanForLabelText(TextSelection sel, Label l, String text, int x, int y, int textSpaceW) {
+        
+        Span span = sel.newSpan(l);
+        Style style = l.getStyle();
+        Font f = style.getFont();
+        int h = f.getHeight() + (int)(f.getHeight() * 0.25);
+        y -= (int)(f.getHeight() * 0.25);
+        boolean rtl = l.isRTL();
+        boolean isTickerRunning = l.isTickerRunning();
+        int txtW = l.getStringWidth(f);
+        int curPos = text.length();
+        if ((!isTickerRunning) || rtl) {
+            //if there is no space to draw the text add ... at the end
+            if (txtW > textSpaceW && textSpaceW > 0) {
+            	// Handling of adding 3 points and in fact all text positioning when the text is bigger than
+            	// the allowed space is handled differently in RTL, this is due to the reverse algorithm
+            	// effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+            	// trimming characters from the end of the text (as done with LTR) won't do.
+            	// Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+            	// the downside is that a part of a letter may be shown here as well.
+
+            	if (rtl) {
+                	if ((!isTickerRunning) && (l.isEndsWith3Points())) {
+	            		String points = "...";
+	                	int pointsW = f.stringWidth(points);
+                                //xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));
+	            		//g.drawString(points, l.getShiftText() + x, y,l.getStyle().getTextDecoration());
+	            		//g.clipRect(pointsW+l.getShiftText() + x, y, textSpaceW - pointsW, f.getHeight());
+                                Char nextChar = sel.newChar(curPos, pointsW+l.getShiftText() + x, y, textSpaceW - pointsW, h);
+                                span.add(nextChar);
+                	}
+            		x = x - txtW + textSpaceW;
+                } else {
+                    if (l.isEndsWith3Points()) {
+                        String points = "...";
+                        int index = 1;
+                        int widest = f.charWidth('W');
+                        int pointsW = f.stringWidth(points);
+                        int tlen = text.length();
+                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, f) && index < tlen){
+                            index++;
+                        }
+                        text = text.substring(0, Math.min(text.length(), Math.max(1, index-1))) + points;
+                        txtW =  f.stringWidth(text);
+                    }
+                }
+            }
+        }
+
+        int len = text.length();
+        int xPos = 0;
+        curPos = 1;
+        while (curPos <= len) {
+            int newXpos = f.stringWidth(text.substring(0, curPos));
+            Char next = sel.newChar(curPos-1, l.getShiftText() + x + xPos, y, newXpos - xPos, h);
+            span.add(next);
+            xPos = newXpos;
+            curPos++;
+        }
+        //System.out.println("Span: "+span);
+        return span.translate(l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX(), l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY());
     }
 }

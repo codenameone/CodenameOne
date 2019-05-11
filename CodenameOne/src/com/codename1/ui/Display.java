@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
@@ -51,6 +52,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -156,7 +158,14 @@ public final class Display extends CN1Constants {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     
-
+    /**
+     * Enable Async stack traces.  This is disabled by default, but will cause
+     * stack traces of callSerially() calls to be stored, and logged if the 
+     * Runnable throws an exception.
+     */
+    private boolean enableAsyncStackTraces;
+    
+    
     /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
@@ -670,6 +679,102 @@ public final class Display extends CN1Constants {
         impl.playDialogSound(type);
     }
 
+    private DebugRunnable currentEdtContext;
+
+    
+    
+    
+    
+    private class EdtException extends RuntimeException {
+        private Throwable cause;
+        private EdtException parent;
+        public void setCause(Throwable t) {
+            this.cause = t;
+        }
+
+        public synchronized Throwable getCause() {
+            return cause;
+        }
+        
+        private void throwRoot(Throwable cause) {
+            EdtException root = this;
+            root.setCause(cause);
+            while (root.parent != null) {
+                root.parent.setCause(root);
+                root = root.parent;
+            }
+            throw root;
+        }
+        
+    }
+    
+    /**
+     * A wrapper around Runnable that records the stack trace so that
+     * if an exception occurs, it is easier to track it back to the original
+     * source.
+     */
+    private class DebugRunnable implements Runnable {
+        private final Runnable internal;
+        private final EdtException exceptionWrapper;
+        private final DebugRunnable parentContext;
+        
+        DebugRunnable(Runnable internal) {
+            this.internal = internal;
+            this.parentContext = currentEdtContext;
+            if (isEnableAsyncStackTraces()) {
+                exceptionWrapper = new EdtException();
+                if (parentContext != null) {
+                    exceptionWrapper.parent = parentContext.exceptionWrapper;
+                }
+            } else {
+                exceptionWrapper = null;
+            }
+        }
+        
+        @Override
+        public void run() {
+            if (exceptionWrapper != null) {
+                try {
+                    currentEdtContext = this;
+                    internal.run();
+                } catch (RuntimeException t) {
+                    exceptionWrapper.throwRoot(t);
+                }
+            } else {
+                internal.run();
+            }
+        }
+        
+    }
+    
+    
+    /**
+     * Checks if async stack traces are enabled.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @return Whether async stack traces are enabled.  
+     * @see #setEnableAsyncStackTraces(boolean) 
+     * @since 7.0
+     */
+    public boolean isEnableAsyncStackTraces() {
+        return enableAsyncStackTraces;
+    }
+
+    /**
+     * Enables or disables async stack traces.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * 
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @param enableAsyncStackTraces True to enable async stack traces.  
+     * @see #isEnableAsyncStackTraces() 
+     * @since 7.0
+     */
+    public void setEnableAsyncStackTraces(boolean enableAsyncStackTraces) {
+        this.enableAsyncStackTraces = enableAsyncStackTraces;
+    }
+    
     /**
      * Causes the runnable to be invoked on the event dispatch thread. This method
      * returns immediately and will not wait for the serial call to occur
@@ -680,7 +785,7 @@ public final class Display extends CN1Constants {
     public void callSerially(Runnable r){
         if(codenameOneRunning) {
             synchronized(lock) {
-                pendingSerialCalls.add(r);
+                pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
@@ -708,6 +813,10 @@ public final class Display extends CN1Constants {
         }
     }
 
+    public String getLineSeparator() {
+        return impl.getLineSeparator();
+    }
+    
     /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
@@ -1623,6 +1732,15 @@ public final class Display extends CN1Constants {
      */
     public boolean isAltGraphKeyDown() {
         return impl.isAltGraphKeyDown();
+    }
+    
+    /**
+     * Checks if the last mouse press was a right click.
+     * @return True if the last mouse press was a right click.
+     * @since 7.0
+     */
+    public boolean isRightMouseButtonDown() {
+        return impl.isRightMouseButtonDown();
     }
     
     /**
@@ -3158,6 +3276,19 @@ public final class Display extends CN1Constants {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
+    
+    /**
+     * Creates media asynchronously.
+     *
+     * @param uri the platform specific location for the sound
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @since 7.0
+     */
+    public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
+        return impl.createMediaAsync(uri, video, onCompletion);
+    }
+
 
     /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
@@ -3193,6 +3324,11 @@ public final class Display extends CN1Constants {
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return impl.createMedia(stream, mimeType, onCompletion);
+    }
+
+    public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+        return impl.createMediaAsync(stream, mimeType, onCompletion);
+        
     }
 
 
@@ -3434,6 +3570,21 @@ hi.show();}</pre></noscript>
      */
     public void captureVideo(ActionListener response) {
         impl.captureVideo(response);
+    }
+    
+    /**
+     * Same as {@link #captureVideo(com.codename1.ui.events.ActionListener) }, except that it
+     * attempts to impose constraints on the capture.  Constraints include width, height, 
+     * and max length.  Not all platforms support capture constraints.  Use the {@link VideoCaptureConstraints#isSupported()}
+     * to see if a constraint is supported.  If constraints are not supported at all, then this method 
+     * will fall back to calling {@link #captureVideo(com.codename1.ui.events.ActionListener) }.
+     * @param constraints Capture constraints to use.
+     * @param response a callback Object to retrieve the file path
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        impl.captureVideo(constraints, response);
     }
     
     /**
@@ -4318,6 +4469,21 @@ hi.show();}</pre></noscript>
     public Media createBackgroundMedia(String uri) throws IOException{
         return impl.createBackgroundMedia(uri);
     }
+    
+    /**
+     * Creates an audio media that can be played in the background.  This call is
+     * asynchronous, so that it will return perhaps before the media object is ready.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media or null if background playing is not supported on the platform
+     * 
+     */ 
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        return impl.createBackgroundMediaAsync(uri);
+    }
 
     /**
      * Create a blur image from the given image.
@@ -4428,5 +4594,7 @@ hi.show();}</pre></noscript>
     public void onCanInstallOnHomescreen(Runnable r) {
         impl.onCanInstallOnHomescreen(r);
     }
+
+    
 
 }

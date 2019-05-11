@@ -26,6 +26,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.net.URL;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -47,12 +49,12 @@ class ClassPathLoader extends ClassLoader {
     }
 
     public Class loadClass(String className) throws ClassNotFoundException {
-        if (className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
+        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
             return super.loadClass(className);
         }
         return findClass(className);
     }
-
+    
     public Class findClass(String className) throws ClassNotFoundException {
         byte[] classByte;
         Class result = null;

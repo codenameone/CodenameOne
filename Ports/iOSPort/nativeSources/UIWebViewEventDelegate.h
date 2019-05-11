@@ -23,8 +23,17 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import "CodenameOne_GLViewController.h"
+#ifdef ENABLE_WKWEBVIEW
+#import <WebKit/WebKit.h>
+#import <WebKit/WKNavigationDelegate.h>
+#endif
 
-@interface UIWebViewEventDelegate : NSObject<UIWebViewDelegate>{
+@interface UIWebViewEventDelegate : NSObject<UIWebViewDelegate
+#ifdef ENABLE_WKWEBVIEW
+        ,WKNavigationDelegate, WKUIDelegate
+#endif
+>{
     void *c;
 }
 

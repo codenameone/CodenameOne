@@ -883,15 +883,16 @@ public class LayeredLayout extends Layout {
             }
         }
     }
-    
-    /**
+     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         int maxWidth = 0;
         int maxHeight = 0;
         int numOfcomponents = parent.getComponentCount();
         tmpLaidOut.clear();
+        boolean requiresSecondPassToCalculatePercentInsets = false;
         for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
             calcPreferredValues(cmp);
@@ -899,11 +900,21 @@ public class LayeredLayout extends Layout {
             int vInsets = 0;
             int hInsets = 0;
             if (constraint != null) {
+                if (!requiresSecondPassToCalculatePercentInsets) {
+                    for (Inset ins : constraint.insets) {
+                        if (ins.unit == UNIT_PERCENT && ins.referenceComponent == null) {
+                            requiresSecondPassToCalculatePercentInsets = true;
+                            break;
+                        }
+                    }
+                }
                 vInsets += constraint.insets[Component.TOP].preferredValue
                         + constraint.insets[Component.BOTTOM].preferredValue;
                 hInsets += constraint.insets[Component.LEFT].preferredValue
                         + constraint.insets[Component.RIGHT].preferredValue;
-                
+                /*
+                // Commenting all this stuff out because the calcPreferredValues() call should
+                // take all of this into account already.
                 Component topRef = constraint.top().getReferenceComponent();
                 LayeredLayoutConstraint currConstraint = constraint;
                 int maxIterations = numOfcomponents;
@@ -943,6 +954,7 @@ public class LayeredLayout extends Layout {
                     currConstraint = getOrCreateConstraint(rightRef);
                     rightRef = currConstraint.right().getReferenceComponent();
                 }
+                */
                 
             }
             maxHeight = Math.max(maxHeight, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom() + vInsets);
@@ -963,6 +975,52 @@ public class LayeredLayout extends Layout {
             int minH = Display.getInstance().convertToPixels(preferredHeightMM);
             if (d.getHeight() < Display.getInstance().convertToPixels(preferredHeightMM)) {
                 d.setHeight(minH);
+            }
+        }
+        
+        if (requiresSecondPassToCalculatePercentInsets) {
+            // We will do a second pass to deal with percent unit insets
+            // since these were set to have zero preferred sizes in the calculation.
+            // This is still a bit of a hack as it only deals with components that
+            // don't depend on any other components.  E.g. If we have a label that is 
+            // supposed to have a top inset of 75%.  The preferred height should then
+            // be 4 times the preferred height of the label rather than just the 
+            // preferred height of the label itself.  
+            // This still doesn't deal with the case where there is another label
+            // that references that label and has an inset of an additional 20%
+            // Ref https://github.com/codenameone/CodenameOne/issues/2720
+            float maxHRatio = 0;
+            float maxWRatio = 0;
+            for (int i=0; i< numOfcomponents; i++) {
+                Component cmp = parent.getComponentAt(i);
+                LayeredLayoutConstraint constraint = (LayeredLayoutConstraint) getComponentConstraint(cmp);
+                if (constraint != null) {
+                    float hRatio = 0;
+                    if (constraint.top().unit == UNIT_PERCENT && constraint.top().referenceComponent == null) {
+                        hRatio += constraint.top().value / 100f;
+                    }
+                    if (constraint.bottom().unit == UNIT_PERCENT && constraint.bottom().referenceComponent == null) {
+                        hRatio += constraint.bottom().value / 100f;
+                    }
+                    hRatio = Math.min(1f, hRatio);
+                    maxHRatio = Math.max(maxHRatio, hRatio);
+
+                    float wRatio = 0;
+                    if (constraint.left().unit == UNIT_PERCENT && constraint.left().referenceComponent == null) {
+                        wRatio += constraint.left().value / 100f;
+                    }
+                    if (constraint.right().unit == UNIT_PERCENT && constraint.right().referenceComponent == null) {
+                        wRatio += constraint.right().value / 100f;
+                    }
+                    wRatio = Math.min(1f, wRatio);
+                    maxWRatio = Math.max(maxWRatio, wRatio);
+                }
+            }
+            if (maxHRatio > 0 && maxHRatio <1) {
+                d.setHeight((int)Math.round(d.getHeight()/(1-maxHRatio)));
+            }
+            if (maxWRatio > 0 && maxWRatio <1) {
+                d.setWidth((int)Math.round(d.getWidth()/(1-maxWRatio)));
             }
         }
         return d;
@@ -2389,7 +2447,7 @@ public class LayeredLayout extends Layout {
              * @return The preferred value of this inset in pixels.
              */
             public int calcPreferredValue(Container parent, Component cmp) {
-
+            
                 if (referenceComponent == null) {
                     // There is no reference component for this inset so we measure
                     // against the parent component directly.

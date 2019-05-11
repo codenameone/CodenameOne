@@ -109,6 +109,7 @@ import android.view.View.MeasureSpec;
 import android.webkit.*;
 import android.widget.*;
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -1076,6 +1077,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         HttpURLConnection.setFollowRedirects(false);
         CookieHandler.setDefault(null);
+        VideoCaptureConstraints.init(new AndroidVideoCaptureConstraintsCompiler());
     }
 
 
@@ -2024,7 +2026,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 fis.close();
 
                 //fix rotation
-                ExifInterface exif = new ExifInterface(path);
+                ExifInterface exif = new ExifInterface(removeFilePrefix(path));
                 int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 
                 int angle = 0;
@@ -4229,6 +4231,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             return true;
                                         }
                                 }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyDown(keyCode, event);
+                                }
                                 return super.onKeyDown(keyCode, event);
                             }
 
@@ -4243,6 +4251,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
                                             return true;
                                         }
+                                }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyUp(keyCode, event);
                                 }
                                 return super.onKeyUp(keyCode, event);
                             }
@@ -5122,7 +5136,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         s.setUserAgentString((String)value);
                         return;
                     }
-                    s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    try {
+                        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    } catch(Throwable t) {
+                        // the method isn't available in Android 4.x
+                    }
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
                         if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 1) {
@@ -5942,6 +5960,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
+        }
         return file;
     }
 
@@ -6218,7 +6239,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int getSMSSupport() {
         if(canDial()) {
-            return Display.SMS_BOTH;
+            return Display.SMS_INTERACTIVE;
         }
         return Display.SMS_NOT_SUPPORTED;
     }
@@ -6227,9 +6248,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
-        if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
+        /*if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
             return;
-        }
+        }*/
         if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to send a SMS")){
             return;
         }
@@ -6247,11 +6268,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             getContext().startActivity(smsIntent);
 
-        } else {
+        } /*else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);
             sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
-        }
+        }*/
     }
 
     @Override
@@ -7115,7 +7136,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     String lastId = (String)pathandId.get(1);
                     Storage.getInstance().deleteStorageFile("imageUri");
                     clearMediaDB(lastId, path);
-                    callback.fireActionEvent(new ActionEvent(path));
+                    callback.fireActionEvent(new ActionEvent(addFile(path)));
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -7123,12 +7144,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (requestCode == CAPTURE_VIDEO) {
                 String path = (String) Storage.getInstance().readObject("videoUri");
                 Storage.getInstance().deleteStorageFile("videoUri");
-                callback.fireActionEvent(new ActionEvent(path));
+                callback.fireActionEvent(new ActionEvent(addFile(path)));
                 return;
             } else if (requestCode == CAPTURE_AUDIO) {
                 Uri data = intent.getData();
                 String path = convertImageUriToFilePath(data, getContext());
-                callback.fireActionEvent(new ActionEvent(path));
+                callback.fireActionEvent(new ActionEvent(addFile(path)));
                 return;
                 
             } else if (requestCode == OPEN_GALLERY_MULTI) {
@@ -7312,6 +7333,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void captureVideo(ActionListener response) {
+        captureVideo(null, response);
+    }
+    
+    @Override
+    public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture video in background mode");
         }
@@ -7332,8 +7358,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
+        if (cnst != null) {
+            switch (cnst.getQuality()) {
+                case VideoCaptureConstraints.QUALITY_LOW:
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 0);
+                    break;
+                case VideoCaptureConstraints.QUALITY_HIGH:
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+                    break;
+            }
+            
+            if (cnst.getMaxFileSize() > 0) {
+                intent.putExtra(MediaStore.EXTRA_SIZE_LIMIT, cnst.getMaxFileSize());
+            }
+            if (cnst.getMaxLength() > 0) {
+                intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, cnst.getMaxLength());
+            }
+        }
+        
 
         File newFile = getOutputMediaFile(true);
+        newFile.getParentFile().mkdirs();
+        newFile.getParentFile().setWritable(true, false);
         Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
 
         Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());
@@ -7806,7 +7852,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     BitmapFactory.decodeStream(fis, null, o);
                     fis.close();
 
-                    ExifInterface exif = new ExifInterface(imageFilePath);
+                    ExifInterface exif = new ExifInterface(removeFilePrefix(imageFilePath));
 
                     // if the image is in portrait mode
                     int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
@@ -7841,7 +7887,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException{
-                    ExifInterface exif = new ExifInterface(imageFilePath);
+                    ExifInterface exif = new ExifInterface(removeFilePrefix(imageFilePath));
                     Dimension d = getImageSizeNoRotation(imageFilePath);
                     if(onlyDownscale) {
                         if(scaleToFill) {
@@ -9520,13 +9566,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
 
             RenderScript rs = RenderScript.create(getContext());
-            ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-            Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
-            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
-            theIntrinsic.setRadius(radius);
-            theIntrinsic.setInput(tmpIn);
-            theIntrinsic.forEach(tmpOut);
-            tmpOut.copyTo(outputBitmap);
+            try {
+                ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+                Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+                Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+                theIntrinsic.setRadius(radius);
+                theIntrinsic.setInput(tmpIn);
+                theIntrinsic.forEach(tmpOut);
+                tmpOut.copyTo(outputBitmap);
+                tmpIn.destroy();
+                tmpOut.destroy();
+                theIntrinsic.destroy();
+            } finally {
+                rs.destroy();
+            }
 
             return new NativeImage(outputBitmap);
         } catch(Throwable t) {

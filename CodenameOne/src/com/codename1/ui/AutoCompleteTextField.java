@@ -58,6 +58,7 @@ public class AutoCompleteTextField extends TextField {
     private boolean dontCalcSize = false;
     private FilterProxyListModel<String> filter;
     private ActionListener listener = new FormPointerListener();
+    private ActionListener pressListener = new FormPointerPressListener();
     private ListCellRenderer completionRenderer;
     private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
     private String pickedText;
@@ -130,6 +131,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void initComponent() {
         super.initComponent();
+        getComponentForm().addPointerPressedListener(pressListener);
         getComponentForm().addPointerReleasedListener(listener);
         Display.getInstance().callSerially(new Runnable() {
 
@@ -146,6 +148,7 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void deinitialize() {
         super.deinitialize();
+        getComponentForm().removePointerPressedListener(pressListener);
         getComponentForm().removePointerReleasedListener(listener);
         Display.getInstance().callSerially(new Runnable() {
 
@@ -160,11 +163,13 @@ public class AutoCompleteTextField extends TextField {
      * Causes the popup UI to show
      */
     public void showPopup() {
-        requestFocus();
-        int m = minimumLength;
-        minimumLength = 0;
-        setText(getText());
-        minimumLength = m;
+        if(shouldShowPopup()) {
+            requestFocus();
+            int m = minimumLength;
+            minimumLength = 0;
+            setText(getText());
+            minimumLength = m;
+        }
     }
     
     void setParentText(String text) {
@@ -293,6 +298,9 @@ public class AutoCompleteTextField extends TextField {
 
     private void removePopup() {
         Form f = getComponentForm();
+        if (f == null && popup != null) {
+            f = popup.getComponentForm();
+        }
         if (f != null) {
             Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             Container parent = popup.getParent();
@@ -346,16 +354,18 @@ public class AutoCompleteTextField extends TextField {
         l.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                pickedText = (String) l.getSelectedItem();
-                setParentText(pickedText);
-                fireActionEvent();
-                // relaunch text editing if we are still editing
-                if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
-                    Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                if(shouldShowPopup()) {
+                    pickedText = (String) l.getSelectedItem();
+                    setParentText(pickedText);
+                    fireActionEvent();
+                    // relaunch text editing if we are still editing
+                    if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
+                        Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                    }
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    f.repaint();
                 }
-                popup.setVisible(false);
-                popup.setEnabled(false);
-                f.repaint();
             }
         });
         
@@ -453,19 +463,50 @@ public class AutoCompleteTextField extends TextField {
         return popupHeight;
     }
 
+    boolean pressInBounds;
+    class FormPointerPressListener implements ActionListener {
+        public void actionPerformed(ActionEvent evt) {
+            pressInBounds = false;
+            final Form f = getComponentForm();
+            Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+
+            boolean canOpenPopup = true;
+
+            for (int i = 0; i < layered.getComponentCount(); i++) {
+                Container wrap = (Container) layered.getComponentAt(i);
+                Component pop = wrap.getComponentAt(0);
+                if(pop.isVisible()){
+                    if(!pop.contains(evt.getX(), evt.getY())){
+
+                    }else{
+                        pressInBounds = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Callback that allows subclasses to block the popup from showing
+     * @return true to allow the popup if applicable, false to block it
+     */
+    protected boolean shouldShowPopup() {
+        return true;
+    }
+    
     class FormPointerListener implements ActionListener {
 
         public void actionPerformed(final ActionEvent evt) {
             final Form f = getComponentForm();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             
-            boolean canOpenPopup = true;
+            boolean canOpenPopup = shouldShowPopup();
             
             for (int i = 0; i < layered.getComponentCount(); i++) {
                 Container wrap = (Container) layered.getComponentAt(i);
                 Component pop = wrap.getComponentAt(0);
                 if(pop.isVisible()){
-                    if(!pop.contains(evt.getX(), evt.getY())){
+                    if(!pressInBounds && !pop.contains(evt.getX(), evt.getY())){
                         pop.setVisible(false);
                         pop.setEnabled(false);      
                         f.repaint();

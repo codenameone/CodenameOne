@@ -66,6 +66,15 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    UIWindow *win = [[ctrl view] window];
+    if (win == nil) {
+        // If the main GLView isn't showing, then just
+        // skip this.  We were getting pointer events
+        // handled here when the gallery was opened:
+        // https://github.com/codenameone/CodenameOne/issues/2793
+        POOL_END();
+        return;
+    }
     CGPoint point = [touch locationInView:ctrl.view];
     if([touches count] > 1) {
         for(int iter = 0 ; iter < [ts count] ; iter++) {
@@ -97,6 +106,15 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touchesArray count]];
     int yArray[[touchesArray count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    UIWindow *win = [[ctrl view] window];
+    if (win == nil) {
+        // If the main GLView isn't showing, then just
+        // skip this.  We were getting pointer events
+        // handled here when the gallery was opened:
+        // https://github.com/codenameone/CodenameOne/issues/2793
+        POOL_END();
+        return;
+    }
     CGPoint point = [touch locationInView:ctrl.view];
     if([touchesArray count] > 1) {
         for(int iter = 0 ; iter < [touchesArray count] ; iter++) {
@@ -134,6 +152,15 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    UIWindow *win = [[ctrl view] window];
+    if (win == nil) {
+        // If the main GLView isn't showing, then just
+        // skip this.  We were getting pointer events
+        // handled here when the gallery was opened:
+        // https://github.com/codenameone/CodenameOne/issues/2793
+        POOL_END();
+        return;
+    }
     CGPoint point = [touch locationInView:ctrl.view];
     //CN1Log(@"Released %i fingers", [touches count]);
     if([touches count] > 1) {
@@ -169,6 +196,15 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    UIWindow *win = [[ctrl view] window];
+    if (win == nil) {
+        // If the main GLView isn't showing, then just
+        // skip this.  We were getting pointer events
+        // handled here when the gallery was opened:
+        // https://github.com/codenameone/CodenameOne/issues/2793
+        POOL_END();
+        return;
+    }
     CGPoint point = [touch locationInView:ctrl.view];
     if([touches count] > 1) {
         for(int iter = 0 ; iter < [ts count] ; iter++) {

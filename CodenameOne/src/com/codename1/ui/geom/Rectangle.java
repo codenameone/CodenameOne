@@ -138,6 +138,15 @@ public class Rectangle implements Shape {
     }
     
     /**
+     * Sets the bounds of this rectangle.
+     * @param bounds A rectangle whose bounds will be copied.
+     * @since 7.0
+     */
+    public void setBounds(Rectangle bounds) {
+        setBounds(bounds.x, bounds.y, bounds.size.getWidth(), bounds.size.getHeight());
+    }
+    
+    /**
      * Convenience method for getSize().getWidth();
      * @return width
      */

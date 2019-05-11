@@ -23,6 +23,7 @@
 package com.codename1.media;
 
 import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -66,6 +67,21 @@ public class MediaManager {
     }
     
     /**
+     * Creates an audio media asynchronously that can be played in the background.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * 
+     * @since 7.0
+     */ 
+    public static AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        return Display.getInstance().createBackgroundMediaAsync(uri);
+    }
+    
+    /**
      * Creates a Media from a given URI
      * 
      * @param uri the uri of the media can start with file://, http:// (can also
@@ -93,6 +109,21 @@ public class MediaManager {
     public static Media createMedia(InputStream stream, String mimeType) throws IOException {
         return createMedia(stream, mimeType, null);
     }
+    
+    /**
+     * Creates the Media in the given stream asynchronously.
+     * Notice that a Media is "auto destroyed" on completion and cannot be played
+     * twice!
+     *
+     * @param stream the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * @since 7.0
+     */
+    public static AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+        return Display.getInstance().createMediaAsync(stream, mimeType, onCompletion);
+    }
 
     /**
      * Creates a Media from a given URI
@@ -107,6 +138,21 @@ public class MediaManager {
      */
     public static Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return Display.getInstance().createMedia(uri, isVideo, onCompletion);
+    }
+    
+    /**
+     * Creates a Media from a given URI asynchronously.
+     * 
+     * @param uri the uri of the media can start with file://, http:// (can also
+     * use rtsp:// although may not be supported on all target platforms)
+     * @param isVideo a boolean flag to indicate if this is a video media
+     * @param onCompletion a Runnable to be called when the media has finished
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * @since 7.0
+     */
+    public static AsyncResource<Media> createMediaAsync(String uri, boolean isVideo, Runnable onCompletion) {
+        return Display.getInstance().createMediaAsync(uri, isVideo, onCompletion);
     }
     
     /**

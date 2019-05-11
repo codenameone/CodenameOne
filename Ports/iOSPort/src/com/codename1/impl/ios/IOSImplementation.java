@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
@@ -102,6 +103,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
@@ -206,6 +208,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(m instanceof Lifecycle) {
             life = (Lifecycle)m;
         }
+        VideoCaptureConstraints.init(new IOSVideoCaptureConstraintsCompiler());
     }
 
     public void setThreadPriority(Thread t, int p) {
@@ -375,7 +378,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public static void foldKeyboard() {
         if(instance.isAsyncEditMode()) {
-            final Component cmp = Display.getInstance().getCurrent().getFocused();
+            Form f = Display.getInstance().getCurrent();
+            
+            final Component cmp = f == null ? null : f.getFocused();
             instance.callHideTextEditor();
             nativeInstance.foldVKB();
 
@@ -1790,6 +1795,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.nativeDrawImage(nm.peer, ng.alpha, x, y, nm.width, nm.height);
     }
 
+    
+    
+    @Override
+    public void setRenderingHints(Object nativeGraphics, int hints) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        ng.setRenderingHints(hints);
+    }
+
+    @Override
+    public int getRenderingHints(Object nativeGraphics) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        return ng.renderingHints;
+    }
+    
+    
+    
+    
+
     // -------------------------------------------------------------------------
     // METHODS FOR DRAWING SHAPES AND TRANSFORMATIONS
     // -------------------------------------------------------------------------
@@ -2247,11 +2270,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     // END SHAPES AND TRANSFORMATION CODE
     
-    private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height) {
-        nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height);
+    private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+        nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
     }
-    private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height) {
-        nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height);
+    private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+        nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height, renderingHints);
     }
 
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
@@ -2947,7 +2970,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(false);
+        nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
 
@@ -3068,15 +3091,51 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        captureVideo(null, response);
+    }
+        
+    /**
+     * Captures a video and notifies with the data when available
+     * @param response callback for the resulting video
+     */
+    public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
         }
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(true);
+        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst.getPreferredMaxLength());
         dropEvents = true;
     }
+    
+    private static int getUIPickerControllerQualityType(VideoCaptureConstraints cnst) {
+        if (cnst == null) {
+            return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+        int w = cnst.getWidth();
+        int h = cnst.getHeight();
+        if (w == 640 && h == 480) {
+            return 3; //UIImagePickerControllerQualityType640x480 = 3
+        }
+        if (w == 1280 && h == 720) {
+            return 4; //UIImagePickerControllerQualityTypeIFrame1280x720 = 4
+        }
+        if (w == 960 && h == 540) {
+            return 5; //UIImagePickerControllerQualityTypeIFrame960x540 = 5
+        }
+        int quality = cnst.getQuality();
+        switch (quality) {
+            case VideoCaptureConstraints.QUALITY_LOW:
+                return 2; //UIImagePickerControllerQualityTypeLow = 2
+            case VideoCaptureConstraints.QUALITY_HIGH:
+                return 0; //UIImagePickerControllerQualityTypeHigh = 0
+            default:
+                return 1; //UIImagePickerControllerQualityTypeMedium = 1
+        }
+    }
+    
+
 
     @Override
     public void openImageGallery(ActionListener response) {    
@@ -3966,6 +4025,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean antialiasedSet;
         private boolean antialiasedText;
         private boolean antialiasedTextSet;
+        int renderingHints;
         
         boolean isAntiAliasingSupported() {
             return true;
@@ -4346,7 +4406,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
-            nativeDrawImageMutable(peer, alpha, x, y, width, height);
+            nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
         }
         
         
@@ -4566,6 +4626,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             } finally {
                 GeneralPath.recycle(path);
             }
+        }
+
+        private void setRenderingHints(int hints) {
+            renderingHints = hints;
+        }
+        
+        private int getRenderingHints() {
+            return renderingHints;
         }
 
         
@@ -4793,7 +4861,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
-            nativeDrawImageGlobal(peer, alpha, x, y, width, height);
+            nativeDrawImageGlobal(peer, alpha, x, y, width, height, renderingHints);
         }
 
         @Override
@@ -5098,6 +5166,27 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
+        if (Boolean.TRUE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
+            final String[] res = new String[1];
+            final boolean[] complete = new boolean[1];
+            nativeInstance.browserExecuteAndReturnStringCallback(get(browserPeer), javaScript, new SuccessCallback<String>() {
+                @Override
+                public void onSucess(String value) {
+                    synchronized(complete) {
+                        res[0] = value;
+                        complete[0] = true;
+                        complete.notify();
+                    }
+                }
+                
+            });
+            while (!complete[0]) {
+                synchronized(complete) {
+                    Util.wait(complete);
+                }
+            }
+            return res[0];
+        }
         if(Display.getInstance().isEdt()) {
             final String[] result = new String[1];
 
@@ -5326,7 +5415,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        long browserPeer = nativeInstance.createBrowserComponent(browserComponent);
+        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
+        if (useWKWebView && browserComponent instanceof Component) {
+            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.TRUE);
+        }
+        long browserPeer = useWKWebView ? 
+                nativeInstance.createWKBrowserComponent(browserComponent) : 
+                nativeInstance.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
         nativeInstance.releasePeer(browserPeer);
         return pc;
@@ -6120,12 +6215,16 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setAntiAliased(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliased(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliased(a);
     }
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        ((NativeGraphics)graphics).setAntiAliasedText(a);
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.setAntiAliasedText(a);
     }
 
     /*@Override
@@ -6542,6 +6641,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     static class NetworkConnection extends InputStream {
+        private int id;
         private long peer;
         private boolean closed;
         private FileBackedOutputStream body;
@@ -6554,6 +6654,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         String error;
         public final Object LOCK = new Object();
         
+        public void setId(int id) {
+            this.id = id;
+            nativeInstance.setConnectionId(peer, id);
+        }
         
         public void setChunkedStreamingMode(int len) {
             nativeInstance.setChunkedStreamingMode(peer, len);
@@ -6821,7 +6925,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         NetworkConnection conn =  (NetworkConnection)connection;
-        conn.ensureConnection();
+        //conn.ensureConnection();
         return conn.getSSLCertificates(url);
     }
 
@@ -6829,6 +6933,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return true;
     }
+
+    /**
+     * Checking SSL certificates uses a native callback, instead of the direct approach
+     * which is used in other ports.
+     * @return 
+     */
+    @Override
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return true;
+    }
+    
+    
 
     /**
      * @inheritDoc
@@ -6899,6 +7015,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.setMethod(n.peer, "GET");
         }
     }
+
+    @Override
+    public void setConnectionId(Object connection, int id) {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.setId(id);
+    }
+    
+    
 
     /**
      * @inheritDoc

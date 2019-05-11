@@ -25,6 +25,10 @@ package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
 import com.codename1.io.Log;
+import com.codename1.ui.TextSelection.Char;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -51,6 +55,10 @@ public class Label extends Component {
      */
     private boolean legacyRenderer;
     private String text = "";
+    
+    private TextSelectionSupport textSelectionSupport;
+    private boolean textSelectionEnabled;
+    
     
     private Image icon;
     private Image maskedIcon;
@@ -83,7 +91,7 @@ public class Label extends Component {
     private EventDispatcher textBindListeners = null;
     private boolean shouldLocalize = true;
     private boolean showEvenIfBlank = false;
-    private int shiftMillimeters = 1;
+    private float shiftMillimeters = 0.25f;
     private int stringWidthUnselected = -1;
     
     private boolean autoSizeMode;
@@ -820,12 +828,12 @@ public class Label extends Component {
         if(tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()){
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
-                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                shiftText -= Display.getInstance().convertToPixels(shiftMillimeters);
                 if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
                     shiftText = getStringWidth(getStyle().getFont()); 
                 }
             }else{
-                shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                shiftText += Display.getInstance().convertToPixels(shiftMillimeters);
                 if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
                     shiftText = -getStringWidth(getStyle().getFont()); 
                 }
@@ -1039,11 +1047,21 @@ public class Label extends Component {
     }
 
     /**
-     * Returns the number of millimeters that should be shifted in tickering
+     * Returns the number of millimeters that should be shifted in tickering rounded to nearest int.
      * 
      * @return the shiftMillimeters
+     * @deprecated Use {@link #getShiftMillimetersF() }
      */
     public int getShiftMillimeters() {
+        return (int)Math.round(shiftMillimeters);
+    }
+    
+    /**
+     * Returns the number of millimeters that should be shifted in tickering as a float.
+     * @return 
+     * @since 7.0
+     */
+    public float getShiftMillimetersF() {
         return shiftMillimeters;
     }
 
@@ -1053,6 +1071,16 @@ public class Label extends Component {
      * @param shiftMillimeters the shiftMillimeters to set
      */
     public void setShiftMillimeters(int shiftMillimeters) {
+        this.shiftMillimeters = shiftMillimeters;
+    }
+    
+    /**
+     * Sets the millimeters that should be shifted in tickering as a float.
+     * 
+     * @param shiftMillimeters the shiftMillimeters to set
+     * @since 7.0
+     */
+    public void setShiftMillimeters(float shiftMillimeters) {
         this.shiftMillimeters = shiftMillimeters;
     }
 
@@ -1133,5 +1161,119 @@ public class Label extends Component {
         this.autoSizeMode = autoSizeMode;
     }
     
+    /**
+     * Enables text selection on this label.  Text selection must also be enabled on the Form in order to
+     * text selection to be activated.
+     * @param enabled 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @see Form#getTextSelection() 
+     * @see TextSelection#setEnabled(boolean) 
+     * @since 7.0
+     */
+    public void setTextSelectionEnabled(boolean enabled) {
+        this.textSelectionEnabled = enabled;
+        if (enabled) {
+            setCursor(Component.TEXT_CURSOR);
+        }
+    }
     
+    /**
+     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
+     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
+     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
+     * @return 
+     * @see #setTextSelectionEnabled(boolean) 
+     * @since 7.0
+     */
+    public boolean isTextSelectionEnabled() {
+        return textSelectionEnabled;
+    }
+    
+    private Span span;
+    public TextSelectionSupport getTextSelectionSupport() {
+        if (textSelectionSupport == null) {
+            textSelectionSupport = new TextSelectionSupport() {
+                @Override
+                public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
+                    span = getUIManager().getLookAndFeel().calculateLabelSpan(sel, Label.this);
+                    if (span == null) {
+                        return sel.newSpans();
+                    }
+                    
+                    Span result = span.getIntersection(bounds, true);
+                    if (bounds.getY() < getY()) {
+                        
+                    }
+                    Spans out = sel.newSpans();
+                    out.add(result);
+                    return out;
+                            
+                }
+
+                @Override
+                public boolean isTextSelectionEnabled(TextSelection sel) {
+                    return textSelectionEnabled;
+                }
+
+                @Override
+                public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
+                    return textSelectionEnabled;
+                }
+
+                @Override
+                public Span triggerSelectionAt(TextSelection sel, int x, int y) {
+                    span = getUIManager().getLookAndFeel().calculateLabelSpan(sel, Label.this);
+                    if (span.size() == 0) {
+                        return null;
+                    }
+                    Char charAtPoint = span.charAt(x, y);
+                    if (charAtPoint == null) {
+                        return null;
+                    }
+                    
+                    int startPos = charAtPoint.getPosition();
+                    int endPos = charAtPoint.getPosition()+1;
+                    String dividers = " \t\r\n-.;";
+                    
+                    while (startPos > span.first().getPosition()) {
+                        if (dividers.indexOf(Label.this.getText().substring(startPos, startPos+1)) < 0) {
+                            startPos--;
+                        } else {
+                            if (startPos < span.last().getPosition()) {
+                                startPos++;
+                            }
+                            break;
+                        }
+                    }
+                    
+                    while (endPos < span.last().getPosition()+1) {
+                        if (dividers.indexOf(Label.this.getText().substring(endPos-1, endPos))<0) {
+                            endPos++;
+                        } else {
+                            if (endPos > span.first().getPosition()) {
+                                endPos--;
+                            }
+                            break;
+                        }
+                    }
+                    System.out.println("Text is ["+getText().substring(startPos, endPos)+"]");
+                    return span.subspan(startPos, endPos);
+                }
+
+                @Override
+                public String getTextForSpan(TextSelection sel, Span span) {
+                    int offset = span.getStartPos();
+                    offset = Math.max(0, offset);
+                    offset = Math.min(getText().length()-1, offset);
+                    int end = span.getEndPos();
+                    end = Math.min(getText().length(), end);
+                    return getText().substring(offset, end);
+                    
+                }
+                
+            };
+        }
+        return textSelectionSupport;
+    };
+            
 }

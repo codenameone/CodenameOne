@@ -110,7 +110,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 9;
+    private static final short MINOR_VERSION = 10;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -2082,8 +2082,10 @@ public class EditableResources extends Resources implements TreeModel {
             return;
         }
         if(border instanceof RoundRectBorder) {
-            output.writeShort(0xff13);
+            
+            
             RoundRectBorder rb = (RoundRectBorder)border;
+            output.writeShort(0xff15);
             output.writeFloat(rb.getStrokeThickness());
             output.writeBoolean(rb.isStrokeMM());
             output.writeInt(rb.getStrokeColor());
@@ -2095,8 +2097,10 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeFloat(rb.getShadowY());
             output.writeFloat(rb.getCornerRadius());
             output.writeBoolean(rb.isBezierCorners());
-            output.writeBoolean(rb.isTopOnlyMode());
-            output.writeBoolean(rb.isBottomOnlyMode());
+            output.writeBoolean(rb.isTopLeft());
+            output.writeBoolean(rb.isTopRight());
+            output.writeBoolean(rb.isBottomRight());
+            output.writeBoolean(rb.isBottomLeft());
             return;
         }
         int type = Accessor.getType(border);

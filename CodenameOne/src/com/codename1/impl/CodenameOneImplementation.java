@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
@@ -48,6 +49,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
+import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
@@ -58,6 +60,7 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
@@ -2094,6 +2097,15 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Checks if last mouse press was a right click.
+     * @return True if last mouse press was a right click.
+     * @since 7.0
+     */
+    public boolean isRightMouseButtonDown() {
+        return false;
+    }
+    
+    /**
      * Checks whether the alt key is currently down.  Only relevant on desktop ports.
      * @return 
      */
@@ -3707,6 +3719,29 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Creates media asynchronously.
+     * @param uri the platform specific location for the sound
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @see #createMedia(java.lang.String, boolean, java.lang.Runnable) 
+     */
+    public AsyncResource<Media> createMediaAsync(final String uri, final boolean video, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        CN.scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.complete(createMedia(uri, video, onCompletion));
+                } catch (IOException ex) {
+                    out.error(ex);
+                }
+            }
+        });
+        return out;
+    }
+
+    
+    /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
      * 
      * @param media The media to add the callback to.
@@ -3736,9 +3771,36 @@ public abstract class CodenameOneImplementation {
      * @param onCompletion invoked when the audio file finishes playing, may be null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
+     * @see #createMediaAsync(java.io.InputStream, java.lang.String, java.lang.Runnable) 
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return null;
+    }
+    
+    /**
+     * Creates media asynchronously.
+     *
+     * @param stream the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @see #createMedia(java.io.InputStream, java.lang.String, java.lang.Runnable) 
+     * @since 7.0
+     */
+    public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        CN.scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.complete(createMedia(stream, mimeType, onCompletion));
+                } catch (Throwable t) {
+                    out.error(t);
+                }
+            }
+            
+        });
+        return out;
     }
     
     /**
@@ -3774,6 +3836,43 @@ public abstract class CodenameOneImplementation {
         }
         return createMedia(uri, false, null);
     }
+    
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * This is run asynchronously so that this call does not block.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
+        
+        if (uri.startsWith("jar://")) {
+            final AsyncResource<Media> out = new AsyncResource<Media>();
+        
+            CN.scheduleBackgroundTask(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        out.complete(createBackgroundMedia(uri));
+                    } catch (IOException ex) {
+                        out.error(ex);
+                    }
+                }
+
+            });
+            return out;
+        } else {
+            return createMediaAsync(uri, false, null);
+        }
+    }
+
+    
 
     /**
      * Creates a soft/weak reference to an object that allows it to be collected
@@ -4486,6 +4585,23 @@ public abstract class CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return false;
     }
+    
+    /**
+     * SSL certificate checks must be performed via a callback from the native side,
+     * rather than explicitly checking as part of NetworkManager's connection
+     * flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
+     * explicitly, it forces the connection to be sent without a POST body.  Hence
+     * we need to let iOS do the check on the native side, and callback into Java
+     * to run the checkSSLCertificates method of the request.
+     * @return True if the platform requires a native callback fo check SSL certificates
+     */
+    public boolean checkSSLCertificatesRequiresCallbackFromNative() {
+        return false;
+    }
+    
+    public void setConnectionId(Object connection, int id) {
+        
+    }
 
     /**
      * Connects to a given URL, returns a connection object to be used with the implementation
@@ -4927,6 +5043,10 @@ public abstract class CodenameOneImplementation {
      * @return the separator char
      */
     public abstract char getFileSystemSeparator();
+    
+    public String getLineSeparator() {
+        return "\n";
+    }
 
     /**
      * Indicates whether looking up an access point is supported by this device
@@ -5174,6 +5294,19 @@ public abstract class CodenameOneImplementation {
      */
     public void captureVideo(ActionListener response) {
     }
+    
+    /**
+     * Captures a video, and notifies with the data when available.  This version accepts
+     * capture constraints which may be used if the platform supports them.
+     * @param constraints Constraints for the capture.
+     * @param response Callback for the resulting video.
+     * @since 7.0
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     */
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        captureVideo(response);
+    }
+
 
     /**
      * Checks if the given gallery type is supported on this platform.
@@ -6086,7 +6219,156 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /**
+     * Initializes text selection.  This provides an opportunity for the native
+     * platform to register listeners on text selection to ensure that it works.
+     * 
+     * Implementations that implement this method should also implement {@link #deinitializeTextSelection(com.codename1.ui.TextSelection) }
+     * @param aThis 
+     * @see #deinitializeTextSelection(com.codename1.ui.TextSelection) 
+     * @since 7.0
+     */
+    public void initializeTextSelection(TextSelection aThis) {
+        
+    }
 
+    /**
+     * Deinitializes text selection.
+     * @param aThis 
+     * @see #initializeTextSelection(com.codename1.ui.TextSelection) 
+     * @since 7.0
+     */
+    public void deinitializeTextSelection(TextSelection aThis) {
+        
+    }
+
+    /**
+     * Creates the native side of a {@link com.codename1.ui.HeavyButton}.  A HeavyButton
+     * is a button that has a native button displayed over top of it.  It is primarily used
+     * in the Javascript port where some functions can only be executed as a direct result
+     * of user interaction.
+     * @param aThis The lightweight button for which a heavy peer is created
+     * @return Native peer.  Format chosen by implementation.
+     * @since 7.0
+     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     */
+    public Object createHeavyButton(Button aThis) {
+        return null;
+    }
+
+    /**
+     * Adds an action listener which will be run in response to the native button's
+     * click event.  {@link ActionListener#actionPerformed(com.codename1.ui.events.ActionEvent) } will
+     * be executed on the native UI thread, not the EDT.
+     * @param peer The peer.  
+     * @param l The action listener.
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @see #removeHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void addHeavyActionListener(Object peer, ActionListener l) {
+        
+    }
+
+    /**
+     * Removes a heavy action listener from a heavy button.
+     * @param peer THe heavy button peer.
+     * @param l The action listener.
+     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public void removeHeavyActionListener(Object peer, ActionListener l) {
+        
+    }
+
+    /**
+     * Updates the bounds of the native heavy button to match the bounds of the lightweight button.
+     * @param peer The heavy peer.
+     * @param x The absolute X coordinate of the light peer.
+     * @param y The absolute Y coordinate of the light peer.
+     * @param width The width of the light peer.
+     * @param height The height of the light peer.
+     * @since 7.0
+     */
+    public void updateHeavyButtonBounds(Object peer, int x, int y, int width, int height) {
+        
+    }
+
+    /**
+     * Initializes a heavy button.  This is called whenever the light peer's initComponent() method is called.
+     * It should add the heavy button to the native UI hierarchy.
+     * @param peer The heavy peer.
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public void initHeavyButton(Object peer) {
+        
+    }
+
+    /**
+     * Deinitializes a heavy button.  This is called whenever the light peer's deinitialize() method is called.  It
+     * should remove the heavy button from the native UI hierarchy.
+     * 
+     * @param peer The heavy peer.
+     * @since 7.0
+     * @see #initHeavyButton(java.lang.Object) 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     */
+    public void deinitializeHeavyButton(Object peer) {
+        
+    }
+
+    /**
+     * Checks whether the current platform requires a heavy button for copy to clipboard functionality to work.
+     * This will be true on the Javascript port.
+     * @return 
+     * @see #createHeavyButton(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public boolean requiresHeavyButtonForCopyToClipboard() {
+        return false;
+    }
+
+    /**
+     * Copies the current text selection to the clipboard.
+     * @param sel The current TextSelection instance for the current form.
+     * @since 7.0
+     */
+    public void copySelectionToClipboard(TextSelection sel) {
+        copyToClipboard(sel.getSelectionAsText());
+    }
+
+    /**
+     * Sets the rendering hints for a graphics context.
+     * @param nativeGraphics The native graphics context
+     * @param hints Hints
+     * @see Graphics#RENDERING_HINT_FAST
+     * @since 7.0
+     */
+    public void setRenderingHints(Object nativeGraphics, int hints) {
+        
+    }
+
+    /**
+     * Gets the rendering hints for this graphics context
+     * @param nativeGraphics The native graphics context.
+     * @return The current rendering hints.
+     * @since 7.0
+     * @see Graphics#RENDERING_HINT_FAST
+     */
+    public int getRenderingHints(Object nativeGraphics) {
+        return 0;
+    }
+
+    
+
+    
+
+    
+  
+
+    
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {
@@ -7349,7 +7631,7 @@ public abstract class CodenameOneImplementation {
             }
         }
     }
-
+        
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
@@ -7368,7 +7650,7 @@ public abstract class CodenameOneImplementation {
                 return drawLabelString(nativeGraphics, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
         }
     }
-
+    
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
@@ -7389,7 +7671,7 @@ public abstract class CodenameOneImplementation {
 
         return drawnW;
     }
-
+    
     private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
         if (length * charWidth < width) {
             return true;

@@ -299,7 +299,7 @@ public class Picker extends Button {
                     evt.consume();
                     return;
                 }
-                if (useLightweightPopup && isLightweightModeSupportedForType(type)) {
+                if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
                     return;
@@ -690,7 +690,7 @@ public class Picker extends Button {
                 
                 
                 spinnerC = (Component)spinner;
-                Container wrapper = BorderLayout.center(spinnerC);
+                Container wrapper = BorderLayout.centerAbsolute(spinnerC);
                 ComponentSelector.select(wrapper).addTags("SpinnerWrapper");
                 ComponentSelector.select(wrapper).selectAllStyles()
                         .setBorder(Border.createEmpty())

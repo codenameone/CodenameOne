@@ -27,6 +27,7 @@ import com.codename1.payment.Product;
 import com.codename1.social.GoogleImpl;
 import com.codename1.social.LoginCallback;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.SuccessCallback;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Vector;
@@ -75,8 +76,8 @@ public final class IOSNative {
     native void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
-    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height);
-    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height);
+    native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+    native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
@@ -194,8 +195,12 @@ public final class IOSNative {
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);
+    
+    // Creates a UIWebView
     native long createBrowserComponent(Object bc);
-
+    
+    // Creates a WKWebView
+    native long createWKBrowserComponent(Object browserComponent);
     native void setBrowserPage(long browserPeer, String html, String baseUrl);
 
     native void setBrowserURL(long browserPeer, String url);
@@ -209,6 +214,7 @@ public final class IOSNative {
     native void browserClearHistory(long browserPeer);
 
     native void browserExecute(long browserPeer, String javaScript);
+    native void browserExecuteAndReturnStringCallback(long browserPeer, String javaScript, SuccessCallback<String> callback);
     native String browserExecuteAndReturnString(long browserPeer, String javaScript);
     
     native void browserForward(long browserPeer);
@@ -327,7 +333,7 @@ public final class IOSNative {
     native void removeGeofencing(long clLocation, String id);
     
     // capture
-    native void captureCamera(boolean movie);
+    native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
     native long createAudioRecorder(String destinationFile);
     native void startAudioRecord(long peer);
@@ -391,6 +397,7 @@ public final class IOSNative {
     native long sqlCursorValueAtColumnLong(long statement, int col);
     native short sqlCursorValueAtColumnShort(long statement, int col);
     native String sqlCursorValueAtColumnString(long statement, int col);
+    native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
     
     native int sqlCursorGetColumnCount(long statementPeer);
     
@@ -683,6 +690,10 @@ public final class IOSNative {
     native void firePushCompletionHandler();
 
     native boolean isMultiGallerySelectSupported();
+
+    native void setConnectionId(long peer, int id);
+
+    
 
      
 

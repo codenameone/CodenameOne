@@ -25,6 +25,7 @@ package com.codename1.impl.ios;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
+import com.codename1.db.RowExt;
 import java.io.IOException;
 
 /**
@@ -110,9 +111,11 @@ class DatabaseImpl extends Database {
         return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null));
     }
 
-    class CursorImpl implements Cursor, Row {
+    class CursorImpl implements Cursor, RowExt {
         private long peer;
         private int position = -1;
+        private boolean null_last_read_value = true;
+        
         public CursorImpl(long peer) {
             this.peer = peer;
         }
@@ -223,6 +226,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnBlob(peer, index);
         }
 
@@ -231,6 +235,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnDouble(peer, index);
         }
 
@@ -239,6 +244,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnFloat(peer, index);
         }
 
@@ -247,6 +253,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnInteger(peer, index);
         }
 
@@ -255,6 +262,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnLong(peer, index);
         }
 
@@ -263,6 +271,7 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnShort(peer, index);
         }
 
@@ -271,8 +280,15 @@ class DatabaseImpl extends Database {
             if(peer == 0) {
                 throw new IOException("Working with a closed cursor");
             }
+            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
             return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
         }
+        
+        @Override
+        public boolean wasNull() throws IOException {
+            return null_last_read_value;
+        }
+        
 
         @Override
         public int getColumnCount() throws IOException {

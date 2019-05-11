@@ -35,6 +35,7 @@
     NSString* sslCertificates;
     NSMutableArray* pendingData;
     int pendingDataPos;
+    JAVA_INT connectionId;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout;
@@ -61,5 +62,6 @@
 - (NSString*)getResponseHeaderName:(int)offset;
 -(void)setChunkedStreamingLen:(int)len;
 -(JAVA_OBJECT)getSSLCertificates;
+-(void)setConnectionId:(JAVA_INT)connId;
 
 @end

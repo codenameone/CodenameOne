@@ -359,4 +359,25 @@ public class SpanLabel extends Container {
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
+    
+    /**
+     * Enables or disables text selection on this span label.  Default is off.
+     * @param enabled True to enable text selection on this label.
+     * @since 7.0
+     */
+    public void setTextSelectionEnabled(boolean enabled) {
+        text.setTextSelectionEnabled(enabled);
+    }
+    
+    /**
+     * Checks if text selection is enabled on this SpanLabel.  Note that the Form must also have text selection enabled
+     * for text selection to work.
+     * @return True if text selection is enabled on this element.
+     * @since 7.0
+     * @see Form#getTextSelection()
+     * @see TextSelection#setEnabled(boolean)
+     */
+    public boolean isTextSelectionEnabled() {
+        return text.isTextSelectionEnabled();
+    }
 }

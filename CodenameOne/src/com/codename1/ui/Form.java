@@ -43,6 +43,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -78,6 +79,8 @@ public class Form extends Container {
     static Component rippleComponent;
     static int rippleX;
     static int rippleY;
+    
+    private TextSelection textSelection;
     
     ArrayList<Component> buttonsAwatingRelease;
     
@@ -214,6 +217,18 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+    
+    /**
+     * Gets TextSelection support for this form.
+     * @return The text selection support for this form.
+     * @since 7.0
+     */
+    public TextSelection getTextSelection() {
+        if (textSelection == null) {
+            textSelection = new TextSelection(getContentPane());
+        }
+        return textSelection;
     }
     
     /**
@@ -356,7 +371,11 @@ public class Form extends Container {
         if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
             Button bar = new Button();
             bar.setShowEvenIfBlank(true);
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             bar.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -369,7 +388,11 @@ public class Form extends Container {
             return bar;
         } else {
             Container bar = new Container();
-            bar.setUIID("StatusBar");
+            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                bar.setUIID("StatusBar", "StatusBarLandscape");
+            } else {
+                bar.setUIID("StatusBar");
+            }
             return bar;
         }
     }
@@ -1565,6 +1588,78 @@ public class Form extends Container {
         contentPane.removeComponent(cmp);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchy(int duration) {
+        contentPane.animateHierarchy(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyAndWait(int duration) {
+        contentPane.animateHierarchyAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFade(int duration, int startingOpacity) {
+        contentPane.animateHierarchyFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFadeAndWait(int duration,
+        int startingOpacity) {
+        contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayout(int duration) {
+        contentPane.animateLayout(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutAndWait(int duration) {
+        contentPane.animateLayoutAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFade(int duration, int startingOpacity) {
+        contentPane.animateLayoutFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFadeAndWait(int duration, int startingOpacity) {
+        contentPane.animateLayoutFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayout(int duration, int opacity, Runnable callback) {
+        contentPane.animateUnlayout(duration, opacity, callback);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayoutAndWait(int duration, int opacity) {
+        contentPane.animateUnlayoutAndWait(duration, opacity);
+    }
+    
+    
     final void addComponentToForm(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
@@ -2007,6 +2102,12 @@ public class Form extends Container {
                 Log.e(ex);
             }
         }
+        if (getParent() != null) {
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.deregisterAnimated(this);
+            }
+        }
         super.deinitializeImpl();
         animMananger.flush();
         buttonsAwatingRelease = null;
@@ -2023,7 +2124,34 @@ public class Form extends Container {
             Display.impl.setNativeCommands(menuBar.getCommands());
         }
         if (getParent() != null) {
-            getParent().getComponentForm().registerAnimated(this);
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.registerAnimated(this);
+                if (pointerPressedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerPressedListeners.getListenerCollection()) {
+                        f.addPointerPressedListener(l);
+                    }
+                    pointerPressedListeners = null;
+                }
+                if (pointerDraggedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerDraggedListeners.getListenerCollection()) {
+                        f.addPointerDraggedListener(l);
+                    }
+                    pointerDraggedListeners = null;
+                }
+                if (pointerReleasedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerReleasedListeners.getListenerCollection()) {
+                        f.addPointerReleasedListener(l);
+                    }
+                    pointerReleasedListeners = null;
+                }
+                if (longPressListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)longPressListeners.getListenerCollection()) {
+                        f.addLongPressListener(l);
+                    }
+                    longPressListeners = null;
+                }
+            }
         }
     }
 
@@ -2432,6 +2560,13 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 if (focused.hasLead) {
@@ -2884,8 +3019,15 @@ public class Form extends Container {
         }
     }
     
-    // https://github.com/codenameone/CodenameOne/issues/2352
-    private boolean resumeDragAfterScrolling(int x, int y) {
+    /**
+     * This method fixes <a href="https://github.com/codenameone/CodenameOne/issues/2352">this tensile drag issue</a>. 
+     * However, this might be undesireable in some cases and so this method
+     * can be overriden to return false in some cases.
+     * @param x the x position of a pointer press operation
+     * @param y the y position of a pointer press operation
+     * @return true if drag should be resumed and false otherwise
+     */
+    protected boolean resumeDragAfterScrolling(int x, int y) {
         Component cmp = getComponentAt(x, y);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
             cmp = cmp.getParent();
@@ -2900,7 +3042,17 @@ public class Form extends Container {
     }
 
     private Component pressedCmp;
+    private Rectangle pressedCmpAbsBounds=new Rectangle();
     
+    private void setPressedCmp(Component cmp) {
+        pressedCmp = cmp;
+        if (cmp == null) {
+            pressedCmpAbsBounds.setBounds(0,0,0,0);
+        } else {
+            pressedCmpAbsBounds.setBounds(pressedCmp.getAbsoluteX(), pressedCmp.getAbsoluteY(), pressedCmp.getWidth(), pressedCmp.getHeight());
+        }
+        
+    }
     /**
      * {@inheritDoc}
      */
@@ -2911,7 +3063,7 @@ public class Form extends Container {
         }
         
         
-        pressedCmp = null;
+        setPressedCmp(null);
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
@@ -2964,7 +3116,7 @@ public class Form extends Container {
                     if (!isScrollWheeling) {
                         setFocused(leadParent);
                     }
-                    pressedCmp = cmp.getLeadComponent();
+                    setPressedCmp(cmp.getLeadComponent());
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2978,7 +3130,8 @@ public class Form extends Container {
                         if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
+                        
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -2992,7 +3145,7 @@ public class Form extends Container {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                    pressedCmp = cmp;
+                    setPressedCmp(cmp);
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
@@ -3018,7 +3171,7 @@ public class Form extends Container {
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
-                        pressedCmp = cmp;
+                        setPressedCmp(cmp);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -3326,8 +3479,10 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        Component origPressedCmp = pressedCmp;
+        boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
         rippleMotion = null;
-        pressedCmp = null;
+        setPressedCmp(null);
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane(formLayeredPane, x, y);
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -3402,6 +3557,17 @@ public class Form extends Container {
         if (dragged == null) {
             //if the pointer was released on the menu invoke the appropriate
             //soft button.
+            if (origPressedCmp != null && inOrigPressedCmpBounds) {
+                // This is a special case that occurs when the pointer press
+                // causes a drastic change in the layout (e.g. hiding the keyboard)
+                // This causes buttons to fail to fire their action events because
+                // the button is no longer under the pointer release event.
+                // We solve this by tracking the original location of the pressed component.
+                if (origPressedCmp.isEnabled()) {
+                    origPressedCmp.pointerReleased(x, y);
+                }
+                return;
+            }
             if (menuBar.contains(x, y)) {
                 Component cmp = menuBar.getComponentAt(x, y);
                 if (cmp != null && cmp.isEnabled()) {

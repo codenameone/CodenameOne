@@ -93,18 +93,21 @@ public interface Media {
     public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
             
     /**
-     * Starts playing the audio file
+     * Starts playing the media file
      */
     public void play();
 
     /**
-     * Pauses the playback of the audio file
+     * Pauses the playback of the media file
      */
     public void pause();
     
     /**
      * Optional call that allows the caller to prepare the upcoming media player. This is useful
      * when streaming multiple streams one after another.
+     * 
+     * <p>Note: On some platforms (iOS), the poster frame and native embedded controls will not appear
+     * for the video until you call this method, otherwise.</p>
      */
     public void prepare();
     
@@ -114,23 +117,23 @@ public interface Media {
     public void cleanup();
 
     /**
-     * Returns the time in seconds in the audio file or -1 if not known
+     * Returns the time in milliseconds in the audio file or -1 if not known
      *
-     * @return time in milli seconds
+     * @return time in milliseconds
      */
     public int getTime();
 
     /**
      * Sets the position in the audio file or doesn't effect if not supported 
      *
-     * @param time in milli seconds
+     * @param time in milliseconds
      */
     public void setTime(int time);
 
     /**
      * Returns the length in milliseconds of the audio file or -1 if not known
      *
-     * @return time in milli seconds
+     * @return time in milliseconds
      */
     public int getDuration();
 

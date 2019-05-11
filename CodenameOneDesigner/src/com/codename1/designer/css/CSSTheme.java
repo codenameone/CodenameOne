@@ -21,6 +21,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EditableResourcesForCSS;
 import com.codename1.ui.util.EditableResources;
 import java.io.ByteArrayInputStream;
+import java.io.CharArrayReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -78,6 +79,7 @@ import org.w3c.css.sac.helpers.ParserFactory;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.w3c.flute.parser.ParseException;
 
 /**
  *
@@ -1400,164 +1402,235 @@ public class CSSTheme {
     }
     
     public void updateResources() {
+        // TODO:  We need to remove stale theme entries
+        // https://github.com/codenameone/CodenameOne/issues/2698
+        
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
                 continue;
             }
-            Element el = elements.get(id);
-            Map<String,LexicalUnit> unselectedStyles = el.getUnselected().getFlattenedStyle();
-            Map<String,LexicalUnit> selectedStyles = el.getSelected().getFlattenedStyle();
-            Map<String,LexicalUnit> pressedStyles  = el.getPressed().getFlattenedStyle();
-            Map<String,LexicalUnit> disabledStyles = el.getDisabled().getFlattenedStyle();
-            
-            Element selected = el.getSelected();
-            String selId = id+".sel";
-            String unselId = id;
-            String pressedId = id+".press";
-            String disabledId = id+".dis";
-            
-            res.setThemeProperty(themeName, unselId+".padding", el.getThemePadding(unselectedStyles));
-            res.setThemeProperty(themeName, unselId+".padUnit", el.getThemePaddingUnit(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#padding", el.getThemePadding(selectedStyles));
-            res.setThemeProperty(themeName, selId+"#padUnit", el.getThemePaddingUnit(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#padding", el.getThemePadding(pressedStyles));
-            res.setThemeProperty(themeName, pressedId+"#padUnit", el.getThemePaddingUnit(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#padding", el.getThemePadding(disabledStyles));
-            res.setThemeProperty(themeName, disabledId+"#padUnit", el.getThemePaddingUnit(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".margin", el.getThemeMargin(unselectedStyles));
-            res.setThemeProperty(themeName, unselId+".marUnit", el.getThemeMarginUnit(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#margin", el.getThemeMargin(selectedStyles));
-            res.setThemeProperty(themeName, selId+"#marUnit", el.getThemeMarginUnit(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#margin", el.getThemeMargin(pressedStyles));
-            res.setThemeProperty(themeName, pressedId+"#marUnit", el.getThemeMarginUnit(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#margin", el.getThemeMargin(disabledStyles));
-            res.setThemeProperty(themeName, disabledId+"#marUnit", el.getThemeMarginUnit(disabledStyles));
-            
-            
-            res.setThemeProperty(themeName, unselId+".fgColor", el.getThemeFgColor(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#fgColor", el.getThemeFgColor(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#fgColor", el.getThemeFgColor(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#fgColor", el.getThemeFgColor(disabledStyles));
-            res.setThemeProperty(themeName, unselId+".bgColor", el.getThemeBgColor(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#bgColor", el.getThemeBgColor(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#bgColor", el.getThemeBgColor(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#bgColor", el.getThemeBgColor(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".transparency", el.getThemeTransparency(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#transparency", el.getThemeTransparency(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#transparency", el.getThemeTransparency(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#transparency", el.getThemeTransparency(disabledStyles));
-            
-            
-            res.setThemeProperty(themeName, unselId+".align", el.getThemeAlignment(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#align", el.getThemeAlignment(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#align", el.getThemeAlignment(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#align", el.getThemeAlignment(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".font", el.getThemeFont(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#font", el.getThemeFont(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#font", el.getThemeFont(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#font", el.getThemeFont(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".textDecoration", el.getThemeTextDecoration(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#textDecoration", el.getThemeTextDecoration(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#textDecoration", el.getThemeTextDecoration(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#textDecoration", el.getThemeTextDecoration(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".bgGradient", el.getThemeBgGradient(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#bgGradient", el.getThemeBgGradient(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#bgGradient", el.getThemeBgGradient(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#bgGradient", el.getThemeBgGradient(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".bgType", el.getThemeBgType(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#bgType", el.getThemeBgType(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#bgType", el.getThemeBgType(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#bgType", el.getThemeBgType(disabledStyles));
-            
-            res.setThemeProperty(themeName, unselId+".derive", el.getThemeDerive(unselectedStyles, ""));
-            res.setThemeProperty(themeName, selId+"#derive", el.getThemeDerive(selectedStyles, ".sel"));
-            res.setThemeProperty(themeName, pressedId+"#derive", el.getThemeDerive(pressedStyles, ".press"));
-            res.setThemeProperty(themeName, disabledId+"#derive", el.getThemeDerive(disabledStyles, ".dis"));
-            
-            res.setThemeProperty(themeName, unselId+".opacity", el.getThemeOpacity(unselectedStyles));
-            res.setThemeProperty(themeName, selId+"#opacity", el.getThemeOpacity(selectedStyles));
-            res.setThemeProperty(themeName, pressedId+"#opacity", el.getThemeOpacity(pressedStyles));
-            res.setThemeProperty(themeName, disabledId+"#opacity", el.getThemeOpacity(disabledStyles));
-            
-           //System.out.println("Checking if background image is here for "+unselectedStyles);
-           if (el.hasBackgroundImage(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles) && !el.requiresImageBorder(unselectedStyles)) {
-               //System.out.println("Getting background image... it is here"); 
-               Image[] imageId = getBackgroundImages(unselectedStyles);
-                if (imageId != null && imageId.length > 0) {
-                    
-                    res.setThemeProperty(themeName, unselId+".bgImage", imageId[0]);
+            String currToken = "";
+            try {
+                Element el = elements.get(id);
+                Map<String,LexicalUnit> unselectedStyles = el.getUnselected().getFlattenedStyle();
+                Map<String,LexicalUnit> selectedStyles = el.getSelected().getFlattenedStyle();
+                Map<String,LexicalUnit> pressedStyles  = el.getPressed().getFlattenedStyle();
+                Map<String,LexicalUnit> disabledStyles = el.getDisabled().getFlattenedStyle();
+
+                Element selected = el.getSelected();
+                String selId = id+".sel";
+                String unselId = id;
+                String pressedId = id+".press";
+                String disabledId = id+".dis";
+                currToken = "padding";
+                res.setThemeProperty(themeName, unselId+".padding", el.getThemePadding(unselectedStyles));
+                currToken = "padUnit";
+                res.setThemeProperty(themeName, unselId+".padUnit", el.getThemePaddingUnit(unselectedStyles));
+                currToken = "selected padding";
+                res.setThemeProperty(themeName, selId+"#padding", el.getThemePadding(selectedStyles));
+                currToken = "selected padUnit";
+                res.setThemeProperty(themeName, selId+"#padUnit", el.getThemePaddingUnit(selectedStyles));
+                currToken = "pressed padding";
+                res.setThemeProperty(themeName, pressedId+"#padding", el.getThemePadding(pressedStyles));
+                currToken = "pressed padUnit";
+                res.setThemeProperty(themeName, pressedId+"#padUnit", el.getThemePaddingUnit(pressedStyles));
+                currToken = "disabled padding";
+                res.setThemeProperty(themeName, disabledId+"#padding", el.getThemePadding(disabledStyles));
+                currToken = "disabled padUnit";
+                res.setThemeProperty(themeName, disabledId+"#padUnit", el.getThemePaddingUnit(disabledStyles));
+
+                currToken = "margin";
+                res.setThemeProperty(themeName, unselId+".margin", el.getThemeMargin(unselectedStyles));
+                currToken = "marUnit";
+                res.setThemeProperty(themeName, unselId+".marUnit", el.getThemeMarginUnit(unselectedStyles));
+                currToken = "selected margin";
+                res.setThemeProperty(themeName, selId+"#margin", el.getThemeMargin(selectedStyles));
+                currToken = "selected marUnit";
+                res.setThemeProperty(themeName, selId+"#marUnit", el.getThemeMarginUnit(selectedStyles));
+                currToken = "pressed margin";
+                res.setThemeProperty(themeName, pressedId+"#margin", el.getThemeMargin(pressedStyles));
+                currToken = "pressed marUnit";
+                res.setThemeProperty(themeName, pressedId+"#marUnit", el.getThemeMarginUnit(pressedStyles));
+                currToken = "disabled margin";
+                res.setThemeProperty(themeName, disabledId+"#margin", el.getThemeMargin(disabledStyles));
+                currToken = "disabled marUnit";
+                res.setThemeProperty(themeName, disabledId+"#marUnit", el.getThemeMarginUnit(disabledStyles));
+
+                currToken = "fgColor";
+                res.setThemeProperty(themeName, unselId+".fgColor", el.getThemeFgColor(unselectedStyles));
+                currToken = "selected fgColor";
+                res.setThemeProperty(themeName, selId+"#fgColor", el.getThemeFgColor(selectedStyles));
+                currToken = "pressed fgColor";
+                res.setThemeProperty(themeName, pressedId+"#fgColor", el.getThemeFgColor(pressedStyles));
+                currToken = "disabled fgColor";
+                res.setThemeProperty(themeName, disabledId+"#fgColor", el.getThemeFgColor(disabledStyles));
+                currToken = "bgColor";
+                res.setThemeProperty(themeName, unselId+".bgColor", el.getThemeBgColor(unselectedStyles));
+                currToken = "selected bgColor";
+                res.setThemeProperty(themeName, selId+"#bgColor", el.getThemeBgColor(selectedStyles));
+                currToken = "pressed bgColor";
+                res.setThemeProperty(themeName, pressedId+"#bgColor", el.getThemeBgColor(pressedStyles));
+                currToken = "disabled bgColor";
+                res.setThemeProperty(themeName, disabledId+"#bgColor", el.getThemeBgColor(disabledStyles));
+
+                currToken = "transparency";
+                res.setThemeProperty(themeName, unselId+".transparency", el.getThemeTransparency(unselectedStyles));
+                currToken = "selected transparency";
+                res.setThemeProperty(themeName, selId+"#transparency", el.getThemeTransparency(selectedStyles));
+                currToken = "pressed transparency";
+                res.setThemeProperty(themeName, pressedId+"#transparency", el.getThemeTransparency(pressedStyles));
+                currToken = "disabled transparency";
+                res.setThemeProperty(themeName, disabledId+"#transparency", el.getThemeTransparency(disabledStyles));
+
+                currToken = "align";
+                res.setThemeProperty(themeName, unselId+".align", el.getThemeAlignment(unselectedStyles));
+                currToken = "selected align";
+                res.setThemeProperty(themeName, selId+"#align", el.getThemeAlignment(selectedStyles));
+                currToken = "pressed align";
+                res.setThemeProperty(themeName, pressedId+"#align", el.getThemeAlignment(pressedStyles));
+                currToken = "disabled align";
+                res.setThemeProperty(themeName, disabledId+"#align", el.getThemeAlignment(disabledStyles));
+
+                currToken = "font";
+                res.setThemeProperty(themeName, unselId+".font", el.getThemeFont(unselectedStyles));
+                currToken = "selected font";
+                res.setThemeProperty(themeName, selId+"#font", el.getThemeFont(selectedStyles));
+                currToken = "pressed font";
+                res.setThemeProperty(themeName, pressedId+"#font", el.getThemeFont(pressedStyles));
+                currToken = "disabled font";
+                res.setThemeProperty(themeName, disabledId+"#font", el.getThemeFont(disabledStyles));
+                currToken = "textDecoration";
+                res.setThemeProperty(themeName, unselId+".textDecoration", el.getThemeTextDecoration(unselectedStyles));
+                currToken = "selected textDecoration";
+                res.setThemeProperty(themeName, selId+"#textDecoration", el.getThemeTextDecoration(selectedStyles));
+                currToken = "pressed textDecoration";
+                res.setThemeProperty(themeName, pressedId+"#textDecoration", el.getThemeTextDecoration(pressedStyles));
+                currToken = "disabled textDecoration";
+                res.setThemeProperty(themeName, disabledId+"#textDecoration", el.getThemeTextDecoration(disabledStyles));
+                currToken = "bgGradient";
+                res.setThemeProperty(themeName, unselId+".bgGradient", el.getThemeBgGradient(unselectedStyles));
+                currToken = "selected bgGradient";
+                res.setThemeProperty(themeName, selId+"#bgGradient", el.getThemeBgGradient(selectedStyles));
+                currToken = "pressed bgGradient";
+                res.setThemeProperty(themeName, pressedId+"#bgGradient", el.getThemeBgGradient(pressedStyles));
+                currToken = "disabled bgGradient";
+                res.setThemeProperty(themeName, disabledId+"#bgGradient", el.getThemeBgGradient(disabledStyles));
+
+                currToken = "bgType";
+                res.setThemeProperty(themeName, unselId+".bgType", el.getThemeBgType(unselectedStyles));
+                currToken = "selected bgType";
+                res.setThemeProperty(themeName, selId+"#bgType", el.getThemeBgType(selectedStyles));
+                currToken = "pressed bgType";
+                res.setThemeProperty(themeName, pressedId+"#bgType", el.getThemeBgType(pressedStyles));
+                currToken = "disabled bgType";
+                res.setThemeProperty(themeName, disabledId+"#bgType", el.getThemeBgType(disabledStyles));
+                currToken = "derive";
+                res.setThemeProperty(themeName, unselId+".derive", el.getThemeDerive(unselectedStyles, ""));
+                currToken = "selected derive";
+                res.setThemeProperty(themeName, selId+"#derive", el.getThemeDerive(selectedStyles, ".sel"));
+                currToken = "pressed derive";
+                res.setThemeProperty(themeName, pressedId+"#derive", el.getThemeDerive(pressedStyles, ".press"));
+                currToken = "disabled derive";
+                res.setThemeProperty(themeName, disabledId+"#derive", el.getThemeDerive(disabledStyles, ".dis"));
+
+                currToken = "opacity";
+                res.setThemeProperty(themeName, unselId+".opacity", el.getThemeOpacity(unselectedStyles));
+                currToken = "selected opacity";
+                res.setThemeProperty(themeName, selId+"#opacity", el.getThemeOpacity(selectedStyles));
+                currToken = "pressed opacity";
+                res.setThemeProperty(themeName, pressedId+"#opacity", el.getThemeOpacity(pressedStyles));
+                currToken = "disabled opacity";
+                res.setThemeProperty(themeName, disabledId+"#opacity", el.getThemeOpacity(disabledStyles));
+
+               //System.out.println("Checking if background image is here for "+unselectedStyles);
+               currToken = "bgImage";
+               if (el.hasBackgroundImage(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles) && !el.requiresImageBorder(unselectedStyles)) {
+                   //System.out.println("Getting background image... it is here"); 
+                   Image[] imageId = getBackgroundImages(unselectedStyles);
+                    if (imageId != null && imageId.length > 0) {
+
+                        res.setThemeProperty(themeName, unselId+".bgImage", imageId[0]);
+                    }
                 }
-            }
-            if (el.hasBackgroundImage(selectedStyles) && !el.requiresBackgroundImageGeneration(selectedStyles) && !el.requiresImageBorder(selectedStyles)) {
-                Image[] imageId = getBackgroundImages(selectedStyles);
-                if (imageId != null && imageId.length > 0) {
-                    
-                    res.setThemeProperty(themeName, selId+"#bgImage", imageId[0]);
+               currToken = "selected bgImage";
+                if (el.hasBackgroundImage(selectedStyles) && !el.requiresBackgroundImageGeneration(selectedStyles) && !el.requiresImageBorder(selectedStyles)) {
+                    Image[] imageId = getBackgroundImages(selectedStyles);
+                    if (imageId != null && imageId.length > 0) {
+
+                        res.setThemeProperty(themeName, selId+"#bgImage", imageId[0]);
+                    }
                 }
-            }
-            
-            if (el.hasBackgroundImage(pressedStyles) && !el.requiresBackgroundImageGeneration(pressedStyles) && !el.requiresImageBorder(pressedStyles)) {
-                Image[] imageId = getBackgroundImages(pressedStyles);
-                if (imageId != null && imageId.length > 0) {
-                    
-                    res.setThemeProperty(themeName, pressedId+"#bgImage", imageId[0]);
+
+                currToken = "pressed bgImage";
+                if (el.hasBackgroundImage(pressedStyles) && !el.requiresBackgroundImageGeneration(pressedStyles) && !el.requiresImageBorder(pressedStyles)) {
+                    Image[] imageId = getBackgroundImages(pressedStyles);
+                    if (imageId != null && imageId.length > 0) {
+
+                        res.setThemeProperty(themeName, pressedId+"#bgImage", imageId[0]);
+                    }
                 }
-            }
-            if (el.hasBackgroundImage(disabledStyles) && !el.requiresBackgroundImageGeneration(disabledStyles) && !el.requiresImageBorder(disabledStyles)) {
-                Image[] imageId = getBackgroundImages(disabledStyles);
-                if (imageId != null && imageId.length > 0) {
-                    
-                    res.setThemeProperty(themeName, disabledId+"#bgImage", imageId[0]);
+                currToken = "disabled bgImage";
+                if (el.hasBackgroundImage(disabledStyles) && !el.requiresBackgroundImageGeneration(disabledStyles) && !el.requiresImageBorder(disabledStyles)) {
+                    Image[] imageId = getBackgroundImages(disabledStyles);
+                    if (imageId != null && imageId.length > 0) {
+
+                        res.setThemeProperty(themeName, disabledId+"#bgImage", imageId[0]);
+                    }
                 }
-            }
+
+                currToken = "border";
+                if (!el.requiresImageBorder(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles)) {
+                    res.setThemeProperty(themeName, unselId+".border", el.getThemeBorder(unselectedStyles));
+                }
+                currToken = "selected border";
+                if (!el.requiresImageBorder(selectedStyles) && !el.requiresBackgroundImageGeneration(selectedStyles)) {
+                    res.setThemeProperty(themeName, selId+"#border", el.getThemeBorder(selectedStyles));
+                }
+                currToken = "pressed border";
+                if (!el.requiresImageBorder(pressedStyles) && !el.requiresBackgroundImageGeneration(pressedStyles)) {
+                    res.setThemeProperty(themeName, pressedId+"#border", el.getThemeBorder(pressedStyles));
+                }
+                currToken = "disabled border";
+                if (!el.requiresImageBorder(disabledStyles) && !el.requiresBackgroundImageGeneration(disabledStyles)) {
+                    res.setThemeProperty(themeName, disabledId+"#border", el.getThemeBorder(disabledStyles));
+                }
+
             
-            if (!el.requiresImageBorder(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles)) {
-                res.setThemeProperty(themeName, unselId+".border", el.getThemeBorder(unselectedStyles));
+            } catch (RuntimeException t) {
+                System.err.println("An error occurred while updating resources for UIID "+id+".  Processing property "+currToken);
+                throw t;
             }
-            if (!el.requiresImageBorder(selectedStyles) && !el.requiresBackgroundImageGeneration(selectedStyles)) {
-                res.setThemeProperty(themeName, selId+"#border", el.getThemeBorder(selectedStyles));
-            }
-            if (!el.requiresImageBorder(pressedStyles) && !el.requiresBackgroundImageGeneration(pressedStyles)) {
-                res.setThemeProperty(themeName, pressedId+"#border", el.getThemeBorder(pressedStyles));
-            }
-            if (!el.requiresImageBorder(disabledStyles) && !el.requiresBackgroundImageGeneration(disabledStyles)) {
-                res.setThemeProperty(themeName, disabledId+"#border", el.getThemeBorder(disabledStyles));
-            }
-            
-            
-            
             
         }
         
         for (String constantKey : constants.keySet()) {
-            LexicalUnit lu = constants.get(constantKey);
+            try {
+                LexicalUnit lu = constants.get(constantKey);
 
-            if (lu.getLexicalUnitType() == LexicalUnit.SAC_STRING_VALUE || lu.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
-                if (constantKey.endsWith("Image")) {
-                    // We have an image
-                    Image im = res.getImage(lu.getStringValue());
-                    if (im == null) {
-                        im = getResourceImage(lu.getStringValue());
+                if (lu.getLexicalUnitType() == LexicalUnit.SAC_STRING_VALUE || lu.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
+                    if (constantKey.endsWith("Image")) {
+                        // We have an image
+                        Image im = res.getImage(lu.getStringValue());
+                        if (im == null) {
+                            im = getResourceImage(lu.getStringValue());
+                        }
+                        if (im == null) {
+                            //System.out.println(Arrays.toString(res.getImageResourceNames()));
+                            System.err.println("Error processing file "+this.baseURL);
+                            throw new RuntimeException("Failed to set constant value "+constantKey+" to value "+ lu.getStringValue()+" because no such image was found in the resource file");
+                        }
+                        res.setThemeProperty(themeName, "@"+constantKey, im);
+
+
+                    } else {
+                        res.setThemeProperty(themeName, "@"+constantKey, lu.getStringValue());
                     }
-                    if (im == null) {
-                        //System.out.println(Arrays.toString(res.getImageResourceNames()));
-                        System.err.println("Error processing file "+this.baseURL);
-                        throw new RuntimeException("Failed to set constant value "+constantKey+" to value "+ lu.getStringValue()+" because no such image was found in the resource file");
-                    }
-                    res.setThemeProperty(themeName, "@"+constantKey, im);
-
-
-                } else {
-                    res.setThemeProperty(themeName, "@"+constantKey, lu.getStringValue());
+                } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
+                    res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
                 }
-            } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
-                res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
+            } catch (RuntimeException t) {
+                System.err.println("\nAn error occurred processing constant key "+constantKey);
+                throw t;
             }
         }
 
@@ -2386,17 +2459,9 @@ public class CSSTheme {
         }
         
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
-            //System.out.println("Checking if we can achieve with background image generation "+styles);
             if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
-                //System.out.println("Failed test 1");
-                //System.out.println("unequalBorders? "+hasUnequalBorders());
-                //System.out.println("Has gradient? "+hasGradient());
-                //System.out.println("BorderLineOrNone? "+isBorderLineOrNone());
-                //System.out.println("Background Image URL: "+backgroundImageUrl);
                 return false;
             }
-            
-            
             
             String prefix = "cn1-border";
             String[] corners = new String[]{"top-left", "top-right", "bottom-left", "bottom-right"};
@@ -2411,25 +2476,9 @@ public class CSSTheme {
             }
             
             ScaledUnit val = null;
-            boolean topLeft=false;
-            boolean topRight = false;
-            boolean bottomLeft = false;
-            boolean bottomRight = false;
             for (String cornerStyle : radiusAtts) {
                 ScaledUnit u = (ScaledUnit)styles.get(cornerStyle);
                 if (u != null && u.getPixelValue() != 0) {
-                    if (cornerStyle.indexOf("top-left") != -1) {
-                        topLeft = true;
-                    }
-                    if (cornerStyle.indexOf("top-right") != -1) {
-                        topRight = true;
-                    }
-                    if (cornerStyle.indexOf("bottom-left") != -1) {
-                        bottomLeft = true;
-                    }
-                    if (cornerStyle.indexOf("bottom-right") != -1) {
-                        bottomRight = true;
-                    }
                     if (val != null && val.getPixelValue() != u.getPixelValue()) {
                         // We have more than one non-zero corner radius
                         //System.out.println("Failed corner test");
@@ -2438,13 +2487,6 @@ public class CSSTheme {
                     }
                     val = u;
                 }
-            }
-            
-            
-            if (topLeft != topRight || bottomLeft != bottomRight) {
-                // Resource files don't currently support topLeftMode, topRightMode, bottomLeftMode, and bottomRightMode
-                // so we need to fall back to image borders if the left and right have different radii
-                return false;
             }
             
             // All corners are the same, so we can proceed to the next step.
@@ -3728,6 +3770,8 @@ public class CSSTheme {
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER;
                 case "cn1-image-tile-halign-bottom" :
                     return Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM;
+                case "cn1-image-align-top":
+                    return Style.BACKGROUND_IMAGE_ALIGNED_TOP;
                 case "cn1-image-align-bottom" :
                     return Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
                 case "cn1-image-align-right" :
@@ -4484,11 +4528,15 @@ public class CSSTheme {
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             //System.out.println("TopLeftRadius is : "+topLeftRadius+" isZero? "+isZero(topLeftRadius));
             //System.out.println("BottomRight Radius is : "+bottomRightRadius+" isZero? "+isZero(bottomRightRadius));
-            if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
-                out.bottomOnlyMode(true);
-            } else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
-                out.topOnlyMode(true);
-            }
+            //if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
+            //    out.bottomOnlyMode(true);
+            //} else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
+            //    out.topOnlyMode(true);
+            //}
+            out.topLeftMode(!isZero(topLeftRadius));
+            out.topRightMode(!isZero(topRightRadius));
+            out.bottomRightMode(!isZero(bottomRightRadius));
+            out.bottomLeftMode(!isZero(bottomLeftRadius));
             
             
             
@@ -5115,6 +5163,7 @@ public class CSSTheme {
                                 case "cn1-image-tile-halign-top" :
                                 case "cn1-image-tile-halign-center" :
                                 case "cn1-image-tile-halign-bottom" :
+                                case "cn1-image-align-top" :
                                 case "cn1-image-align-bottom" :
                                 case "cn1-image-align-left" :
                                 case "cn1-image-align-right" :
@@ -6117,11 +6166,15 @@ public class CSSTheme {
             System.setProperty("org.w3c.css.sac.parser", "org.w3c.flute.parser.Parser");
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
-            
-            source.setCharacterStream(new InputStreamReader(stream, "UTF-8"));
+            String stringContents = Util.readToString(stream);
+            //System.out.println("Contents before: "+stringContents);
+            stringContents = stringContents.replaceAll("([\\(\\W])(--[a-zA-Z0-9\\-]+)", "$1cn1$2");
+            //System.out.println("Contents after: "+stringContents);
+            source.setCharacterStream(new CharArrayReader(stringContents.toCharArray()));
             source.setURI(uri.toString());
             source.setEncoding("UTF-8");
             ParserFactory parserFactory = new ParserFactory();
+            
             Parser parser = parserFactory.makeParser();
             final CSSTheme theme = new CSSTheme();
             theme.baseURL = uri;
@@ -6146,7 +6199,7 @@ public class CSSTheme {
             });
             //parser.setLocale(Locale.getDefault());
             parser.setDocumentHandler(new DocumentHandler() {
-                
+                Map<String,LexicalUnit> variables = new HashMap<>();
                 SelectorList currSelectors;
                 FontFace currFontFace;
                 //double currentTargetDpi = 320;
@@ -6230,7 +6283,48 @@ public class CSSTheme {
                 
                 @Override
                 public void property(String string, LexicalUnit lu, boolean bln) throws CSSException {
-                    
+                    try {
+                        property_(string, lu, bln);
+                    } catch (Throwable t) {
+                        if (t instanceof CSSException) {
+                            throw (CSSException)t;
+                        } else {
+                            System.out.println("Exception occurred while parsing property "+string+" "+lu);
+                            t.printStackTrace();
+                            
+                            throw new ParseException(t.getMessage());
+                        }
+                    }
+                }
+                private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
+                    if (string.startsWith("cn1--")) {
+                        System.out.println("Registering variable "+string+" with value "+lu);
+                        variables.put(string, lu);
+                        return;
+                    }
+                    if (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "var".equals(lu.getFunctionName())) {
+                        
+                        LexicalUnit parameters = lu.getParameters();
+                        String varname = parameters.getStringValue();
+                        System.out.println("Found variable property: "+varname);
+                        if (variables.containsKey(varname)) {
+                            property(string, variables.get(varname), bln);
+                            return;
+                        } else {
+                            parameters = parameters.getNextLexicalUnit();
+                            if (parameters != null && parameters.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                                parameters = parameters.getNextLexicalUnit();
+                            }
+                            if (parameters != null) {
+                                property(string, parameters, bln);
+                                return;
+                            } else {
+                                System.err.println("Reference to variable "+string+" not found.  Skipping property");
+                                return;
+                            }
+                        }
+                        
+                    }
                     lu = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
                     if (currFontFace != null) {
                         switch (string) {

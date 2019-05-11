@@ -145,6 +145,15 @@ public class TextComponent extends InputComponent {
         initInput();
     }
 
+    private void updateLabel() {
+        if(field.getText() == null || field.getText().length() == 0) {
+            field.setHint(getLabel().getText());
+            getLabel().setVisible(false);
+        } else {
+            getLabel().setVisible(true);
+        } 
+    }
+    
     void constructUI() {
         if(getComponentCount() == 0) {
             if(isOnTopMode() && isFocusAnimation()) {
@@ -159,10 +168,7 @@ public class TextComponent extends InputComponent {
                 Component.setSameSize(errorMessageFiller, getErrorMessage());
                 animationLayer = BorderLayout.south(errorMessageFiller);
                 add(animationLayer);
-                if(field.getText() == null || field.getText().length() == 0) {
-                    field.setHint(getLabel().getText());
-                    getLabel().setVisible(false);
-                }  
+                updateLabel();
             } else {
                 super.constructUI();
             }
@@ -223,6 +229,7 @@ public class TextComponent extends InputComponent {
      */
     public TextComponent text(String text) {
         field.setText(text);
+        updateLabel();
         refreshForGuiBuilder();
         return this;
     }

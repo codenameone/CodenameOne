@@ -833,6 +833,14 @@ public class Container extends Component implements Iterable<Component>{
             });
         }
         components.add(index, cmp);
+        if (layout instanceof BorderLayout && !BorderLayout.OVERLAY.equals(layout.getComponentConstraint(cmp))) {
+            // Make sure overlay component is always on top
+            Component overlay = ((BorderLayout)layout).getOverlay();
+            if (overlay != null) {
+                components.remove(overlay);
+                components.add(index, overlay);
+            }
+        }
         setShouldCalcPreferredSize(true);
         if (isInitialized()) {
             cmp.initComponentImpl();
@@ -2087,7 +2095,7 @@ public class Container extends Component implements Iterable<Component>{
      * @see #getResponderAt(int, int) 
      */
     public Component getComponentAt(int x, int y) {
-        if (!contains(x, y)) {
+        if (!contains(x, y) || !isVisible()) {
             return null;
         }
         int startIter = 0;
@@ -2111,7 +2119,7 @@ public class Container extends Component implements Iterable<Component>{
         Component component = null;
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
-            if (cmp.contains(x, y)) {
+            if (cmp.contains(x, y) && cmp.isVisible()) {
                 // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
                 // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
                 if(component != null && component.isBlockLead()) {

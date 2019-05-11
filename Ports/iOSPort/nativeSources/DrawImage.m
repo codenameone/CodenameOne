@@ -121,7 +121,29 @@ static GLuint getOGLProgram(){
         actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
         actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
     }
-    GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
+    while (actualImageWidthP2 > GL_MAX_TEXTURE_SIZE || actualImageHeightP2 > GL_MAX_TEXTURE_SIZE) {
+        actualImageWidth = actualImageWidth/2;
+        actualImageHeight = actualImageHeight/2;
+        actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+        actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    }
+    
+    int textW = [img getTextureWidth];
+    int textH = [img getTextureHeight];
+    GLuint tex;
+    double threshold = 2;
+    if ([self useFastRendering] && textW * threshold > actualImageWidth && textW / threshold < actualImageWidth && textH * threshold > actualImageHeight && textH / threshold < actualImageHeight) {
+        tex = [img getTexture:(int)textW texHeight:(int)textH];
+        actualImageWidth = textW;
+        actualImageHeight = textH;
+        actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+        actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+        
+    } else {
+        tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
+    }
+    
+    //GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -292,6 +314,15 @@ static GLuint getOGLProgram(){
 
 -(NSString*)getName {
     return @"DrawImage";
+}
+
+-(void)setRenderingHints:(JAVA_INT)hints {
+    renderingHints = hints;
+}
+
+// See Graphics.RENDERING_HINT_FAST
+-(BOOL)useFastRendering {
+    return (renderingHints & 1) == 1;
 }
 
 @end

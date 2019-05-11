@@ -66,10 +66,6 @@ public class Parser extends ClassVisitor {
         Parser p = new Parser();
         
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
-        if(p.clsName.startsWith("java_lang_annotation") || p.clsName.startsWith("java_lang_Deprecated")
-                 || p.clsName.startsWith("java_lang_Override") || p.clsName.startsWith("java_lang_SuppressWarnings")) {
-            return;
-        }
         p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         r.accept(p, ClassReader.EXPAND_FRAMES);
         
@@ -413,6 +409,12 @@ public class Parser extends ClassVisitor {
                 }
             }
             
+            // load the native sources (including user native code) 
+            // We need to load native sources before we clear any unmarked classes
+            // because native source may be the only thing referencing a class,
+            // and the class may be purged before it even has a shot.
+            readNativeFiles(outputDirectory);
+            usedByNativeCheck();
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
@@ -420,8 +422,6 @@ public class Parser extends ClassVisitor {
             ByteCodeClass.markDependencies(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
 
-            // load the native sources (including user native code) 
-            readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
             if (BytecodeMethod.optimizerOn) {
@@ -589,13 +589,12 @@ public class Parser extends ClassVisitor {
                 StringBuilder b = new StringBuilder();
                 mtd.appendFunctionPointer(b);
                 String str = b.toString();
-                
                 for(String s : nativeSources) {
                     if(s.contains(str)) {
                         mtd.setUsedByNative(true);
                         break;
                     }
-                }
+                }  
             }
         }
     }

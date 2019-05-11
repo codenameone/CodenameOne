@@ -200,7 +200,14 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
 JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_INT len) {
     enteringNativeAllocations();
     struct clazz* clz = (struct clazz*)cls;
-    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz, sizeof(JAVA_OBJECT), 1);
+    if (clz->arrayClass == 0) {
+        JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG "Attempt to create array with reflection, but the component class has no registered array class"));
+        finishedNativeAllocations();
+        throwException(threadStateData, ex);
+        return NULL;
+    }
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayClass, sizeof(JAVA_OBJECT), 1);
     finishedNativeAllocations();
     return out;
 }

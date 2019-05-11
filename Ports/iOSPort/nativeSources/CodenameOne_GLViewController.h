@@ -38,6 +38,7 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define ENABLE_WKWEBVIEW
 //#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
@@ -244,4 +245,5 @@
 +(BOOL)isCurrentMutableTransformSet;
 
 +(CGAffineTransform) currentMutableTransform;
+-(void)updateCanvas:(BOOL)animated;
 @end

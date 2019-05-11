@@ -321,10 +321,15 @@ static void installSignalHandlers() {
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
+    
     /*
      Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
      */
     com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
+    if (vc != nil) {
+        [vc updateCanvas:YES];
+    }
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application

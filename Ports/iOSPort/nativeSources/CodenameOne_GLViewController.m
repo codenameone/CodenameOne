@@ -316,7 +316,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 alignment == 3 ? NSTextAlignmentRight : NSTextAlignmentLeft;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
-            
+            utf.tintColor = UIColorFromRGB(color, 255);
             if(hintString != nil) {
                 utf.placeholder = hintString;
             }
@@ -329,7 +329,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 if((constraint & 0x200000) == 0x200000) {
                     utf.autocapitalizationType = UITextAutocapitalizationTypeSentences;
                 } else {
-                    utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                    // UPPERCASE
+                    if((constraint & 0x800000) == 0x800000) {
+                        utf.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+                    } else {
+                        utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                    }
                 }
             }
             
@@ -509,6 +514,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
             [utv setTextColor:UIColorFromRGB(color, 255)];
+            utv.tintColor = UIColorFromRGB(color, 255);
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
@@ -767,7 +773,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y) {
 }
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height);
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints);
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
@@ -780,7 +786,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
 #endif
@@ -810,7 +816,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
 #endif
@@ -1111,7 +1117,7 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
-(void* peer, int alpha, int x, int y, int width, int height) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1539,12 +1545,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -1756,6 +1763,11 @@ bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     [self becomeFirstResponder];
+    [self updateCanvas:animated];
+    //replaceViewDidAppear
+}
+
+-(void)updateCanvas:(BOOL)animated {
     if(viewDidAppearRepaint) {
         if(animated) {
             // postpone this to the next edt cycle to prevent a black screen
@@ -1775,7 +1787,6 @@ bool lockDrawing;
         screenSizeChanged(displayWidth, displayHeight);
     }
     
-    //replaceViewDidAppear
 }
 
 - (BOOL)canBecomeFirstResponder {
@@ -1894,6 +1905,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     return img;
 }
 
+EAGLView* lastFoundEaglView;
 /**
  * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
  * if there are peer components, and they are to be painted behind, then the view hierarchy
@@ -1902,13 +1914,30 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
  */
 -(EAGLView*) eaglView {
     if ([self.view class] == [EAGLView class]) {
+        lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
         
         if ([child class] == [EAGLView class]) {
+            lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
         }
+    }
+    if (lastFoundEaglView != nil && lastFoundEaglView.peerComponentsLayer != nil) {
+        // This is an edge case that occurs if we add a peer component for the first time while
+        // the app is in transition.  In this case, the new root would be added
+        // to the UITransitionView, and when the transition is complete, the 
+        // AutoLayoutView has the original EAGL view added to it, but our view controller
+        // would lose the reference to the eagl view.
+        // We need to re-do the re-rooting of the EAGL view and peer components layer in this case.
+        UIView* parent = [lastFoundEaglView superview];
+        UIView* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
+        [lastFoundEaglView removeFromSuperview];
+        [newRoot addSubview:lastFoundEaglView];
+        [parent addSubview:newRoot];
+        self.view = newRoot;
+        return lastFoundEaglView;
     }
     NSLog(@"EAGLView not found.  This is not good!!");
     return nil;

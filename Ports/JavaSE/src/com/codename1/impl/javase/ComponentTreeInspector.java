@@ -422,7 +422,17 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         });
         
     }
-    
+
+    private void showInfoMessage(final String message, final String title) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                JOptionPane.showMessageDialog(ComponentTreeInspector.this, message, title, JOptionPane.PLAIN_MESSAGE);
+            }
+        });
+        
+    }
+
     private void validateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_validateActionPerformed
         Display.getInstance().callSerially(new Runnable() {
             @Override
@@ -453,6 +463,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
                         }
                     }
                 }
+                showInfoMessage("Validation finished without an error", "Validation");
             }
         });
     }//GEN-LAST:event_validateActionPerformed

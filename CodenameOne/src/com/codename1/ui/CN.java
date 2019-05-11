@@ -250,7 +250,32 @@ public class CN extends  CN1Constants {
         return Display.impl.extractHardRef(o);
     }
 
+    /**
+     * Checks if async stack traces are enabled.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @return Whether async stack traces are enabled.  
+     * @see #setEnableAsyncStackTraces(boolean) 
+     * @since 7.0
+     */
+    public static boolean isEnableAsyncStackTraces() {
+        return Display.getInstance().isEnableAsyncStackTraces();
+    }
     
+    /**
+     * Enables or disables async stack traces.  If enabled, the stack trace
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * be recorded, and logged in the case that there is an uncaught exception.
+     * 
+     * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
+     * @param enable True to enable async stack traces.  
+     * @see #isEnableAsyncStackTraces() 
+     * @since 7.0
+     */
+    public static void setEnableAsyncStackTraces(boolean enable) {
+        Display.getInstance().setEnableAsyncStackTraces(enable);
+    }
     
     /**
      * This method allows us to manipulate the drag started detection logic.
