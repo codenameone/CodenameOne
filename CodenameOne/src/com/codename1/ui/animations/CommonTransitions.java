@@ -31,12 +31,14 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.LazyValue;
+import java.util.Map;
 
 /**
  * <p>Contains common transition animations that can be applied to forms &amp; components 
@@ -93,7 +95,7 @@ public final class CommonTransitions extends Transition {
      * @see #createSlide
      */
     public static final int SLIDE_VERTICAL = 1;
-
+    
     private long startTime;
     private int slideType;
     private int speed;
@@ -107,6 +109,7 @@ public final class CommonTransitions extends Transition {
     private boolean linearMotion = defaultLinearMotion;
     private boolean motionSetManually;
     private int originalWidth, originalHeight, originalX, originalY;
+    
 
     /**
      * The transition is a special case where we "keep" an allocated buffer
@@ -453,6 +456,7 @@ public final class CommonTransitions extends Transition {
             motion.start();
             
             if(Display.getInstance().areMutableImagesFast()) {
+                hideInterformContainers();
                 Graphics g = buffer.getGraphics();
                 g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
@@ -466,12 +470,14 @@ public final class CommonTransitions extends Transition {
 
                 paint(g, getSource(), 0, 0, true);
                 g.translate(source.getAbsoluteX(), source.getAbsoluteY());
+                showInterformContainers();
             }
             return;
         }
         
 
         if(transitionType == TYPE_TIMELINE) {
+            hideInterformContainers();
             Graphics g = buffer.getGraphics();
             g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
@@ -489,6 +495,7 @@ public final class CommonTransitions extends Transition {
 
             paint(g, getDestination(), 0, 0);
             g.translate(source.getAbsoluteX(), source.getAbsoluteY());
+            showInterformContainers();
             return;
         }
 
@@ -590,11 +597,13 @@ public final class CommonTransitions extends Transition {
                         drawDialogCmp(secondaryBuffer.getGraphics(), d);
                     }
                 } else {
+                    hideInterformContainers();
                     paint(g, source, -source.getAbsoluteX(), -source.getAbsoluteY(), true);
                     if(transitionType == TYPE_FAST_SLIDE) {
                         secondaryBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
                         paint(secondaryBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
                     }
+                    showInterformContainers();
                 }
             }
             motion.start();
@@ -677,36 +686,48 @@ public final class CommonTransitions extends Transition {
         try {
             switch (transitionType) {
                 case TYPE_FAST_SLIDE:
-                case TYPE_SLIDE:
+                case TYPE_SLIDE: {
+                    hideInterformContainers();
                     // if this is an up or down slide
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintSlideAtPosition(g, position, 0);
                     } else {
                         paintSlideAtPosition(g, 0, position);
                     }
+                    paintInterformContainers(g);
                     return;
+                }
                 case TYPE_UNCOVER:
+                    hideInterformContainers();
                     int p = motion.getDestinationValue() - position;
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintCoverAtPosition(g, p, 0);
                     } else {
                         paintCoverAtPosition(g, 0, p);
                     }
+                    paintInterformContainers(g);
+                    
                     return;
                 case TYPE_COVER:
+                    hideInterformContainers();
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintCoverAtPosition(g, position, 0);
                     } else {
                         paintCoverAtPosition(g, 0, position);
                     }
+                    paintInterformContainers(g);
                     return;
                 case TYPE_FADE:
+                    hideInterformContainers();
                     paintAlpha(g);
+                    paintInterformContainers(g);
                     return;
                 case TYPE_TIMELINE:
+                    hideInterformContainers();
                     Object mask = timeline.createMask();
                     paint(g, getSource(), 0, 0);
                     g.drawImage(buffer.applyMask(mask), 0, 0);
+                    paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
                     Form sourceForm = (Form)getSource();
@@ -727,6 +748,7 @@ public final class CommonTransitions extends Transition {
                     if(sourceForm != null && sourceForm.getUIManager().getLookAndFeel().isRTL()) {
                         dir = !dir;
                     }
+                    hideInterformContainers();
                     if(dir) {
                         g.translate(slidePos, 0);
                         paint(g, sourcePane, -sourcePane.getAbsoluteX() -sourcePane.getScrollX(), -sourcePane.getAbsoluteY() -sourcePane.getScrollY(), true);
@@ -743,6 +765,7 @@ public final class CommonTransitions extends Transition {
                     g.translate(0, -sourceForm.getTitleArea().getHeight());
                     g.setClip(clipX, clipY, clipW, clipH);
 
+                    paintInterformContainers(g);
                     sourceForm.getTitleArea().paintComponentBackground(g);
                     paintShiftFadeHierarchy(sourceForm.getTitleArea(), 255 - alpha, g, false);
                     paintShiftFadeHierarchy(destForm.getTitleArea(), alpha, g, true);
@@ -985,7 +1008,7 @@ public final class CommonTransitions extends Transition {
             paint(g, dest, -slideX - w, -slideY - h);
             return;
         } 
-        
+        hideInterformContainers();
         if(source.getParent() != null || buffer == null) {
             source.paintBackgrounds(g);
             paint(g, source, slideX , slideY );
@@ -993,6 +1016,7 @@ public final class CommonTransitions extends Transition {
             g.drawImage(buffer, slideX, slideY);        
         }
         paint(g, dest, slideX + w, slideY + h);
+        paintInterformContainers(g);
         
     }
 
@@ -1048,6 +1072,7 @@ public final class CommonTransitions extends Transition {
             return;
         } 
 
+        hideInterformContainers();
         if(transitionType == TYPE_UNCOVER) {
             paint(g, dest, 0, 0);
             if(source.getParent() != null || buffer == null) {
@@ -1065,6 +1090,7 @@ public final class CommonTransitions extends Transition {
             }
             paint(g, dest, slideX + w, slideY + h);
         }
+        paintInterformContainers(g);
     }
     
     private int getDialogTitleHeight(Dialog d) {
@@ -1093,6 +1119,7 @@ public final class CommonTransitions extends Transition {
     }
 
     private void paint(Graphics g, Component cmp, int x, int y, boolean background) {
+        
         boolean b = cmp.isVisible();
         cmp.setVisible(true);
         int cx = g.getClipX();
@@ -1131,7 +1158,7 @@ public final class CommonTransitions extends Transition {
          g.translate(x, y);
         //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
         cmp.paintComponent(g, background);
-         g.translate(-x, -y);
+        g.translate(-x, -y);
         
         g.setClip(cx, cy, cw, ch);
         cmp.setVisible(b);
