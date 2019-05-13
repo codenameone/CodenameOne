@@ -4019,6 +4019,58 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
+     * 
+     * <p>This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation
+     * in BrowserComponent.</p>
+     * 
+     * <p>Web pages wishing to receive messages via this mechanism should register a "message" event listener.  See 
+     * <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage">Javascript postMessage() docs</a>
+     * for more details about this.</p>
+     * @param browserComponent The browser component peer.
+     * @param message The message to send
+     * @param targetOrigin The target origin for the message.
+     * @return True if the implementation handled the message.  False to let BrowserComponent handle it in its default way.
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     * @see #installMessageListener(java.lang.Object) 
+     * @see #uninstallMessageListener(java.lang.Object) 
+     * @since 7.0
+     */
+    public boolean postMessage(Object browserComponent, String message, String targetOrigin) {
+        return false;
+    }
+    
+    /**
+     * Installs a message listener to allow webpages inside a browser component to send 
+     * messages to CN1 cross-domain.
+     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
+     * use the default implementation in {@link BrowserComponent}.
+     * @param browserComponent The browser component peer.
+     * @return True if a message listener was installed.  False otherwise.
+     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String) 
+     * @see BrowserComponent#onMessage
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     */
+    public boolean installMessageListener(Object browserComponent) {
+        return false;
+    }
+    
+    /**
+     * Uninstalls a message listener to allow webpages inside a browser component to send 
+     * messages to CN1 cross-domain.
+     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
+     * use the default implementation in {@link BrowserComponent}.
+     * @param browserComponent The browser component peer.
+     * @return True if a message listener was installed.  False otherwise.
+     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String) 
+     * @see BrowserComponent#onMessage
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     */
+    public boolean uninstallMessageListener(Object browserComponent) {
+        return false;
+    }
+    
+    /**
      * <p>Creates a native overlay for the given component. A native overlay is a native component
      * that is always present over the given component.  It can be used to help processing user 
      * events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
