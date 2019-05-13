@@ -1,0 +1,10 @@
+#Constants {
+    includeNativeBool: true; 
+}
+@font-face {
+    font-family: "Suisse Int'l";
+    src: url(https://weblite.ca/cn1tests/Suisse%20Int%27l.ttf);
+}
+MyLabel {
+    font-family: "Suisse Int'l";
+}
