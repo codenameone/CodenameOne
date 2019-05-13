@@ -739,7 +739,8 @@ public class CSSTheme {
                     if (url.getProtocol().startsWith("http")) {
                         // If it is remote, check so see if we've already downloaded
                         // the font to the current directory.
-                        String fontName = url.getPath();
+                        String fontName = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
+                        
                         if (fontName.indexOf("/") != -1) {
                             fontName = fontName.substring(fontName.lastIndexOf("/")+1);
                         }
