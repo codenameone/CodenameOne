@@ -27,7 +27,7 @@ package java.io;
  * Applications that need to define a subclass of InputStream must always provide a method that returns the next byte of input.
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayInputStream, DataInputStream, read(), OutputStream
  */
-public abstract class InputStream{
+public abstract class InputStream implements AutoCloseable {
     public InputStream(){
     }
 
