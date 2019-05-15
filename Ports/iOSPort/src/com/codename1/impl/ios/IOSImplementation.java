@@ -2979,12 +2979,38 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getAvailableRecordingMimeTypes();
     }
     
+    private static boolean finishedCreatingAudioRecorder;
+    private static Object createAudioRecorderLock = new Object();
+    private static IOException createAudioRecorderException = null;
+    
+    public static void finishedCreatingAudioRecorder(IOException ex) {
+        createAudioRecorderException = ex;
+        finishedCreatingAudioRecorder = true;
+        synchronized(createAudioRecorderLock) {
+            createAudioRecorderLock.notifyAll();
+        }
+    }
+    
     @Override
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
         if (!nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
         }
+        finishedCreatingAudioRecorder = false;
+        createAudioRecorderException = null;
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                while (!finishedCreatingAudioRecorder) {
+                    synchronized(createAudioRecorderLock) {
+                        Util.wait(createAudioRecorderLock);
+                    }
+                }
+            }
+        });
+        if (createAudioRecorderException != null) {
+            throw createAudioRecorderException;
+        }
         return new Media() {
             private boolean playing;
             @Override

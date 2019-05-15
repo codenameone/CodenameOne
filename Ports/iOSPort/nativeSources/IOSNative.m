@@ -4851,6 +4851,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                                                   JAVA_OBJECT  destinationFile) {
 #ifdef INCLUDE_MICROPHONE_USAGE
     __block AVAudioRecorder* recorder = nil;
+     
+    __block JAVA_OBJECT ex = JAVA_NULL;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
@@ -4858,12 +4860,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
         if(err){
             CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
+            POOL_END();
             return;
         }
         err = nil;
         [audioSession setActive:YES error:&err];
         if(err){
             CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
+            POOL_END();
             return;
         }
         if (isIOS7()) {
@@ -4892,10 +4900,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                               error: &error];
                     if(error != nil) {
                         CN1Log(@"Error in recording: %@", [error localizedDescription]);
+                        ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
+                        com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG ex);
+                        POOL_END();
+                        return;
                     }
                     recorder.delegate = [CodenameOne_GLViewController instance];
+                    com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
                 } else {
                     recorder = nil;
+                    ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                    java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Permission to record was denied"));
+                    com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG ex);
                 }
                 POOL_END();
             }];
@@ -4921,12 +4938,22 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                       error: &error];
             if(error != nil) {
                 CN1Log(@"Error in recording: %@", [error localizedDescription]);
+                ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+                POOL_END();
+                return;
             }
             recorder.delegate = [CodenameOne_GLViewController instance];
         }
         POOL_END();
     });
-    return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+    if (ex != JAVA_NULL) {
+        throwException(threadStateData, ex);
+        return (JAVA_LONG)0;
+    } else {
+        com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
+        return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+    }
 #else
     return (JAVA_LONG)0;
 #endif
