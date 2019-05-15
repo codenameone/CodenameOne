@@ -4905,7 +4905,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         final String sysroot = System.getenv("SystemRoot");
         String tabTipExe = "C:\\Program Files\\Common Files\\microsoft shared\\ink\\TabTip.exe";
         
-        final boolean useTabTip = "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
+        final boolean useTabTip = exposeFilesystem && "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
         if (new File(tabTipExe).exists()) {
             try {
 
