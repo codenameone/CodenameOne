@@ -2976,7 +2976,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String [] getAvailableRecordingMimeTypes() {
-        return super.getAvailableRecordingMimeTypes();
+        return new String[]{"audio/m4a"};
     }
     
     private static boolean finishedCreatingAudioRecorder;

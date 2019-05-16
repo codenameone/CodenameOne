@@ -10364,60 +10364,58 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             @Override
             public void play() {
-                try {
-                    AudioFormat format = getAudioFormat();
-                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+                if (line == null) {
+                    try {
+                        AudioFormat format = getAudioFormat();
+                        DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-                    // checks if system supports the data line
-                    if (!AudioSystem.isLineSupported(info)) {
-                        throw new RuntimeException("Audio format not supported on this platform");
-                    }
-                    line = (TargetDataLine) AudioSystem.getLine(info);
-                    line.open(format);
-                    line.start();   // start capturing
-
-                    
-
-                    recording = true;
-                    // start recording
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                AudioInputStream ais = new AudioInputStream(line);
-                                AudioSystem.write(ais, fileType, wavFile);
-                            } catch (IOException ioe) {
-                                throw new RuntimeException(ioe);
-                            }
+                        // checks if system supports the data line
+                        if (!AudioSystem.isLineSupported(info)) {
+                            throw new RuntimeException("Audio format not supported on this platform");
                         }
-                    }).start();
-                    
-               } catch (LineUnavailableException ex) {
-                                throw new RuntimeException(ex);
-                }     
+                        line = (TargetDataLine) AudioSystem.getLine(info);
+                        line.open(format);
+                        line.start();   // start capturing
+
+
+
+                        recording = true;
+                        // start recording
+                        new Thread(new Runnable() {
+                            public void run() {
+                                try {
+                                    AudioInputStream ais = new AudioInputStream(line);
+                                    AudioSystem.write(ais, fileType, wavFile);
+                                } catch (IOException ioe) {
+                                    throw new RuntimeException(ioe);
+                                }
+                            }
+                        }).start();
+
+                   } catch (LineUnavailableException ex) {
+                                    throw new RuntimeException(ex);
+                    }    
+                } else {
+                    if (!line.isActive()) {
+                        line.start();
+                        recording = true;
+                    }
+                }
 
                 
             }
 
             @Override
             public void pause() {
+                if (line == null) {
+                    return;
+                }
                 if (!recording) {
                     return;
                 }
                 recording = false;
-                
-               
                 line.stop();
-                line.close();
-                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
-                    try {
-                        System.out.println("Encoding to mp3");
-                        FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
-                        wavFile.delete();
-                    } catch (Throwable ex) {
-                        com.codename1.io.Log.e(ex);
-                        throw new RuntimeException(ex);
-                    }
-                }
+                
                 
             }
             
@@ -10433,11 +10431,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
-                try {
-                    line.stop();
-                    line.close();
-                    line = null;
-                } catch (Throwable t){}
+                line.close();
+                
+                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                    final Throwable[] t = new Throwable[1];
+                    CN.invokeAndBlock(new Runnable() {
+                        public void run() {
+                            try {
+                                System.out.println("Encoding to mp3");
+                                FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
+                                wavFile.delete();
+                            } catch (Throwable ex) {
+                                com.codename1.io.Log.e(ex);
+                                t[0] = ex;
+                            }
+                        }
+                    });
+                    if (t[0] != null) {
+                        throw new RuntimeException(t[0]);
+                    }
+                    
+                }
+                line = null;
             }
 
             @Override
@@ -10447,7 +10462,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void setTime(int time) {
-                
+                throw new RuntimeException("setTime() not supported on recordable Media");
             }
 
             @Override
