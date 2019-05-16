@@ -26,17 +26,17 @@
 #include "java_lang_Runnable.h"
 #include "com_codename1_ui_Display.h"
 #include "xmlvm.h"
+#import "java_io_IOException.h"
 
 static float volume = -1;
 AudioPlayer* currentlyPlaying = nil;
 
 @implementation AudioPlayer
 
-- (id)initWithURL:(NSString*)url callback:(void*)callback {
+- (id)initWithURL:(NSString*)url callback:(void*)callback error:(NSError **)outError {
     self = [super init];
     if (self) {
         runnableCallback = callback;
-        errorInfo = nil;
         playerInstance = nil;
         avPlayerInstance = nil;
         if(currentlyPlaying == nil) {
@@ -52,9 +52,9 @@ AudioPlayer* currentlyPlaying = nil;
                                                        object:[avPlayerInstance currentItem]];
         } else {
 #ifndef CN1_USE_ARC
-            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:&errorInfo];
+            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:outError];
 #else
-            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:nil];
+            playerInstance = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL URLWithString:url] error:outError];
 #endif
             if(playerInstance != nil)
             {
@@ -69,14 +69,14 @@ AudioPlayer* currentlyPlaying = nil;
     return self;    
 }
 
-- (id)initWithNSData:(NSData*)data callback:(void*)callback {
+- (id)initWithNSData:(NSData*)data callback:(void*)callback error:(NSError **)outError {
     self = [super init];
     if (self) {
         runnableCallback = callback;
 #ifndef CN1_USE_ARC
-        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:&errorInfo];
+        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:outError];
 #else
-        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:nil];
+        playerInstance = [[AVAudioPlayer alloc] initWithData:data error:outError];
 #endif
         if(playerInstance != nil)
         {

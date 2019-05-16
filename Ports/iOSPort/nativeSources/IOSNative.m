@@ -2095,6 +2095,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_lang_Runnable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT uri, JAVA_OBJECT onCompletion) {
+    __block NSError* error = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG uri);
@@ -2102,14 +2103,26 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___java_lang_String_java_l
             ns = fixFilePath(ns);
             NSURL* nu = [NSURL fileURLWithPath:ns];
             ns = [nu absoluteString];
+            NSLog(@"%@", ns);
         }
-        com_codename1_impl_ios_IOSNative_createAudio = (JAVA_LONG)((BRIDGE_CAST void*)[[AudioPlayer alloc] initWithURL:ns callback:onCompletion]);
+        com_codename1_impl_ios_IOSNative_createAudio = (JAVA_LONG)((BRIDGE_CAST void*)[[AudioPlayer alloc] initWithURL:ns callback:onCompletion error:&error]);
+        if (error != nil) {
+            [error retain];
+        }
         POOL_END();
     });
+    if (error != nil) {
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+        [error release];
+        throwException(threadStateData, ex);
+        return 0;
+    }
     return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_Runnable(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT b, JAVA_OBJECT onCompletion) {
+    __block NSError* error = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
@@ -2121,9 +2134,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
         int len = ((JAVA_ARRAY)b)->length;
 #endif
         NSData* d = [NSData dataWithBytes:data length:len];
-        com_codename1_impl_ios_IOSNative_createAudio = (JAVA_LONG)((BRIDGE_CAST void*)[[AudioPlayer alloc] initWithNSData:d callback:onCompletion]);
+        com_codename1_impl_ios_IOSNative_createAudio = (JAVA_LONG)((BRIDGE_CAST void*)[[AudioPlayer alloc] initWithNSData:d callback:onCompletion error:&error]);
+        if (error != nil) {
+            [error retain];
+        }
         POOL_END();
     });
+    if (error != nil) {
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+        [error release];
+        throwException(threadStateData, ex);
+        return 0;
+    }
     return com_codename1_impl_ios_IOSNative_createAudio;
 }
 
@@ -4852,7 +4875,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
 #ifdef INCLUDE_MICROPHONE_USAGE
     __block AVAudioRecorder* recorder = nil;
      
-    __block JAVA_OBJECT ex = JAVA_NULL;
+    __block NSString *exStr = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
@@ -4860,8 +4883,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
         if(err){
             CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
-            ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
+            exStr = [[err userInfo] description];
             POOL_END();
             return;
         }
@@ -4869,8 +4891,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         [audioSession setActive:YES error:&err];
         if(err){
             CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
-            ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
+            exStr = [[err userInfo] description];
             POOL_END();
             return;
         }
@@ -4900,9 +4921,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                               error: &error];
                     if(error != nil) {
                         CN1Log(@"Error in recording: %@", [error localizedDescription]);
-                        ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [[err userInfo] description]));
-                        com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG ex);
+                        exStr = [error localizedDescription];
                         POOL_END();
                         return;
                     }
@@ -4910,9 +4929,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                     com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
                 } else {
                     recorder = nil;
-                    ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                    java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Permission to record was denied"));
-                    com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(CN1_THREAD_GET_STATE_PASS_ARG ex);
+                    exStr = @"Permission to record was denied";
+                    
                 }
                 POOL_END();
             }];
@@ -4921,7 +4939,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
             
             // cleanup older file if it exists in this location
             NSFileManager* fm = [[NSFileManager alloc] init];
-            NSString* ns = fixFilePath(ns);
+            NSString* ns = fixFilePath(filePath);
             if([fm fileExistsAtPath:ns]) {
                 [fm removeItemAtPath:ns error:nil];
             }
@@ -4938,8 +4956,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                       error: &error];
             if(error != nil) {
                 CN1Log(@"Error in recording: %@", [error localizedDescription]);
-                ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+                exStr = [error localizedDescription];
                 POOL_END();
                 return;
             }
@@ -4947,7 +4964,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         }
         POOL_END();
     });
-    if (ex != JAVA_NULL) {
+    if (exStr != nil) {
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
         throwException(threadStateData, ex);
         return (JAVA_LONG)0;
     } else {
@@ -4958,6 +4977,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
     return (JAVA_LONG)0;
 #endif
 }
+
 
 void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                               JAVA_LONG  peer) {
