@@ -8183,17 +8183,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
-            String cookieString = c.getName()+"="+c.getValue()+
-                    "; Domain="+c.getDomain()+
-                    "; Path="+c.getPath()+
-                    "; "+(c.isSecure()?"Secure;":"")
-                    +(c.isHttpOnly()?"httpOnly;":"")
-                    + (c.getExpires() != 0 ? ("Expires="+format.format(new Date(c.getExpires()))+";") : "")
-                    ;
-            mgr.setCookie("http"+
-                    (c.isSecure()?"s":"")+"://"+
-                    c.getDomain()+
-                    c.getPath(), cookieString);
+            addCookie(c, mgr, format);
             if(sync) {
                 syncer.sync();
             }
@@ -8202,6 +8192,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
 
+    }
+
+    private void addCookie(Cookie c, CookieManager mgr, java.text.SimpleDateFormat format) {
+
+        String d = c.getDomain();
+        String port = "";
+        if (d.contains(":")) {
+            // For some reason, the port must be stripped and stored separately
+            // or it won't retrieve it properly.
+            // https://github.com/codenameone/CodenameOne/issues/2804
+            port = "; Port=" + d.substring(d.indexOf(":")+1);
+            d = d.substring(0, d.indexOf(":"));
+        }
+        String cookieString = c.getName() + "=" + c.getValue() +
+                "; Domain=" + d +
+                port +
+                "; Path=" + c.getPath() +
+                "; " + (c.isSecure() ? "Secure;" : "")
+                + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
+                + (c.isHttpOnly() ? "httpOnly;" : "");
+        String cookieUrl = "http" +
+                (c.isSecure() ? "s" : "") + "://" +
+                d +
+                c.getPath();
+        mgr.setCookie(cookieUrl, cookieString);
     }
 
     public void addCookie(Cookie[] cs, boolean addToWebViewCookieManager, boolean sync) {
@@ -8219,16 +8234,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
 
             for (Cookie c : cs) {
-                String cookieString = c.getName() + "=" + c.getValue() +
-                        "; Domain=" + c.getDomain() +
-                        "; Path=" + c.getPath() +
-                        "; " + (c.isSecure() ? "Secure;" : "")
-                        + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
-                        + (c.isHttpOnly() ? "httpOnly;" : "");
-                mgr.setCookie("http" +
-                        (c.isSecure() ? "s" : "") + "://" +
-                        c.getDomain() +
-                        c.getPath(), cookieString);
+                addCookie(c, mgr, format);
 
             }
 
