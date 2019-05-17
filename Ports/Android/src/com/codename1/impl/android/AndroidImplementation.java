@@ -5609,6 +5609,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // workaround for Android bug discussed here: http://stackoverflow.com/questions/17638398/androids-httpurlconnection-throws-eofexception-on-head-requests
         HttpURLConnection con = (HttpURLConnection) connection;
         if("head".equalsIgnoreCase(con.getRequestMethod())) {
+            con.setDoOutput(false);
             con.setRequestProperty( "Accept-Encoding", "" );
         }
         return ((HttpURLConnection) connection).getResponseCode();
