@@ -1483,8 +1483,9 @@ public class Border {
                 Image left = images[0];
                 Image right = images[1];
                 Image center = images[2];
-
-                if(c.getUIManager().isThemeConstant("centerAlignHBorderBool", false)) {
+                Boolean centerAlignHBorderBool = c == null ? null : (Boolean)c.getClientProperty("@centerAlignHBorderBool");
+                boolean b = centerAlignHBorderBool == null ? false : centerAlignHBorderBool;
+                if(b || c.getUIManager().isThemeConstant("centerAlignHBorderBool", false)) {
                     y += Math.max(0, height / 2 - center.getHeight() / 2);
                 }
 

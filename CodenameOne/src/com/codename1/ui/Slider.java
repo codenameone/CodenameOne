@@ -89,6 +89,11 @@ public class Slider extends Label {
         setUIID(uiid);
         this.fullUIID = fullUIID;
         setAlignment(CENTER);
+        
+        // This is necessary for the Android theme to make sure that the progress bar
+        // is rendered vertically centered.  Otherwise the thumb image will be
+        // rendered below it (on y axis) rather than over-top of it.
+        putClientProperty("@centerAlignHBorderBool", true);
     }
     
     /**
