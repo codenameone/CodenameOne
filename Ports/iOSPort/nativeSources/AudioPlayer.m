@@ -144,8 +144,9 @@ AudioPlayer* currentlyPlaying = nil;
     if(playerInstance != nil) {
         return (int)(playerInstance.currentTime * 1000);
     }
-    if(avPlayerInstance.currentItem != nil) {
-        return (int)(CMTimeGetSeconds(avPlayerInstance.currentItem.currentTime) * 1000);
+    if(avPlayerInstance != nil) {
+        int t = (int)(CMTimeGetSeconds(avPlayerInstance.currentTime) * 1000);
+        return t;
     }
     return -1;
 }
@@ -224,7 +225,7 @@ AudioPlayer* currentlyPlaying = nil;
 
 - (BOOL) isPlaying {
     if(playerInstance != nil) {
-        return playerInstance.isPlaying;
+        return playerInstance.playing;
     }
     if(avPlayerInstance != nil) {
         return [avPlayerInstance rate] != 0.0;
