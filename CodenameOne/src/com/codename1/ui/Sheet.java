@@ -125,7 +125,7 @@ public class Sheet extends Container {
     private final Label title = new Label();
     private Container commandsContainer = new Container(BoxLayout.x());
     private Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
-            BorderLayout.center(FlowLayout.encloseCenter(title)),
+            BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
     ));
     private Container contentPane = new Container(BoxLayout.y());
@@ -153,47 +153,70 @@ public class Sheet extends Container {
         
     };
     
-   
-    
     /**
      * Creates a new sheet with the specified parent and title.
      * @param parent Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
      * @param title The title to display in the title bar of the sheet.
      */
     public Sheet(Sheet parent, String title) {
+        this(parent, title, null);
+    }
+    
+    /**
+     * Creates a new sheet with the specified parent and title.
+     * @param parent Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
+     * @param title The title to display in the title bar of the sheet.
+     * @param uiid Optional UIID for the sheet.  If non-null, then the Sheet's uiid will be {@literal uiid}, the title label's UIID will be {@literal uiid + "Title"},
+     * the title bar's UIID will be {@literal uiid + "TitleBar"}, and the back/close button's UIID will be {@literal uiid + "BackButton"}.
+     */
+    public Sheet(Sheet parent, String title, String uiid) {
         setGrabsPointerEvents(true);
-        $(this).selectAllStyles()
-                .setBackgroundType(Style.BACKGROUND_NONE)
-                .setBgImage(null)
-                .setBgColor(0xffffff)
-                .setBgTransparency(0xff)
+        if (uiid != null) {
+            this.setUIID(uiid);
+        } else {
+            $(this).selectAllStyles()
+                    .setBackgroundType(Style.BACKGROUND_NONE)
+                    .setBgImage(null)
+                    .setBgColor(0xffffff)
+                    .setBgTransparency(0xff)
+
+                    .setBorder(RoundRectBorder.create()
+                            //.topOnlyMode(true)
+
+                            .bottomLeftMode(false)
+                            .bottomRightMode(false)
+                            .cornerRadius(2f)
+                    );
+        }
                 
-                .setBorder(RoundRectBorder.create()
-                        //.topOnlyMode(true)
-                        
-                        .bottomLeftMode(false)
-                        .bottomRightMode(false)
-                        .cornerRadius(2f)
-                );
                 
-                
+        if (uiid != null) {
+            this.title.setUIID(uiid+"Title");
+        } else {
+            $(this.title).selectAllStyles()
+                    .setFgColor(0x0)
+                    .setBgTransparency(0x0)
+                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD))
+                    .setAlignment(Component.CENTER);
+        }
         
-        $(title).selectAllStyles()
-                .setFgColor(0x0)
-                .setBgTransparency(0x0)
-                .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD))
-                .setAlignment(Component.CENTER);
-        
-        $(titleBar).selectAllStyles() 
-                .setBgTransparency(0x0)
-                .setBorder(Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
+        if (uiid != null) {
+            titleBar.setUIID(uiid+"TitleBar");
+        } else {
+            $(titleBar).selectAllStyles() 
+                    .setBgTransparency(0x0)
+                    .setBorder(Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
+        }
        
                 
-        
-        $(backButton).selectAllStyles()
-                .setFgColor(0x333333)
-                .setBgTransparency(0)
-                .setBorder(Border.createEmpty());
+        if (uiid != null) {
+            backButton.setUIID(uiid+"BackButton");
+        } else {
+            $(backButton).selectAllStyles()
+                    .setFgColor(0x333333)
+                    .setBgTransparency(0)
+                    .setBorder(Border.createEmpty());
+        }
         this.parentSheet = parent;
         this.title.setText(title);
         initUI();
@@ -207,6 +230,20 @@ public class Sheet extends Container {
      */
     public Container getContentPane() {
         return contentPane;
+    }
+    
+    /**
+     * Hides the back button.
+     */
+    public void hideBackButton() {
+        backButton.setVisible(false);
+    }
+    
+    /**
+     * Shows the back button.
+     */
+    public void showBackButton() {
+        backButton.setVisible(true);
     }
     
     /**
