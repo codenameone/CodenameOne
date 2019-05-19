@@ -850,6 +850,9 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     public boolean animate() {
+        if (!isVisibleOnForm()) {
+            return false;
+        }
         boolean animateTicker = false;
         if(tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()){
             tickerStartTime = System.currentTimeMillis();
