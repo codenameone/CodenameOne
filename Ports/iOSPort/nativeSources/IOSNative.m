@@ -4870,8 +4870,8 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 }
 
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-                                                                                  JAVA_OBJECT  destinationFile) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                                                  JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
 #ifdef INCLUDE_MICROPHONE_USAGE
     __block AVAudioRecorder* recorder = nil;
      
@@ -4910,10 +4910,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                     }
                     
                     CN1Log(@"Recording audio to: %@", filePath);
+                    
+                    // Ignoring bit rate setting as ios doesn't have direct equivalent
+                    // We only support the one mimetype for now also.
                     NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
-                                                    [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
+                                                    [NSNumber numberWithFloat: (JAVA_FLOAT)sampleRate], AVSampleRateKey,     
                                                     [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
-                                                    [NSNumber numberWithInt: 1], AVNumberOfChannelsKey,
+                                                    [NSNumber numberWithInt: channels], AVNumberOfChannelsKey,
                                                     nil];
                     NSError *error = nil;
                     recorder = [[AVAudioRecorder alloc] initWithURL: [NSURL fileURLWithPath:ns]
@@ -7787,9 +7790,9 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long_R_int(CN1_THREAD_
     return com_codename1_impl_ios_IOSNative_getNSDataSize___long(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-                                                                                         JAVA_OBJECT  destinationFile) {
-    return com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, destinationFile);
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                                                         JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration ) {
+    return com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, destinationFile, mimeType, sampleRate, bitRate, channels, maxDuration);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {

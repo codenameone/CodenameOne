@@ -124,6 +124,7 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Audio;
 import com.codename1.media.AudioService;
 import com.codename1.media.MediaProxy;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -3419,7 +3420,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
+
+    @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mimeType);
+        return createMediaRecorder(builder);
+    }
+    
+    
+    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         if (getActivity() == null) {
             return null;
         }
@@ -3443,6 +3457,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }else{
                             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
                             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                            recorder.setAudioSamplingRate(sampleRate);
+                            recorder.setAudioEncodingBitRate(bitRate);
+                        }
+                        if (audioChannels > 0) {
+                            recorder.setAudioChannels(audioChannels);
+                        }
+                        if (maxDuration > 0) {
+                            recorder.setMaxDuration(maxDuration);
                         }
                         recorder.setOutputFile(removeFilePrefix(path));
                         try {
@@ -3476,7 +3498,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public String [] getAvailableRecordingMimeTypes(){
-        return new String[]{"audio/amr", "audio/aac"};
+        // audio/aac and audio/mp4 result in the same thing
+        // AAC are wrapped in an mp4 container.
+        return new String[]{"audio/amr", "audio/aac", "audio/mp4"};
     }
 
 

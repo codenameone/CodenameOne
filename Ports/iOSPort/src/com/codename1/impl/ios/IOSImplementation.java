@@ -84,6 +84,7 @@ import com.codename1.location.Geofence;
 import com.codename1.location.GeofenceListener;
 import com.codename1.location.LocationRequest;
 import com.codename1.media.MediaManager;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
@@ -2976,7 +2977,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String [] getAvailableRecordingMimeTypes() {
-        return new String[]{"audio/m4a"};
+        // All of these amount to the same thing.
+        // We record in AAC format, wrapped in an mp4 container.
+        return new String[]{"audio/mp4", "audio/aac", "audio/m4a"};
     }
     
     private static boolean finishedCreatingAudioRecorder;
@@ -2990,15 +2993,30 @@ public class IOSImplementation extends CodenameOneImplementation {
             createAudioRecorderLock.notifyAll();
         }
     }
+
+    @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
+    
+    
     
     @Override
-    public Media createMediaRecorder(String path, String mimeType) throws IOException{
+    public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mimeType);
+        return createMediaRecorder(builder);
+    }
+    
+
+    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         if (!nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
         }
         finishedCreatingAudioRecorder = false;
         createAudioRecorderException = null;
-        final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
+        final long[] peer = new long[] { nativeInstance.createAudioRecorder(path, mimeType, sampleRate, bitRate, audioChannels, maxDuration) };
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
                 while (!finishedCreatingAudioRecorder) {

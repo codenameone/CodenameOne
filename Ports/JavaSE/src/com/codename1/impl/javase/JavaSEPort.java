@@ -100,6 +100,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
@@ -10305,9 +10306,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return FileEncoder.getEncoder("audio/wav", "audio/mp3") != null;
     }
+
+    @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
     
     @Override
     public Media createMediaRecorder(final String path, String mime) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mime);
+        return createMediaRecorder(builder);
+    }
+
+    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
@@ -10353,9 +10366,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             boolean recording;
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
-                float sampleRate = 44100;
+                float sampleRate = samplingRate;
                 int sampleSizeInBits = 8;
-                int channels = 2;
+                int channels = audioChannels;
                 boolean signed = true;
                 boolean bigEndian = true;
                 javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,

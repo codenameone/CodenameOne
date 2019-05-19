@@ -45,6 +45,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
@@ -4096,6 +4097,19 @@ hi.show();}</pre></noscript>
      */
     public Media createMediaRecorder(String path) throws IOException {
         return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);
+    }
+    
+    /**
+     * 
+     * @param builder A MediaRecorderBuilder
+     * @return a MediaRecorder
+     * @throws IOException 
+     * @deprecated use MediaRecorderBuilder#build()
+     * @see MediaRecorderBuilder#build() 
+     * @since 7.0
+     */
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return impl.createMediaRecorder(builder);
     }
 
     /**

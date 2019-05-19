@@ -43,6 +43,7 @@ import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -6469,6 +6470,19 @@ public abstract class CodenameOneImplementation {
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
         return null;
+    }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param builder THe media builder with settings for the recorder.
+     * getAvailableRecordingMimeTypes()
+     * @since 7.0
+     
+     */
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType());
     }
     
     /**
