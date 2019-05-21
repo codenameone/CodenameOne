@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Timer;
@@ -698,16 +699,29 @@ public final class Display extends CN1Constants {
         }
         
         private void throwRoot(Throwable cause) {
+            HashSet<Throwable> circuitCheck = new HashSet<Throwable>();
+            circuitCheck.add(cause);
             EdtException root = this;
-            root.setCause(cause);
+            if (root != cause) {
+                root.setCause(cause);
+                circuitCheck.add(root);
+            } else {
+                root = (EdtException)cause;
+            }
             while (root.parent != null) {
+                if (circuitCheck.contains(root.parent)) {
+                    break;
+                }
                 root.parent.setCause(root);
+                circuitCheck.add(root.parent);
                 root = root.parent;
             }
             throw root;
         }
         
     }
+    
+    private static final int MAX_ASYNC_EXCEPTION_DEPTH=10;
     
     /**
      * A wrapper around Runnable that records the stack trace so that
@@ -716,8 +730,9 @@ public final class Display extends CN1Constants {
      */
     private class DebugRunnable implements Runnable {
         private final Runnable internal;
-        private final EdtException exceptionWrapper;
-        private final DebugRunnable parentContext;
+        private EdtException exceptionWrapper;
+        private DebugRunnable parentContext;
+        private int depth = -1;
         
         DebugRunnable(Runnable internal) {
             this.internal = internal;
