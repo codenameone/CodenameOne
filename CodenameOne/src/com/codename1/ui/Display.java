@@ -732,18 +732,31 @@ public final class Display extends CN1Constants {
         private final Runnable internal;
         private EdtException exceptionWrapper;
         private DebugRunnable parentContext;
-        private int depth = -1;
+        private int depth;
+        private int totalDepth;
         
         DebugRunnable(Runnable internal) {
             this.internal = internal;
             this.parentContext = currentEdtContext;
+            if (parentContext != null) {
+                depth = parentContext.depth+1;
+                totalDepth = parentContext.totalDepth+1;
+            }
+            
             if (isEnableAsyncStackTraces()) {
                 exceptionWrapper = new EdtException();
+                
                 if (parentContext != null) {
-                    exceptionWrapper.parent = parentContext.exceptionWrapper;
+                    if (depth < MAX_ASYNC_EXCEPTION_DEPTH) {
+                        exceptionWrapper.parent = parentContext.exceptionWrapper;
+                        parentContext = null;
+                    } else {
+                        depth = 0;
+                    }
                 }
             } else {
                 exceptionWrapper = null;
+                parentContext = null;
             }
         }
         
