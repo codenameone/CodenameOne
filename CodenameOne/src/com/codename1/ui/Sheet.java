@@ -22,7 +22,6 @@
  */
 package com.codename1.ui;
 
-import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -30,9 +29,6 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
-import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.RoundRectBorder;
-import com.codename1.ui.plaf.Style;
 
 /**
  * A light-weight dialog that slides up from the bottom of the screen on mobile devices. 
@@ -159,7 +155,7 @@ public class Sheet extends Container {
      * @param title The title to display in the title bar of the sheet.
      */
     public Sheet(Sheet parent, String title) {
-        this(parent, title, null);
+        this(parent, title, "Sheet");
     }
     
     /**
@@ -170,53 +166,15 @@ public class Sheet extends Container {
      * the title bar's UIID will be {@literal uiid + "TitleBar"}, and the back/close button's UIID will be {@literal uiid + "BackButton"}.
      */
     public Sheet(Sheet parent, String title, String uiid) {
+        if (uiid == null) {
+            uiid = "Sheet";
+        }
         setGrabsPointerEvents(true);
-        if (uiid != null) {
-            this.setUIID(uiid);
-        } else {
-            $(this).selectAllStyles()
-                    .setBackgroundType(Style.BACKGROUND_NONE)
-                    .setBgImage(null)
-                    .setBgColor(0xffffff)
-                    .setBgTransparency(0xff)
-
-                    .setBorder(RoundRectBorder.create()
-                            //.topOnlyMode(true)
-
-                            .bottomLeftMode(false)
-                            .bottomRightMode(false)
-                            .cornerRadius(2f)
-                    );
-        }
-                
-                
-        if (uiid != null) {
-            this.title.setUIID(uiid+"Title");
-        } else {
-            $(this.title).selectAllStyles()
-                    .setFgColor(0x0)
-                    .setBgTransparency(0x0)
-                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD))
-                    .setAlignment(Component.CENTER);
-        }
-        
-        if (uiid != null) {
-            titleBar.setUIID(uiid+"TitleBar");
-        } else {
-            $(titleBar).selectAllStyles() 
-                    .setBgTransparency(0x0)
-                    .setBorder(Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
-        }
+        this.setUIID(uiid);       
+        this.title.setUIID(uiid+"Title");
+        titleBar.setUIID(uiid+"TitleBar");
+        backButton.setUIID(uiid+"BackButton");
        
-                
-        if (uiid != null) {
-            backButton.setUIID(uiid+"BackButton");
-        } else {
-            $(backButton).selectAllStyles()
-                    .setFgColor(0x333333)
-                    .setBgTransparency(0)
-                    .setBorder(Border.createEmpty());
-        }
         this.parentSheet = parent;
         this.title.setText(title);
         initUI();
@@ -323,7 +281,6 @@ public class Sheet extends Container {
         if (cnt.getComponentCount() > 0) {
             Component existing = cnt.getComponentAt(0);
             cnt.replace(existing, this, null);
-            this.setHeight(this.getPreferredH());
             cnt.animateLayout(duration);
         } else {
             cnt.add(BorderLayout.SOUTH, this);
