@@ -6484,9 +6484,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     default:
                         throw new IllegalArgumentException("Unsupported native font type: " + fontName);
                 }
-                InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                String fontResourcePath = "/com/codename1/impl/javase/Roboto-" + res + ".ttf";
+                InputStream is = getClass().getResourceAsStream(fontResourcePath);
                 if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    java.awt.Font fnt;
+                    try {
+                         fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    } catch (Exception e) {
+                        System.err.println("Exception while reading font from resource path "+fontResourcePath);
+                        throw e;
+                    }
                     is.close();
                     return fnt;
                 }
@@ -6497,26 +6504,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fontFile = new File("src", fileName);
             }
             if (fontFile.exists()) {
-                FileInputStream fs = new FileInputStream(fontFile);
-                java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
-                fs.close();
-                if (fnt != null) {
-                    if (!fontName.startsWith(fnt.getFamily())) {
-                        System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
-                    }
-                }
-                return fnt;
-            } else {
-                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
-                if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
-                    is.close();
+                try {
+                    FileInputStream fs = new FileInputStream(fontFile);
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
+                    fs.close();
                     if (fnt != null) {
                         if (!fontName.startsWith(fnt.getFamily())) {
                             System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
                         }
                     }
                     return fnt;
+                } catch (Exception e) {
+                    System.err.println("Exception thrown while trying to create font from file "+fontFile);
+                    throw e;
+                }
+            } else {
+                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
+                if(is != null) {
+                    try {
+                        java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                        is.close();
+                        if (fnt != null) {
+                            if (!fontName.startsWith(fnt.getFamily())) {
+                                System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
+                            }
+                        }
+                        return fnt;
+                    } catch (Exception e) {
+                        System.err.println("Exception thrown while trying to create font file from resource path "+"/"+fileName);
+                        throw e;
+                    }
                 }
             }
         } catch (Exception err) {
