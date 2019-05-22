@@ -137,6 +137,7 @@ public class InterFormContainer extends Container {
         
     }
     
+    
     /**
      * {@inheritDoc}
      */
@@ -145,13 +146,20 @@ public class InterFormContainer extends Container {
             return;
         }
         if (content.getParent() != this) {
-            if (content.getParent() != null) {
-                content.remove();
+            if (isInitialized() && !content.isInitialized()) {
+                if (content.getParent() != null) {
+                    content.remove();
+                }
+                add(BorderLayout.CENTER, content);
             }
-            add(BorderLayout.CENTER, content);
-        }
-        super.paint(g);
+        } 
+        
+        g.translate(getX() - content.getX(), getY() - content.getY());
+        content.paint(g);
+        g.translate(content.getX() - getX(), content.getY() - getY());
     }
+    
+    
     
    
     /**
@@ -159,10 +167,7 @@ public class InterFormContainer extends Container {
      */
     @Override
     protected Dimension calcPreferredSize() {
-        if (content.getWidth() <= 0 || content.getHeight() <= 0) {
-            return new Dimension(content.getPreferredW() + content.getStyle().getHorizontalMargins(), content.getPreferredH() + content.getStyle().getVerticalMargins());
-        }
-        return new Dimension(content.getWidth() + content.getStyle().getHorizontalMargins(), content.getHeight() + content.getStyle().getVerticalMargins());
+        return new Dimension(content.getPreferredW() + content.getStyle().getHorizontalMargins(), content.getPreferredH() + content.getStyle().getVerticalMargins());
     }
     
     

@@ -2263,7 +2263,13 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    private void paintIntersectingComponentsAbove(Graphics g) {
+    /**
+     * Paints intersecting components that appear above this component.
+     * 
+     * @param g Graphics context
+     * @deprecated For internal use only
+     */
+    public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
         int tx = g.getTranslateX();
