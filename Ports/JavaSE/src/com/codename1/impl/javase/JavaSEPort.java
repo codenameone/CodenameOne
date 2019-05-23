@@ -6771,17 +6771,61 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
+    private static final double[] IDENTITY = new double[6]; 
+    {
+        AffineTransform.getScaleInstance(1, 1).getMatrix(IDENTITY);
+    }
     
-    private AffineTransform clamp(AffineTransform at){
+    private static AffineTransform clamp(AffineTransform at){
         double[] mat = new double[6];
         at.getMatrix(mat);
-        for ( int i=0; i<6; i++){
-            mat[i] = clamp(mat[i]);
-        }
+        clamp(mat);
         at.setTransform(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
         return at;
     }
     
+    
+    private static void clamp(double[] mat) {
+        for (int i=0; i<6; i++) {
+            double d = mat[i];
+            double clampVal = IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static void clamp(float[] mat) {
+        for (int i=0; i<6; i++) {
+            float d = mat[i];
+            float clampVal = (float)IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static float[] clampCoord(float[] in) {
+        for ( int i=0; i<in.length; i++){
+            in[i] = clampScalar(in[i]);
+        }
+        return in;
+    }
+    
+    private static float clampScalar(float d){
+        float abs = Math.abs(d);
+        if ( Math.abs(abs-Math.round(abs)) < 0.001){
+            return Math.round(d);
+        }
+        return d;
+    }
+
+    
+    /*
     private double clamp(double d){
         double abs = Math.abs(d);
         if ( Math.abs(abs-Math.round(abs)) < 0.001){
@@ -6809,6 +6853,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return in;
     }
+    */
 
     @Override
     public boolean transformNativeEqualsImpl(Object t1, Object t2) {
@@ -7168,7 +7213,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         AffineTransform t = (AffineTransform)nativeTransform;
         t.transform(in, 0, out, 0, 1);
-        clamp(out);
+        clampCoord(out);
     }
     
     
