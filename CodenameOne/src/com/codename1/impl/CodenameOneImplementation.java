@@ -5903,6 +5903,46 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
     
+    /**
+     * Makes a transform given the specified AffineTransform values.  
+     * @param m00 the X coordinate scaling element of the 3x3 matrix
+     * @param m10 the Y coordinate shearing element of the 3x3 matrix
+     * @param m01 the X coordinate shearing element of the 3x3 matrix
+     * @param m11 the Y coordinate scaling element of the 3x3 matrix
+     * @param m02 the X coordinate translation element of the 3x3 matrix
+     * @param m12 the Y coordinate translation element of the 3x3 matrix
+     * @return 
+     * @since 7.0
+     */
+    public Object makeTransformAffine(double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
+    /**
+     * Sets transform to the given specified AffineTransform values.
+     * @param nativeTransform Platform-specific native transform.
+     * @param m00 the X coordinate scaling element of the 3x3 matrix
+     * @param m10 the Y coordinate shearing element of the 3x3 matrix
+     * @param m01 the X coordinate shearing element of the 3x3 matrix
+     * @param m11 the Y coordinate scaling element of the 3x3 matrix
+     * @param m02 the X coordinate translation element of the 3x3 matrix
+     * @param m12 the Y coordinate translation element of the 3x3 matrix
+     * @since 7.0
+     */
+    public void setTransformAffine(Object nativeTransform, double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
         setTransformIdentity(nativeTransform);
         transformScale(nativeTransform, scaleX, scaleY, scaleZ);
