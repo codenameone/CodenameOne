@@ -460,15 +460,22 @@ public final class CommonTransitions extends Transition {
                 Graphics g = buffer.getGraphics();
                 g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
-                if(getSource().getParent() != null){
+                if(getSource().getComponentForm() != null){
                     getSource().getComponentForm().paintComponent(g);
+                } else {
+                    getSource().paintBackgrounds(g);
                 }
-                getSource().paintBackgrounds(g);
-                g.setClip(0, 0, buffer.getWidth()+source.getAbsoluteX(), buffer.getHeight()+source.getAbsoluteY());
-                paint(g, getDestination(), 0, 0);
+                g.setClip(source.getAbsoluteX(), source.getAbsoluteY(), buffer.getWidth(), buffer.getHeight());
+                paint(g, getDestination(), 0, 0, false);
+                source.paintIntersectingComponentsAbove(g);
                 rgbBuffer = new RGBImage(buffer.getRGBCached(), buffer.getWidth(), buffer.getHeight());
+                if(getSource().getComponentForm() != null){
+                    getSource().getComponentForm().paintComponent(g);
+                } else {
+                    paint(g, getSource(), 0, 0, true);
+                    source.paintIntersectingComponentsAbove(g);
+                }
 
-                paint(g, getSource(), 0, 0, true);
                 g.translate(source.getAbsoluteX(), source.getAbsoluteY());
                 showInterformContainers();
             }
@@ -762,10 +769,12 @@ public final class CommonTransitions extends Transition {
                         paint(g, destPane, -destPane.getAbsoluteX() -destPane.getScrollX(), -destPane.getAbsoluteY() -destPane.getScrollY(), true);
                         g.translate(slidePos - destPane.getWidth(), 0);
                     }
+                    
                     g.translate(0, -sourceForm.getTitleArea().getHeight());
                     g.setClip(clipX, clipY, clipW, clipH);
-
                     paintInterformContainers(g);
+
+                    
                     sourceForm.getTitleArea().paintComponentBackground(g);
                     paintShiftFadeHierarchy(sourceForm.getTitleArea(), 255 - alpha, g, false);
                     paintShiftFadeHierarchy(destForm.getTitleArea(), alpha, g, true);
@@ -1008,7 +1017,7 @@ public final class CommonTransitions extends Transition {
             paint(g, dest, -slideX - w, -slideY - h);
             return;
         } 
-        hideInterformContainers();
+        //hideInterformContainers();
         if(source.getParent() != null || buffer == null) {
             source.paintBackgrounds(g);
             paint(g, source, slideX , slideY );
@@ -1016,7 +1025,8 @@ public final class CommonTransitions extends Transition {
             g.drawImage(buffer, slideX, slideY);        
         }
         paint(g, dest, slideX + w, slideY + h);
-        paintInterformContainers(g);
+
+        //paintInterformContainers(g);
         
     }
 
@@ -1072,7 +1082,6 @@ public final class CommonTransitions extends Transition {
             return;
         } 
 
-        hideInterformContainers();
         if(transitionType == TYPE_UNCOVER) {
             paint(g, dest, 0, 0);
             if(source.getParent() != null || buffer == null) {
@@ -1090,7 +1099,6 @@ public final class CommonTransitions extends Transition {
             }
             paint(g, dest, slideX + w, slideY + h);
         }
-        paintInterformContainers(g);
     }
     
     private int getDialogTitleHeight(Dialog d) {

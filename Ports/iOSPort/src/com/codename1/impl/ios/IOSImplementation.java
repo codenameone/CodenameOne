@@ -811,6 +811,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            final Style hintStyle = currentEditing.getHintLabel() != null ? currentEditing.getHintLabel().getStyle() : stl;
             
             if (current != null) {
                 Component nextComponent = current.getNextComponent(cmp);
@@ -847,6 +848,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                         hint = currentEditing.getHint();
                     }
+                    int hintColor = hintStyle.getFgColor();
+                    
                     if(isAsyncEditMode()) {
                         // request focus triggers a scroll which flicks the textEditorHidden flag
                         doNotHideTextEditorSemaphore++;
@@ -873,7 +876,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pb,
                                 pl,
                                 pr, 
-                                hint, 
+                                hint,
+                                hintColor,
                                 showToolbar, 
                                 Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
                                 currentEditing.getStyle().getAlignment(),

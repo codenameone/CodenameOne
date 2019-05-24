@@ -73,6 +73,9 @@ public abstract class Transition implements Animation {
      * @since 7.0
      */
     protected void hideInterformContainers() {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
         if (interFormContainers == null) {
             interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
         }
@@ -90,6 +93,9 @@ public abstract class Transition implements Animation {
      * @since 7.0
      */
     protected void showInterformContainers() {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
         if (interFormContainers == null) {
             interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
         }
@@ -105,6 +111,9 @@ public abstract class Transition implements Animation {
      * @since 7.0
      */
     protected void paintInterformContainers(Graphics g) {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
         if (interFormContainers == null) {
             interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
         }
