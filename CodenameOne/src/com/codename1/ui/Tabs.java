@@ -192,13 +192,16 @@ public class Tabs extends Container {
      */
     void initComponentImpl() {
         super.initComponentImpl();
-        getComponentForm().registerAnimatedInternal(this);
-        if(changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
-            Component f = getComponentForm().getFocused();
-            if(f != null && f.getParent() == tabsContainer) {
-                initTabsContainerStyle();
-                tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
-                tabsContainer.repaint();
+        Form frm = getComponentForm();
+        if(frm != null) {
+            frm.registerAnimatedInternal(this);
+            if(changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
+                Component f = getComponentForm().getFocused();
+                if(f != null && f.getParent() == tabsContainer) {
+                    initTabsContainerStyle();
+                    tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
+                    tabsContainer.repaint();
+                }
             }
         }
     }
