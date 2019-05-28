@@ -43,7 +43,9 @@ import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -6452,6 +6454,28 @@ public abstract class CodenameOneImplementation {
      */
     public int getRenderingHints(Object nativeGraphics) {
         return 0;
+    }
+
+    /**
+     * Starts the remote control service.  This should be implemented
+     * in the platform to handle binding the {@link RemoteControlListener} with
+     * the platform's remote control.
+     * 
+     * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void startRemoteControl() {
+        
+    }
+
+    /**
+     * Stops the remote control service.  This should be implemented in the platform
+     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void stopRemoteControl() {
+        
     }
 
     

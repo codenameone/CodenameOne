@@ -29,7 +29,12 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationManagerCompat;
+import android.support.v4.media.session.MediaButtonReceiver;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import android.widget.Toast;
 import com.codename1.ui.Component;
@@ -51,7 +56,16 @@ public class AudioService extends Service  {
     java.util.Map<Integer,BackgroundMedia> backgroundMedia = new java.util.HashMap<Integer, BackgroundMedia>();
     @Override
     public void onCreate() {
+
         Log.d("CN1", "onCreate");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            BackgroundAudioService.createChannelStatic(this);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, BackgroundAudioService.CHANNEL_ID);
+        if( builder != null ) {
+            startForeground(1, builder.build());
+        }
     }
 
     @Override
@@ -75,6 +89,7 @@ public class AudioService extends Service  {
             }
         }
 
+        stopForeground(true);
         super.onDestroy();
 
     }
@@ -93,6 +108,9 @@ public class AudioService extends Service  {
         }
     }
 
+
+
+
     class BackgroundMedia implements Media, MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedListener,
             MediaPlayer.OnErrorListener, MediaPlayer.OnSeekCompleteListener, MediaPlayer.OnInfoListener, MediaPlayer.OnBufferingUpdateListener {
 
@@ -100,6 +118,7 @@ public class AudioService extends Service  {
         private String mediaLink;
         private File tempFile;
         private int mediaId;
+        boolean released;
 
         BackgroundMedia(int mediaId, String mediaLink) {
             this.mediaId = mediaId;
@@ -207,7 +226,25 @@ public class AudioService extends Service  {
         public void onBufferingUpdate(MediaPlayer mp, int i) {
         }
 
+        private void showPlayingNotification() {
+            BackgroundAudioService s = BackgroundAudioService.getInstance();
+            if (s != null) {
+                s.initMediaSessionMetadata();
+
+                s.showPlayingNotification();
+            }
+        }
+
+        private void showPauseNotification() {
+            BackgroundAudioService s = BackgroundAudioService.getInstance();
+            if (s != null) {
+                s.initMediaSessionMetadata();
+                s.showPausedNotification();
+            }
+        }
+
         public void play() {
+            if (released) return;
             for (BackgroundMedia bm : backgroundMedia.values()) {
                 try {
                     if (bm != this && bm.isPlaying()) {
@@ -216,47 +253,58 @@ public class AudioService extends Service  {
                 } catch (Throwable t){}
             }
             if (!mediaPlayer.isPlaying()) {
+                showPlayingNotification();
                 mediaPlayer.start();
             }
         }
 
         @Override
         public void pause() {
+            if (released) return;
             if (mediaPlayer.isPlaying()) {
+                showPauseNotification();
                 mediaPlayer.pause();
             }
         }
 
         @Override
         public void prepare() {
+            if (released) return;
             mediaPlayer.prepareAsync();
         }
 
         @Override
         public void cleanup() {
+            if (released) return;
             backgroundMedia.remove(mediaId);
             pause();
             mediaPlayer.release();
+            released = true;
+
 
         }
 
         @Override
         public int getTime() {
+            if (released) return 0;
             return mediaPlayer.getCurrentPosition();
         }
 
         @Override
         public void setTime(int time) {
+            if (released) return;
             mediaPlayer.seekTo(time);
         }
 
         @Override
         public int getDuration() {
+            if (released) return 0;
             return mediaPlayer.getDuration();
         }
 
         @Override
         public void setVolume(int vol) {
+            if (released) return;
             float v = ((float) vol) / 100.0F;
             if (mediaPlayer != null) {
                 mediaPlayer.setVolume(v, v);
@@ -265,12 +313,14 @@ public class AudioService extends Service  {
 
         @Override
         public int getVolume() {
+            if (released) return 0;
             AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             return am.getStreamVolume(AudioManager.STREAM_MUSIC);
         }
 
         @Override
         public boolean isPlaying() {
+            if (released) return false;
             return mediaPlayer.isPlaying();
         }
 

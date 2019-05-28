@@ -683,6 +683,28 @@ public final class Display extends CN1Constants {
 
     private DebugRunnable currentEdtContext;
 
+    /**
+     * Stops the remote control service.  This should be implemented in the platform
+     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void stopRemoteControl() {
+        impl.stopRemoteControl();
+    }
+
+    /**
+     * Starts the remote control service.  This should be implemented
+     * in the platform to handle binding the {@link RemoteControlListener} with
+     * the platform's remote control.
+     * 
+     * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void startRemoteControl() {
+        impl.startRemoteControl();
+    }
+
     
     
     
