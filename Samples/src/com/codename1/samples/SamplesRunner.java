@@ -331,7 +331,16 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }).start();
     }
 
-   
+    @Override
+    public void launchUWP(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildUWP(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
     
     
 
@@ -372,6 +381,8 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         
         
     }
+
+    
 
     
     
