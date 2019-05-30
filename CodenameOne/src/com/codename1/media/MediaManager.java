@@ -49,7 +49,37 @@ import java.io.InputStream;
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  */
 public class MediaManager {
-
+    private static RemoteControlListener remoteControlListener;
+    
+    /**
+     * Registers a listener to be notified of remote control events - e.g.
+     * the play/pause/seek buttons on the user's lock screen when background
+     * media is being played.
+     * @param l The remote control listener to set.  null to set no listener.
+     * @since 7.0
+     */
+    public static void setRemoteControlListener(RemoteControlListener l) {
+        boolean shouldStop = remoteControlListener != null && l == null;
+        if (shouldStop) {
+                Display.getInstance().stopRemoteControl();
+        }
+        boolean shouldStart = remoteControlListener == null && l != null;
+        remoteControlListener = l;
+        if (shouldStart) {
+            Display.getInstance().startRemoteControl();
+        }
+        
+    }
+    
+    /**
+     * Gets the currently registered remote control listener.
+     * @return The currently registered remote control listener, or null if 
+     * none is registered.
+     * @since 7.0
+     */
+    public static RemoteControlListener getRemoteControlListener() {
+        return remoteControlListener;
+    }
 
     /**
      * Creates an audio media that can be played in the background.
