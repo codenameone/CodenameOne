@@ -427,7 +427,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return a map representation of the properties
      */
     private Map<String, Object> toMapRepresentationImpl(String excludeFlag) {
-        HashMap<String, Object> m = new HashMap<String, Object>();
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
         for(PropertyBase p : this) {
             if(p.getClientProperty(excludeFlag) != null) {
                 continue;
