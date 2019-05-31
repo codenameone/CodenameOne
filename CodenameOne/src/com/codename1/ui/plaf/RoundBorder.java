@@ -117,6 +117,18 @@ public class RoundBorder extends Border {
      * True if this border grows into a rectangle horizontally or keeps growing as a circle
      */
     private boolean rectangle;
+
+    /**
+     * Forces a special case of the rectangle mode that renders the right side as 
+     * square. This is ignored when the rectangle mode is false
+     */
+    private boolean onlyLeftRounded;
+
+    /**
+     * Forces a special case of the rectangle mode that renders the left side as 
+     * square. This is ignored when the rectangle mode is false
+     */
+    private boolean onlyRightRounded;
     
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;
@@ -333,6 +345,29 @@ public class RoundBorder extends Border {
         return this;
     }
 
+    /**
+     * Forces a special case of the rectangle mode that renders the right side as 
+     * square. This is ignored when the rectangle mode is false
+     * @param onlyLeftRounded the new state of this mode
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder onlyLeftRounded(boolean onlyLeftRounded) {
+        this.onlyLeftRounded = onlyLeftRounded;
+        return this;
+    }
+
+    /**
+     * Forces a special case of the rectangle mode that renders the left side as 
+     * square. This is ignored when the rectangle mode is false
+     * @param onlyRightRounded the new state of this mode
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder onlyRightRounded(boolean onlyRightRounded) {
+        this.onlyRightRounded = onlyRightRounded;
+        return this;
+    }
+    
+    
     private Image createTargetImage(Component c, int w, int h, boolean fast) {
         Image target = Image.createImage(w, h, 0);
         
@@ -379,10 +414,20 @@ public class RoundBorder extends Border {
             if(rectangle) {
                 float sw = this.stroke != null ? this.stroke.getLineWidth() : 0;
                 gp.moveTo(shapeH / 2.0, sw);
-                gp.lineTo(shapeW - (shapeH / 2.0), sw);
-                gp.arcTo(shapeW - (shapeH / 2.0), shapeH / 2.0, shapeW - (shapeH / 2.0), shapeH-sw, true);
-                gp.lineTo(shapeH / 2.0, shapeH-sw);
-                gp.arcTo(shapeH / 2.0, shapeH / 2.0, shapeH / 2.0, sw, true);
+                if(onlyLeftRounded) {
+                    gp.lineTo(shapeW, sw);
+                    gp.lineTo(shapeW, shapeH-sw);
+                } else {
+                    gp.lineTo(shapeW - (shapeH / 2.0), sw);
+                    gp.arcTo(shapeW - (shapeH / 2.0), shapeH / 2.0, shapeW - (shapeH / 2.0), shapeH-sw, true);
+                }
+                if(onlyRightRounded) {
+                    gp.lineTo(sw, shapeH-sw);
+                    gp.lineTo(sw, sw);
+                } else {
+                    gp.lineTo(shapeH / 2.0, shapeH-sw);
+                    gp.arcTo(shapeH / 2.0, shapeH / 2.0, shapeH / 2.0, sw, true);
+                }
                 gp.closePath();
             } else {
                 int size = shapeW;
@@ -403,6 +448,12 @@ public class RoundBorder extends Border {
             tg.setClip(gp);
             c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
             c.getStyle().setBorder(this);
+            if(strokeOpacity > 0 && this.stroke != null) {
+                tg.setColor(strokeColor);
+                tg.setAlpha(strokeOpacity);
+                tg.setAntiAliased(true);
+                tg.drawShape(gp, stroke);
+            }
         } else {
             fillShape(tg, color, opacity, shapeW, shapeH, true);
         }
@@ -495,10 +546,20 @@ public class RoundBorder extends Border {
             GeneralPath gp = new GeneralPath();
             float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
             gp.moveTo(height / 2.0, sw);
-            gp.lineTo(width - (height / 2.0), sw);
-            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-sw, true);
-            gp.lineTo(height / 2.0, height-sw);
-            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
+            if(onlyLeftRounded) {
+                gp.lineTo(width, sw);
+                gp.lineTo(width , height-sw);                
+            } else {
+                gp.lineTo(width - (height / 2.0), sw);
+                gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-sw, true);
+            }
+            if(onlyRightRounded) {
+                gp.lineTo(sw, height-sw);
+                gp.lineTo(sw, sw);                
+            } else {
+                gp.lineTo(height / 2.0, height-sw);
+                gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
+            }
             gp.closePath();
             g.fillShape(gp);
             if(stroke && this.stroke != null) {

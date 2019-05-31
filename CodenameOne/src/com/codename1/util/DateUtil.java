@@ -144,6 +144,26 @@ public class DateUtil {
     }
     
     /**
+     * Checks if two dates are on the same day in the current timezone.
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same day.
+     * @since 7.0
+     */
+    public boolean isSameDay(Date d1, Date d2) {
+        Calendar c1 = Calendar.getInstance(tz);
+        c1.setTime(d1);
+        Calendar c2 = Calendar.getInstance(tz);
+        c2.setTime(d2);
+        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) 
+                && c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH) 
+                && c1.get(Calendar.DATE) == c2.get(Calendar.DATE);
+        
+    }
+    
+    
+    
+    /**
      * Gets the date in "time ago" format.  E.g. "Just now", or "1 day ago", etc..
      * @param date The date
      * @return String representing how long ago from now the given date is.

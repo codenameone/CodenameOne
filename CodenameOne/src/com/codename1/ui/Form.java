@@ -43,6 +43,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -78,6 +79,8 @@ public class Form extends Container {
     static Component rippleComponent;
     static int rippleX;
     static int rippleY;
+    
+    private TextSelection textSelection;
     
     ArrayList<Component> buttonsAwatingRelease;
     
@@ -214,6 +217,18 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+    
+    /**
+     * Gets TextSelection support for this form.
+     * @return The text selection support for this form.
+     * @since 7.0
+     */
+    public TextSelection getTextSelection() {
+        if (textSelection == null) {
+            textSelection = new TextSelection(getContentPane());
+        }
+        return textSelection;
     }
     
     /**
@@ -1573,6 +1588,78 @@ public class Form extends Container {
         contentPane.removeComponent(cmp);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchy(int duration) {
+        contentPane.animateHierarchy(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyAndWait(int duration) {
+        contentPane.animateHierarchyAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFade(int duration, int startingOpacity) {
+        contentPane.animateHierarchyFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateHierarchyFadeAndWait(int duration,
+        int startingOpacity) {
+        contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayout(int duration) {
+        contentPane.animateLayout(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutAndWait(int duration) {
+        contentPane.animateLayoutAndWait(duration);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFade(int duration, int startingOpacity) {
+        contentPane.animateLayoutFade(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateLayoutFadeAndWait(int duration, int startingOpacity) {
+        contentPane.animateLayoutFadeAndWait(duration, startingOpacity);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayout(int duration, int opacity, Runnable callback) {
+        contentPane.animateUnlayout(duration, opacity, callback);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void animateUnlayoutAndWait(int duration, int opacity) {
+        contentPane.animateUnlayoutAndWait(duration, opacity);
+    }
+    
+    
     final void addComponentToForm(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
@@ -2015,6 +2102,12 @@ public class Form extends Container {
                 Log.e(ex);
             }
         }
+        if (getParent() != null) {
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.deregisterAnimated(this);
+            }
+        }
         super.deinitializeImpl();
         animMananger.flush();
         buttonsAwatingRelease = null;
@@ -2031,7 +2124,34 @@ public class Form extends Container {
             Display.impl.setNativeCommands(menuBar.getCommands());
         }
         if (getParent() != null) {
-            getParent().getComponentForm().registerAnimated(this);
+            Form f = getParent().getComponentForm();
+            if (f != null) {
+                f.registerAnimated(this);
+                if (pointerPressedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerPressedListeners.getListenerCollection()) {
+                        f.addPointerPressedListener(l);
+                    }
+                    pointerPressedListeners = null;
+                }
+                if (pointerDraggedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerDraggedListeners.getListenerCollection()) {
+                        f.addPointerDraggedListener(l);
+                    }
+                    pointerDraggedListeners = null;
+                }
+                if (pointerReleasedListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)pointerReleasedListeners.getListenerCollection()) {
+                        f.addPointerReleasedListener(l);
+                    }
+                    pointerReleasedListeners = null;
+                }
+                if (longPressListeners != null) {
+                    for (ActionListener l : (Collection<ActionListener>)longPressListeners.getListenerCollection()) {
+                        f.addLongPressListener(l);
+                    }
+                    longPressListeners = null;
+                }
+            }
         }
     }
 
@@ -2440,6 +2560,13 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 if (focused.hasLead) {

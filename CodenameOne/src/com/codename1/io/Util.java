@@ -38,6 +38,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.FailureCallback;
@@ -1333,6 +1334,35 @@ public class Util {
         implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);
     }
     
+    
+    /**
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * the file system.
+     * @param url The URL to download the image from.
+     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @since 7.0
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
+     */
+    public static AsyncResource<Image> downloadImageToFileSystem(String url, String fileName) {
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        downloadImageToFileSystem(url, fileName, new SuccessCallback<Image>() {
+            @Override
+            public void onSucess(Image value) {
+                out.complete(value);
+            }
+
+        },
+                new FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                out.error(err);
+            }
+        }
+        );
+        return out;
+    }
+    
     /**
      * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
      * the file system.
@@ -1362,9 +1392,68 @@ public class Util {
         implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);
     }
     
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * storage.
+     * @param url The URL to download the image from.
+     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @since 7.0
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
+     */
+    public static AsyncResource<Image> downloadImageToStorage(String url, String fileName) {
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        downloadImageToStorage(url, fileName, new SuccessCallback<Image>() {
+            @Override
+            public void onSucess(Image value) {
+                out.complete(value);
+            }
+
+        },
+                new FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                out.error(err);
+            }
+        }
+        );
+        return out;
+    }
+    
+    /**
+     * Downloads an image to the cache asynchronously.
+     * @param url The URL to download.
+     * @param onSuccess Callback to run on successful completion.
+     * @param onFail Callback to run if download fails.
+     */
     public static void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToCache(url, onSuccess, onFail);
         
+    }
+    
+    /**
+     * Downloads an image to the cache asynchronously.
+     * @param url The URL of the image to download.
+     * @return AsyncResource to wrap the Image.
+     * @since 7.0
+     */
+    public static AsyncResource<Image> downloadImageToCache(String url) {
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        downloadImageToCache(url, new SuccessCallback<Image>() {
+            @Override
+            public void onSucess(Image value) {
+                out.complete(value);
+            }
+
+        },
+                new FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                out.error(err);
+            }
+        }
+        );
+        return out;
     }
     
     /**

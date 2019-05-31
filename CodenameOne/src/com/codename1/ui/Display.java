@@ -45,6 +45,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
@@ -52,12 +53,14 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Timer;
@@ -679,6 +682,32 @@ public final class Display extends CN1Constants {
     }
 
     private DebugRunnable currentEdtContext;
+
+    /**
+     * Stops the remote control service.  This should be implemented in the platform
+     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void stopRemoteControl() {
+        impl.stopRemoteControl();
+    }
+
+    /**
+     * Starts the remote control service.  This should be implemented
+     * in the platform to handle binding the {@link RemoteControlListener} with
+     * the platform's remote control.
+     * 
+     * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void startRemoteControl() {
+        impl.startRemoteControl();
+    }
+
+    
+    
+    
     
     private class EdtException extends RuntimeException {
         private Throwable cause;
@@ -692,16 +721,29 @@ public final class Display extends CN1Constants {
         }
         
         private void throwRoot(Throwable cause) {
+            HashSet<Throwable> circuitCheck = new HashSet<Throwable>();
+            circuitCheck.add(cause);
             EdtException root = this;
-            root.setCause(cause);
+            if (root != cause) {
+                root.setCause(cause);
+                circuitCheck.add(root);
+            } else {
+                root = (EdtException)cause;
+            }
             while (root.parent != null) {
+                if (circuitCheck.contains(root.parent)) {
+                    break;
+                }
                 root.parent.setCause(root);
+                circuitCheck.add(root.parent);
                 root = root.parent;
             }
             throw root;
         }
         
     }
+    
+    private static final int MAX_ASYNC_EXCEPTION_DEPTH=10;
     
     /**
      * A wrapper around Runnable that records the stack trace so that
@@ -710,19 +752,33 @@ public final class Display extends CN1Constants {
      */
     private class DebugRunnable implements Runnable {
         private final Runnable internal;
-        private final EdtException exceptionWrapper;
-        private final DebugRunnable parentContext;
+        private EdtException exceptionWrapper;
+        private DebugRunnable parentContext;
+        private int depth;
+        private int totalDepth;
         
         DebugRunnable(Runnable internal) {
             this.internal = internal;
             this.parentContext = currentEdtContext;
+            if (parentContext != null) {
+                depth = parentContext.depth+1;
+                totalDepth = parentContext.totalDepth+1;
+            }
+            
             if (isEnableAsyncStackTraces()) {
                 exceptionWrapper = new EdtException();
+                
                 if (parentContext != null) {
-                    exceptionWrapper.parent = parentContext.exceptionWrapper;
+                    if (depth < MAX_ASYNC_EXCEPTION_DEPTH) {
+                        exceptionWrapper.parent = parentContext.exceptionWrapper;
+                        parentContext = null;
+                    } else {
+                        depth = 0;
+                    }
                 }
             } else {
                 exceptionWrapper = null;
+                parentContext = null;
             }
         }
         
@@ -808,6 +864,10 @@ public final class Display extends CN1Constants {
         }
     }
 
+    public String getLineSeparator() {
+        return impl.getLineSeparator();
+    }
+    
     /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
@@ -1723,6 +1783,15 @@ public final class Display extends CN1Constants {
      */
     public boolean isAltGraphKeyDown() {
         return impl.isAltGraphKeyDown();
+    }
+    
+    /**
+     * Checks if the last mouse press was a right click.
+     * @return True if the last mouse press was a right click.
+     * @since 7.0
+     */
+    public boolean isRightMouseButtonDown() {
+        return impl.isRightMouseButtonDown();
     }
     
     /**
@@ -3258,6 +3327,19 @@ public final class Display extends CN1Constants {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
+    
+    /**
+     * Creates media asynchronously.
+     *
+     * @param uri the platform specific location for the sound
+     * @param onCompletion invoked when the audio file finishes playing, may be null
+     * @return a handle that can be used to control the playback of the audio
+     * @since 7.0
+     */
+    public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
+        return impl.createMediaAsync(uri, video, onCompletion);
+    }
+
 
     /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
@@ -3293,6 +3375,11 @@ public final class Display extends CN1Constants {
      */
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return impl.createMedia(stream, mimeType, onCompletion);
+    }
+
+    public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+        return impl.createMediaAsync(stream, mimeType, onCompletion);
+        
     }
 
 
@@ -4061,6 +4148,19 @@ hi.show();}</pre></noscript>
     public Media createMediaRecorder(String path) throws IOException {
         return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);
     }
+    
+    /**
+     * 
+     * @param builder A MediaRecorderBuilder
+     * @return a MediaRecorder
+     * @throws IOException 
+     * @deprecated use MediaRecorderBuilder#build()
+     * @see MediaRecorderBuilder#build() 
+     * @since 7.0
+     */
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return impl.createMediaRecorder(builder);
+    }
 
     /**
      * Creates a Media recorder Object which will record from the device mic to
@@ -4432,6 +4532,21 @@ hi.show();}</pre></noscript>
      */ 
     public Media createBackgroundMedia(String uri) throws IOException{
         return impl.createBackgroundMedia(uri);
+    }
+    
+    /**
+     * Creates an audio media that can be played in the background.  This call is
+     * asynchronous, so that it will return perhaps before the media object is ready.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media or null if background playing is not supported on the platform
+     * 
+     */ 
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        return impl.createBackgroundMediaAsync(uri);
     }
 
     /**

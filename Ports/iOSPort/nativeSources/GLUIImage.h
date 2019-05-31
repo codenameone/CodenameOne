@@ -41,4 +41,6 @@
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight;
 -(void)setName:(NSString*)s;
 -(void)setImage:(UIImage*)i;
+-(int)getTextureWidth;
+-(int)getTextureHeight;
 @end

@@ -32,6 +32,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
@@ -340,6 +341,7 @@ public class ImageViewer extends Component {
     @Override
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
+        isPinchZooming = false;
         if(panPositionX > 1) {
             if(panPositionX >= 1 + swipeThreshold && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
@@ -359,6 +361,15 @@ public class ImageViewer extends Component {
             return;
         }
     }
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+        pressX = x;
+        pressY = y;
+        currentZoom = zoom;
+        isPinchZooming = false;
+    }
+    
     
     
     /**
@@ -426,11 +437,14 @@ public class ImageViewer extends Component {
         updatePositions();
     }
     
+    private boolean isPinchZooming;
+    
     /**
      * {@inheritDoc}
      */
     @Override
     protected boolean pinch(float scale) {
+        isPinchZooming = true;
         zoom = currentZoom * scale;
         if(zoom < MIN_ZOOM) {
             zoom = MIN_ZOOM;
@@ -474,6 +488,7 @@ public class ImageViewer extends Component {
             imageDrawHeight = prefH;
             imageX = prefX;
             imageY = prefY;
+            cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
             return;
         } 
         int iW = image.getWidth();
@@ -491,7 +506,57 @@ public class ImageViewer extends Component {
         imageDrawHeight = (int)(((float)iH) * r2 * zoom);
         imageX = (int)(s.getPaddingLeftNoRTL()+ (width - imageDrawWidth) * panPositionX);
         imageY = (int)(s.getPaddingTop() + (height - imageDrawHeight) * panPositionY);
+        cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
     }
+    
+    /**
+     * Gets the current image cropped using the current pan and zoom state.  The cropped image
+     * dimensions will be the result of cropping the full-sized image with the current pan/zoom state.  The aspect
+     * ratio will match the aspect ratio of the ImageViewer - not the source image itself.
+     * @param backgroundColor The background color, visible for letterboxing.
+     * @return The cropped image.
+     * @since 7.0
+     */
+    public Image getCroppedImage(int backgroundColor) {
+        if (image == null) {
+            return null;
+        }
+        updatePositions();
+        int width = (int)Math.round(-image.getWidth() * (cropBox.left + cropBox.right - 1));
+        int height = (int)Math.round(-image.getHeight() * (cropBox.top + cropBox.bottom - 1));
+        return getCroppedImage(width, height, backgroundColor);
+    }
+    
+    /**
+     * Gets the current image cropped using the current pan and zoom state.
+     * @param width The width of the cropped image.  Use -1 to match aspect ratio of the ImageViewer component.  Either height or width must be positive.
+     * @param height The height of the cropped image. Use -1 to match aspect ratio of the ImageViewer component.  Either height or width must be positive.
+     * @param backgroundColor Background color to use for letterboxing.
+     * @return Cropped image in specified dimensions.
+     * @since 7.0
+     */
+    public Image getCroppedImage(int width, int height, int backgroundColor) {
+        if (image == null) {
+            return null;
+        }
+        updatePositions();
+        if (width < 0) {
+            width = (int)Math.round(height * getWidth() / (double)getHeight());
+        }
+        if (height < 0) {
+            height = (int)Math.round(width * getHeight() / (double)getWidth());
+        }
+        
+        Image out = Image.createImage(width, height, backgroundColor);
+        Graphics g = out.getGraphics();
+        g.setColor(backgroundColor);
+        g.fillRect(0, 0, width, height);
+        cropBox.paint(g, width, height);
+        return out;
+        
+    }
+    
+    
     
     /**
      * {@inheritDoc}
@@ -534,8 +599,77 @@ public class ImageViewer extends Component {
         return super.animate() || result; 
     }
     
-    
-    
+    /**
+     * The crop box.  This is automatically updated whenever pan/zoom is changed.
+     */
+    private final CropBox cropBox = new CropBox();
+    private class CropBox {
+        /**
+         * The top, left, right, bottom crop positions expressed as 
+         * ratios of corresponding axis length.  E.g. top/bottom are
+         * ratio of crop position to the height.  Left/right are ratio of crop
+         * position to width.  Positive values move inward toward image center
+         * Negative values move box out.
+         */
+        private double top, left, right, bottom;
+        
+        CropBox() {
+            
+        }
+        
+        CropBox(double top, double right, double bottom, double left) {
+            this.top = top;
+            this.left = left;
+            this.right = right;
+            this.bottom = bottom;
+        }
+        
+        void set(double top, double right, double bottom, double left) {
+            this.top = top;
+            this.left = left;
+            this.right = right;
+            this.bottom = bottom;
+        }
+
+        @Override
+        public String toString() {
+            return "CropBox{"+top+", "+right+", "+bottom+", "+left+"}";
+        }
+        
+        /**
+         * Given a cropped image width, this returns the source image width necessary
+         * to produce the cropped image.
+         * @param croppedWidth
+         * @return 
+         */
+        private int imageWidthForCroppedWidth(int croppedWidth) {
+            return (int)Math.round(-croppedWidth/(left + right - 1));
+        }
+        
+        /**
+         * Given a cropped image height, this returns the source image height necessary to
+         * produce the cropped image.
+         * @param croppedHeight
+         * @return 
+         */
+        private int imageHeightForCroppedHeight(int croppedHeight) {
+            return (int)(Math.round(-croppedHeight/(top+bottom-1)));
+        }
+        
+        /**
+         * Paints the source image onto a Graphics context for a cropped image.
+         * @param g The graphics context
+         * @param imageWidth The cropped image width.
+         * @param imageHeight The cropped image height.
+         */
+        private void paint(Graphics g, int imageWidth, int imageHeight) {
+            int ih = imageHeightForCroppedHeight(imageHeight);
+            int iw = imageWidthForCroppedWidth(imageWidth);
+            g.drawImage(image, (int)Math.round(-left * iw), (int)Math.round(-top * ih), iw, ih);
+        }
+        
+        
+    }
     /**
      * {@inheritDoc}
      */
@@ -545,7 +679,11 @@ public class ImageViewer extends Component {
             Style s = getStyle();
             int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (panPositionX * -1);
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
             if (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos()) {
                 Image left = getImageLeft();
                 if(swipePlaceholder != null) {
@@ -555,7 +693,11 @@ public class ImageViewer extends Component {
                 }
                 ratio = ratio - width;
                 imageAspectCalc(left);
+                if (isPinchZooming) {
+                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+                }
                 g.drawImage(left, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);            
+                g.setRenderingHints(0);
             }
             return;
         }
@@ -563,7 +705,11 @@ public class ImageViewer extends Component {
             Style s = getStyle();
             int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (1 - panPositionX);
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
             if (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos()) {
                 Image right = getImageRight();
                 if(swipePlaceholder != null) {
@@ -573,13 +719,21 @@ public class ImageViewer extends Component {
                 }
                 ratio = ratio + width;
                 imageAspectCalc(right);
+                if (isPinchZooming) {
+                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+                }
                 g.drawImage(right, ((int)ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
+                g.setRenderingHints(0);
             }
             return;
         }
         // can happen in the GUI builder
         if(image != null) {
+            if (isPinchZooming) {
+                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
+            }
             g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+            g.setRenderingHints(0);
         }
     }
     

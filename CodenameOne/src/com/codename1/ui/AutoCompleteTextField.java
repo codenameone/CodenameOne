@@ -298,6 +298,9 @@ public class AutoCompleteTextField extends TextField {
 
     private void removePopup() {
         Form f = getComponentForm();
+        if (f == null && popup != null) {
+            f = popup.getComponentForm();
+        }
         if (f != null) {
             Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             Container parent = popup.getParent();
@@ -351,16 +354,18 @@ public class AutoCompleteTextField extends TextField {
         l.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                pickedText = (String) l.getSelectedItem();
-                setParentText(pickedText);
-                fireActionEvent();
-                // relaunch text editing if we are still editing
-                if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
-                    Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                if(shouldShowPopup()) {
+                    pickedText = (String) l.getSelectedItem();
+                    setParentText(pickedText);
+                    fireActionEvent();
+                    // relaunch text editing if we are still editing
+                    if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
+                        Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());
+                    }
+                    popup.setVisible(false);
+                    popup.setEnabled(false);
+                    f.repaint();
                 }
-                popup.setVisible(false);
-                popup.setEnabled(false);
-                f.repaint();
             }
         });
         

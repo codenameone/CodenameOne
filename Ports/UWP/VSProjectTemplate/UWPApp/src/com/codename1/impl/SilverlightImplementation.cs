@@ -1747,7 +1747,13 @@ namespace com.codename1.impl
             return new NativeTransform(Matrix3x2.Identity);
         }
 
+        public override object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+            return new NativeTransform(new Matrix3x2((float)m00, (float)m10, (float)m01, (float)m11, (float)m02, (float)m12));
+        }
 
+        public override void setTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+            
+        }
 
         public override object makeTransformTranslation(float translateX, float translateY, float translateZ)
         {

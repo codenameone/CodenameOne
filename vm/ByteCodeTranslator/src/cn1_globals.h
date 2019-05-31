@@ -116,7 +116,7 @@ struct clazz {
     int dimensions;
     
     // array internal type
-    struct clazz* arrayType;
+    struct clazz* arrayType;  // <---- The component type for an array class. 0 for scalars.
     JAVA_BOOLEAN primitiveType;
     
     const struct clazz* baseClass;
@@ -133,6 +133,8 @@ struct clazz {
     JAVA_BOOLEAN isInterface;
     JAVA_BOOLEAN isAnonymous;
     JAVA_BOOLEAN isAnnotation;
+    
+    struct clazz* arrayClass;  // <----- The array type for a class.  if clazz=Object, then class->arrayClass=Object[]
 };
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)

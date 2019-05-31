@@ -117,23 +117,23 @@ public interface Media {
     public void cleanup();
 
     /**
-     * Returns the time in seconds in the audio file or -1 if not known
+     * Returns the time in milliseconds in the audio file or -1 if not known
      *
-     * @return time in milli seconds
+     * @return time in milliseconds
      */
     public int getTime();
 
     /**
      * Sets the position in the audio file or doesn't effect if not supported 
      *
-     * @param time in milli seconds
+     * @param time in milliseconds
      */
     public void setTime(int time);
 
     /**
      * Returns the length in milliseconds of the audio file or -1 if not known
      *
-     * @return time in milli seconds
+     * @return time in milliseconds
      */
     public int getDuration();
 

@@ -74,6 +74,34 @@ E.g. Check out the [CameraKitSample](https://github.com/codenameone/CodenameOne/
 
 That's all there is to it.  The library will be automatically downloaded into the build project when you do a launch or build.
 
+### Using Local cn1libs
+
+By default, required cn1libs are downloaded directly from the [CodenameOneLibs](https://github.com/codenameone/CodenameOneLibs) github project.  However, you can override this with a local copy of any libs by specifying the `cn1.library.path` build hint. 
+
+E.g.  Select "File" > "Edit Global Build Hints", then add a line like:
+
+~~~~
+cn1.library.path=/path/to/mycn1libs
+~~~~
+
+You can specify multiple paths using your platform's path separator.  E.g.
+
+~~~~
+cn1.library.path=C:\\path\\to\\cn1libs1;C:\\other\\path
+~~~~
+
+or
+
+~~~~
+cn1.library.path=/path/to/cn1libs1:/other/path
+~~~~
+
+If you're building a cn1lib from source, you could just add the "dist" directory of this project to the cn1.library.path:
+
+~~~~
+cn1.library.path=/path/to/myproject/dist
+~~~~
+
 ### Building against Local Library Project
 
 If you are developing a sample that uses a library that you are still developing, then you can tell the SamplesRunner to use your local codename one library project instead of the version in CodenameOneLibs repository.  
@@ -98,6 +126,41 @@ Where /path/to/CameraKitCodenameOne is where I have the CameraKitCodenameOne lib
 ## Exporting a Sample as a Project
 
 You can export any sample as a self-contained Netbeans project by pressing "More..." > "Export" > "Netbeans" in the row for the sample.  This will prompt you for the location to save the project.  You can then open the project in Netbeans.
+
+## Sending iOS Builds
+
+There is an option in the "More..." menu for each sample to send an iOS build.  However, since iOS requires certificates, and provisioning profiles, you will need to do some "prep" before you can successfully send a build.  You need to:
+
+1. Generate certificates and profiles.
+2. Specify a custom App ID
+3. Send the build.
+
+**Generating Certificates**
+
+The easiest way to generate certificates is to first export the sample as a Netbeans project using "More" > "Export as" > "Netbeans".
+
+After saving the project, you should open the project in Netbeans.
+
+After the project is opened in netbeans, you should open Codename One Settings by right clicking the project node in the project explorer and choosing "Codename One" > "Codename One Settings".
+
+Then complete the certificate wizard.
+
+When the certificate wizard is complete, you'll find a directory named "iosCerts" inside the project folder. 
+
+NOTE: At this point you could just proceed by working with this project directly, but the remainder of these instructions will show you how to use the certificates in the sample directly so that you can send a build in the Sample Runner.
+
+Copy the "iosCerts" directory into the "config/SAMPLE_NAME" directory in the samples project ("SAMPLE_NAME" should be replaced with the name of your sample).  This will be the same directory that contains your sample's private build hints' codenameone_settings.properties file.
+
+**Specifying a Custom App ID**
+
+Once you have copied the iOSCerts directory you need to ensure that the sample's App ID matches the App ID that was generated in the certificate wizard.  
+
+1. Open the sample's private build hints using "More..." > "Edit Private Build Hints"
+2. Copy the `codename1.ios.appid` build hint from your exported netbeans project's codenameone_settings.properties file, into your private build hints.
+
+**Sending the Build**
+
+Now you should be able to send the build using "More..." > "Send iOS Debug Build" (or "Send iOS Release Build"
 
 
 

@@ -31,8 +31,8 @@
     NSError* errorInfo;
     void* runnableCallback;
 }
-- (id)initWithURL:(NSString*)url callback:(void*)callback;
-- (id)initWithNSData:(NSData*)data callback:(void*)callback;
+- (id)initWithURL:(NSString*)url callback:(void*)callback error:(NSError **)outError;
+- (id)initWithNSData:(NSData*)data callback:(void*)callback error:(NSError **)outError;
 - (void)audioPlayerBeginInterruption:(AVAudioPlayer *)player;
 - (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(NSError *)error;
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag;

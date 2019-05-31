@@ -26,6 +26,7 @@ package com.codename1.ui.plaf;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.StyleParser.BorderInfo;
@@ -401,11 +402,14 @@ public class UIManager {
         Font lightFont = thinFont;
         Font italic = Font.createSystemFont(Font.FACE_SYSTEM,
                     Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
+        Font bold = Font.createSystemFont(Font.FACE_SYSTEM,
+                    Font.STYLE_BOLD, Font.SIZE_MEDIUM);
         if(Font.isNativeFontSchemeSupported()) {
             int size = Display.getInstance().convertToPixels(2.5f);
             thinFont = Font.createTrueTypeFont("native:MainThin", "native:MainThin").derive(size, Font.STYLE_PLAIN);
             lightFont = Font.createTrueTypeFont("native:MainLight", "native:MainLight").derive(size, Font.STYLE_PLAIN);
             italic = Font.createTrueTypeFont("native:ItalicLight", "native:ItalicLight").derive(size, Font.STYLE_ITALIC);
+            bold = Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD, Font.NATIVE_MAIN_BOLD).derive(size, Font.STYLE_BOLD);
         }
         
         // component specific settings
@@ -478,6 +482,79 @@ public class UIManager {
             themeProps.put("ToastBarMessage.sel#derive", "ToastBarMessage");
             themeProps.put("ToastBarMessage.press#derive", "ToastBarMessage");
             themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Sheet.derive")) {
+            /*
+            .setBackgroundType(Style.BACKGROUND_NONE)
+                    .setBgImage(null)
+                    .setBgColor(0xffffff)
+                    .setBgTransparency(0xff)
+
+                    .setBorder(RoundRectBorder.create()
+                            //.topOnlyMode(true)
+
+                            .bottomLeftMode(false)
+                            .bottomRightMode(false)
+                            .cornerRadius(2f)
+                    );
+            */
+            
+            themeProps.put("Sheet.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("Sheet.bgColor", "FFFFFF");
+            themeProps.put("Sheet.transparency", "255");
+            themeProps.put("Sheet.border", RoundRectBorder.create()
+                            //.topOnlyMode(true)
+
+                            .bottomLeftMode(false)
+                            .bottomRightMode(false)
+                            .cornerRadius(2f));
+            themeProps.put("Sheet.sel#derive", "Sheet");
+            themeProps.put("Sheet.press#derive", "Sheet");
+            themeProps.put("Sheet.dis#derive", "Sheet");
+            
+            /*
+            $(this.title).selectAllStyles()
+                    .setFgColor(0x0)
+                    .setBgTransparency(0x0)
+                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD))
+                    .setAlignment(Component.CENTER);
+            */
+            themeProps.put("SheetTitle.fgColor", "0");
+            themeProps.put("SheetTitle.transparency", "0");
+            themeProps.put("SheetTitle.font", bold);
+            themeProps.put("SheetTitle.align", centerAlign);
+            themeProps.put("SheetTitle.sel#derive", "SheetTitle");
+            themeProps.put("SheetTitle.press#derive", "SheetTitle");
+            themeProps.put("SheetTitle.dis#derive", "SheetTitle");
+            
+            /*
+            $(titleBar).selectAllStyles() 
+                    .setBgTransparency(0x0)
+                    .setBorder(Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
+            */
+            
+            themeProps.put("SheetTitleBar.transparency", "0");
+            themeProps.put("SheetTitleBar.border", Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
+            themeProps.put("SheetTitleBar.sel#derive", "SheetTitleBar");
+            themeProps.put("SheetTitleBar.press#derive", "SheetTitleBar");
+            themeProps.put("SheetTitleBar.dis#derive", "SheetTitleBar");
+            
+            /*
+            $(backButton).selectAllStyles()
+                    .setFgColor(0x333333)
+                    .setBgTransparency(0)
+                    .setBorder(Border.createEmpty());
+            */
+            
+            themeProps.put("SheetBackButton.fgColor", "333333");
+            themeProps.put("SheetBackButton.transparency", "0");
+            themeProps.put("SheetBackButton.border", Border.createEmpty());
+            themeProps.put("SheetBackButton.sel#derive", "SheetBackButton");
+            themeProps.put("SheetBackButton.press#derive", "SheetBackButton");
+            themeProps.put("SheetBackButton.dis#derive", "SheetBackButton");
+                    
+            
         }
         
         if (installedTheme == null || !installedTheme.containsKey("ChartComponent.derive")) {

@@ -27,6 +27,7 @@ import android.annotation.TargetApi;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.support.v4.content.ContextCompat;
 import android.view.MotionEvent;
 import com.codename1.codescan.ScanResult;
 import com.codename1.media.Media;
@@ -92,6 +93,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.provider.Settings.Secure;
@@ -101,6 +103,9 @@ import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.FileProvider;
+import android.support.v4.media.MediaBrowserCompat;
+import android.support.v4.media.session.MediaControllerCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -123,7 +128,9 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Audio;
 import com.codename1.media.AudioService;
+import com.codename1.media.BackgroundAudioService;
 import com.codename1.media.MediaProxy;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -138,11 +145,13 @@ import com.codename1.ui.Display;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -3161,6 +3170,138 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isNativeVideoPlayerControlsIncluded() {
         return true;
     }
+    
+    private static final int STATE_PAUSED = 0;
+    private static final int STATE_PLAYING = 1;
+
+    private int mCurrentState;
+
+    private MediaBrowserCompat mMediaBrowserCompat;
+    private android.support.v4.media.session.MediaControllerCompat mMediaControllerCompat;
+    
+    private android.support.v4.media.session.MediaControllerCompat.Callback mMediaControllerCompatCallback = new android.support.v4.media.session.MediaControllerCompat.Callback() {
+
+        @Override
+        public void onPlaybackStateChanged(PlaybackStateCompat state) {
+            super.onPlaybackStateChanged(state);
+            if( state == null ) {
+                return;
+            }
+
+            switch( state.getState() ) {
+                case PlaybackStateCompat.STATE_PLAYING: {
+                    mCurrentState = STATE_PLAYING;
+                    break;
+                }
+                case PlaybackStateCompat.STATE_PAUSED: {
+                    mCurrentState = STATE_PAUSED;
+                    break;
+                }
+            }
+        }
+    };
+    
+    private MediaBrowserCompat.ConnectionCallback mMediaBrowserCompatConnectionCallback = new MediaBrowserCompat.ConnectionCallback() {
+
+        @Override
+        public void onConnected() {
+            super.onConnected();
+            try {
+                mMediaControllerCompat = new MediaControllerCompat(getActivity(), mMediaBrowserCompat.getSessionToken());
+                mMediaControllerCompat.registerCallback(mMediaControllerCompatCallback);
+                MediaControllerCompat.setMediaController(getActivity(), mMediaControllerCompat);
+                MediaControllerCompat.getMediaController(getActivity()).getTransportControls().play();
+
+            } catch( RemoteException e ) {
+                e.printStackTrace();
+            }
+        }
+    };
+
+    //BackgroundAudioService remoteControl;
+
+    @Override
+    public void startRemoteControl() {
+        super.startRemoteControl();
+        getActivity().runOnUiThread(new Runnable() {
+            public void run() {
+                mMediaBrowserCompat = new MediaBrowserCompat(getActivity(), new ComponentName(getActivity(), BackgroundAudioService.class),
+                mMediaBrowserCompatConnectionCallback, getActivity().getIntent().getExtras());
+
+                mMediaBrowserCompat.connect();
+                AndroidNativeUtil.addLifecycleListener(new LifecycleListener() {
+                    @Override
+                    public void onCreate(Bundle savedInstanceState) {
+
+                    }
+
+                    @Override
+                    public void onResume() {
+
+                    }
+
+                    @Override
+                    public void onPause() {
+
+                    }
+
+                    @Override
+                    public void onDestroy() {
+                        if (mMediaBrowserCompat != null) {
+                            if( MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
+                                MediaControllerCompat.getMediaController(getActivity()).getTransportControls().pause();
+                            }
+
+                            mMediaBrowserCompat.disconnect();
+                            mMediaBrowserCompat = null;
+                        }
+                    }
+
+                    @Override
+                    public void onSaveInstanceState(Bundle b) {
+
+                    }
+
+                    @Override
+                    public void onLowMemory() {
+
+                    }
+                });
+            }
+            
+        });
+        
+    }
+
+    @Override
+    public void stopRemoteControl() {
+        super.stopRemoteControl(); 
+        if (mMediaBrowserCompat != null) {
+            if( MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
+                MediaControllerCompat.getMediaController(getActivity()).getTransportControls().pause();
+            }
+
+            mMediaBrowserCompat.disconnect();
+            mMediaBrowserCompat = null;
+        }
+    }
+
+
+    @Override
+    public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    out.complete(createBackgroundMedia(uri));
+                } catch (IOException ex) {
+                    out.error(ex);
+                }
+            }
+        }).start();
+
+        return out;
+    }
 
     private int nextMediaId;
     private int backgroundMediaCount;
@@ -3193,7 +3334,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (!boundSuccess) {
                 throw new RuntimeException("Failed to bind background media service for uri "+uri);
             }
-            getContext().startService(serviceIntent);
+            ContextCompat.startForegroundService(getContext(), serviceIntent);
             while (background == null) {
                 Display.getInstance().invokeAndBlock(new Runnable() {
                     @Override
@@ -3203,7 +3344,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 });
             }
         } else {
-            getContext().startService(serviceIntent);
+            ContextCompat.startForegroundService(getContext(), serviceIntent);
         }
 
         while (background.getMedia(mediaId) == null) {
@@ -3226,7 +3367,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 super.cleanup();
                 if (--backgroundMediaCount <= 0) {
                     if (backgroundMediaServiceConnection != null) {
-                        getContext().unbindService(backgroundMediaServiceConnection);
+                        try {
+                            getContext().unbindService(backgroundMediaServiceConnection);
+                        } catch (IllegalArgumentException ex) {
+                            // This is thrown sometimes if the service has already been unbound
+                        }
                     }
                 }
             }
@@ -3419,7 +3564,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
+
+    @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mimeType);
+        return createMediaRecorder(builder);
+    }
+    
+    
+    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         if (getActivity() == null) {
             return null;
         }
@@ -3443,6 +3601,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }else{
                             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
                             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                            recorder.setAudioSamplingRate(sampleRate);
+                            recorder.setAudioEncodingBitRate(bitRate);
+                        }
+                        if (audioChannels > 0) {
+                            recorder.setAudioChannels(audioChannels);
+                        }
+                        if (maxDuration > 0) {
+                            recorder.setMaxDuration(maxDuration);
                         }
                         recorder.setOutputFile(removeFilePrefix(path));
                         try {
@@ -3476,7 +3642,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public String [] getAvailableRecordingMimeTypes(){
-        return new String[]{"audio/amr", "audio/aac"};
+        // audio/aac and audio/mp4 result in the same thing
+        // AAC are wrapped in an mp4 container.
+        return new String[]{"audio/amr", "audio/aac", "audio/mp4"};
     }
 
 
@@ -4231,6 +4399,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             return true;
                                         }
                                 }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyDown(keyCode, event);
+                                }
                                 return super.onKeyDown(keyCode, event);
                             }
 
@@ -4245,6 +4419,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
                                             return true;
                                         }
+                                }
+                                if(Display.getInstance().getProperty(
+                                    "android.propogateKeyEvents", "false").
+                                        equalsIgnoreCase("true") && 
+                                    myView instanceof AndroidAsyncView) {
+                                    ((AndroidAsyncView)myView).onKeyUp(keyCode, event);
                                 }
                                 return super.onKeyUp(keyCode, event);
                             }
@@ -5597,6 +5777,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // workaround for Android bug discussed here: http://stackoverflow.com/questions/17638398/androids-httpurlconnection-throws-eofexception-on-head-requests
         HttpURLConnection con = (HttpURLConnection) connection;
         if("head".equalsIgnoreCase(con.getRequestMethod())) {
+            con.setDoOutput(false);
             con.setRequestProperty( "Accept-Encoding", "" );
         }
         return ((HttpURLConnection) connection).getResponseCode();
@@ -8170,17 +8351,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
-            String cookieString = c.getName()+"="+c.getValue()+
-                    "; Domain="+c.getDomain()+
-                    "; Path="+c.getPath()+
-                    "; "+(c.isSecure()?"Secure;":"")
-                    +(c.isHttpOnly()?"httpOnly;":"")
-                    + (c.getExpires() != 0 ? ("Expires="+format.format(new Date(c.getExpires()))+";") : "")
-                    ;
-            mgr.setCookie("http"+
-                    (c.isSecure()?"s":"")+"://"+
-                    c.getDomain()+
-                    c.getPath(), cookieString);
+            addCookie(c, mgr, format);
             if(sync) {
                 syncer.sync();
             }
@@ -8189,6 +8360,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
 
+    }
+
+    private void addCookie(Cookie c, CookieManager mgr, java.text.SimpleDateFormat format) {
+
+        String d = c.getDomain();
+        String port = "";
+        if (d.contains(":")) {
+            // For some reason, the port must be stripped and stored separately
+            // or it won't retrieve it properly.
+            // https://github.com/codenameone/CodenameOne/issues/2804
+            port = "; Port=" + d.substring(d.indexOf(":")+1);
+            d = d.substring(0, d.indexOf(":"));
+        }
+        String cookieString = c.getName() + "=" + c.getValue() +
+                "; Domain=" + d +
+                port +
+                "; Path=" + c.getPath() +
+                "; " + (c.isSecure() ? "Secure;" : "")
+                + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
+                + (c.isHttpOnly() ? "httpOnly;" : "");
+        String cookieUrl = "http" +
+                (c.isSecure() ? "s" : "") + "://" +
+                d +
+                c.getPath();
+        mgr.setCookie(cookieUrl, cookieString);
     }
 
     public void addCookie(Cookie[] cs, boolean addToWebViewCookieManager, boolean sync) {
@@ -8206,16 +8402,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
 
             for (Cookie c : cs) {
-                String cookieString = c.getName() + "=" + c.getValue() +
-                        "; Domain=" + c.getDomain() +
-                        "; Path=" + c.getPath() +
-                        "; " + (c.isSecure() ? "Secure;" : "")
-                        + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
-                        + (c.isHttpOnly() ? "httpOnly;" : "");
-                mgr.setCookie("http" +
-                        (c.isSecure() ? "s" : "") + "://" +
-                        c.getDomain() +
-                        c.getPath(), cookieString);
+                addCookie(c, mgr, format);
 
             }
 
@@ -9095,10 +9282,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        CN1Matrix4f t = CN1Matrix4f.make(new float[]{
+                (float)m00, (float)m10, 0, 0,
+                (float)m01, (float)m11, 0, 0,
+                0, 0, 1, 0,
+                (float)m02, (float)m12, 0, 1
+        });
+        return t;
+    }
 
-
-
-
+    @Override
+    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
+        ((CN1Matrix4f)nativeTransform).setData(new float[]{
+                (float)m00, (float)m10, 0, 0,
+                (float)m01, (float)m11, 0, 0,
+                0, 0, 1, 0,
+                (float)m02, (float)m12, 0, 1
+        });
+    }
+    
+    
     @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return CN1Matrix4f.makeTranslation(translateX, translateY, translateZ);
@@ -9291,7 +9496,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape, Path p) {
         //Path p = new Path();
         p.rewind();
+        
         com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+        switch (it.getWindingRule()) {
+            case GeneralPath.WIND_EVEN_ODD:
+                p.setFillType(Path.FillType.EVEN_ODD);
+                break;
+            case GeneralPath.WIND_NON_ZERO:
+                p.setFillType(Path.FillType.WINDING);
+                break;
+        }
         //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
         float[] buf = new float[6];
         while (!it.isDone()) {

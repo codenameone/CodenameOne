@@ -27,6 +27,7 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
 import com.codename1.ui.geom.Rectangle;
@@ -446,6 +447,7 @@ public class Component implements Animation, StyleListener, Editable {
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
     EventDispatcher dragFinishedListeners;
+    EventDispatcher longPressListeners;
     boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
@@ -685,6 +687,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     protected Component() {
         initLaf(getUIManager());
+        setCursor(DEFAULT_CURSOR);
     }
     
     /**
@@ -961,6 +964,43 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public boolean isVisible() {
         return visible;
+    }
+    
+    void getVisibleRect(Rectangle r, boolean init) {
+        if (!isVisible() || !initialized) {
+            r.setWidth(0);
+            r.setHeight(0);
+            return;
+        }
+        
+        int w = getWidth();
+        int h = getHeight();
+        int x = getAbsoluteX();
+        int y = getAbsoluteY();
+        if (init) {
+            r.setBounds(x, y, w, h);
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+        } else {
+            Rectangle.intersection(x, y, w, h, r.getX(), r.getY(), r.getWidth(), r.getHeight(), r);
+            if (r.getWidth() <= 0 || r.getHeight() <= 0) {
+                return;
+            }
+        }
+        
+        
+        Container parent = getParent();
+        if (parent != null) {
+            parent.getVisibleRect(r, false);
+            
+        }
+        
+    }
+    private static Rectangle tmpRect = new Rectangle();
+    boolean isVisibleOnForm() {
+        getVisibleRect(tmpRect, true);
+        return (tmpRect.getWidth() > 0 && tmpRect.getHeight() > 0);   
     }
 
     /**
@@ -2223,7 +2263,13 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    private void paintIntersectingComponentsAbove(Graphics g) {
+    /**
+     * Paints intersecting components that appear above this component.
+     * 
+     * @param g Graphics context
+     * @deprecated For internal use only
+     */
+    public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
         int tx = g.getTranslateX();
@@ -3997,6 +4043,19 @@ public class Component implements Animation, StyleListener, Editable {
         return Math.sqrt(disx * disx + disy * disy);
     }
 
+    private boolean inPinch;
+    
+    /**
+     * To be implemented by subclasses interested in being notified when a pinch zoom has
+     * ended (i.e the user has removed one of their fingers, but is still dragging).
+     * @param x The x-coordinate of the remaining finger in the drag.  (Absolute)
+     * @param y The y-coordinate of the remaining finger in the drag. (Absolute)
+     * @since 7.0
+     */
+    protected void pinchReleased(int x, int y) {
+        
+    }
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
@@ -4014,7 +4073,16 @@ public class Component implements Animation, StyleListener, Editable {
             }
             double scale = currentDis / pinchDistance;
             if (pinch((float)scale)) {
+                inPinch = true;
                 return;
+            }
+        } else {
+            if (inPinch) {
+                // if we were in a pinch zoom, but the user
+                // removes a finger, then we need a way to signal to the component
+                // that the pinch portion is over
+                inPinch = false;
+                pinchReleased(x[0], y[0]);
             }
         }
         pointerDragged(x[0], y[0]);
@@ -4498,6 +4566,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerPressed(int[] x, int[] y) {
+        inPinch = false;
         dragActivated = false;
         pointerPressed(x[0], y[0]);
         scrollOpacity = 0xff;
@@ -4558,6 +4627,13 @@ public class Component implements Animation, StyleListener, Editable {
      * 
      */
     public void longPointerPress(int x, int y) {
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
     }
 
     /**
@@ -4568,6 +4644,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerReleased(int x, int y) {
+        if (inPinch) {
+            inPinch = false;
+        }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
@@ -4597,6 +4676,16 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public boolean isTensileDragEnabled() {
         return tensileDragEnabled;
+    }
+    
+    /**
+     * Returns text selection support object for this component.  Only used by 
+     * components that support text selection (e.g. Labels, un-editable text fields, etc..).
+     * @return 
+     * @since 7.0
+     */
+    public TextSelectionSupport getTextSelectionSupport() {
+        return null;
     }
 
     boolean isScrollDecelerationMotionInProgress() {
@@ -4800,6 +4889,19 @@ public class Component implements Animation, StyleListener, Editable {
         }
         pointerPressedListeners.addListener(l);
     }
+    
+    /**
+     * Adds a listener to the pointer event
+     *
+     * @param l callback to receive pointer events
+     * @since 7.0
+     */
+    public void addLongPressListener(ActionListener l) {
+        if (longPressListeners == null) {
+            longPressListeners = new EventDispatcher();
+        }
+        longPressListeners.addListener(l);
+    }
 
     /**
      * Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing 
@@ -4836,6 +4938,18 @@ public class Component implements Animation, StyleListener, Editable {
     public void removePointerPressedListener(ActionListener l) {
         if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Removes the listener from the pointer event
+     *
+     * @param l callback to remove
+     * @since 7.0
+     */
+    public void removeLongPressListener(ActionListener l) {
+        if (longPressListeners != null) {
+            longPressListeners.removeListener(l);
         }
     }
     
@@ -6778,6 +6892,7 @@ public class Component implements Animation, StyleListener, Editable {
         if(b) {
             if(!sizeRequestedByUser) {
                 if(changeMargin) {
+                	getAllStyles().cacheMargins(false); //if a margins cache already exists because the component is already hidden it would be kept else it would be created
                     getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
@@ -6785,9 +6900,10 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
-                    setUIID(getUIID());
-                }
+            	getAllStyles().restoreCachedMargins(); //restore margins to the values they had before the component being hidden and flush the margins cache
+//                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
+//                    setUIID(getUIID());
+//                }
             }
         }
     }

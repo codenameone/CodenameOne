@@ -22,6 +22,8 @@
  */
 package com.codename1.l10n;
 
+import com.codename1.io.Util;
+import java.util.Calendar;
 import java.util.Hashtable;
 import java.util.TimeZone;
 
@@ -215,7 +217,8 @@ public class DateFormatSymbols implements Cloneable {
 		String shortForms[] = new String[longForms.length];
                 int sflen = shortForms.length;
 		for (int i = 0; i < sflen; i++) {
-			String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), null);
+                        String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
+			String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), defaultVal);
 			if (shortForm != null) {
 				shortForms[i] = shortForm;
 			} else {
@@ -287,17 +290,74 @@ public class DateFormatSymbols implements Cloneable {
 		months = newMonths;
 	}
 
+        private String[] platformLocalizedMonths;
+        private String[] getPlatformLocalizedMonths() {
+            if (platformLocalizedMonths == null) {
+                int len = MONTHS.length;
+                platformLocalizedMonths = new String[len];
+                L10NManager l10n = L10NManager.getInstance();
+                Calendar cal = Calendar.getInstance();
+                cal.set(Calendar.DAY_OF_MONTH, 15);
+                for (int i=0; i<len; i++) {
+                    cal.set(Calendar.MONTH, i);
+                    String fmt = l10n.formatDateLongStyle(cal.getTime());
+                    try {
+                        platformLocalizedMonths[i] = extractMonthName(fmt);
+                    } catch (ParseException ex) {
+                        platformLocalizedMonths[i] = MONTHS[i];
+                    }
+                }
+            }
+            return platformLocalizedMonths;
+        }
+        
+        private String[] platformLocalizedShortMonths;
+        private String[] getPlatformLocalizedShortMonths() {
+            if (platformLocalizedShortMonths == null) {
+                int len = MONTHS.length;
+                platformLocalizedShortMonths = new String[len];
+                L10NManager l10n = L10NManager.getInstance();
+                Calendar cal = Calendar.getInstance();
+                cal.set(Calendar.DAY_OF_MONTH, 15);
+                for (int i=0; i<len; i++) {
+                    cal.set(Calendar.MONTH, i);
+                    String fmt = l10n.formatDateLongStyle(cal.getTime());
+                    try {
+                        platformLocalizedShortMonths[i] = extractMonthName(fmt).substring(0, 3);
+                    } catch (ParseException ex) {
+                        platformLocalizedShortMonths[i] = MONTHS[i].substring(0, 3);
+                    }
+                }
+            }
+            return platformLocalizedShortMonths;
+        }
+        
+        private String extractMonthName(String dateStr) throws ParseException {
+            String[] parts = Util.split(dateStr, " ");
+            for (String part : parts) {
+                if (part.length() == 0) {
+                    continue;
+                }
+                String firstChar = part.substring(0, 1);
+                if (!firstChar.toLowerCase().equals(firstChar.toUpperCase())) {
+                    return part;
+                }
+            }
+            throw new ParseException("Cannot extract month from string", 0);
+            
+        }
+        
 	public String[] getMonths() {
 		synchronized (this) {
 			if (months == null) {
 				if (resourceBundle == null) {
-					return MONTHS;
+					return getPlatformLocalizedMonths();
 				}
                                 int mlen = MONTHS.length;
 				String newMonths[] = new String[mlen];
 				for (int i = 0; i < mlen; i++) {
 					String key = MONTHS[i].toUpperCase();
-					newMonths[i] = getLocalizedValue(L10N_MONTH_LONGNAME + key, MONTHS[i]);
+					newMonths[i] = getLocalizedValue(L10N_MONTH_LONGNAME + key, getPlatformLocalizedMonths()[i]);
 				}
 				months = newMonths;
 			}

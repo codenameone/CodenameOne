@@ -100,23 +100,30 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.SuccessCallback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
@@ -996,6 +1003,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         formChangeListener.addListener(al);
     }
 
+    @Override
+    public void copyToClipboard(Object obj) {
+        if (obj instanceof String) {
+            final String text = (String)obj;
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    Toolkit toolkit = Toolkit.getDefaultToolkit();
+                    Clipboard clipboard = toolkit.getSystemClipboard();
+                    StringSelection strSel = new StringSelection(text.trim());
+                    clipboard.setContents(strSel, null);
+                }
+            });
+        }
+        super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    
+    
     public void setCurrentForm(Form f) {        
         super.setCurrentForm(f);
         if (formChangeListener != null) {
@@ -1069,6 +1094,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
+    @Override
+    public boolean isRightMouseButtonDown() {
+        if (lastInputEvent != null) {
+            if (lastInputEvent instanceof MouseEvent) {
+                MouseEvent me = (MouseEvent) lastInputEvent;
+                return SwingUtilities.isRightMouseButton(me);
+            }
+        }
+        return false;
+    }
+
+    
+    
     @Override
     public boolean isShiftKeyDown() {
         if (lastInputEvent != null) {
@@ -1541,10 +1579,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private int getCode(java.awt.event.KeyEvent evt) {
             int code = evt.getKeyCode();
-            if(code >= 'A' && code <= 'Z') {
-                return evt.getKeyChar();
+            switch (code) {
+                case KeyEvent.VK_UP:
+                    return GAME_KEY_CODE_UP;
+                case KeyEvent.VK_DOWN:
+                    return GAME_KEY_CODE_DOWN;
+                case KeyEvent.VK_LEFT:
+                    return GAME_KEY_CODE_LEFT;
+                case KeyEvent.VK_RIGHT:
+                    return GAME_KEY_CODE_RIGHT;
+                case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_ENTER:
+                    return GAME_KEY_CODE_FIRE;
             }
-            return getCode(code);
+            char c = evt.getKeyChar();
+            if(c == java.awt.event.KeyEvent.CHAR_UNDEFINED) {
+                return evt.getKeyCode();
+            }
+            return c;
         }
 
         private int getCode(int k) {
@@ -1564,6 +1616,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             return k;
         }
 
+        
+        
+        
         public void keyTyped(KeyEvent e) {
         }
         // We only know if meta/ctrl/alt etc is down when the key is pressed, but we 
@@ -1573,6 +1628,47 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
+            }
+            if (e.isMetaDown() && e.getKeyChar() == 'c') {
+                Form f = CN.getCurrentForm();
+                if (f != null) {
+                    final TextSelection ts = f.getTextSelection();
+                    if (ts.isEnabled()) {
+                        CN.callSerially(new Runnable() {
+                            public void run() {
+                                final String text = ts.getSelectionAsText();
+                                if (text != null && !text.trim().isEmpty()) {
+                                    EventQueue.invokeLater(new Runnable() {
+                                        public void run() {
+                                            Toolkit toolkit = Toolkit.getDefaultToolkit();
+                                            Clipboard clipboard = toolkit.getSystemClipboard();
+                                            StringSelection strSel = new StringSelection(text.trim());
+                                            clipboard.setContents(strSel, null);
+                                        }
+                                    });
+                                    
+                                }
+                            }
+                        });
+                    }
+                }
+                
+            }
+            
+            if (e.isMetaDown() && e.getKeyChar() == 'a') {
+                System.out.println("Select all");
+                Form f = CN.getCurrentForm();
+                if (f != null) {
+                    final TextSelection ts = f.getTextSelection();
+                    if (ts.isEnabled()) {
+                        CN.callSerially(new Runnable() {
+                            public void run() {
+                                ts.selectAll();
+                            }
+                        });
+                    }
+                }
+                
             }
             lastInputEvent = e;
             // block key combos that might generate unreadable events
@@ -4611,6 +4707,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private EditingInProgress editingInProgress;
     private Component currentlyEditingField;
     
+    private Process tabTipProcess;
+    
     /**
      * @inheritDoc
      */
@@ -4765,6 +4863,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
+        swingT.setCaretColor(new Color(cmp.getUnselectedStyle().getFgColor()));
         final javax.swing.text.JTextComponent tf = swingT;
         if (keyCode > 0) {
             text += ((char) keyCode);
@@ -4800,9 +4899,63 @@ public class JavaSEPort extends CodenameOneImplementation {
             tf.setFont(fallback);
         }
         setCaretPosition(tf, getText(tf).length());
+        
+        
+        // Windows Tablet Show Virtual Keyboard
+        // REf https://stackoverflow.com/a/25783041/2935174
+        final String sysroot = System.getenv("SystemRoot");
+        String tabTipExe = "C:\\Program Files\\Common Files\\microsoft shared\\ink\\TabTip.exe";
+        
+        final boolean useTabTip = exposeFilesystem && "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
+        if (new File(tabTipExe).exists()) {
+            try {
+
+                if (useTabTip) {
+                    //System.out.println("Opening TabTip");
+                    ProcessBuilder pb = new ProcessBuilder("cmd", "/c", tabTipExe);
+                    tabTipProcess = pb.start();
+                } else {
+                    //System.out.println("Opening OSK");
+                    ProcessBuilder pb = new ProcessBuilder(sysroot + "/system32/osk.exe");
+                    tabTipProcess = pb.start();
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to open VKB: " + e.getMessage());
+            }
+
+            tf.addFocusListener(new FocusListener() {
+                @Override
+                public void focusLost(FocusEvent arg0) {
+                    //System.out.println("Lost focus...");
+                    try {
+                        if (tabTipProcess != null) {
+                            tabTipProcess.destroy();
+                        } 
+                    } catch (Exception ex){}
+                    try {
+                        if (useTabTip) {
+                            Runtime.getRuntime().exec("cmd /c taskkill /IM TabTip.exe");
+                        } else {
+                            Runtime.getRuntime().exec("cmd /c taskkill /IM osk.exe");
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Problem closing VKB: " + e.getMessage());
+                    }
+                }
+
+                @Override
+                public void focusGained(FocusEvent arg0) {
+
+                }
+            });
+        }
+
+        
         tf.requestFocus();
         tf.setSelectionStart(0);
         tf.setSelectionEnd(0);
+
+
         class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener, EditingInProgress {
             private final JTextComponent textCmp;
             private final JComponent swingComponentToRemove;
@@ -4867,6 +5020,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             public void focusGained(FocusEvent e) {
                 setCaretPosition(tf, getText(tf).length());
+                
+                
             }
 
             public void focusLost(FocusEvent e) {
@@ -6329,9 +6484,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     default:
                         throw new IllegalArgumentException("Unsupported native font type: " + fontName);
                 }
-                InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                String fontResourcePath = "/com/codename1/impl/javase/Roboto-" + res + ".ttf";
+                InputStream is = getClass().getResourceAsStream(fontResourcePath);
                 if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    java.awt.Font fnt;
+                    try {
+                         fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    } catch (Exception e) {
+                        System.err.println("Exception while reading font from resource path "+fontResourcePath);
+                        throw e;
+                    }
                     is.close();
                     return fnt;
                 }
@@ -6342,26 +6504,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fontFile = new File("src", fileName);
             }
             if (fontFile.exists()) {
-                FileInputStream fs = new FileInputStream(fontFile);
-                java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
-                fs.close();
-                if (fnt != null) {
-                    if (!fontName.startsWith(fnt.getFamily())) {
-                        System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
-                    }
-                }
-                return fnt;
-            } else {
-                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
-                if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
-                    is.close();
+                try {
+                    FileInputStream fs = new FileInputStream(fontFile);
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
+                    fs.close();
                     if (fnt != null) {
                         if (!fontName.startsWith(fnt.getFamily())) {
                             System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
                         }
                     }
                     return fnt;
+                } catch (Exception e) {
+                    System.err.println("Exception thrown while trying to create font from file "+fontFile);
+                    throw e;
+                }
+            } else {
+                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
+                if(is != null) {
+                    try {
+                        java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                        is.close();
+                        if (fnt != null) {
+                            if (!fontName.startsWith(fnt.getFamily())) {
+                                System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
+                            }
+                        }
+                        return fnt;
+                    } catch (Exception e) {
+                        System.err.println("Exception thrown while trying to create font file from resource path "+"/"+fileName);
+                        throw e;
+                    }
                 }
             }
         } catch (Exception err) {
@@ -6599,17 +6771,61 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
+    private static final double[] IDENTITY = new double[6]; 
+    {
+        AffineTransform.getScaleInstance(1, 1).getMatrix(IDENTITY);
+    }
     
-    private AffineTransform clamp(AffineTransform at){
+    private static AffineTransform clamp(AffineTransform at){
         double[] mat = new double[6];
         at.getMatrix(mat);
-        for ( int i=0; i<6; i++){
-            mat[i] = clamp(mat[i]);
-        }
+        clamp(mat);
         at.setTransform(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
         return at;
     }
     
+    
+    private static void clamp(double[] mat) {
+        for (int i=0; i<6; i++) {
+            double d = mat[i];
+            double clampVal = IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static void clamp(float[] mat) {
+        for (int i=0; i<6; i++) {
+            float d = mat[i];
+            float clampVal = (float)IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static float[] clampCoord(float[] in) {
+        for ( int i=0; i<in.length; i++){
+            in[i] = clampScalar(in[i]);
+        }
+        return in;
+    }
+    
+    private static float clampScalar(float d){
+        float abs = Math.abs(d);
+        if ( Math.abs(abs-Math.round(abs)) < 0.001){
+            return Math.round(d);
+        }
+        return d;
+    }
+
+    
+    /*
     private double clamp(double d){
         double abs = Math.abs(d);
         if ( Math.abs(abs-Math.round(abs)) < 0.001){
@@ -6637,6 +6853,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return in;
     }
+    */
 
     @Override
     public boolean transformNativeEqualsImpl(Object t1, Object t2) {
@@ -6701,6 +6918,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isPerspectiveTransformSupported(){
         return false;
     }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        return new AffineTransform(m00, m10, m01, m11, m02, m12);
+    }
+
+    @Override
+    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
+        ((AffineTransform)nativeTransform).setTransform(m00, m10, m01, m11, m02, m12);
+    }
+    
+    
+    
     
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
@@ -6996,7 +7226,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         AffineTransform t = (AffineTransform)nativeTransform;
         t.transform(in, 0, out, 0, 1);
-        clamp(out);
+        clampCoord(out);
     }
     
     
@@ -7350,6 +7580,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         return super.createBackgroundMedia(uri);
     }
+
+    @Override
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        AsyncResource<Media> out = new AsyncResource<Media>();
+        
+        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
+        }
+        
+        return super.createBackgroundMediaAsync(uri);
+    }
+    
+    
     
     
     
@@ -7591,6 +7835,65 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
     }
+
+    @Override
+    public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
+        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
+        }
+        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
+            out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
+            return out;
+        }
+        
+        if(uriAddress.startsWith("file:")) {
+            uriAddress = unfile(uriAddress);
+        }
+        final String uri = uriAddress;
+        if (!fxExists) {
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
+            System.out.println(msg);
+            out.error(new IOException(msg));
+            return out;
+        }
+        java.awt.Container cnt = canvas.getParent();
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                out.error(new RuntimeException("Could not find canvas.  Cannot create media"));
+                return out;
+            }
+        }
+
+        final java.awt.Container c = cnt;
+
+        //final Media[] media = new Media[1];
+        final Exception[] err = new Exception[1];
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
+        //mediaContainer = m;
+        Platform.runLater(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
+                        String mimeType = "video/mp4";
+                        new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion, out);
+                        return;
+                    }
+
+                   new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion, out);
+                } catch (Exception ex) {
+                    out.error(ex);
+                }
+            }
+        });
+        return out;
+    }
+    
+    
     
     /**
      * Plays the sound in the given URI which is partially platform specific.
@@ -7602,22 +7905,49 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(String uriAddress, final boolean isVideo, final Runnable onCompletion) throws IOException {
-        
+        AsyncResource<Media> res = createMediaAsync(uriAddress, isVideo, onCompletion);
+        try {
+            return res.get();
+        } catch (Throwable t) {
+            Throwable cause = t.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException)cause;
+            }
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException)cause;
+            }
+            throw new IOException(cause);
+        }
+    }
+
+    
+    /**
+     * Plays the sound in the given stream
+     *
+     * @param stream the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @param onCompletion invoked when the audio file finishes playing, may be
+     * null
+     * @return a handle that can be used to control the playback of the audio
+     * @throws java.io.IOException if the URI access fails
+     */
+    @Override
+    public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
+            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
+            return out;
         }
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
+             out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
+            return out;
         }
         
-        if(uriAddress.startsWith("file:")) {
-            uriAddress = unfile(uriAddress);
-        }
-        final String uri = uriAddress;
         if (!fxExists) {
             String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            System.out.println(msg);
-            throw new IOException(msg);
+            //System.out.println(msg);
+            out.error(new IOException(msg));
+            return out;
         }
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
@@ -7626,50 +7956,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
         }
-
         final java.awt.Container c = cnt;
 
-        final Media[] media = new Media[1];
-        final Exception[] err = new Exception[1];
+        //final Media[] media = new Media[1];
+        //final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         //mediaContainer = m;
+
         Platform.runLater(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
-                        String mimeType = "video/mp4";
-                        media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion);
-                        return;
-                    }
-
-                    media[0] = new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion);
+                    new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion, out);
                 } catch (Exception ex) {
-                    err[0] = ex;
+                    out.error(ex);
                 }
             }
         });
 
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while (media[0] == null && err[0] == null) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            }
-        });
-        if (err[0] != null) {
-            throw new IOException(err[0]);
-        }
-        return media[0];
-
+        return out;
     }
-
+    
     /**
      * Plays the sound in the given stream
      *
@@ -7681,61 +7989,18 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(final InputStream stream, final String mimeType, final Runnable onCompletion) throws IOException {
-
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
-        }
-        
-        if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            System.out.println(msg);
-            throw new IOException(msg);
-        }
-        java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof JFrame)) {
-            cnt = cnt.getParent();
-            if (cnt == null) {
-                return null;
+        try {
+            return createMediaAsync(stream, mimeType, onCompletion).get();
+        } catch (Throwable t) {
+            t = t.getCause();
+            if (t instanceof IOException) {
+                throw (IOException)t;
+            } else if (t instanceof RuntimeException) {
+                throw (RuntimeException)t;
+            } else {
+                throw new IOException(t);
             }
         }
-        final java.awt.Container c = cnt;
-
-        final Media[] media = new Media[1];
-        final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        //mediaContainer = m;
-
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    media[0] = new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion);
-                } catch (Exception ex) {
-                    err[0] = ex;
-                }
-            }
-        });
-
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while (media[0] == null && err[0] == null) {
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            }
-        });
-        if (err[0] != null) {
-            throw new IOException(err[0]);
-        }
-        return media[0];
     }
 
     @Override
@@ -8594,6 +8859,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     public char getFileSystemSeparator() {
         return '/';
     }
+    
+    public String getLineSeparator() {
+        return System.lineSeparator();
+    }
 
     /**
      * @inheritDoc
@@ -9329,7 +9598,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean playing = false;
         private boolean nativePlayerMode;
         
-        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             if (onCompletion != null) {
                 addCompletionHandler(onCompletion);
             }
@@ -9370,6 +9639,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     uri = temp.toURI().toURL().toExternalForm();
                 }
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                player.setOnReady(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.complete(CodenameOneMediaPlayer.this);
+                        }
+                    }
+                });
                 player.setOnPaused(new Runnable() {
                     public void run() {
                         playing = false;
@@ -9385,14 +9661,27 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (isVideo) {
                     videoPanel = fx;
                 }
+                player.setOnError(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.error(player.errorProperty().get());
+                        } else {
+                            Log.e(player.errorProperty().get());
+                        }
+                    }
+                });
 
             } catch (Exception ex) {
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
+                if (callback != null) {
+                    callback.error(ex);
+                } else {
+                    ex.printStackTrace();
+                    throw new RuntimeException(ex);
+                }
             }
         }
 
-        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
+        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             String suffix = "";
             if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
                 suffix = ".mp3";
@@ -9447,6 +9736,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.frm = f;
             try {
                 player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
+                player.setOnReady(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.complete(CodenameOneMediaPlayer.this);
+                        }
+                    }
+                });
                 player.setOnPaused(new Runnable() {
                     public void run() {
                         playing = false;
@@ -9461,10 +9757,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (isVideo) {
                     videoPanel = fx;
                 }
+                player.setOnError(new Runnable() {
+                    public void run() {
+                        if (callback != null) {
+                            callback.error(player.errorProperty().get());
+                        } else {
+                            Log.e(player.errorProperty().get());
+                        }
+                    }
+                });
 
             } catch (Exception ex) {
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
+                if (callback != null) {
+                    callback.error(ex);
+                } else {
+                    ex.printStackTrace();
+                    throw new RuntimeException(ex);
+                }
             }
         }
 
@@ -10072,9 +10381,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return FileEncoder.getEncoder("audio/wav", "audio/mp3") != null;
     }
+
+    @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
     
     @Override
     public Media createMediaRecorder(final String path, String mime) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mime);
+        return createMediaRecorder(builder);
+    }
+
+    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
@@ -10120,9 +10441,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             boolean recording;
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
-                float sampleRate = 44100;
+                float sampleRate = samplingRate;
                 int sampleSizeInBits = 8;
-                int channels = 2;
+                int channels = audioChannels;
                 boolean signed = true;
                 boolean bigEndian = true;
                 javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,
@@ -10131,60 +10452,58 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             @Override
             public void play() {
-                try {
-                    AudioFormat format = getAudioFormat();
-                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+                if (line == null) {
+                    try {
+                        AudioFormat format = getAudioFormat();
+                        DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-                    // checks if system supports the data line
-                    if (!AudioSystem.isLineSupported(info)) {
-                        throw new RuntimeException("Audio format not supported on this platform");
-                    }
-                    line = (TargetDataLine) AudioSystem.getLine(info);
-                    line.open(format);
-                    line.start();   // start capturing
-
-                    
-
-                    recording = true;
-                    // start recording
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                AudioInputStream ais = new AudioInputStream(line);
-                                AudioSystem.write(ais, fileType, wavFile);
-                            } catch (IOException ioe) {
-                                throw new RuntimeException(ioe);
-                            }
+                        // checks if system supports the data line
+                        if (!AudioSystem.isLineSupported(info)) {
+                            throw new RuntimeException("Audio format not supported on this platform");
                         }
-                    }).start();
-                    
-               } catch (LineUnavailableException ex) {
-                                throw new RuntimeException(ex);
-                }     
+                        line = (TargetDataLine) AudioSystem.getLine(info);
+                        line.open(format);
+                        line.start();   // start capturing
+
+
+
+                        recording = true;
+                        // start recording
+                        new Thread(new Runnable() {
+                            public void run() {
+                                try {
+                                    AudioInputStream ais = new AudioInputStream(line);
+                                    AudioSystem.write(ais, fileType, wavFile);
+                                } catch (IOException ioe) {
+                                    throw new RuntimeException(ioe);
+                                }
+                            }
+                        }).start();
+
+                   } catch (LineUnavailableException ex) {
+                                    throw new RuntimeException(ex);
+                    }    
+                } else {
+                    if (!line.isActive()) {
+                        line.start();
+                        recording = true;
+                    }
+                }
 
                 
             }
 
             @Override
             public void pause() {
+                if (line == null) {
+                    return;
+                }
                 if (!recording) {
                     return;
                 }
                 recording = false;
-                
-               
                 line.stop();
-                line.close();
-                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
-                    try {
-                        System.out.println("Encoding to mp3");
-                        FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
-                        wavFile.delete();
-                    } catch (Throwable ex) {
-                        com.codename1.io.Log.e(ex);
-                        throw new RuntimeException(ex);
-                    }
-                }
+                
                 
             }
             
@@ -10200,11 +10519,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
-                try {
-                    line.stop();
-                    line.close();
-                    line = null;
-                } catch (Throwable t){}
+                line.close();
+                
+                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                    final Throwable[] t = new Throwable[1];
+                    CN.invokeAndBlock(new Runnable() {
+                        public void run() {
+                            try {
+                                System.out.println("Encoding to mp3");
+                                FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
+                                wavFile.delete();
+                            } catch (Throwable ex) {
+                                com.codename1.io.Log.e(ex);
+                                t[0] = ex;
+                            }
+                        }
+                    });
+                    if (t[0] != null) {
+                        throw new RuntimeException(t[0]);
+                    }
+                    
+                }
+                line = null;
             }
 
             @Override
@@ -10214,7 +10550,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void setTime(int time) {
-                
+                throw new RuntimeException("setTime() not supported on recordable Media");
             }
 
             @Override

@@ -307,6 +307,20 @@ public class SamplesRunner implements SamplesPanel.Delegate {
     }
     
     @Override
+    public void launchIOSRelease(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildIOSRelease(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+    
+
+    
+    @Override
     public void launchAndroid(Sample sample) {
         new Thread(()->{
             try {
@@ -317,7 +331,16 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }).start();
     }
 
-   
+    @Override
+    public void launchUWP(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.buildUWP(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
     
     
 
@@ -361,6 +384,7 @@ public class SamplesRunner implements SamplesPanel.Delegate {
 
     
 
+    
     
     
     

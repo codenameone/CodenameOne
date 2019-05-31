@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 
 /**
@@ -50,6 +51,7 @@ public final class Graphics {
     private Transform translation;
     private GeneralPath tmpClipShape; /// A buffer shape to use when we need to transform a shape
     private int color;
+    private Paint paint;
     private Font current = Font.getDefaultFont();
 
     private CodenameOneImplementation impl;
@@ -57,6 +59,16 @@ public final class Graphics {
 
     private Object[] nativeGraphicsState;
     private float scaleX = 1, scaleY = 1;
+    
+    /**
+     * Rendering hint to indicate that the context should prefer to render
+     * primitives in a quick way, at the cost of quality, if there is an 
+     * expensive operation.
+     * @see #setRenderingHints(int) 
+     * @see #getRenderingHints() 
+     * @since 7.0
+     */
+    public static final int RENDERING_HINT_FAST=1;
     
     /**
      * Constructing new graphics with a given javax.microedition.lcdui.Graphics 
@@ -159,6 +171,17 @@ public final class Graphics {
     public int getColor() {
         return color;
     }
+    
+    /**
+     * Gets the current {@link Paint} that is set to be used for filling shapes.
+     * 
+     * @return The paint that is to be used for filling shapes.
+     * @since 7.0
+     * @see LinearGradientPaint
+     */
+    public Paint getPaint() {
+        return paint;
+    }
 
     /**
      * Sets the current rgb color while ignoring any potential alpha component within
@@ -167,8 +190,19 @@ public final class Graphics {
      * @param RGB the RGB value for the color.
      */
     public void setColor(int RGB) {
+        paint = null;
         color = 0xffffff & RGB;
         impl.setColor(nativeGraphics, color);
+    }
+    
+    /**
+     * Sets paint to be used for filling shapes.  This is only used for the {@link #fillShape(com.codename1.ui.geom.Shape) } method.
+     * @param paint
+     * @since 7.0
+     * @see LinearGradientPaint
+     */
+    public void setColor(Paint paint) {
+        this.paint = paint;
     }
     
     /**
@@ -629,6 +663,8 @@ public final class Graphics {
         }
     }
     
+    
+    
     void drawImageWH(Object nativeImage, int x, int y, int w ,int h) {
         impl.drawImage(nativeGraphics, nativeImage, x + xTranslate, y + yTranslate, w, h);
     }
@@ -691,6 +727,9 @@ public final class Graphics {
      * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
      * 
+     * <p>Note: You can specify a custom {@link Paint} to use for filling the shape using the {@link #setColor(com.codename1.ui.Paint) }
+     * method.  This is useful for filling the shape with a {@link LinearGradientPaint}, for example.</p>
+     * 
      * 
      * @param shape The shape to be filled.
      * 
@@ -698,6 +737,24 @@ public final class Graphics {
      */
     public void fillShape(Shape shape){
         if ( isShapeSupported() ){
+            if (paint != null) {
+                int clipX = getClipX();
+                int clipY = getClipY();
+                int clipW = getClipWidth();
+                int clipH = getClipHeight();
+                setClip(shape);
+                clipRect(clipX, clipY, clipW, clipH);
+                if ( xTranslate != 0 || yTranslate != 0 ){
+                    GeneralPath p = tmpClipShape();
+                    p.setShape(shape, translation());
+                    shape = p;
+                }
+                Rectangle bounds = shape.getBounds();
+                paint.paint(this, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+                setClip(clipX, clipY, clipW, clipH);
+                return;
+                
+            }
             if ( xTranslate != 0 || yTranslate != 0 ){
                 GeneralPath p = tmpClipShape();
                 p.setShape(shape, translation());
@@ -784,6 +841,17 @@ public final class Graphics {
      */
     public void setTransform(Transform transform){
         impl.setTransform(nativeGraphics, transform);
+    }
+    
+    /**
+     * Concatenates the given transform to the context's transform.
+     * @param transform The transform to concatenate.
+     * @since 7.0
+     */
+    public void transform(Transform transform) {
+        Transform existing = getTransform();
+        existing.concatenate(transform);
+        setTransform(existing);
     }
     
     /**
@@ -1319,5 +1387,25 @@ public final class Graphics {
             clearRectImpl(peer.getAbsoluteX(), peer.getAbsoluteY(), peer.getWidth(), peer.getHeight());
         }
         
-    }    
+    }   
+    
+    /**
+     * Sets rendering hints for this context.
+     * @param hints int of rendering hints produced by logical AND on all applicable hints.
+     * @see #RENDERING_HINT_FAST
+     * @see #getRenderingHints() 
+     * @since 7.0
+     */
+    public void setRenderingHints(int hints) {
+        impl.setRenderingHints(nativeGraphics, hints);
+    }
+    
+    /**
+     * Gets the current rendering hints for this context.
+     * @see #RENDERING_HINT_FAST
+     * @return The rendering hints.
+     */
+    public int getRenderingHints() {
+        return impl.getRenderingHints(nativeGraphics);
+    }
 }

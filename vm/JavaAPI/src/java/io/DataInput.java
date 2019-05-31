@@ -27,7 +27,7 @@ package java.io;
  * It is generally true of all the reading routines in this interface that if end of file is reached before the desired number of bytes has been read, an EOFException (which is a kind of IOException) is thrown. If any byte cannot be read for any reason other than end of file, an IOException other than EOFException is thrown. In particular, an IOException may be thrown if the input stream has been closed.
  * Since: JDK1.0, CLDC 1.0 See Also:DataInputStream, DataOutput
  */
-public interface DataInput{
+public interface DataInput extends AutoCloseable {
     /**
      * Reads one input byte and returns true if that byte is nonzero, false if that byte is zero. This method is suitable for reading the byte written by the writeBoolean method of interface DataOutput.
      */

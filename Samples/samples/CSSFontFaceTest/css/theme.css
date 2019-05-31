@@ -1,0 +1,20 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+@font-face {
+    font-family: "MyIcons";
+    src: url(fonts/controller.ttf);
+}
+
+Label {
+    font-family: 'MyIcons';
+    font-size: 12px;
+    color: blue;
+}
+
+Label2 {
+    font-family: 'native:MainRegular';
+    font-size: 20pt;
+    color: red;
+}

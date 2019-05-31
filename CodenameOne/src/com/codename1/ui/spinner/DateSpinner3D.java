@@ -22,6 +22,8 @@
  */
 package com.codename1.ui.spinner;
 
+import com.codename1.l10n.DateFormatSymbols;
+import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import static com.codename1.ui.CN.convertToPixels;
 import com.codename1.ui.Component;
@@ -60,6 +62,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private boolean numericMonths = false;
 
     private String monthRenderingPrototype = "WWW";
+    private SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     
     /**
      * Default constructor
@@ -70,8 +73,22 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         currentDay = c.get(Calendar.DAY_OF_MONTH);
         currentMonth = c.get(Calendar.MONTH) + 1;
         currentYear = c.get(Calendar.YEAR);
+        
+        // If dates should be formatted with month day year in this locale,
+        // then the first character of a formatted date should start with a letter
+        // otherwise it will start with a number.
+        String firstChar = L10NManager.getInstance().formatDateLongStyle(new Date()).substring(0, 1);
+        monthDayYear = !firstChar.toLowerCase().equals(firstChar.toUpperCase());
         initSpinner();
     }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        monthFormat.getDateFormatSymbols().setResourceBundle(getUIManager().getResourceBundle());
+    }
+    
+    
     
     void initSpinner() {
         if(month == null) {
@@ -89,15 +106,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             
             month = Spinner3D.create(1, 13, currentMonth, 1);
             month.setRowFormatter(new SpinnerNode.RowFormatter() {
-                SimpleDateFormat fmt = new SimpleDateFormat("MMMM");
-
                 @Override
                 public String format(String input) {
                     if (input != null) {
                         Calendar c = Calendar.getInstance();
                         c.set(Calendar.MONTH, new Double(Double.parseDouble(input)).intValue()-1);
                         c.set(Calendar.DAY_OF_MONTH, 15);
-                        return fmt.format(c.getTime());
+                        return monthFormat.format(c.getTime());
                     }
                     return null;
                 }

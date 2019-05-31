@@ -48,6 +48,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -59,7 +60,7 @@ import java.util.Map;
  */
 public class PropertyIndex implements Iterable<PropertyBase> {
     private final PropertyBase[] properties;
-    private static HashMap<String, HashMap<String, Object>> metadata = new HashMap<String, HashMap<String, Object>>();
+    private static Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     PropertyBusinessObject parent;
     private final String name;
     
@@ -426,7 +427,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return a map representation of the properties
      */
     private Map<String, Object> toMapRepresentationImpl(String excludeFlag) {
-        HashMap<String, Object> m = new HashMap<String, Object>();
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
         for(PropertyBase p : this) {
             if(p.getClientProperty(excludeFlag) != null) {
                 continue;

@@ -24,6 +24,7 @@ package com.codename1.impl.javase;
 
 import com.codename1.db.Cursor;
 import com.codename1.db.Row;
+import com.codename1.db.RowExt;
 import com.codename1.io.Util;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +38,7 @@ import java.util.logging.Logger;
  *
  * @author Chen
  */
-public class SECursor implements Cursor, Row{
+public class SECursor implements Cursor, RowExt {
     
     private ResultSet resultSet;
     private boolean closed;
@@ -266,6 +267,20 @@ public class SECursor implements Cursor, Row{
             throw new IOException(ex.getMessage());
         }
     }
+    
+    @Override
+    public boolean wasNull()throws IOException {
+        if(closed) {
+            throw new IOException("Cursor is closed");
+        }
+        try {
+            return resultSet.wasNull();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new IOException(ex.getMessage());
+        }
+    }
+    
 
     public int getColumnCount() throws IOException {
         if(closed) {

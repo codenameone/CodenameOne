@@ -1973,4 +1973,14 @@ public class TextField extends TextArea {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected TextSelection.Spans calculateTextSelectionSpan(TextSelection sel) {
+        return getUIManager().getLookAndFeel().calculateTextFieldSpan(sel, this);
+    }
+    
+    
+
 }

@@ -28,6 +28,8 @@ import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -225,6 +227,16 @@ public abstract class LookAndFeel {
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawLabel(Graphics g, Label l);
+    
+    /**
+     * Calculates the text selection spans for a given label
+     * @param sel TextSelection instance
+     * @param l Label
+     * @return A span representing the positions of characters in the label
+     * @since 7.0
+     * @see TextSelection
+     */
+    public abstract Span calculateLabelSpan(TextSelection sel, Label l);
 
     /**
      * Invoked for drawing a list widget
@@ -249,6 +261,15 @@ public abstract class LookAndFeel {
      * @param ta component to draw
      */
     public abstract void drawTextArea(Graphics g, TextArea ta);
+    
+    /**
+     * Calculates the Spans used in text selection for a given text area.
+     * @param sel The current TextSelection instance.
+     * @param ta The TextArea to calculate spans for.
+     * @return The spans for the given text field.
+     * @since 7.0
+     */
+    public abstract Spans calculateTextAreaSpan(TextSelection sel, TextArea ta);
 
     /**
      * Draws the text field without its cursor which is drawn in a separate method
@@ -258,7 +279,15 @@ public abstract class LookAndFeel {
      * @param ta component to draw
      */
     public abstract void drawTextField(Graphics g, TextArea ta);
-
+    
+    /**
+     * Calculates the Spans used in text selection for a given text field.
+     * @param sel The current TextSelection instance.
+     * @param ta The textfield to calculate spans for.
+     * @return The spans for the given text field.
+     * @since 7.0
+     */
+    public abstract Spans calculateTextFieldSpan(TextSelection sel, TextArea ta);
     /**
      * Draws the cursor of the text field, blinking is handled simply by avoiding
      * a call to this method.
