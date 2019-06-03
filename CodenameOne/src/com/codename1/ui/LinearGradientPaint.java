@@ -56,26 +56,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         this.endX = endX;
         this.endY = endY;
     }
-    
-    /**
-     * Creates a LinearGradientPaint with the specified settings.
-     * @param startX The startX coordinate of the gradient in user space.
-     * @param startY The startY coordinate of the gradient in user space.
-     * @param endX The endX coordinate of the gradient in user space.
-     * @param endY THe endY coordinate of the gradient in user space.
-     * @param fractions Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
-     * @param colors The colors to use in the gradient.  There should be the same number of colors as there are fractions.
-     * @param cycleMethod The cycle method to use.
-     * @param colorSpace The color space to use.
-     * @param gradientTransform Transform to use for the gradient.  Not used right now.
-     */
-    public LinearGradientPaint(double startX, double startY, double endX, double endY, float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {
-        super(fractions, colors, cycleMethod, colorSpace, gradientTransform);
-        this.startX = startX;
-        this.startY = startY;
-        this.endX = endX;
-        this.endY = endY;
-    }
 
     /**
      * Paints linear gradient in the given bounds.
@@ -164,13 +144,10 @@ public class LinearGradientPaint extends MultipleGradientPaint {
 
         
         double pEndX = (endX-x) * pw/w;
-        //System.out.println("px="+px+", "+py+", "+pw+", "+ph+" theta="+theta);
+        System.out.println("px="+px+", "+py+", "+pw+", "+ph+" theta="+theta);
         
         g.getTransform(t);
         t2.setTransform(t);
-        if (getTransform() != null) {
-            t2.concatenate(getTransform());
-        }
         int tx = g.getTranslateX();
         int ty = g.getTranslateY();
         g.translate(-tx, -ty);
@@ -178,7 +155,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         t2.translate((float)(startX+tx), (float)(startY+ty));
         t2.rotate((float)theta, 0, 0);
         t2.translate(0, -(float)ph/2);
-        
         g.setTransform(t2);
         int len = Math.min(colors.length, fractions.length);
         int alpha = g.getAlpha();
