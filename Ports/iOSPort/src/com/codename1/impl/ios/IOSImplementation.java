@@ -1446,29 +1446,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
-        return Matrix.make(new float[]{
-           (float)m00, (float)m10, 0, 0,
-           (float)m01, (float)m11, 0, 0,
-           0, 0, 1, 0,
-           (float)m02, (float)m12, 0, 1
-        });
-    }
-
-    @Override
-    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
-        ((Matrix)nativeTransform).setData(new float[]{
-           (float)m00, (float)m10, 0, 0,
-           (float)m01, (float)m11, 0, 0,
-           0, 0, 1, 0,
-           (float)m02, (float)m12, 0, 1
-        });
-    }
-    
-    
-    
-
-    @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return Matrix.makeTranslation(translateX, translateY, translateZ);
     }

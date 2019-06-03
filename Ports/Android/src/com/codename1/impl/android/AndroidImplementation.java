@@ -145,7 +145,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
@@ -9282,28 +9281,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    @Override
-    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
-        CN1Matrix4f t = CN1Matrix4f.make(new float[]{
-                (float)m00, (float)m10, 0, 0,
-                (float)m01, (float)m11, 0, 0,
-                0, 0, 1, 0,
-                (float)m02, (float)m12, 0, 1
-        });
-        return t;
-    }
 
-    @Override
-    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
-        ((CN1Matrix4f)nativeTransform).setData(new float[]{
-                (float)m00, (float)m10, 0, 0,
-                (float)m01, (float)m11, 0, 0,
-                0, 0, 1, 0,
-                (float)m02, (float)m12, 0, 1
-        });
-    }
-    
-    
+
+
+
     @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return CN1Matrix4f.makeTranslation(translateX, translateY, translateZ);
@@ -9496,16 +9477,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape, Path p) {
         //Path p = new Path();
         p.rewind();
-        
         com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
-        switch (it.getWindingRule()) {
-            case GeneralPath.WIND_EVEN_ODD:
-                p.setFillType(Path.FillType.EVEN_ODD);
-                break;
-            case GeneralPath.WIND_NON_ZERO:
-                p.setFillType(Path.FillType.WINDING);
-                break;
-        }
         //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
         float[] buf = new float[6];
         while (!it.isDone()) {

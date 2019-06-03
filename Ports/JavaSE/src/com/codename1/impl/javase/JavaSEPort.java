@@ -6919,19 +6919,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isPerspectiveTransformSupported(){
         return false;
     }
-
-    @Override
-    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
-        return new AffineTransform(m00, m10, m01, m11, m02, m12);
-    }
-
-    @Override
-    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
-        ((AffineTransform)nativeTransform).setTransform(m00, m10, m01, m11, m02, m12);
-    }
-    
-    
-    
     
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
