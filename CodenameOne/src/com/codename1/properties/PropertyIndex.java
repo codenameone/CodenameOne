@@ -364,15 +364,35 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                             ((MapProperty)p).clear();
                             for(Object k : ((Map)val).keySet()) {
                                 Object value = ((Map)val).get(k);
-                                if(value instanceof Map) {
-                                    PropertyBusinessObject po = (PropertyBusinessObject)p.get();
-                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)value, recursiveType);
-                                    ((MapProperty)p).set(k, po);
-                                    continue;
+                                Class keyType = ((MapProperty)p).getKeyType();
+                                if(keyType != null && 
+                                    PropertyBusinessObject.class.isAssignableFrom(keyType)) {
+                                    PropertyBusinessObject po = (PropertyBusinessObject)keyType.newInstance();
+                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)val, keyType);
+                                    k = po;
                                 }
-                                if(value instanceof List) {
-                                    ((MapProperty)p).set(k, listParse((List)value, recursiveType));
+                                Class valueType = ((MapProperty)p).getValueType();
+                                if(valueType != null && 
+                                    PropertyBusinessObject.class.isAssignableFrom(valueType)) {
+                                    Map<String, Object> contentMap = (Map<String, Object>)val;
+                                    for(String kk : contentMap.keySet()) {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)valueType.newInstance();
+                                        Map<String, Object> vv = (Map<String, Object>)contentMap.get(kk);
+                                        po.getPropertyIndex().populateFromMap(vv, valueType);
+                                        ((MapProperty)p).set(kk, po);
+                                    }
                                     continue;
+                                } else {
+                                    if(value instanceof Map) {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)p.get();
+                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)value, recursiveType);
+                                        ((MapProperty)p).set(k, po);
+                                        continue;
+                                    }
+                                    if(value instanceof List) {
+                                        ((MapProperty)p).set(k, listParse((List)value, recursiveType));
+                                        continue;
+                                    }
                                 }
                                 ((MapProperty)p).set(k, value);
                             }                        
