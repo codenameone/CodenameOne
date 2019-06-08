@@ -118,6 +118,7 @@ public class ScaleImageLabel extends Label {
         if(i !=null && i.isAnimation()) {
             checkAnimation(i);
         }
+        repaint();
     }
 
     /**
