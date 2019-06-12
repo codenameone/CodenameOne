@@ -419,6 +419,16 @@ public class Transform {
         return makeScale(x, y, 1);
     }
     
+    public static Transform makeAffine(double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        return new Transform(Display.impl.makeTransformAffine(m00, m10, m01, m11, m02, m12));
+        
+    }
+    
     /**
      * Resets the transformation to a scale transformation.
      * @param x x-axis scaling
@@ -766,6 +776,17 @@ public class Transform {
         type = TYPE_UNKNOWN;
         inverseDirty=true;
         impl.setTransformPerspective(getNativeTransform(), fovy, aspect, zNear, zFar);
+    }
+    
+    public void setAffine(double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        type = TYPE_UNKNOWN;
+        inverseDirty=true;
+        impl.setTransformAffine(getNativeTransform(), m00, m10, m01, m11, m02, m12);
     }
     
     /**

@@ -27,7 +27,7 @@ package java.io;
  * For all the methods in this interface that write bytes, it is generally true that if a byte cannot be written for any reason, an IOException is thrown.
  * Since: JDK1.0, CLDC 1.0 See Also:DataInput, DataOutputStream
  */
-public interface DataOutput{
+public interface DataOutput extends AutoCloseable {
     /**
      * Writes to the output stream all the bytes in array b. If b is null, a NullPointerException is thrown. If b.length is zero, then no bytes are written. Otherwise, the byte b[0] is written first, then b[1], and so on; the last byte written is b[b.length-1].
      */

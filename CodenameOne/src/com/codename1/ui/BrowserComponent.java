@@ -99,6 +99,33 @@ public class BrowserComponent extends Container {
      */
     public static final String onError = "onError";
     
+    /**
+     * String constant for web event listener.  Use this event types to register to receive messages 
+     * in a cross-domain-safe way from the web page.  To send a message from the webpage, the page should
+     * include a function like:
+     * <pre>{@code 
+     * function postToCN1(msg) {
+     *       if (window.cn1PostMessage) {
+     *           // Case 1: Running inside native app in a WebView
+     *           window.cn1PostMessage(msg);
+     *       } else {
+     *           // Case 2: Running inside a Javascript app in an iframe
+     *           window.parent.postMessage(msg, '*');
+     *       }
+     *   }
+     * }</pre>
+     * <p>Receiving a message:</p>
+     * <pre>{@code 
+     * myBrowserComponent.addWebEventListener(BrowserComponent.onMessage, e->{
+     *       CN.callSerially(()->{
+     *           Log.p("Message: "+e.getSource());
+     *           Dialog.show("Here", (String)e.getSource(), "OK", null);
+     *       });
+     *   });
+     * }</pre>
+     */
+    public static final String onMessage = "onMessage";
+    
     private BrowserNavigationCallback browserNavigationCallback = new BrowserNavigationCallback(){
         public boolean shouldNavigate(String url) {
             return true;
@@ -212,6 +239,68 @@ public class BrowserComponent extends Container {
             returnValueParser = new JSONParser();
         }
         return returnValueParser;
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent(); 
+    }
+
+    @Override
+    protected void deinitialize() {
+        uninstallMessageListener();
+        
+        super.deinitialize();
+    }
+    
+    
+    
+    
+    
+    /**
+     * Calls the {@literal postMessage()} method on the webpage's {@literal window} object.
+     * <p>This is useful mainly for the Javascript port so that you don't have to worry about
+     * cross-domain issues, as postMessage() is supported cross-domain.</p>
+     * 
+     * <p>To receive a message, the web page should register a "message" event listener, just as
+     * it would to receive messages from other windows in the browser.  See <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage">MDN docs for postMessage()</a>
+     * for more information.</p>
+     * 
+     * @param message The message to send.
+     * @param targetOrigin The target origin of the message.  E.g. http://example.com:1234
+     * @since 7.0
+     */
+    public void postMessage(String message, String targetOrigin) {
+        if (!Display.impl.postMessage(internal, message, targetOrigin)) {
+            execute("window.postMessage(${0}, ${1})", new Object[]{message, targetOrigin});
+        }
+    }
+    
+    private void installMessageListener() {
+        if (!Display.impl.installMessageListener(internal)) {
+           
+            messageCallback = new SuccessCallback<JSRef>() {
+                @Override
+                public void onSucess(JSRef value) {
+                    fireWebEvent(onMessage, new ActionEvent(value.toString()));
+                }
+            };
+
+            addJSCallback("window.cn1PostMessage = function(msg){ callback.onSuccess(msg);};", messageCallback);
+        }
+    }
+    
+    SuccessCallback<JSRef> messageCallback;
+    
+    private void uninstallMessageListener() {
+        
+        if (!Display.impl.installMessageListener(internal)) {
+            //if (messageCallback != null) {
+            //    removeJSCallback(messageCallback);
+            //    messageCallback = null;
+            //}
+            
+        }
     }
     
     /**
@@ -382,6 +471,13 @@ public class BrowserComponent extends Container {
         s.setPadding(0, 0, 0, 0);
         s.setMargin(0, 0, 0, 0);
         s.setBgTransparency(255);
+        addWebEventListener(onStart, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                installMessageListener();
+            }
+            
+        });
     }
     
     private final Object readyLock = new Object();
@@ -400,6 +496,20 @@ public class BrowserComponent extends Container {
                 }
             });
         }
+    }
+    
+    public BrowserComponent ready(final SuccessCallback<BrowserComponent> onReady) {
+        if (ready) {
+            onReady.onSucess(this);
+        } else {
+            ActionListener l = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    removeWebEventListener(onStart, this);
+                    onReady.onSucess(BrowserComponent.this);
+                }
+            };
+        }
+        return this;
     }
 
     /**
@@ -1407,6 +1517,12 @@ public class BrowserComponent extends Container {
      * @param callback The callback to remove.
      */
     public void removeJSCallback(Callback<JSRef> callback) {
+        if (jsCallbacks != null) {
+            jsCallbacks.remove(callback);
+        }
+    }
+    
+    public void removeJSCallback(SuccessCallback<JSRef> callback) {
         if (jsCallbacks != null) {
             jsCallbacks.remove(callback);
         }

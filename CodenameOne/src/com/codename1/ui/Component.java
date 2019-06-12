@@ -965,6 +965,43 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isVisible() {
         return visible;
     }
+    
+    void getVisibleRect(Rectangle r, boolean init) {
+        if (!isVisible() || !initialized) {
+            r.setWidth(0);
+            r.setHeight(0);
+            return;
+        }
+        
+        int w = getWidth();
+        int h = getHeight();
+        int x = getAbsoluteX();
+        int y = getAbsoluteY();
+        if (init) {
+            r.setBounds(x, y, w, h);
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+        } else {
+            Rectangle.intersection(x, y, w, h, r.getX(), r.getY(), r.getWidth(), r.getHeight(), r);
+            if (r.getWidth() <= 0 || r.getHeight() <= 0) {
+                return;
+            }
+        }
+        
+        
+        Container parent = getParent();
+        if (parent != null) {
+            parent.getVisibleRect(r, false);
+            
+        }
+        
+    }
+    private static Rectangle tmpRect = new Rectangle();
+    boolean isVisibleOnForm() {
+        getVisibleRect(tmpRect, true);
+        return (tmpRect.getWidth() > 0 && tmpRect.getHeight() > 0);   
+    }
 
     /**
      * Client properties allow the association of meta-data with a component, this
@@ -2226,7 +2263,13 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    private void paintIntersectingComponentsAbove(Graphics g) {
+    /**
+     * Paints intersecting components that appear above this component.
+     * 
+     * @param g Graphics context
+     * @deprecated For internal use only
+     */
+    public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
         int tx = g.getTranslateX();

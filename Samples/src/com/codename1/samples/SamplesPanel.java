@@ -94,6 +94,8 @@ public class SamplesPanel extends JPanel {
         public void exportAsNetbeansProject(Sample sample);
 
         public void launchIOSRelease(Sample sample);
+
+        public void launchUWP(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -209,6 +211,14 @@ public class SamplesPanel extends JPanel {
             }
         });
         
+        JMenuItem launchUWP = new JMenuItem("Send UWP Build");
+        launchUWP.setToolTipText("Send UWP build.");
+        launchUWP.addActionListener(e->{
+            if (delegate != null) {
+                delegate.launchUWP(sample);
+            }
+        });
+        
         JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build");
         winDesktopBuild.setToolTipText("Send Windows desktop build.");
         winDesktopBuild.addActionListener(e->{
@@ -283,6 +293,7 @@ public class SamplesPanel extends JPanel {
         moreMenu.add(launchIOS);
         moreMenu.add(launchIOSRelease);
         moreMenu.add(launchAndroid);
+        moreMenu.add(launchUWP);
         moreMenu.add(winDesktopBuild);
         moreMenu.add(macDesktopBuild);
         moreMenu.addSeparator();

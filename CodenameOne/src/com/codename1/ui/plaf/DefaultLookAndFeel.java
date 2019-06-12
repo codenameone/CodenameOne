@@ -29,7 +29,10 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
@@ -2107,6 +2110,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
 
         if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) {
+            
             parentForm.registerAnimated(new Animation() {
 
                 int counter = 0;
@@ -2132,14 +2136,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         ((Label) pullDown).setIcon(i.rotate(180));                        
                         parentForm.deregisterAnimated(this);
                     }
-                    cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(), 
+                    
+                    // Placing the repaint inside a callSerially() because repaint directly
+                    // inside animate causes painting artifacts in many instances
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY()-getPullToRefreshHeight(), cmp.getWidth(), 
                             getPullToRefreshHeight());
+                        }
+                    });
+                    
+                    
+                    
                     return false;
                 }
 
                 public void paint(Graphics g) {
                 }
             });
+            
         }
         if(pull.getComponentAt(0) != cmpToDraw 
                 && cmpToDraw instanceof Label 
@@ -2155,6 +2170,21 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         pull.setX(cmp.getAbsoluteX());
         pull.setY(cmp.getY() -scrollY - getPullToRefreshHeight());
         pull.layoutContainer();
+        
+        // We need to make the InfiniteProgress to animate, otherwise the progress
+        // just stays static.
+        ComponentSelector.select("*", pull).each(new ComponentClosure() {
+            
+
+            @Override
+            public void call(Component c) {
+                if (c instanceof InfiniteProgress) {
+                    ((InfiniteProgress)c).animate(true);
+                } else {
+                    c.animate();
+                }
+            }
+        });
         pull.paintComponent(g);
 
     }

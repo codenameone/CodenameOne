@@ -192,13 +192,16 @@ public class Tabs extends Container {
      */
     void initComponentImpl() {
         super.initComponentImpl();
-        getComponentForm().registerAnimatedInternal(this);
-        if(changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
-            Component f = getComponentForm().getFocused();
-            if(f != null && f.getParent() == tabsContainer) {
-                initTabsContainerStyle();
-                tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
-                tabsContainer.repaint();
+        Form frm = getComponentForm();
+        if(frm != null) {
+            frm.registerAnimatedInternal(this);
+            if(changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
+                Component f = getComponentForm().getFocused();
+                if(f != null && f.getParent() == tabsContainer) {
+                    initTabsContainerStyle();
+                    tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
+                    tabsContainer.repaint();
+                }
             }
         }
     }
@@ -243,7 +246,7 @@ public class Tabs extends Container {
      */
     public boolean animate() {
         boolean b = super.animate();
-        if (slideToDestMotion != null && swipeActivated || slideToDestMotion != null) {
+        if (slideToDestMotion != null) {
             int motionX = slideToDestMotion.getValue();
             final int size = contentPane.getComponentCount();
             int tabWidth = contentPane.getWidth() - tabsGap*2;
@@ -367,7 +370,7 @@ public class Tabs extends Container {
         tabsContainer.setShouldCalcPreferredSize(true);
         contentPane.setShouldCalcPreferredSize(true);
 
-        revalidate();
+        revalidateWithAnimationSafety();
     }
 
     /**
@@ -580,7 +583,7 @@ public class Tabs extends Container {
                     selectedTab = b;
                     if(!animateTabSelection) {
                         selectedTab.setShouldCalcPreferredSize(true);
-                        tabsContainer.revalidate();
+                        tabsContainer.revalidateWithAnimationSafety();
                     }
                     tabsContainer.scrollComponentToVisible(selectedTab);
                 }
@@ -946,7 +949,7 @@ public class Tabs extends Container {
                 c.setLightweightMode(offset != index);
                 offset++;
             }
-            revalidate();
+            revalidateWithAnimationSafety();
         }
     }
     
@@ -976,7 +979,7 @@ public class Tabs extends Container {
      */
     public void hideTabs(){
         removeComponent(tabsContainer);
-        revalidate();
+        revalidateWithAnimationSafety();
     }
     
     /**
@@ -986,7 +989,7 @@ public class Tabs extends Container {
         int tp = tabPlacement;
         tabPlacement = -1;
         setTabPlacement(tp);
-        revalidate();
+        revalidateWithAnimationSafety();
     }
 
     /**

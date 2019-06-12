@@ -27,6 +27,8 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.InterFormContainer;
+import java.util.Map;
 
 /**
  * Represents a transition animation between two forms this class is used internally
@@ -41,6 +43,8 @@ public abstract class Transition implements Animation {
     private Component source;
     
     private Component destination;
+    
+    private Map<InterFormContainer,InterFormContainer> interFormContainers;
     
     /**
      * Invoked by {@link com.codename1.ui.Display} to set the source and destination forms.
@@ -57,6 +61,66 @@ public abstract class Transition implements Animation {
         }
         if (destination != null && destination instanceof Container) {
             ((Container)destination).layoutContainer();
+        }
+        interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
+    }
+    
+    /**
+     * Sets visibility on all shared InterFormContainers between the source and destination
+     * to be hidden.  This is useful since these containers are not transitioned like
+     * the rest of components, so the transition may need to be able to paint the source
+     * or destination without these containers, and paint them separately.
+     * @since 7.0
+     */
+    protected void hideInterformContainers() {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
+        if (interFormContainers == null) {
+            interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
+        }
+        for (Map.Entry<InterFormContainer,InterFormContainer> e : interFormContainers.entrySet()) {
+            e.getKey().setVisible(false);
+            e.getValue().setVisible(false);
+        }
+    }
+    
+    /**
+     * Sets visibility on all shared InterFormContainers between the source and destination
+     * to be visible.  This is useful since these containers are not transitioned like
+     * the rest of components, so the transition may need to be able to paint the source
+     * or destination without these containers, and paint them separately.
+     * @since 7.0
+     */
+    protected void showInterformContainers() {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
+        if (interFormContainers == null) {
+            interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
+        }
+        for (Map.Entry<InterFormContainer,InterFormContainer> e : interFormContainers.entrySet()) {
+            e.getKey().setVisible(true);
+            e.getValue().setVisible(true);
+        }
+    }
+    
+    /**
+     * Paints all shared InterFormContainers between the source and destination.  
+     * @param g Graphics context to paint to.
+     * @since 7.0
+     */
+    protected void paintInterformContainers(Graphics g) {
+        if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
+            return;
+        }
+        if (interFormContainers == null) {
+            interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
+        }
+        showInterformContainers();
+        for (Map.Entry<InterFormContainer,InterFormContainer> e : interFormContainers.entrySet()) {
+            e.getKey().paintComponentBackground(g);
+            e.getKey().paintComponent(g, false);
         }
     }
     

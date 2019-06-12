@@ -210,11 +210,27 @@ public class InfiniteProgress extends Component {
     }
     
     /**
-     * {@inheritDoc}
+     * Updates the progress animation.  This only updates if the InfiniteProgress is on the
+     * currently displayed form and is visible.  If you need to update the progress animation
+     * in another context, use {@link #animate(boolean) }.
+     * @return true if it animated and should be repainted.
      */
     public boolean animate() {
-        if (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm()) {
-            return false;
+        return animate(false);
+    }
+    
+    /**
+     * Updates the progress animation.
+     * @param force If false, then the animation is only updated if the progress is visible and on
+     * the current form.  True will force the update.
+     * @return True if it animated and should be repainted.
+     * @since 7.0
+     */
+    public boolean animate(boolean force) {
+        if (!force) {
+            if (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm()) {
+                return false;
+            }
         }
         // reduce repaint thrushing of the UI from the infinite progress
         boolean val = super.animate() || tick % tickCount == 0;

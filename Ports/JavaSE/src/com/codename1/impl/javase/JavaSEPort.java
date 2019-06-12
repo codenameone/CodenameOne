@@ -100,6 +100,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
@@ -4905,50 +4906,51 @@ public class JavaSEPort extends CodenameOneImplementation {
         final String sysroot = System.getenv("SystemRoot");
         String tabTipExe = "C:\\Program Files\\Common Files\\microsoft shared\\ink\\TabTip.exe";
         
-        final boolean useTabTip = "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
-        if (new File(tabTipExe).exists()) {
-            try {
+        if(exposeFilesystem) {
+            final boolean useTabTip = "tabtip".equalsIgnoreCase(Display.getInstance().getProperty("javase.win.vkb", "tabtip"));
+            if (new File(tabTipExe).exists()) {
+                try {
 
-                if (useTabTip) {
-                    //System.out.println("Opening TabTip");
-                    ProcessBuilder pb = new ProcessBuilder("cmd", "/c", tabTipExe);
-                    tabTipProcess = pb.start();
-                } else {
-                    //System.out.println("Opening OSK");
-                    ProcessBuilder pb = new ProcessBuilder(sysroot + "/system32/osk.exe");
-                    tabTipProcess = pb.start();
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to open VKB: " + e.getMessage());
-            }
-
-            tf.addFocusListener(new FocusListener() {
-                @Override
-                public void focusLost(FocusEvent arg0) {
-                    //System.out.println("Lost focus...");
-                    try {
-                        if (tabTipProcess != null) {
-                            tabTipProcess.destroy();
-                        } 
-                    } catch (Exception ex){}
-                    try {
-                        if (useTabTip) {
-                            Runtime.getRuntime().exec("cmd /c taskkill /IM TabTip.exe");
-                        } else {
-                            Runtime.getRuntime().exec("cmd /c taskkill /IM osk.exe");
-                        }
-                    } catch (IOException e) {
-                        System.err.println("Problem closing VKB: " + e.getMessage());
+                    if (useTabTip) {
+                        //System.out.println("Opening TabTip");
+                        ProcessBuilder pb = new ProcessBuilder("cmd", "/c", tabTipExe);
+                        tabTipProcess = pb.start();
+                    } else {
+                        //System.out.println("Opening OSK");
+                        ProcessBuilder pb = new ProcessBuilder(sysroot + "/system32/osk.exe");
+                        tabTipProcess = pb.start();
                     }
+                } catch (Exception e) {
+                    System.err.println("Failed to open VKB: " + e.getMessage());
                 }
 
-                @Override
-                public void focusGained(FocusEvent arg0) {
+                tf.addFocusListener(new FocusListener() {
+                    @Override
+                    public void focusLost(FocusEvent arg0) {
+                        //System.out.println("Lost focus...");
+                        try {
+                            if (tabTipProcess != null) {
+                                tabTipProcess.destroy();
+                            } 
+                        } catch (Exception ex){}
+                        try {
+                            if (useTabTip) {
+                                Runtime.getRuntime().exec("cmd /c taskkill /IM TabTip.exe");
+                            } else {
+                                Runtime.getRuntime().exec("cmd /c taskkill /IM osk.exe");
+                            }
+                        } catch (IOException e) {
+                            System.err.println("Problem closing VKB: " + e.getMessage());
+                        }
+                    }
 
-                }
-            });
+                    @Override
+                    public void focusGained(FocusEvent arg0) {
+
+                    }
+                });
+            }
         }
-
         
         tf.requestFocus();
         tf.setSelectionStart(0);
@@ -6483,9 +6485,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     default:
                         throw new IllegalArgumentException("Unsupported native font type: " + fontName);
                 }
-                InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                String fontResourcePath = "/com/codename1/impl/javase/Roboto-" + res + ".ttf";
+                InputStream is = getClass().getResourceAsStream(fontResourcePath);
                 if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    java.awt.Font fnt;
+                    try {
+                         fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    } catch (Exception e) {
+                        System.err.println("Exception while reading font from resource path "+fontResourcePath);
+                        throw e;
+                    }
                     is.close();
                     return fnt;
                 }
@@ -6496,26 +6505,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fontFile = new File("src", fileName);
             }
             if (fontFile.exists()) {
-                FileInputStream fs = new FileInputStream(fontFile);
-                java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
-                fs.close();
-                if (fnt != null) {
-                    if (!fontName.startsWith(fnt.getFamily())) {
-                        System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
-                    }
-                }
-                return fnt;
-            } else {
-                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
-                if(is != null) {
-                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
-                    is.close();
+                try {
+                    FileInputStream fs = new FileInputStream(fontFile);
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
+                    fs.close();
                     if (fnt != null) {
                         if (!fontName.startsWith(fnt.getFamily())) {
                             System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
                         }
                     }
                     return fnt;
+                } catch (Exception e) {
+                    System.err.println("Exception thrown while trying to create font from file "+fontFile);
+                    throw e;
+                }
+            } else {
+                InputStream is = getResourceAsStream(getClass(), "/" + fileName);
+                if(is != null) {
+                    try {
+                        java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                        is.close();
+                        if (fnt != null) {
+                            if (!fontName.startsWith(fnt.getFamily())) {
+                                System.out.println("Warning font name might be wrong for " + fileName + " should be: " + fnt.getName());
+                            }
+                        }
+                        return fnt;
+                    } catch (Exception e) {
+                        System.err.println("Exception thrown while trying to create font file from resource path "+"/"+fileName);
+                        throw e;
+                    }
                 }
             }
         } catch (Exception err) {
@@ -6753,17 +6772,61 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
+    private static final double[] IDENTITY = new double[6]; 
+    {
+        AffineTransform.getScaleInstance(1, 1).getMatrix(IDENTITY);
+    }
     
-    private AffineTransform clamp(AffineTransform at){
+    private static AffineTransform clamp(AffineTransform at){
         double[] mat = new double[6];
         at.getMatrix(mat);
-        for ( int i=0; i<6; i++){
-            mat[i] = clamp(mat[i]);
-        }
+        clamp(mat);
         at.setTransform(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
         return at;
     }
     
+    
+    private static void clamp(double[] mat) {
+        for (int i=0; i<6; i++) {
+            double d = mat[i];
+            double clampVal = IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static void clamp(float[] mat) {
+        for (int i=0; i<6; i++) {
+            float d = mat[i];
+            float clampVal = (float)IDENTITY[i];
+            if (Math.abs(d-clampVal) < 0.001) {
+                mat[i] = clampVal;
+            } else {
+                mat[i] = d;
+            }
+        }
+    }
+    
+    private static float[] clampCoord(float[] in) {
+        for ( int i=0; i<in.length; i++){
+            in[i] = clampScalar(in[i]);
+        }
+        return in;
+    }
+    
+    private static float clampScalar(float d){
+        float abs = Math.abs(d);
+        if ( Math.abs(abs-Math.round(abs)) < 0.001){
+            return Math.round(d);
+        }
+        return d;
+    }
+
+    
+    /*
     private double clamp(double d){
         double abs = Math.abs(d);
         if ( Math.abs(abs-Math.round(abs)) < 0.001){
@@ -6791,6 +6854,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return in;
     }
+    */
 
     @Override
     public boolean transformNativeEqualsImpl(Object t1, Object t2) {
@@ -6855,6 +6919,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isPerspectiveTransformSupported(){
         return false;
     }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        return new AffineTransform(m00, m10, m01, m11, m02, m12);
+    }
+
+    @Override
+    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
+        ((AffineTransform)nativeTransform).setTransform(m00, m10, m01, m11, m02, m12);
+    }
+    
+    
+    
     
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
@@ -7150,7 +7227,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         AffineTransform t = (AffineTransform)nativeTransform;
         t.transform(in, 0, out, 0, 1);
-        clamp(out);
+        clampCoord(out);
     }
     
     
@@ -10305,9 +10382,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return FileEncoder.getEncoder("audio/wav", "audio/mp3") != null;
     }
+
+    @Override
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+    }
     
     @Override
     public Media createMediaRecorder(final String path, String mime) throws IOException {
+        MediaRecorderBuilder builder = new MediaRecorderBuilder()
+                .path(path)
+                .mimeType(mime);
+        return createMediaRecorder(builder);
+    }
+
+    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
@@ -10353,9 +10442,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             boolean recording;
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
-                float sampleRate = 44100;
+                float sampleRate = samplingRate;
                 int sampleSizeInBits = 8;
-                int channels = 2;
+                int channels = audioChannels;
                 boolean signed = true;
                 boolean bigEndian = true;
                 javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,
@@ -10364,60 +10453,58 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             @Override
             public void play() {
-                try {
-                    AudioFormat format = getAudioFormat();
-                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+                if (line == null) {
+                    try {
+                        AudioFormat format = getAudioFormat();
+                        DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-                    // checks if system supports the data line
-                    if (!AudioSystem.isLineSupported(info)) {
-                        throw new RuntimeException("Audio format not supported on this platform");
-                    }
-                    line = (TargetDataLine) AudioSystem.getLine(info);
-                    line.open(format);
-                    line.start();   // start capturing
-
-                    
-
-                    recording = true;
-                    // start recording
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                AudioInputStream ais = new AudioInputStream(line);
-                                AudioSystem.write(ais, fileType, wavFile);
-                            } catch (IOException ioe) {
-                                throw new RuntimeException(ioe);
-                            }
+                        // checks if system supports the data line
+                        if (!AudioSystem.isLineSupported(info)) {
+                            throw new RuntimeException("Audio format not supported on this platform");
                         }
-                    }).start();
-                    
-               } catch (LineUnavailableException ex) {
-                                throw new RuntimeException(ex);
-                }     
+                        line = (TargetDataLine) AudioSystem.getLine(info);
+                        line.open(format);
+                        line.start();   // start capturing
+
+
+
+                        recording = true;
+                        // start recording
+                        new Thread(new Runnable() {
+                            public void run() {
+                                try {
+                                    AudioInputStream ais = new AudioInputStream(line);
+                                    AudioSystem.write(ais, fileType, wavFile);
+                                } catch (IOException ioe) {
+                                    throw new RuntimeException(ioe);
+                                }
+                            }
+                        }).start();
+
+                   } catch (LineUnavailableException ex) {
+                                    throw new RuntimeException(ex);
+                    }    
+                } else {
+                    if (!line.isActive()) {
+                        line.start();
+                        recording = true;
+                    }
+                }
 
                 
             }
 
             @Override
             public void pause() {
+                if (line == null) {
+                    return;
+                }
                 if (!recording) {
                     return;
                 }
                 recording = false;
-                
-               
                 line.stop();
-                line.close();
-                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
-                    try {
-                        System.out.println("Encoding to mp3");
-                        FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
-                        wavFile.delete();
-                    } catch (Throwable ex) {
-                        com.codename1.io.Log.e(ex);
-                        throw new RuntimeException(ex);
-                    }
-                }
+                
                 
             }
             
@@ -10433,11 +10520,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
-                try {
-                    line.stop();
-                    line.close();
-                    line = null;
-                } catch (Throwable t){}
+                line.close();
+                
+                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                    final Throwable[] t = new Throwable[1];
+                    CN.invokeAndBlock(new Runnable() {
+                        public void run() {
+                            try {
+                                System.out.println("Encoding to mp3");
+                                FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
+                                wavFile.delete();
+                            } catch (Throwable ex) {
+                                com.codename1.io.Log.e(ex);
+                                t[0] = ex;
+                            }
+                        }
+                    });
+                    if (t[0] != null) {
+                        throw new RuntimeException(t[0]);
+                    }
+                    
+                }
+                line = null;
             }
 
             @Override
@@ -10447,7 +10551,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void setTime(int time) {
-                
+                throw new RuntimeException("setTime() not supported on recordable Media");
             }
 
             @Override

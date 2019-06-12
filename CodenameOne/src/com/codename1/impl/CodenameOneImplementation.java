@@ -43,6 +43,9 @@ import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
+import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -4019,6 +4022,58 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
+     * 
+     * <p>This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation
+     * in BrowserComponent.</p>
+     * 
+     * <p>Web pages wishing to receive messages via this mechanism should register a "message" event listener.  See 
+     * <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage">Javascript postMessage() docs</a>
+     * for more details about this.</p>
+     * @param browserComponent The browser component peer.
+     * @param message The message to send
+     * @param targetOrigin The target origin for the message.
+     * @return True if the implementation handled the message.  False to let BrowserComponent handle it in its default way.
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     * @see #installMessageListener(java.lang.Object) 
+     * @see #uninstallMessageListener(java.lang.Object) 
+     * @since 7.0
+     */
+    public boolean postMessage(Object browserComponent, String message, String targetOrigin) {
+        return false;
+    }
+    
+    /**
+     * Installs a message listener to allow webpages inside a browser component to send 
+     * messages to CN1 cross-domain.
+     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
+     * use the default implementation in {@link BrowserComponent}.
+     * @param browserComponent The browser component peer.
+     * @return True if a message listener was installed.  False otherwise.
+     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String) 
+     * @see BrowserComponent#onMessage
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     */
+    public boolean installMessageListener(Object browserComponent) {
+        return false;
+    }
+    
+    /**
+     * Uninstalls a message listener to allow webpages inside a browser component to send 
+     * messages to CN1 cross-domain.
+     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
+     * use the default implementation in {@link BrowserComponent}.
+     * @param browserComponent The browser component peer.
+     * @return True if a message listener was installed.  False otherwise.
+     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String) 
+     * @see BrowserComponent#onMessage
+     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String) 
+     */
+    public boolean uninstallMessageListener(Object browserComponent) {
+        return false;
+    }
+    
+    /**
      * <p>Creates a native overlay for the given component. A native overlay is a native component
      * that is always present over the given component.  It can be used to help processing user 
      * events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
@@ -5850,6 +5905,46 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
     
+    /**
+     * Makes a transform given the specified AffineTransform values.  
+     * @param m00 the X coordinate scaling element of the 3x3 matrix
+     * @param m10 the Y coordinate shearing element of the 3x3 matrix
+     * @param m01 the X coordinate shearing element of the 3x3 matrix
+     * @param m11 the Y coordinate scaling element of the 3x3 matrix
+     * @param m02 the X coordinate translation element of the 3x3 matrix
+     * @param m12 the Y coordinate translation element of the 3x3 matrix
+     * @return 
+     * @since 7.0
+     */
+    public Object makeTransformAffine(double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
+    /**
+     * Sets transform to the given specified AffineTransform values.
+     * @param nativeTransform Platform-specific native transform.
+     * @param m00 the X coordinate scaling element of the 3x3 matrix
+     * @param m10 the Y coordinate shearing element of the 3x3 matrix
+     * @param m01 the X coordinate shearing element of the 3x3 matrix
+     * @param m11 the Y coordinate scaling element of the 3x3 matrix
+     * @param m02 the X coordinate translation element of the 3x3 matrix
+     * @param m12 the Y coordinate translation element of the 3x3 matrix
+     * @since 7.0
+     */
+    public void setTransformAffine(Object nativeTransform, double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+            double m12) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
         setTransformIdentity(nativeTransform);
         transformScale(nativeTransform, scaleX, scaleY, scaleZ);
@@ -6361,6 +6456,28 @@ public abstract class CodenameOneImplementation {
         return 0;
     }
 
+    /**
+     * Starts the remote control service.  This should be implemented
+     * in the platform to handle binding the {@link RemoteControlListener} with
+     * the platform's remote control.
+     * 
+     * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void startRemoteControl() {
+        
+    }
+
+    /**
+     * Stops the remote control service.  This should be implemented in the platform
+     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * @since 7.0
+     */
+    public void stopRemoteControl() {
+        
+    }
+
     
 
     
@@ -6417,6 +6534,19 @@ public abstract class CodenameOneImplementation {
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
         return null;
+    }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param builder THe media builder with settings for the recorder.
+     * getAvailableRecordingMimeTypes()
+     * @since 7.0
+     
+     */
+    public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        return createMediaRecorder(builder.getPath(), builder.getMimeType());
     }
     
     /**

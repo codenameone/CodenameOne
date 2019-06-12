@@ -50,7 +50,10 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment);
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, 
+            int rows, int maxSize, int constraint, String text, boolean forceSlideUp, 
+            int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,
+            String hint, int hintColor, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
@@ -335,7 +338,7 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
-    native long createAudioRecorder(String destinationFile);
+    native long createAudioRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration);
     native void startAudioRecord(long peer);
     native void pauseAudioRecord(long peer);
     native void cleanupAudioRecord(long peer);
