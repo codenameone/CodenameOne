@@ -36,6 +36,8 @@ import java.util.Set;
  */
 public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> implements Iterable<Map.Entry<T1, T2>> {
     private LinkedHashMap<T1, T2> value = new LinkedHashMap<T1, T2>();
+    private Class keyType;
+    private Class valueType;
     
     /**
      * Constructs a property with the given name 
@@ -56,6 +58,24 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
         super(name);
         validateCollectionType(genericTypeKey);
         validateCollectionType(genericTypeValue);
+        keyType = genericTypeKey;
+        valueType = genericTypeValue;
+    }
+    
+    /**
+     * Returns the class for the key element if it's defined or null if it isn't
+     * @return the class matching the map key
+     */
+    public Class getKeyType() {
+        return keyType;
+    }
+
+    /**
+     * Returns the class for the value element if it's defined or null if it isn't
+     * @return the class matching the map value
+     */
+    public Class getValueType() {
+        return valueType;
     }
     
     /**

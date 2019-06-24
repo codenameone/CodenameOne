@@ -48,6 +48,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -59,7 +60,7 @@ import java.util.Map;
  */
 public class PropertyIndex implements Iterable<PropertyBase> {
     private final PropertyBase[] properties;
-    private static HashMap<String, HashMap<String, Object>> metadata = new HashMap<String, HashMap<String, Object>>();
+    private static Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     PropertyBusinessObject parent;
     private final String name;
     
@@ -363,15 +364,35 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                             ((MapProperty)p).clear();
                             for(Object k : ((Map)val).keySet()) {
                                 Object value = ((Map)val).get(k);
-                                if(value instanceof Map) {
-                                    PropertyBusinessObject po = (PropertyBusinessObject)p.get();
-                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)value, recursiveType);
-                                    ((MapProperty)p).set(k, po);
-                                    continue;
+                                Class keyType = ((MapProperty)p).getKeyType();
+                                if(keyType != null && 
+                                    PropertyBusinessObject.class.isAssignableFrom(keyType)) {
+                                    PropertyBusinessObject po = (PropertyBusinessObject)keyType.newInstance();
+                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)val, keyType);
+                                    k = po;
                                 }
-                                if(value instanceof List) {
-                                    ((MapProperty)p).set(k, listParse((List)value, recursiveType));
+                                Class valueType = ((MapProperty)p).getValueType();
+                                if(valueType != null && 
+                                    PropertyBusinessObject.class.isAssignableFrom(valueType)) {
+                                    Map<String, Object> contentMap = (Map<String, Object>)val;
+                                    for(String kk : contentMap.keySet()) {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)valueType.newInstance();
+                                        Map<String, Object> vv = (Map<String, Object>)contentMap.get(kk);
+                                        po.getPropertyIndex().populateFromMap(vv, valueType);
+                                        ((MapProperty)p).set(kk, po);
+                                    }
                                     continue;
+                                } else {
+                                    if(value instanceof Map) {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)p.get();
+                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)value, recursiveType);
+                                        ((MapProperty)p).set(k, po);
+                                        continue;
+                                    }
+                                    if(value instanceof List) {
+                                        ((MapProperty)p).set(k, listParse((List)value, recursiveType));
+                                        continue;
+                                    }
                                 }
                                 ((MapProperty)p).set(k, value);
                             }                        
@@ -426,7 +447,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return a map representation of the properties
      */
     private Map<String, Object> toMapRepresentationImpl(String excludeFlag) {
-        HashMap<String, Object> m = new HashMap<String, Object>();
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
         for(PropertyBase p : this) {
             if(p.getClientProperty(excludeFlag) != null) {
                 continue;
