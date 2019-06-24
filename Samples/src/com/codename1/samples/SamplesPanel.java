@@ -144,7 +144,7 @@ public class SamplesPanel extends JPanel {
     
     private void update() {
         samplesWrapper.removeAll();
-        
+        samples.sort();
         
         for (Sample sample : samples) {
             //System.out.println("Updating with "+sample.getName());
