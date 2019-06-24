@@ -1642,8 +1642,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int stringWidth(Object nativeFont, String str) {
-        float w = (nativeFont == null ? this.defaultFont
-                : (Paint) ((NativeFont) nativeFont).font).measureText(str);
+        float w = 0;
+        if (nativeFont == null) {
+            w = this.defaultFont.measureText(str);
+        } else {
+            w = ((NativeFont)nativeFont).stringWidth(str);
+        }
+
         if (w - (int) w > 0) {
             return (int) (w + 1);
         }
@@ -1674,16 +1679,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getFontAscent(Object nativeFont) {
-        Paint font = (nativeFont == null ? this.defaultFont
-                : (Paint) ((NativeFont) nativeFont).font);
-        return -Math.round(font.getFontMetrics().ascent);
+        CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
+                : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
+
+        return -font.getFontAscent();
     }
 
     @Override
     public int getFontDescent(Object nativeFont) {
-        Paint font = (nativeFont == null ? this.defaultFont
-                : (Paint) ((NativeFont) nativeFont).font);
-        return Math.abs(Math.round(font.getFontMetrics().descent));
+        CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
+                : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
+        return font.getFontDescent();
     }
 
     @Override
@@ -1798,6 +1804,55 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
 
+    private static class StringWidthCacheEntry {
+        private String str;
+        private float width;
+        private int mark;
+    }
+
+    private static class StringWidthCache {
+        static final int MAX_SIZE = 500;
+        Map<String,StringWidthCacheEntry> entries = new HashMap<String,StringWidthCacheEntry>();
+        public float get(String str) {
+            if (!containsString(str)) {
+                throw new IllegalArgumentException("String not found "+str);
+            }
+            return entries.get(str).width;
+        }
+        public boolean containsString(String str) {
+            return entries.containsKey(str);
+        }
+
+        public void put(String str, float width) {
+            StringWidthCacheEntry e = entries.get(str);
+            if (e == null) {
+                e = new StringWidthCacheEntry();
+                e.str = str;
+                e.width = width;
+                entries.put(str, e);
+            }
+            e.mark = entries.size();
+            if (entries.size() > MAX_SIZE) {
+                ArrayList<StringWidthCacheEntry> tmp = new ArrayList<StringWidthCacheEntry>();
+                tmp.addAll(entries.values());
+                Collections.sort(tmp, new Comparator<StringWidthCacheEntry>() {
+
+                    @Override
+                    public int compare(StringWidthCacheEntry o1, StringWidthCacheEntry o2) {
+                        return o1.mark - o2.mark;
+                    }
+                });
+                int len = tmp.size();
+                entries.clear();
+                for (int i=MAX_SIZE/2; i<len; i++) {
+                    StringWidthCacheEntry ee = tmp.get(i);
+                    entries.put(ee.str, ee);
+                }
+            }
+
+        }
+    }
+
     public static class NativeFont {
         int face;
         int style;
@@ -1806,6 +1861,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String fileName;
         float height;
         int weight;
+        StringWidthCache stringWidthCache = new StringWidthCache();
+
+
 
         public NativeFont(int face, int style, int size, Object font, String fileName, float height, int weight) {
             this(face, style, size, font);
@@ -1820,6 +1878,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.size = size;
             this.font = font;
         }
+
+        public float stringWidth(String str) {
+            if (stringWidthCache.containsString(str)) {
+                return stringWidthCache.get(str);
+            }
+            float val =  ((Paint)font).measureText(str);
+            stringWidthCache.put(str, val);
+            return val;
+        }
+
 
         public boolean equals(Object o) {
             if(o == null) {
@@ -1982,7 +2050,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics(Object image) {
-        return new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
+        return g;
     }
 
     @Override
@@ -2091,24 +2161,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(myView != null && myView.alwaysRepaintAll()) {
             if(cmp instanceof Component) {
                 Component c = (Component)cmp;
-                c.setDirtyRegion(null);
-                if(c.getParent() != null) {
-                    cmp = c.getComponentForm();
-                } else {
+                    c.setDirtyRegion(null);
+                    if(c.getParent() != null) {
+                        cmp = c.getComponentForm();
+                    } else {
+                        Form f = getCurrentForm();
+                        if(f != null) {
+                            cmp = f;
+                        }
+                    }
+            } else {
+                    // make sure the form is repainted for standalone anims e.g. in the case
+                    // of replace animation
                     Form f = getCurrentForm();
                     if(f != null) {
-                        cmp = f;
+                        super.repaint(f);
                     }
                 }
-            } else {
-                // make sure the form is repainted for standalone anims e.g. in the case
-                // of replace animation
-                Form f = getCurrentForm();
-                if(f != null) {
-                    super.repaint(f);
-                }
             }
-        }
         super.repaint(cmp);
     }
 

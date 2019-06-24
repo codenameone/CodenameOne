@@ -1152,7 +1152,28 @@ public final class Display extends CN1Constants {
     }
 
     long time;
-
+    private EDTProfiler profiler;
+    long tmpProfilerTime;
+    
+    /**
+     * Sets a profiler for the event dispatch thread to be notified when key
+     * events occur.
+     * @param profiler The profiler.
+     * @since 7.0
+     */
+    public void setEDTProfiler(EDTProfiler profiler) {
+        this.profiler = profiler;
+    }
+    
+    /**
+     * Gets the profiler that is currently set for the event dispatch thread.
+     * @return The profiler.
+     * @since 7.0
+     */
+    public EDTProfiler getEDTProfiler() {
+        return profiler;
+    }
+    
     /**
      * Implementation of the event dispatch loop content
      */
@@ -1179,6 +1200,9 @@ public final class Display extends CN1Constants {
             }
         } catch(Exception ignor) {
             Log.e(ignor);
+        }
+        if (profiler != null) {
+            profiler.startFrame();
         }
         long currentTime = System.currentTimeMillis();
         
@@ -1214,16 +1238,28 @@ public final class Display extends CN1Constants {
         
         actualStack[actualStack.length - 1] = 0;
 
-    if(!impl.isInitialized()){
+        if(!impl.isInitialized()){
             return;
         }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
+        if (profiler != null) {
+            profiler.startPaintDirty();
+        }
         impl.paintDirty();
+        if (profiler != null) {
+            profiler.endPaintDirty();
+        }
 
         // draw the animations
         Form current = impl.getCurrentForm();
         if(current != null){
+            if (profiler != null) {
+                profiler.startRepaintAnimations();
+            }
             current.repaintAnimations();
+            if (profiler != null) {
+                profiler.endRepaintAnimations();
+            }
             // check key repeat events
             long t = System.currentTimeMillis();
             if(keyRepeatCharged && nextKeyRepeatEvent <= t) {
@@ -1239,7 +1275,14 @@ public final class Display extends CN1Constants {
                 current.longPointerPress(pointerX, pointerY);
             }
         }
+        if (profiler != null) {
+            profiler.startProcessSerialCalls();
+        }
         processSerialCalls();
+        if (profiler != null) {
+            profiler.endProcessSerialCalls();
+            profiler.endFrame();
+        }
         time = System.currentTimeMillis() - currentTime;
     }
 

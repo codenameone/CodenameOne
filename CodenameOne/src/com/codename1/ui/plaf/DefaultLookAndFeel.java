@@ -1490,12 +1490,20 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.LEFT:
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
-                        strWidth = drawLabelStringValign(g, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        if (text.trim().length() > 0) {
+                            strWidth = drawLabelStringValign(g, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        } else {
+                            strWidth = 0;
+                        }
 
                         g.drawImage(icon, x + strWidth + gap, y);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
-                        strWidth = drawLabelString(g, l, text, x, y, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            strWidth = drawLabelString(g, l, text, x, y, textSpaceW);
+                        } else {
+                            strWidth = 0;
+                        }
 
                         g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
                     }
@@ -1504,11 +1512,15 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         g.drawImage(icon, x, y);
-                        drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        if (text.trim().length() > 0) {
+                            drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        }
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         g.drawImage(icon, x, y + iconStringHGap);
-                        drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceW);
+                        }
                     }
                     break;
                 case Label.BOTTOM:
@@ -1516,23 +1528,30 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         g.drawImage(icon, x, y);
-                        drawLabelString(g, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            drawLabelString(g, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);
+                        }
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         g.drawImage(icon, x + iconStringWGap, y);
-                        
-                        drawLabelString(g, l, text, x, y + iconHeight + gap, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            drawLabelString(g, l, text, x, y + iconHeight + gap, textSpaceW);
+                        }
                     }
                     break;
                 case Label.TOP:
                     if (iconWidth > strWidth) { //center align the smaller
 
                         iconStringWGap = (iconWidth - strWidth) / 2;
-                        drawLabelString(g, l, text, x + iconStringWGap, y, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            drawLabelString(g, l, text, x + iconStringWGap, y, textSpaceW);
+                        }
                         g.drawImage(icon, x, y + fontHeight + gap);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
-                        drawLabelString(g, l, text, x, y, textSpaceW);
+                        if (text.trim().length() > 0) {
+                            drawLabelString(g, l, text, x, y, textSpaceW);
+                        }
                         g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
                     }
                     break;

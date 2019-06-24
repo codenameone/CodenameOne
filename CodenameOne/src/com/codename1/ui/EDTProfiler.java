@@ -20,19 +20,54 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package com.codename1.ui;
 
 /**
- * Allows access to package protected methods without exposing them thru official API
- * 
- * @author Shai Almog
+ * An interface that can be implemented and registered to receive callbacks on the
+ * event dispatch thread (EDT).  This allows for measuring the time taken to draw
+ * frames in the UI.
+ * @author shannah
+ * @since 7.0
  */
-public class Accessor {
-    public static Object getNativeGraphics(Graphics g) {
-        return g.getGraphics();
-    }
-    public static boolean scrollableYFlag(Container c) {
-        return c.scrollableYFlag();
-    }
+public interface EDTProfiler {
+    /**
+     * Called at the start of rendering a frame.
+     */
+    public void startFrame();
+    
+    /**
+     * Called when rendering a frame is complete.
+     */
+    public void endFrame();
+    
+    /**
+     * Called before painting dirty components for a frame.
+     */
+    public void startPaintDirty();
+    
+    /**
+     * Called after finishing painting dirty components for a frame.
+     */
+    public void endPaintDirty();
+    
+    /**
+     * Called before repainting animations for a frame.
+     */
+    public void startRepaintAnimations();
+    
+    /**
+     * Called after repainting animations for a frame.
+     */
+    public void endRepaintAnimations();
+    
+    /**
+     * Called before processing serial calls for a frame.
+     */
+    public void startProcessSerialCalls();
+    
+    /**
+     * Called after processing serial calls for a frame.
+     */
+    public void endProcessSerialCalls();
+    
 }
