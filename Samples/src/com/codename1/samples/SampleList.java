@@ -6,6 +6,8 @@
 package com.codename1.samples;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
@@ -34,6 +36,16 @@ public class SampleList implements Iterable<Sample> {
         }
         return out;
         
+    }
+    
+    public void sort() {
+        Collections.sort(samples, new Comparator<Sample>() {
+            @Override
+            public int compare(Sample o1, Sample o2) {
+                return o1.getName().compareTo(o2.getName());
+            }
+            
+        });
     }
     
 }

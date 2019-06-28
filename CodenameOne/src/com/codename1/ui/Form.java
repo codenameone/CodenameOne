@@ -410,13 +410,13 @@ public class Form extends Container {
     }
 
     Component findScrollableChild(Container c) {
-        if(c.isScrollableY()) {
+        if(c.isScrollableYInternal()) {
             return c;
         }
         int count = c.getComponentCount();
         for(int iter = 0 ; iter < count ; iter++) {
             Component comp = c.getComponentAt(iter);
-            if(comp.isScrollableY()) {
+            if(comp.isScrollableYInternal()) {
                 return comp;
             }
             if(comp instanceof Container) {
@@ -747,7 +747,7 @@ public class Form extends Container {
             if(c != null) {
                 return c.getDragRegionStatus(x, y);
             }
-            if(isScrollable()) {
+            if(isScrollableInternal()) {
                 return DRAG_REGION_LIKELY_DRAG_Y;
             }
         }
@@ -1294,6 +1294,7 @@ public class Form extends Container {
             formLayeredPane = new Container(new LayeredLayout()) {
                 @Override
                 protected void paintBackground(Graphics g) {
+                    if (true) return;
                     if(getComponentCount() > 0) {
                         if(isVisible()) {
                             setVisible(false);
@@ -4074,12 +4075,12 @@ public class Form extends Container {
             }
             while (parent != null) {
                 if(parent == this) {
-                    if(getContentPane().isScrollable()) {
+                    if(getContentPane().isScrollableInternal()) {
                         getContentPane().moveScrollTowards(direction, c);
                     }
                     
                 }else{
-                    if (parent.isScrollable()) {
+                    if (parent.isScrollableInternal()) {
                         return parent.moveScrollTowards(direction, c);
                     }
                 }
@@ -4116,10 +4117,10 @@ public class Form extends Container {
         initFocused();
         Container parent = c.getParent();
         while (parent != null) {
-            if (parent.isScrollable()) {
+            if (parent.isScrollableInternal()) {
                 if(parent == this) {
                     // special case for Form
-                    if(getContentPane().isScrollable()) {
+                    if(getContentPane().isScrollableInternal()) {
                         getContentPane().scrollComponentToVisible(c);
                     }
                 } else {
@@ -4220,6 +4221,24 @@ public class Form extends Container {
     public boolean isScrollableY() {
         return getContentPane().isScrollableY();
     }
+
+    @Override
+    boolean isScrollableInternal() {
+        return false;
+    }
+
+    @Override
+    boolean isScrollableXInternal() {
+        return false;
+    }
+
+    @Override
+    boolean isScrollableYInternal() {
+        return false;
+    }
+    
+    
+    
 
     /**
      * {@inheritDoc}

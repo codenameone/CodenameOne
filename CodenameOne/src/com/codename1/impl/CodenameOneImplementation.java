@@ -575,7 +575,7 @@ public abstract class CodenameOneImplementation {
      * a rectangle each time it is called.
      */
     private Rectangle paintDirtyTmpRect = new Rectangle();
-    
+
     /**
      * Invoked by the EDT to paint the dirty regions
      */
@@ -598,9 +598,9 @@ public abstract class CodenameOneImplementation {
             int bottomY = 0;
             for (int iter = 0; iter < size; iter++) {
                 Animation ani = paintQueueTemp[iter];
-                
+
                 // might happen due to paint queue removal
-                if(ani == null) {
+                if (ani == null) {
                     continue;
                 }
                 paintQueueTemp[iter] = null;
@@ -6478,14 +6478,14 @@ public abstract class CodenameOneImplementation {
         
     }
 
-    
 
-    
 
-    
-  
 
-    
+
+
+
+
+
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {

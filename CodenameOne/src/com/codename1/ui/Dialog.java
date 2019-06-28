@@ -1021,7 +1021,7 @@ public class Dialog extends Form {
         if (timeout != 0) {
             dialog.setTimeout(timeout);
         }
-        if(body.isScrollable() || disableStaticDialogScrolling){
+        if(body.isScrollableInternal() || disableStaticDialogScrolling){
             dialog.setScrollable(false);
         }
         dialog.show();

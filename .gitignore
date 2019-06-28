@@ -59,3 +59,4 @@ node_modules
 /Ports/CLDC11/dist/
 /Samples/SampleProjectTemplate/nbproject/private/
 /Samples/config
+/Samples/nbproject/private/
