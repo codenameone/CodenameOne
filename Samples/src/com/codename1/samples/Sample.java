@@ -493,10 +493,6 @@ public class Sample {
         return result;
     }
     
-    public void clean(SamplesContext context) throws IOException { 
-        FileUtil.delTree(getBuildProjectDir(context));
-    }
-    
     public int buildUWP(SamplesContext context) throws IOException, InterruptedException {
         syncChangesToBuildDir(context);
         //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run

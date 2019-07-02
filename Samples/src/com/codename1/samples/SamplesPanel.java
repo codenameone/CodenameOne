@@ -96,8 +96,6 @@ public class SamplesPanel extends JPanel {
         public void launchIOSRelease(Sample sample);
 
         public void launchUWP(Sample sample);
-
-        public void clean(Sample sample);
     }
     public SamplesPanel(SampleList list) {
         setLayout(new BorderLayout());
@@ -281,15 +279,6 @@ public class SamplesPanel extends JPanel {
         });
         export.add(exportNB);
         
-        JMenuItem clean = new JMenuItem("Clean");
-        clean.setToolTipText("Delete the build project.  May be necessary if some changes to global build hints aren't being picked up");
-        clean.addActionListener(e->{
-            if (delegate != null) {
-                delegate.clean(sample);
-            }
-        });
-        
-        
         JButton more = new JButton("More...");
         JPopupMenu moreMenu = new JPopupMenu("More...");
         more.addActionListener(e->{
@@ -315,8 +304,6 @@ public class SamplesPanel extends JPanel {
         moreMenu.add(refreshCSS);
         moreMenu.addSeparator();
         moreMenu.add(export);
-        moreMenu.addSeparator();
-        moreMenu.add(clean);
         
         JPanel buttons = new JPanel(new FlowLayout());
         buttons.setOpaque(false);

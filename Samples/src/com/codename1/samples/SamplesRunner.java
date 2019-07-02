@@ -382,19 +382,6 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         
     }
 
-    @Override
-    public void clean(Sample sample) {
-        
-        new Thread(()->{
-            try {
-                sample.clean(ctx);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(view, ex.getMessage(), "Clean Failed", JOptionPane.ERROR_MESSAGE);
-            }
-        }).start();
-    }
-
     
 
     
