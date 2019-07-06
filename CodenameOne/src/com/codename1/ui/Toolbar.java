@@ -2037,6 +2037,15 @@ public class Toolbar extends Container {
     }
 
     /**
+     * Removes a Command from the MenuBar
+     * 
+     * @param cmd Command to remove
+     */
+    public void removeCommand(Command cmd) {
+        getMenuBar().removeCommand(cmd);
+    }
+    
+    /**
      * Adds a Command to the TitleArea on the right side.
      *
      * @param cmd a Command
