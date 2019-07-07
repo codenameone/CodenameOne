@@ -180,7 +180,10 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
     }
 
     private void refreshComponentTree() {
-        componentTree.setModel(new ComponentTreeModel(Display.getInstance().getCurrent()));
+        TreePath tp = componentTree.getSelectionPath();
+        ComponentTreeModel cm = new ComponentTreeModel(Display.getInstance().getCurrent());
+        componentTree.setModel(cm);
+        componentTree.setSelectionPath(tp);
     }
     
     /** This method is called from within the constructor to
