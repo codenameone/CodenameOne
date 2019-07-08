@@ -50,6 +50,8 @@ public class Socket {
      * Returns true if server sockets are supported in this port, if this method returns
      * false invocations of listen will always fail
      * @return true if server sockets are supported in this port, false otherwise
+     * @deprecated server sockets are only supported on Android and Desktop and as such 
+     * we recommend against using them
      */
     public static boolean isServerSocketSupported() {
         return Util.getImplementation().isServerSocketAvailable();
@@ -89,6 +91,8 @@ public class Socket {
      * @param scClass class of callback for when the connection is established or fails, this class
      * will be instantiated for every incoming connection and must have a public no argument constructor.
      * @return StopListening instance that allows the the caller to stop listening on a server socket
+     * @deprecated server sockets are only supported on Android and Desktop and as such 
+     * we recommend against using them
      */
     public static StopListening listen(final int port, final Class scClass) {
         class Listener implements StopListening, Runnable {
