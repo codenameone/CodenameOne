@@ -101,6 +101,9 @@ public class Label extends Component {
     private int widthAtLastCheck = -1;
     private char materialIcon;
     private float materialIconSize = -1;
+    private Font font;
+    private char fontIcon;
+    private float fontIconSize = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -234,6 +237,17 @@ public class Label extends Component {
     }
     
     /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
+     * @param c one of the constants from the font
+     */
+    public void setFontIcon(Font font, char c) {
+        FontImage.setFontIcon(this, font, c);
+        fontIconSize = -1;
+        this.font = font;
+        fontIcon = c;
+    }
+    
+    /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
      * @param size the size of the icon in millimeters
@@ -245,11 +259,31 @@ public class Label extends Component {
     }
     
     /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
+     * @param c one of the constants from the font
+     * @param size the size of the icon in millimeters
+     */
+    public void setFontIcon(Font font, char c, float size) {
+        FontImage.setFontIcon(this, font, c, size);
+        fontIconSize = size;
+        this.font = font;
+        fontIcon = c;
+    }
+    
+    /**
      * Returns the material icon assigned to this component or 0 if not applicable
      * @return the material icon
      */
     public char getMaterialIcon() {
         return materialIcon;
+    }
+    
+    /**
+     * Returns the font icon assigned to this component or 0 if not applicable
+     * @return the material icon
+     */
+    public char getFontIcon() {
+        return fontIcon;
     }
     
     /**
@@ -259,6 +293,23 @@ public class Label extends Component {
      */
     public float getMaterialIconSize() {
         return materialIconSize;
+    }
+    
+    /**
+     * Returns the icon size assigned to this component or 0/-1 if 
+     * not applicable
+     * @return the icon size
+     */
+    public float getFontIconSize() {
+        return fontIconSize;
+    }
+    
+    /**
+     * Returns the font for the icon font or null if not font set
+     * @return the material icon size
+     */
+    public Font getIconFont() {
+        return font;
     }
     
     /**
@@ -293,6 +344,8 @@ public class Label extends Component {
         super.setUIID(id);
         if(materialIcon != 0) {
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
+        } else if(fontIcon != 0) {
+            FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
         }
     }
 
@@ -304,6 +357,8 @@ public class Label extends Component {
         super.refreshTheme(merge);
         if(materialIcon != 0) {
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
+        } else if(fontIcon != 0) {
+            FontImage.setFontIcon(this, font,fontIcon, fontIconSize);
         }
     }
     
