@@ -83,6 +83,12 @@ public class ImageViewer extends Component {
     private boolean animateZoom = true;
     
     /**
+     * Allows the image to scale down when image initial position is set to fit
+     * this is off by default since the UX isn't great
+     */
+    private boolean allowScaleDown;
+    
+    /**
      * Indicates the initial position of the image in the viewer to FIT to the 
      * component size
      */ 
@@ -497,7 +503,7 @@ public class ImageViewer extends Component {
         int width = getWidth() - s.getHorizontalPadding();
         int height = getHeight() - s.getVerticalPadding();
         float r2;
-        if(imageInitialPosition == IMAGE_FIT){
+        if(allowScaleDown || imageInitialPosition == IMAGE_FIT){
             r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
         }else{
             r2 = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));        
@@ -603,6 +609,24 @@ public class ImageViewer extends Component {
      * The crop box.  This is automatically updated whenever pan/zoom is changed.
      */
     private final CropBox cropBox = new CropBox();
+
+    /**
+     * Allows the image to scale down when image initial position is set to fit
+     * this is off by default since the UX isn't great
+     * @return the allowScaleDown
+     */
+    public boolean isAllowScaleDown() {
+        return allowScaleDown;
+    }
+
+    /**
+     * Allows the image to scale down when image initial position is set to fit
+     * this is off by default since the UX isn't great
+     * @param allowScaleDown the allowScaleDown to set
+     */
+    public void setAllowScaleDown(boolean allowScaleDown) {
+        this.allowScaleDown = allowScaleDown;
+    }
     private class CropBox {
         /**
          * The top, left, right, bottom crop positions expressed as 
