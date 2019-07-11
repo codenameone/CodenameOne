@@ -592,7 +592,6 @@
     </target>
                 
     <target name="build-for-windows-device" depends="clean,copy-windows-override,copy-libs,jar,clean-override">
-        <property name="windows.targetType" value="windows"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
@@ -606,7 +605,7 @@
             certificate="${codename1.windows.certificate}"
             certPassword="${codename1.windows.certificatePassword}"
 
-            targetType="${windows.targetType}"
+            targetType="windows"
             automated="${automated}"
             />
     </target>

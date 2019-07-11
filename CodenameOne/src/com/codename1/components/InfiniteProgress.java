@@ -228,7 +228,7 @@ public class InfiniteProgress extends Component {
      */
     public boolean animate(boolean force) {
         if (!force) {
-            if (!isVisible() || !isVisibleOnForm() || Display.getInstance().getCurrent() != this.getComponentForm()) {
+            if (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm()) {
                 return false;
             }
         }

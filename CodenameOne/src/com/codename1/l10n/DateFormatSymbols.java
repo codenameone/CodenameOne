@@ -62,6 +62,11 @@ public class DateFormatSymbols implements Cloneable {
 	private String weekdays[];
 	private String shortWeekdays[];
 	private String eras[];
+    
+    /**
+     * Allows turning localization on/off defaults to localization
+     */
+    private boolean localized = true;
 
 	public String[] getAmPmStrings() {
 		synchronized (this) {
@@ -102,12 +107,15 @@ public class DateFormatSymbols implements Cloneable {
 	}
 
 	String getLocalizedValue(String key, String defaultValue) {
-		Hashtable<String, String> resourceBundle = getResourceBundle();
-		if (resourceBundle == null || resourceBundle.containsKey(key) == false) {
-			return defaultValue;
-		}
-		String v = (resourceBundle.get(key));
-		return (v.length() > 0) ? v : defaultValue;
+        if(localized) {
+            Hashtable<String, String> resourceBundle = getResourceBundle();
+            if (resourceBundle == null || resourceBundle.containsKey(key) == false) {
+                return defaultValue;
+            }
+            String v = (resourceBundle.get(key));
+            return (v.length() > 0) ? v : defaultValue;
+        }
+        return defaultValue;
 	}
 
 	public String[][] getZoneStrings() {
@@ -397,4 +405,20 @@ public class DateFormatSymbols implements Cloneable {
 		dfs.resourceBundle = resourceBundle;
 		return dfs;
 	}
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     * @return the localized
+     */
+    public boolean isLocalized() {
+        return localized;
+    }
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     * @param localized the localized to set
+     */
+    public void setLocalized(boolean localized) {
+        this.localized = localized;
+    }
 }
