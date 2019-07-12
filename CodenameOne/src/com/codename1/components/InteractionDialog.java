@@ -698,6 +698,11 @@ public class InteractionDialog extends Container {
             if(border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
                 restoreArrow = true;
+            } 
+        } else {
+            Border border = contentPaneStyle.getBorder();
+            if(border != null) {
+                border.setTrackComponent(rect);
             }
         }
         calcPreferredSize();

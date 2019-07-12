@@ -1227,6 +1227,11 @@ public class Dialog extends Form {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
                 restoreArrow = true;
             }
+        } else {
+            Border border = contentPaneStyle.getBorder();
+            if(border != null) {
+                border.setTrackComponent(rect);
+            }
         }
         int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
