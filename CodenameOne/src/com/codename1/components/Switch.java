@@ -192,6 +192,11 @@ public class Switch extends Component {
         return thumbDisabledImage;
     }
 
+    @Override
+    protected int getDragRegionStatus(int x, int y) {
+        return Component.DRAG_REGION_IMMEDIATELY_DRAG_X;
+    }
+
     private Image getCurrentThumbImage() {
         if (isEnabled()) {
             if (value) {
