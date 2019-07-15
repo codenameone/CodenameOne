@@ -23,6 +23,7 @@
 
 package com.codename1.ui.plaf;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
@@ -112,6 +113,10 @@ public class RoundRectBorder extends Border {
     private final int instanceVal;
 
     private boolean topLeft = true, topRight = true, bottomLeft = true, bottomRight = true;
+
+    private int arrowPosition = -1;
+    private int arrowDirection = -1;
+    private float arrowSize = 3;
     
     private RoundRectBorder() {
         shadowSpread = Display.getInstance().convertToPixels(0.2f);
@@ -417,6 +422,37 @@ public class RoundRectBorder extends Border {
     
     @Override
     public void paintBorderBackground(Graphics g, final Component c) {
+        if(getTrackComponent() != null) {
+            int cabsY = c.getAbsoluteY();
+            int trackY = getTrackComponent().getY();
+            int trackX = getTrackComponent().getX();
+            int cabsX = c.getAbsoluteX();
+            int arrowWH = CN.convertToPixels(arrowSize);
+            if(cabsY >= trackY + getTrackComponent().getHeight()) {
+                // we are below the component
+                arrowDirection = CN.TOP;
+                arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+            } else {    
+                if(cabsY + c.getHeight() <= trackY) {
+                    // we are above the component
+                    arrowDirection = CN.BOTTOM;
+                    arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+                }  else {
+                    if(cabsX >= trackX + getTrackComponent().getWidth()) {
+                        // we are to the right of the component
+                        arrowDirection = CN.LEFT;
+                        arrowPosition = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                    } else {
+                        if(cabsX + c.getWidth() <= trackX) {
+                            // we are to the left of the component
+                            arrowDirection = CN.RIGHT;
+                            arrowPosition = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                        }
+                    }
+                }
+            }
+        }
+        
         final int w = c.getWidth();
         final int h = c.getHeight();
         int x = c.getX();
@@ -495,6 +531,24 @@ public class RoundRectBorder extends Border {
         float widthF = shapeW;
         float heightF = shapeH;
         
+        if(getTrackComponent() != null) {
+            int ah = CN.convertToPixels(arrowSize);
+            switch(arrowDirection) {
+                case CN.TOP:
+                    y = ah;
+                    // intentional fall through to the next statement...
+                case CN.BOTTOM:
+                    heightF -= ah;
+                    break;
+                case CN.LEFT:
+                    x = ah;
+                    // intentional fall through to the next statement...
+                case CN.RIGHT:
+                    widthF -= ah;
+                    break;
+            }
+        }
+        
         if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
             int strokePx = (int)strokeThickness;
             if(strokeMM) {
@@ -516,29 +570,92 @@ public class RoundRectBorder extends Border {
         } else {
             gp.moveTo(x, y);            
         }
-        if(topRight) {
+        if(getTrackComponent() != null && arrowDirection == CN.TOP) {
+            int actualArrowPosition = (int)
+                Math.min(x + widthF,
+                    Math.max(arrowPosition, x + radius));
+            gp.lineTo(actualArrowPosition, y);
+            int ah = CN.convertToPixels(arrowSize);
+            gp.lineTo(actualArrowPosition + ah / 2 - 4, 4);
+            gp.quadTo(actualArrowPosition + ah / 2, 4, actualArrowPosition + ah / 2 + 4, 4);
+            gp.lineTo(actualArrowPosition + ah, y);            
+            
             gp.lineTo(x + widthF - radius, y);            
             gp.quadTo(x + widthF, y, x + widthF, y + radius);
         } else {
-            gp.lineTo(x + widthF, y);
+            if(topRight) {
+                gp.lineTo(x + widthF - radius, y);            
+                gp.quadTo(x + widthF, y, x + widthF, y + radius);
+            } else {
+                gp.lineTo(x + widthF, y);
+            }
         }
-        if(bottomRight) {
-            gp.lineTo(x + widthF, y + heightF - radius);
+        
+        if(getTrackComponent() != null && arrowDirection == CN.RIGHT) {
+            int actualArrowPosition = (int)
+                Math.min(y,
+                    Math.max(arrowPosition, y + heightF - radius));
+
+            gp.lineTo(x + widthF, actualArrowPosition);
+            
+            int ah = CN.convertToPixels(arrowSize);
+            gp.lineTo(x + widthF + ah - 4, actualArrowPosition + ah / 2 - 4);
+            gp.quadTo(x + widthF + ah - 4, actualArrowPosition + ah / 2, x + widthF + ah - 4, actualArrowPosition + ah / 2 + 4);
+            gp.lineTo(x + widthF, actualArrowPosition + ah);            
+            
+            gp.lineTo(x + widthF, y + heightF - radius);            
             gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
         } else {
-            gp.lineTo(x + widthF, y + heightF);
+            if(bottomRight) {
+                gp.lineTo(x + widthF, y + heightF - radius);
+                gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
+            } else {
+                gp.lineTo(x + widthF, y + heightF);
+            }
         }
-        if(bottomLeft) {
+        
+        if(getTrackComponent() != null && arrowDirection == CN.BOTTOM) {
+            int actualArrowPosition = (int)
+                Math.min(x + widthF,
+                    Math.max(arrowPosition, x + radius));
+            gp.lineTo(actualArrowPosition, y + heightF);
+            int ah = CN.convertToPixels(arrowSize);
+            gp.lineTo(actualArrowPosition + ah / 2 - 4, y + heightF + ah - 4);
+            gp.quadTo(actualArrowPosition + ah / 2, y + heightF + ah - 4, actualArrowPosition + ah / 2 + 4, y + heightF + ah - 4);
+            gp.lineTo(actualArrowPosition + ah, y + heightF);            
+            
             gp.lineTo(x + radius, y + heightF);
             gp.quadTo(x, y + heightF, x, y + heightF - radius);
         } else {
-            gp.lineTo(x, y + heightF);
+            if(bottomLeft) {
+                gp.lineTo(x + radius, y + heightF);
+                gp.quadTo(x, y + heightF, x, y + heightF - radius);
+            } else {
+                gp.lineTo(x, y + heightF);
+            }
         }
-        if(topLeft) {
+        
+        if(getTrackComponent() != null && arrowDirection == CN.LEFT) {
+            int actualArrowPosition = (int)
+                Math.min(y,
+                    Math.max(arrowPosition, y + heightF - radius));
+
+            gp.lineTo(x, actualArrowPosition);
+            
+            int ah = CN.convertToPixels(arrowSize);
+            gp.lineTo(4, actualArrowPosition + ah / 2 - 4);
+            gp.quadTo(4, actualArrowPosition + ah / 2, 4, actualArrowPosition + ah / 2 + 4);
+            gp.lineTo(x + widthF, actualArrowPosition + ah);            
+            
             gp.lineTo(x, y + radius);
             gp.quadTo(x, y, x + radius, y);
         } else {
-            gp.lineTo(x, y);            
+            if(topLeft) {
+                gp.lineTo(x, y + radius);
+                gp.quadTo(x, y, x + radius, y);
+            } else {
+                gp.lineTo(x, y);            
+            }
         }
         
         gp.closePath();            
@@ -556,17 +673,6 @@ public class RoundRectBorder extends Border {
     }
 
     
-    private void fillShape(Graphics g, int color, int opacity, int width, int height, boolean stroke) {
-        g.setColor(color);
-        g.setAlpha(opacity);
-        GeneralPath gp = createShape(width, height);
-        g.fillShape(gp);
-        if(stroke && this.stroke != null) {
-            g.setAlpha(strokeOpacity);
-            g.setColor(strokeColor);
-            g.drawShape(gp, this.stroke);
-        }            
-    }
     
     private Stroke stroke1;
     

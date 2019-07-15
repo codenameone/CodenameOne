@@ -174,6 +174,31 @@ public class InfiniteScrollAdapter {
     }
 
     /**
+     * If we previously added components with false for are there more this 
+     * method can continue the process of fetching. This is useful in case of
+     * a networking error. You can end fetching and then restart it based on
+     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+     */
+    public void continueFetching() {
+        if(endMarker.getParent() == null) {
+            fetchMore.run();
+        }    
+    }
+
+    /**
+     * If we previously added components with false for are there more this 
+     * method can continue the process of fetching. This is useful in case of
+     * a networking error. You can end fetching and then restart it based on
+     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+     * 
+     * @param cnt the container associated with the infinite scroll adapter
+     */
+    public static void continueFetching(Container cnt) {
+        InfiniteScrollAdapter ia = (InfiniteScrollAdapter)cnt.getClientProperty("cn1$infinite");
+        ia.continueFetching();
+    }
+    
+    /**
      * The component limit defines the number of components that should be within the infinite scroll adapter,
      * if more than component limit is added then the appropriate number of components is removed from the top.
      * This prevents running out of memory or performance overhead with too many components... 

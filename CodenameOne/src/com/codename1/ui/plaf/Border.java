@@ -142,6 +142,35 @@ public class Border {
     }
 
     /**
+     * The track component is an area to which an arrow based border should point at.
+     * It's assumed to be outside of the border region in absolute screen coordinates.
+     * 
+     * @return the rectangle to point at or null if this isn't an arrow border
+     */
+    protected Rectangle getTrackComponent() {
+        return trackComponent;
+    }
+
+    /**
+     * In the case of an arrow border the track component lets us track the position
+     * to which the border is pointing
+     * @param trackComponent the track component
+     */
+    public void setTrackComponent(Component trackComponent) {
+        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
+    }
+    
+
+    /**
+     * In the case of an arrow border the track component lets us track the position
+     * to which the border is pointing
+     * @param trackComponent the track component
+     */
+    public void setTrackComponent(Rectangle trackComponent) {
+        this.trackComponent = trackComponent;
+    }
+
+    /**
      * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
      * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
      * so it points at the center of the track component
