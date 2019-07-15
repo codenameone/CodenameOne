@@ -26,8 +26,11 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
@@ -62,6 +65,24 @@ import javax.swing.tree.TreePath;
 public class ComponentTreeInspector extends javax.swing.JFrame {
     private List<String> themePaths = new ArrayList<String>();
     private List<String> themeNames = new ArrayList<String>();
+
+    class SelectedComponentGlassPane implements Painter {
+        Component cmp;
+        public SelectedComponentGlassPane(Component cmp) {
+            this.cmp = cmp;
+        }
+
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+            g.setAlpha(30);
+            g.setColor(0xff0000);
+            
+            g.fillRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            
+            g.setAlpha(255);
+        }
+        
+    }
     
     private Component currentComponent; 
     /** Creates new form ComponentTreeInspector */
@@ -143,8 +164,20 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         componentTree.getSelectionModel().addTreeSelectionListener(new TreeSelectionListener() {
             public void valueChanged(TreeSelectionEvent e) {
                 if(e.getPath() != null) {
+                    Form parentForm = Display.getInstance().getCurrent();
                     Component c = (Component)e.getPath().getLastPathComponent();
                     if(c != null) {
+                        if(parentForm.getGlassPane() == null) {
+                            parentForm.setGlassPane(new SelectedComponentGlassPane(c));
+                        } else {
+                            if(parentForm.getGlassPane() instanceof SelectedComponentGlassPane) {
+                                SelectedComponentGlassPane s = (SelectedComponentGlassPane)parentForm.getGlassPane();
+                                if(s.cmp != c) {
+                                    s.cmp = c;
+                                    parentForm.repaint();
+                                }
+                            }
+                        }
                         currentComponent = c;
                         componentClass.setText(c.getClass().getName());
                         componentName.setText("" + c.getName());
@@ -170,6 +203,13 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                                 constraint.setText(o.toString());
                             }
                         } 
+                    } else {
+                        if(parentForm.getGlassPane() != null && 
+                            parentForm.getGlassPane() instanceof SelectedComponentGlassPane) {
+                            parentForm.setGlassPane(null);
+                            parentForm.repaint();
+                        }
+                        
                     }
                 }
             }
@@ -180,7 +220,10 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
     }
 
     private void refreshComponentTree() {
-        componentTree.setModel(new ComponentTreeModel(Display.getInstance().getCurrent()));
+        TreePath tp = componentTree.getSelectionPath();
+        ComponentTreeModel cm = new ComponentTreeModel(Display.getInstance().getCurrent());
+        componentTree.setModel(cm);
+        componentTree.setSelectionPath(tp);
     }
     
     /** This method is called from within the constructor to

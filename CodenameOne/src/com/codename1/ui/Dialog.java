@@ -1021,7 +1021,7 @@ public class Dialog extends Form {
         if (timeout != 0) {
             dialog.setTimeout(timeout);
         }
-        if(body.isScrollableInternal() || disableStaticDialogScrolling){
+        if(body.isScrollable() || disableStaticDialogScrolling){
             dialog.setScrollable(false);
         }
         dialog.show();
@@ -1226,6 +1226,11 @@ public class Dialog extends Form {
             if(border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
                 restoreArrow = true;
+            }
+        } else {
+            Border border = contentPaneStyle.getBorder();
+            if(border != null) {
+                border.setTrackComponent(rect);
             }
         }
         int prefHeight = contentPane.getPreferredH();

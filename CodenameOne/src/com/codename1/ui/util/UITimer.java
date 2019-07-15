@@ -38,7 +38,7 @@ public class UITimer {
     private Runnable internalRunnable;
     private Form bound;
     private long lastEllapse;
-    private long ms;
+    private int ms;
     private boolean repeat;
     private Internal i = new Internal();
     

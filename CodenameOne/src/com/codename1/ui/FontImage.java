@@ -4730,12 +4730,2090 @@ public class FontImage extends Image {
      * https://www.google.com/design/icons/ for full list
      */
     public static final char MATERIAL_ZOOM_OUT = '\uE900';
+
     /**
      * Material design icon font character code see
      * https://www.google.com/design/icons/ for full list
      */
     public static final char MATERIAL_ZOOM_OUT_MAP = '\uE56B';
 
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_10K = '\uE951';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_10MP = '\uE952';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_11MP = '\uE953';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_12MP = '\uE954';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_13MP = '\uE955';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_14MP = '\uE956';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_15MP = '\uE957';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_16MP = '\uE958';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_17MP = '\uE959';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_18MP = '\uE95A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_19MP = '\uE95B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_1K = '\uE95C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_1K_PLUS = '\uE95D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_20MP = '\uE95E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_21MP = '\uE95F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_22MP = '\uE960';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_23MP = '\uE961';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_24MP = '\uE962';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_2K = '\uE963';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_2K_PLUS = '\uE964';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_2MP = '\uE965';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_360 = '\uE577';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_3K = '\uE966';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_3K_PLUS = '\uE967';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_3MP = '\uE968';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_4K = '\uE072';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_4K_PLUS = '\uE969';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_4MP = '\uE96A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_5K = '\uE96B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_5K_PLUS = '\uE96C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_5MP = '\uE96D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_6K = '\uE96E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_6K_PLUS = '\uE96F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_6MP = '\uE970';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_7K = '\uE971';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_7K_PLUS = '\uE972';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_7MP = '\uE973';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_8K = '\uE974';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_8K_PLUS = '\uE975';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_8MP = '\uE976';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_9K = '\uE977';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_9K_PLUS = '\uE978';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_9MP = '\uE979';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ACCESSIBILITY_NEW = '\uE92C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ACCESSIBLE_FORWARD = '\uE934';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ACCOUNT_TREE = '\uE97A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_CALL = '\uE0E8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_CHART = '\uE97B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_COMMENT = '\uE266';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_IC_CALL = '\uE97C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_LINK = '\uE178';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_MODERATOR = '\uE97D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_PHOTO_ALTERNATE = '\uE43E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_TO_HOME_SCREEN = '\uE1FE';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_AIRPLANEMODE_OFF = '\uE194';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_AIRPLANEMODE_ON = '\uE195';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ALL_INBOX = '\uE97F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ALTERNATE_EMAIL = '\uE0E6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_AMP_STORIES = '\uEA13';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_APARTMENT = '\uEA40';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_APPROVAL = '\uE982';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_BACK_IOS = '\uE5E0';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_FORWARD_IOS = '\uE5E1';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_LEFT = '\uE5DE';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_RIGHT_ALT = '\uE941';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_RIGHT = '\uE5DF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ASSISTANT_DIRECTION = '\uE988';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ASSISTANT_NAVIGATION = '\uE989';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ATM = '\uE573';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ATTRACTIONS = '\uEA52';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BADGE = '\uEA67';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BAKERY_DINING = '\uEA53';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BALLOT = '\uE172';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BAR_CHART = '\uE26B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BATHTUB = '\uEA41';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BOLT = '\uEA0B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BOOKMARK_OUTLINE = '\uE867';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BOOKMARKS = '\uE98B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BREAKFAST_DINING = '\uEA54';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BRUNCH_DINING = '\uEA73';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_BUS_ALERT = '\uE98F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CALENDAR_TODAY = '\uE935';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CALENDAR_VIEW_DAY = '\uE936';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CANCEL_PRESENTATION = '\uE0E9';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CANCEL_SCHEDULE_SEND = '\uEA39';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CAR_RENTAL = '\uEA55';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CAR_REPAIR = '\uEA56';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CASES = '\uE992';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CATEGORY = '\uE574';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CELEBRATION = '\uEA65';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CELL_WIFI = '\uE0EC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CHECK_CIRCLE_OUTLINE = '\uE92D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CIRCLE_NOTIFICATIONS = '\uE994';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CLOSED_CAPTION_OFF = '\uE996';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_COMMUTE = '\uE940';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_COMPASS_CALIBRATION = '\uE57C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_COMPRESS = '\uE94D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CONFIRMATION_NUM = '\uE638';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CONNECTED_TV = '\uE998';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CONTACTLESS = '\uEA71';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CONTACT_SUPPORT = '\uE94C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_CONTROL_CAMERA = '\uE074';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DANGEROUS = '\uE99A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DASHBOARD_CUSTOMIZE = '\uE99B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DECK = '\uEA42';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DELETE_OUTLINE = '\uE92E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DELIVERY_DINING = '\uEA72';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DEPARTURE_BOARD = '\uE576';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DESKTOP_ACCESS_DISABLED = '\uE99D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DEVICE_THERMOSTAT = '\uE1FF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DEVICE_UNKNOWN = '\uE339';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DINNER_DINING = '\uEA57';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DIRECTIONS_FERRY = '\uE532';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DIRECTIONS_TRAIN = '\uE534';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DND_FORWARDSLASH = '\uE611';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DOMAIN_DISABLED = '\uE0EF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DONE_OUTLINE = '\uE92F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DOUBLE_ARROW = '\uEA50';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DRAG_INDICATOR = '\uE945';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DRIVE_FILE_MOVE_OUTLINE = '\uE9A1';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DRIVE_FILE_RENAME_OUTLINE = '\uE9A2';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DRIVE_FOLDER_UPLOAD = '\uE9A3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DRY_CLEANING = '\uEA58';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DUO = '\uE9A5';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_DYNAMIC_FEED = '\uEA14';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ECO = '\uEA35';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EDIT_ATTRIBUTES = '\uE578';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EDIT_OFF = '\uE950';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_EMOTIONS = '\uEA22';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_EVENTS = '\uEA23';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_FLAGS = '\uEA1A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_FOOD_BEVERAGE = '\uEA1B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_NATURE = '\uEA1C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_OBJECTS = '\uEA24';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_PEOPLE = '\uEA1D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_SYMBOLS = '\uEA1E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EMOJI_TRANSPORTATION = '\uEA1F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ENHANCE_PHOTO_TRANSLATE = '\uE8FC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EURO = '\uEA15';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EXPAND = '\uE94F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EXPLORE_OFF = '\uE9A8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EXPOSURE_MINUS_1 = '\uE3CB';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_EXPOSURE_MINUS_2 = '\uE3CC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FASTFOOD = '\uE57A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FAVORITE_OUTLINE = '\uE87E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FESTIVAL = '\uEA68';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FILE_COPY = '\uE173';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FILE_DOWNLOAD_DONE = '\uE9AA';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FILE_PRESENT = '\uEA0E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FILTER_LIST_ALT = '\uE94E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FIREPLACE = '\uEA43';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FIT_SCREEN = '\uEA10';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FLIP_CAMERA_ANDROID = '\uEA37';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FLIP_CAMERA_IOS = '\uEA38';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FORMAT_LIST_NUMBERED_RTL = '\uE267';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_FORMAT_UNDERLINE = '\uE249';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_GOAT = '\uDBFF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_GRID_VIEW = '\uE9B0';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HAIL = '\uE9B1';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HARDWARE = '\uEA59';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HEADSET_OFF = '\uE33A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HEIGHT = '\uEA16';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HIGHLIGHT_REMOVE = '\uE888';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HOME_FILLED = '\uE9B2';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HOME_WORK = '\uEA09';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HORIZONTAL_SPLIT = '\uE947';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HOUSE = '\uEA44';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HOW_TO_REG = '\uE174';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_HOW_TO_VOTE = '\uE175';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_ICECREAM = '\uEA69';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_IMAGE_SEARCH = '\uE43F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_IMAGESEARCH_ROLLER = '\uE9B4';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_INSERT_CHART_OUTLINED = '\uE26A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_INVENTORY = '\uE179';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_INVERT_COLORS_ON = '\uE891';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_CONTROL = '\uE5D3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_KING_BED = '\uEA45';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LABEL_IMPORTANT = '\uE937';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LABEL_IMPORTANT_OUTLINE = '\uE948';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LABEL_OFF = '\uE9B6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LIBRARY_ADD_CHECK = '\uE9B7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LIGHTBULB = '\uE0F0';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LINK_OFF = '\uE16F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LIQUOR = '\uEA60';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LIST_ALT = '\uE0EE';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LOCAL_ATTRACTION = '\uE53F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LOCAL_PRINT_SHOP = '\uE555';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LOCAL_RESTAURANT = '\uE556';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LOCATION_HISTORY = '\uE55A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LOGOUT = '\uE9BA';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_LUNCH_DINING = '\uEA61';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MARGIN = '\uE9BB';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MARK_AS_UNREAD = '\uE9BC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MAXIMIZE = '\uE930';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MEETING_ROOM = '\uEB4F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MENU_BOOK = '\uEA19';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MENU_OPEN = '\uE9BD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MESSENGER = '\uE0CA';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MESSENGER_OUTLINE = '\uE0CB';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MINIMIZE = '\uE931';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MISSED_VIDEO_CALL = '\uE073';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MOBILE_FRIENDLY = '\uE200';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MOBILE_OFF = '\uE201';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MOBILE_SCREEN_SHARE = '\uE0E7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MONEY = '\uE57D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MP = '\uE9C3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MULTITRACK_AUDIO = '\uE1B8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MUSEUM = '\uEA36';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MUSIC_OFF = '\uE440';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MY_LIBRARY_ADD = '\uE02E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MY_LIBRARY_BOOKS = '\uE02F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_MY_LIBRARY_MUSIC = '\uE030';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NIGHTLIFE = '\uEA62';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NIGHTS_STAY = '\uEA46';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NO_MEETING_ROOM = '\uEB4E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOTES = '\uE26C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOTIFICATION_IMPORTANT = '\uE004';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOTIFICATIONS_ON = '\uE7F7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOT_LISTED_LOCATION = '\uE575';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOW_WALLPAPER = '\uE1BC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_NOW_WIDGETS = '\uE1BD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_OFFLINE_BOLT = '\uE932';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_OFFLINE_SHARE = '\uE9C5';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_OUTDOOR_GRILL = '\uEA47';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_OUTLINED_FLAG = '\uE16E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PADDING = '\uE9C8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PANORAMA_FISHEYE = '\uE40C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PANORAMA_PHOTOSPHERE = '\uE9C9';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PANORAMA_PHOTOSPHERE_SELECT = '\uE9CA';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PARK = '\uEA63';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PAUSE_PRESENTATION = '\uE0EA';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PEOPLE_ALT = '\uEA21';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PERM_CONTACT_CAL = '\uE8A3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PERM_DEVICE_INFO = '\uE8A5';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PERSON_ADD_DISABLED = '\uE9CB';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PHONE_CALLBACK = '\uE649';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PHONE_DISABLED = '\uE9CC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PHONE_ENABLED = '\uE9CD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PIVOT_TABLE_CHART = '\uE9CE';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PLAY_CIRCLE_FILL = '\uE038';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_POLICY = '\uEA17';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_POST_ADD = '\uEA20';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_POWER_OFF = '\uE646';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_PRINT_DISABLED = '\uE9CF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_QUICK_CONTACTS_DIALER = '\uE0CF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_QUICK_CONTACTS_MAIL = '\uE0D0';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RADIO_BUTTON_OFF = '\uE836';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RADIO_BUTTON_ON = '\uE837';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RAILWAY_ALERT = '\uE9D1';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RAMEN_DINING = '\uEA64';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RECOMMEND = '\uE9D2';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REMOVE_DONE = '\uE9D3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REMOVE_MODERATOR = '\uE9D4';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REPEAT_ON = '\uE9D6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REPEAT_ONE_ON = '\uE9D7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REPLAY_CIRCLE_FILLED = '\uE9D8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_REPORT_OFF = '\uE170';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RESET_TV = '\uE9D9';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RESTORE_FROM_TRASH = '\uE938';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_RTT = '\uE9AD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SAVE_ALT = '\uE171';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SAVED_SEARCH = '\uEA11';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SCATTER_PLOT = '\uE268';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SCHEDULE_SEND = '\uEA0A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SCORE = '\uE269';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SD = '\uE9DD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SEGMENT = '\uE94B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SEND_AND_ARCHIVE = '\uEA0C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SENTIMENT_SATISFIED_ALT = '\uE0ED';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SETTINGS_DISPLAY = '\uE8BD';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SHIELD = '\uE9E0';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SHUFFLE_ON = '\uE9E1';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SHUTTER_SPEED = '\uE43D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_CELLULAR_ALT = '\uE202';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SINGLE_BED = '\uEA48';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPEED = '\uE9E4';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_BASEBALL = '\uEA51';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_BASKETBALL = '\uEA26';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_CRICKET = '\uEA27';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS = '\uEA30';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_ESPORTS = '\uEA28';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_FOOTBALL = '\uEA29';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_GOLF = '\uEA2A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_HANDBALL = '\uEA33';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_HOCKEY = '\uEA2B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_KABADDI = '\uEA34';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_MMA = '\uEA2C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_MOTORSPORTS = '\uEA2D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_RUGBY = '\uEA2E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_SOCCER = '\uEA2F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_TENNIS = '\uEA32';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_VOLLEYBALL = '\uEA31';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SQUARE_FOOT = '\uEA49';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_STACKED_BAR_CHART = '\uE9E6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_STAR_OUTLINE = '\uE83A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_STOREFRONT = '\uEA12';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_STREAM = '\uE9E9';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SUPERVISED_USER_CIRCLE = '\uE939';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SWAP_HORIZONTAL_CIRCLE = '\uE933';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SWAP_VERT_CIRCLE = '\uE8D6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE = '\uE9EC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SWITCH_ACCOUNT = '\uE9ED';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SYNC_ALT = '\uEA18';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_SYSTEM_UPDATE_TV = '\uE8D7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TABLE_CHART = '\uE265';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TAG = '\uE9EF';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TAKEOUT_DINING = '\uEA74';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATE_UP = '\uE93A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATE_VERTICAL = '\uE93B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATION_ANGLEDOWN = '\uE93C';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATION_ANGLEUP = '\uE93D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATION_DOWN = '\uE93E';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_ROTATION_NONE = '\uE93F';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_THEATER_COMEDY = '\uEA66';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_THUMB_DOWN_ALT = '\uE816';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_THUMB_DOWN_OFF_ALT = '\uE9F2';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_THUMB_UP_ALT = '\uE817';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_THUMB_UP_OFF_ALT = '\uE9F3';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TOGGLE_OFF = '\uE9F5';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TOGGLE_ON = '\uE9F6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TRANSIT_ENTEREXIT = '\uE579';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TRENDING_NEUTRAL = '\uE8E4';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TRIP_ORIGIN = '\uE57B';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TV_OFF = '\uE647';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_TWO_WHEELER = '\uE9F9';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_UNSUBSCRIBE = '\uE0EB';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_UPLOAD_FILE = '\uE9FC';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VERTICAL_SPLIT = '\uE949';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VIDEO_COLLECTION = '\uE04A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VIEW_COMFORTABLE = '\uE42A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VIEW_IN_AR = '\uE9FE';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VOICE_OVER_OFF = '\uE94A';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_VOLUNTEER_ACTIVISM = '\uEA70';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WALLET_GIFTCARD = '\uE8F6';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WALLET_MEMBERSHIP = '\uE8F7';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WALLET_TRAVEL = '\uE8F8';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WATERFALL_CHART = '\uEA00';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WAVES = '\uE176';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WB_SHADE = '\uEA01';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WB_TWIGHLIGHT = '\uEA02';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WHERE_TO_VOTE = '\uE177';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_OFF = '\uE648';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WORK_OFF = '\uE942';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WORK_OUTLINE = '\uE943';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WORKSPACES_FILLED = '\uEA0D';
+
+    /**
+     * Material design icon font character code see
+     * https://www.google.com/design/icons/ for full list
+     */
+    public static final char MATERIAL_WORKSPACES_OUTLINE = '\uEA0F';
+    
     private static Font materialDesignFont;
 
     /**
@@ -4799,6 +6877,71 @@ public class FontImage extends Image {
         return false;
     }
 
+        /**
+     * <p>Applies an icon from the font to the given label using the 
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * 
+     * @param l a label or subclass (e.g. Button etc.)
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param size the size of the icon in millimeters, or -1 to use the default height of the font
+     */
+    public static void setFontIcon(Label l, Font font, char icon, float size) {
+        Style s = new Style(l.getUnselectedStyle());
+        s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+        l.setIcon(FontImage.create("" + icon, s));
+        if (l instanceof Button) {
+            Button b = (Button) l;
+            Style sel = b.getSelectedStyle();
+            Style pre = b.getPressedStyle();
+            Style dis = b.getDisabledStyle();
+            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                b.setRolloverIcon(FontImage.create("" + icon, sel));
+            } else {
+                b.setRolloverIcon(null);
+            }
+            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                b.setPressedIcon(FontImage.create("" + icon, pre));
+                b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
+            } else {
+                b.setPressedIcon(null);
+            }
+            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                b.setDisabledIcon(FontImage.create("" + icon, dis));
+            } else {
+                b.setDisabledIcon(null);
+            }
+        }
+    }
+    
+    public static void setFontIcon(Label l, Font font, char icon) {
+        setFontIcon(l, font, icon, -1);
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * 
+     * @param l a label or subclass (e.g. Button etc.)
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param size the size of the icon in millimeters, or -1 to use the default height of the font
+    */
+    public static void setMaterialIcon(Label l, char icon, float size) {
+        setFontIcon(l, getMaterialDesignFont(), icon, -1);
+    }
+
+
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
      * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
@@ -4809,40 +6952,8 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      * @param size the size of the icon in millimeters
      */
-    public static void setMaterialIcon(Label l, char icon, float size) {
-        if(Font.isTrueTypeFileSupported()) {
-            Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
-            l.setIcon(FontImage.create("" + icon, s));
-            if(l instanceof Button) {
-                Button b = (Button)l;
-                Style sel = b.getSelectedStyle();
-                Style pre = b.getPressedStyle();
-                Style dis = b.getDisabledStyle();
-                if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
-                    sel = new Style(sel);
-                    sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
-                    b.setRolloverIcon(FontImage.create("" + icon, sel));
-                } else {
-                    b.setRolloverIcon(null);
-                }
-                if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
-                    pre = new Style(pre);
-                    pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
-                    b.setPressedIcon(FontImage.create("" + icon, pre));
-                    b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
-                } else {
-                    b.setPressedIcon(null);
-                }
-                if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
-                    dis = new Style(dis);
-                    dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
-                    b.setDisabledIcon(FontImage.create("" + icon, dis));
-                } else {
-                    b.setDisabledIcon(null);
-                }
-            }
-        }
+    public static void setMaterialIcon(Label l, Font font, char icon, float size) {
+        setFontIcon(l, getMaterialDesignFont(), icon, size);
     }
 
     /**
@@ -4857,6 +6968,42 @@ public class FontImage extends Image {
         setMaterialIcon(c, icon, uiid, -1);
     }
 
+    
+    /**
+     * <p>Applies an icon from the font to the given command using the 
+     * given UIID. Notice that the pressed/selected &amp; disabled states will be set appropriately.</p>
+     * 
+     * @param c a command 
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param uiid the UIID for the command (e.g. TitleCommand)
+     * @param size the size of the icon in millimeters
+     */
+    public static void setFontIcon(Command c, Font font, char icon, String uiid, float size) {
+        UIManager uim = UIManager.getInstance();
+        Style s = uim.getComponentStyle(uiid);
+        s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+        c.setIcon(FontImage.create("" + icon, s));
+        Style sel = uim.getComponentSelectedStyle(uiid);
+        Style pre = uim.getComponentCustomStyle(uiid, "press");
+        Style dis = uim.getComponentCustomStyle(uiid, "dis");;
+        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            sel = new Style(sel);
+            sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
+            c.setRolloverIcon(FontImage.create("" + icon, sel));
+        }
+        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            pre = new Style(pre);
+            pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
+            c.setPressedIcon(FontImage.create("" + icon, pre));
+        }
+        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            dis = new Style(dis);
+            dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
+            c.setDisabledIcon(FontImage.create("" + icon, dis));
+        }
+    }
+    
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given command using the 
      * given UIID. Notice that the pressed/selected &amp; disabled states will be set appropriately.</p>
@@ -4866,30 +7013,9 @@ public class FontImage extends Image {
      * @param uiid the UIID for the command (e.g. TitleCommand)
      * @param size the size of the icon in millimeters
      */
-    public static void setMaterialIcon(Command c, char icon, String uiid, float size) {
-        if(Font.isTrueTypeFileSupported()) {
-            UIManager uim = UIManager.getInstance();
-            Style s = uim.getComponentStyle(uiid);
-            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
-            c.setIcon(FontImage.create("" + icon, s));
-            Style sel = uim.getComponentSelectedStyle(uiid);
-            Style pre = uim.getComponentCustomStyle(uiid, "press");
-            Style dis = uim.getComponentCustomStyle(uiid, "dis");;
-            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
-                sel = new Style(sel);
-                sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
-                c.setRolloverIcon(FontImage.create("" + icon, sel));
-            }
-            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
-                pre = new Style(pre);
-                pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
-                c.setPressedIcon(FontImage.create("" + icon, pre));
-            }
-            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
-                dis = new Style(dis);
-                dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
-                c.setDisabledIcon(FontImage.create("" + icon, dis));
-            }
+     public static void setMaterialIcon(Command c, char icon, String uiid, float size) {
+        if (Font.isTrueTypeFileSupported()) {
+            setFontIcon(c, getMaterialDesignFont(), icon, uiid, size);
         }
     }
     
@@ -4905,6 +7031,23 @@ public class FontImage extends Image {
     }
     
     /**
+     * <p>Applies an icon from the font to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a multibutton
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param size the size of the icon in millimeters
+     */
+    public static void setFontIcon(MultiButton l, Font font, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
+    }
+    
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
@@ -4913,11 +7056,7 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setMaterialIcon(MultiButton l, char icon, float size) {
-        if(Font.isTrueTypeFileSupported()) {
-            Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
-            l.setIcon(FontImage.create("" + icon, s));
-        }
+        setFontIcon(l, getMaterialDesignFont(), icon, size);
     }
     
     /**
@@ -4932,6 +7071,23 @@ public class FontImage extends Image {
     }    
     
     /**
+     * <p>Applies an icon from the font to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanLabel
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param size the size of the icon in millimeters
+     */
+    public static void setFontIcon(SpanLabel l, Font font, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
+    }
+    
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
@@ -4940,13 +7096,8 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setMaterialIcon(SpanLabel l, char icon, float size) {
-        if(Font.isTrueTypeFileSupported()) {
-            Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
-            l.setIcon(FontImage.create("" + icon, s));
-        }
-    }
-    
+        setFontIcon(l, getMaterialDesignFont(), icon, size);
+    }    
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
@@ -4959,6 +7110,53 @@ public class FontImage extends Image {
     }    
     
     /**
+     * <p>Applies an icon from the font to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanButton
+     * @param font a font with icons
+     * @param icon an icon in the font
+     */
+    public static void setFontIcon(SpanButton l, Font font, char icon) {
+        setFontIcon(l, font, icon, -1);
+    }    
+    
+    /**
+     * <p>Applies an icon from the font to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanButton
+     * @param font a font with icons
+     * @param icon an icon in the font
+     * @param size the size of the icon in millimeters
+     */
+    public static void setFontIcon(SpanButton l, Font font, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+            Style sel = l.getSelectedStyle();
+            Style pre = l.getPressedStyle();
+            Style dis = l.getDisabledStyle();
+            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                l.setRolloverIcon(FontImage.create("" + icon, sel));
+            }
+            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                l.setPressedIcon(FontImage.create("" + icon, pre));
+            }
+            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                l.setDisabledIcon(FontImage.create("" + icon, dis));
+            }
+        }
+    }
+    
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
@@ -4967,30 +7165,9 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setMaterialIcon(SpanButton l, char icon, float size) {
-        if(Font.isTrueTypeFileSupported()) {
-            Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
-            l.setIcon(FontImage.create("" + icon, s));
-            Style sel = l.getSelectedStyle();
-            Style pre = l.getPressedStyle();
-            Style dis = l.getDisabledStyle();
-            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
-                sel = new Style(sel);
-                sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
-                l.setRolloverIcon(FontImage.create("" + icon, sel));
-            }
-            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
-                pre = new Style(pre);
-                pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
-                l.setPressedIcon(FontImage.create("" + icon, pre));
-            }
-            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
-                dis = new Style(dis);
-                dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
-                l.setDisabledIcon(FontImage.create("" + icon, dis));
-            }
-        }
+        setFontIcon(l, getMaterialDesignFont(), icon, size);
     }
+
     
     /**
      * Default factor for image size, icons without a given size are sized as

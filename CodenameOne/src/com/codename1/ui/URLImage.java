@@ -30,6 +30,7 @@ import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
 import java.io.IOException;
@@ -111,6 +112,23 @@ public class URLImage extends EncodedImage {
         }
     };
 
+    /**
+     * The exception handler is used for callbacks in case of an error
+     * @return the exceptionHandler
+     */
+    public static ErrorCallback getExceptionHandler() {
+        return exceptionHandler;
+    }
+
+    /**
+     * The exception handler is used for callbacks in case of an error
+     * @param aExceptionHandler the exceptionHandler to set
+     */
+    public static void setExceptionHandler(
+        ErrorCallback aExceptionHandler) {
+        exceptionHandler = aExceptionHandler;
+    }
+
     static class ScaleToFill implements ImageAdapter {
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
@@ -170,6 +188,18 @@ public class URLImage extends EncodedImage {
     private boolean repaintImage;
     private static final String IMAGE_SUFFIX = "ImageURLTMP";
     private boolean locked;
+    
+    /**
+     * Invoked in a case of an error
+     */
+    public static interface ErrorCallback {
+        public void onError(URLImage source, Exception err);
+    }
+    
+    /**
+     * The exception handler is used for callbacks in case of an error
+     */
+    private static ErrorCallback exceptionHandler;
     
     private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
         super(placeholder.getWidth(), placeholder.getHeight());
@@ -239,8 +269,12 @@ public class URLImage extends EncodedImage {
                         try {
                             adapted = adapter.adaptImage(img, placeholder);
                         } catch(Exception err) {
-                            Log.p("Failed to load image from URL: " + url);
-                            Log.e(err);
+                            if(exceptionHandler != null) {
+                                exceptionHandler.onError(URLImage.this, err);
+                            } else {
+                                Log.p("Failed to load image from URL: " + url);
+                                Log.e(err);
+                            }
                             return;
                         }
                     }
@@ -256,7 +290,11 @@ public class URLImage extends EncodedImage {
                         FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);
                     }
                 } catch (IOException ex) {
-                    Log.e(ex);
+                    if(exceptionHandler != null) {
+                        exceptionHandler.onError(URLImage.this, ex);
+                    } else {
+                        Log.e(ex);
+                    }
                     return;
                 }
             }
@@ -355,7 +393,11 @@ public class URLImage extends EncodedImage {
                 }
             }
         } catch(IOException ioErr) {
-            throw new RuntimeException(ioErr.toString());
+            if(exceptionHandler != null) {
+                exceptionHandler.onError(URLImage.this, ioErr);
+            } else {
+                throw new RuntimeException(ioErr.toString());
+            }
         }
     }
     

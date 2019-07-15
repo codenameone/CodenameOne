@@ -146,6 +146,16 @@ public abstract class InfiniteContainer extends Container {
         }
     }
 
+    /**
+     * If we previously added returned null when fetching components this
+     * method can continue the process of fetching. This is useful in case of
+     * a networking error. You can end fetching and then restart it based on
+     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+     */
+    public void continueFetching() {
+        InfiniteScrollAdapter.continueFetching(this);
+    }
+
     void fetchMore() {
         if (requestingResults) {
             return;

@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -27,8 +27,10 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -57,23 +59,23 @@ import java.util.HashMap;
  * Component that contains Components effectively allowing us to nest Containers infinitely to build any type 
  * of visual hierarchy we want by nesting Containers.
  * </p>
- *
+ * 
  * @see Container
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener, Editable {
-
+    
     private int tabIndex;
     // -1 = the element should be focusable, but should not be reachable via sequential keyboard navigation. Mostly useful to create accessible widgets 
     // 0 =  the element should be focusable in sequential keyboard navigation, but its order is defined by the container's source order.
-
+    
     private int preferredTabIndex=-1;
-
+    
     /**
      * Indicates whether the component displays the material design ripple effect
      */
-    private boolean rippleEffect;
-
+    private boolean rippleEffect;    
+    
     /**
      * The default cursor
      */
@@ -143,7 +145,7 @@ public class Component implements Animation, StyleListener, Editable {
      * The move cursor type.
      */
     public static final int MOVE_CURSOR = 13;
-
+    
     private int cursor;
 
 
@@ -181,22 +183,22 @@ public class Component implements Animation, StyleListener, Editable {
      * Used by getDragRegionStatus to indicate likely dragability
      */
     public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
-
+    
     /**
      * Used by getDragRegionStatus to indicate immediate dragability
      */
     public static final int DRAG_REGION_IMMEDIATELY_DRAG_X = 31;
-
+    
     /**
      * Used by getDragRegionStatus to indicate immediate dragability
      */
     public static final int DRAG_REGION_IMMEDIATELY_DRAG_Y = 32;
-
+    
     /**
      * Used by getDragRegionStatus to indicate immediate dragability
      */
     public static final int DRAG_REGION_IMMEDIATELY_DRAG_XY = 33;
-
+    
     private String selectText;
     private boolean alwaysTensile;
     private int tensileLength = -1;
@@ -206,21 +208,21 @@ public class Component implements Animation, StyleListener, Editable {
      * hierarchy to still act as a standalone component
      */
     private boolean blockLead;
-
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
      */
     private Component nextFocusDown;
     private Component nextFocusUp;
-
+    
     private Editable editingDelegate;
-
+    
     /**
      * Indicates whether component is enabled or disabled
      */
     private boolean enabled = true;
-
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the right key
@@ -229,7 +231,7 @@ public class Component implements Animation, StyleListener, Editable {
     private Component nextFocusLeft;
     private String name;
     boolean hasLead;
-
+    
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -313,7 +315,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
-
+    
     // A flag to indicate whether to paint the component's background.
     // Setting this to false will cause the component's background to not be painted.
     private boolean opaque=true;
@@ -326,7 +328,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hideInLandscape;
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
-
+            
     /**
      * Indicates the decrement units for the scroll opacity
      */
@@ -336,7 +338,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates that moving through the component should work as an animation
      */
     private boolean smoothScrolling;
-
+    
     private static boolean disableSmoothScrolling = false;
 
     /**
@@ -347,7 +349,7 @@ public class Component implements Animation, StyleListener, Editable {
     private Motion animationMotion;
     Motion draggedMotionX;
     Motion draggedMotionY;
-
+    
     // Reference that is only filled when a drag motion is a decelration motion
     // for tensile scrolling
     private Motion decelerationMotion;
@@ -375,35 +377,35 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates a Component center alignment
      */
     public static final int CENTER = 4;
-    /**
+    /** 
      * Box-orientation constant used to specify the top of a box.
      */
     public static final int TOP = 0;
-    /**
+    /** 
      * Box-orientation constant used to specify the left side of a box.
      */
     public static final int LEFT = 1;
-    /**
+    /** 
      * Box-orientation constant used to specify the bottom of a box.
      */
     public static final int BOTTOM = 2;
-    /**
+    /** 
      * Box-orientation constant used to specify the right side of a box.
      */
     public static final int RIGHT = 3;
-
+    
     /**
      * Alignment to the baseline constraint
      */
     public static final int BASELINE = 5;
-
+    
     private HashMap<String, Object> clientProperties;
     private Rectangle dirtyRegion = null;
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
     private String portraitUiid;
     private String landscapeUiid;
-
+    
     private Resources inlineStylesTheme;
     private String inlineAllStyles;
     private String inlinePressedStyles;
@@ -431,28 +433,28 @@ public class Component implements Animation, StyleListener, Editable {
     boolean noBind;
     private Runnable refreshTask;
     private ActionListener refreshTaskDragListener;
-
+    
     private double pinchDistance;
     static int restoreDragPercentage = -1;
 
     private Component[] sameWidth;
     private Component[] sameHeight;
-
+    
     private EventDispatcher focusListeners;
     private EventDispatcher scrollListeners;
     private EventDispatcher dropListener;
-    private EventDispatcher dragOverListener;
+    private EventDispatcher dragOverListener;    
     EventDispatcher pointerPressedListeners;
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
     EventDispatcher dragFinishedListeners;
     EventDispatcher longPressListeners;
     boolean isUnselectedStyle;
-
+    
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
     }
-
+    
     /**
      * Sets the editing delegate for this component.  The editing delegate allows you to define the 
      * editing workflow for a component.  If a delegate is registered, then editing methods such as 
@@ -464,7 +466,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void setEditingDelegate(Editable editable) {
         this.editingDelegate = editable;
     }
-
+    
     /**
      * Gets the delegate that handles the editing of this component.
      * @return The editing delegate for this component.
@@ -473,54 +475,54 @@ public class Component implements Animation, StyleListener, Editable {
     public Editable getEditingDelegate() {
         return this.editingDelegate;
     }
-
+    
 
     /**
      * Sets a custom mouse cursor for this component if the platform supports mouse cursors, notice that this isn't applicable for touch devices.  
      * This will only be used if the platform supports custom cursors.  
      * You can call {@link #isSetCursorSupported() } to find out.
-     *
+     * 
      * <p><strong>Note:</strong> Since cursors incur some overhead, they are turned off at the form level by default.
      * If you want your custom cursors to be used, then you'll need to enable cursors in the form using {@link Form#setEnableCursors(boolean) }.</p>
      * @param cursor The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
      * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
      * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
-     *
-     * @see Form#setEnableCursors(boolean)
-     * @see Form#isEnableCursors()
-     *
+     * 
+     * @see Form#setEnableCursors(boolean) 
+     * @see Form#isEnableCursors() 
+     * 
      */
     public void setCursor(int cursor) {
         this.cursor = cursor;
     }
-
+    
     /**
      * Gets the custom cursor for this component.  This will only be used if the platform supports custom cursors.  
      * You can call {@link #isSetCursorSupported() } to find out.
      * @return The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
      * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
      * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
-     *
-     *
+     * 
+     * 
      */
     public int getCursor() {
         return this.cursor;
     }
-
+    
     /**
      * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
-     *
+     * 
      * @param c the components to group together, this will override all previous width/height grouping
      */
     public static void setSameSize(Component... c) {
         setSameWidth(c);
         setSameHeight(c);
     }
-
+    
     /**
      * Places all of these components in the same width group, to remove a component from
      * the group invoke this method with that component only.
-     *
+     * 
      * @param c the components to group together, this will override all previous width grouping
      */
     public static void setSameWidth(Component... c) {
@@ -546,7 +548,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
-
+    
     /**
      * The native overlay object.  Used in Javascript port for some components so that there is 
      * an inivisible "native" peer overlaid on the component itself to catch events.  E.g.
@@ -556,13 +558,13 @@ public class Component implements Animation, StyleListener, Editable {
      * be *always* present.
      */
     private Object nativeOverlay = null;
-
+    
     /**
      * Creates the native overlay for this component. A native overlay is used on some platforms (e.g. Javascript)
      * to help with user interaction of the component in a native way.
-     * @see #hideNativeOverlay()
-     * @see #updateNativeOverlay()
-     * @see #getNativeOverlay()
+     * @see #hideNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
      */
     protected void showNativeOverlay() {
         if (nativeOverlay == null) {
@@ -572,9 +574,9 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Hides the native overlay for this component.
-     * @see #showNativeOverlay()
-     * @see #updateNativeOverlay()
-     * @see #getNativeOverlay()
+     * @see #showNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
      */
     protected void hideNativeOverlay() {
         if (nativeOverlay != null) {
@@ -586,29 +588,29 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Updates the native overlay for this component.  This is called each time the component
      * is laid out, so it can change the position and visibility to match the current context.
-     * @see #showNativeOverlay()
-     * @see #hideNativeOverlay()
-     * @see #getNativeOverlay()
+     * @see #showNativeOverlay() 
+     * @see #hideNativeOverlay() 
+     * @see #getNativeOverlay() 
      */
     protected void updateNativeOverlay() {
         if (nativeOverlay != null) {
             Display.getInstance().getImplementation().updateNativeOverlay(this, nativeOverlay);
         }
     }
-
+    
     /**
      * Gets the native overlay for this component.  May be null. Native overlays are used in the Javascript
      * port to assist with user interaction on touch devices.  Text fields use native overlays to position
      * an invisible native text field above themselves so that the keyboard will be activated properly when
      * the user taps the text field.
-     * @return
+     * @return 
      */
     public Object getNativeOverlay() {
         return nativeOverlay;
     }
-
-
-
+    
+    
+    
     /**
      * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
      * set with {@link #setCursor(int) } will simply be ignored.
@@ -617,11 +619,11 @@ public class Component implements Animation, StyleListener, Editable {
     public static boolean isSetCursorSupported() {
         return Display.getInstance().getImplementation().isSetCursorSupported();
     }
-
+    
     /**
      * Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
      * style will be meaningless and will return 0 values. Usage:
-     *
+     * 
      * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
      * @return a unified style object for the purpose of setting on object object instances
      */
@@ -631,21 +633,21 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return allStyles;
     }
-
+    
     /**
      * Returns the array of components that have an equal width
-     *
+     * 
      * @return components in the same width group
      */
     public Component[] getSameWidth() {
         return sameWidth;
     }
-
+    
 
     /**
      * Places all of these components in the same height group, to remove a component from
      * the group invoke this method with that component only.
-     *
+     * 
      * @param c the components to group together, this will override all previous height grouping
      */
     public static void setSameHeight(Component... c) {
@@ -671,24 +673,24 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
-
+    
     /**
      * Returns the array of components that have an equal height
-     *
+     * 
      * @return components in the same height group
      */
     public Component[] getSameHeight() {
         return sameHeight;
     }
 
-    /**
+    /** 
      * Creates a new instance of Component 
      */
     protected Component() {
         initLaf(getUIManager());
         setCursor(DEFAULT_CURSOR);
     }
-
+    
     /**
      * This method initializes the Component defaults constants
      */
@@ -707,36 +709,36 @@ public class Component implements Animation, StyleListener, Editable {
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
         isScrollVisible = laf.isScrollVisible();
-
+        
         if(tensileHighlightEnabled) {
             tensileLength = 3;
         } else {
             tensileLength = -1;
-        }
+        }        
     }
 
     /**
      * Gets the UIID that would be used for this component if inline styles are used.
      * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
      * the component, and "name" is the name of the component. 
-     * @return
+     * @return 
      */
     private String getInlineStylesUIID() {
         return getUIID()+"["+getName()+"]";
     }
-
+    
     /**
      * Gets the UIID that would be used for this component if inline styles are used.
      * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
      * the component, and "name" is the name of the component. 
      * @param id UIID to use as the base.
-     * @return
-     * @see #getInlineStylesUIID()
+     * @return 
+     * @see #getInlineStylesUIID() 
      */
     private String getInlineStylesUIID(String id) {
         return id +"["+getName()+"]";
     }
-
+    
     /**
      * Checks to see if the component has any inline styles registered for its unselected state.
      * @return True if the component has inline styles registered for the unselected state.  
@@ -744,7 +746,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hasInlineUnselectedStyle() {
         return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineUnselectedStyles != null);
     }
-
+    
     /**
      * Checks to see if the component has any inline styles registered for its pressed state.
      * @return True if the component has inline styles registered for the pressed state.  
@@ -752,7 +754,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hasInlinePressedStyle() {
         return getInlineStylesTheme() != null && (inlineAllStyles != null || inlinePressedStyles != null);
     }
-
+    
     /**
      * Checks to see if the component has any inline styles registered for its disabled state.
      * @return True if the component has inline styles registered for the disabled state.  
@@ -760,7 +762,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hasInlineDisabledStyle() {
         return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineDisabledStyles != null);
     }
-
+    
     /**
      * Checks to see if the component has any inline styles registered for its selected state.
      * @return True if the component has inline styles registered for the selected state.  
@@ -768,7 +770,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hasInlineSelectedStyle() {
         return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineSelectedStyles != null);
     }
-
+    
     /**
      * Gets array of style strings to be used for inline unselected style. This may include
      * the {@link #inlineAllStyles} string and/or the {@link #inlineUnselectedStyles} string.
@@ -788,10 +790,10 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 return null;
             }
-
+                    
         }
     }
-
+    
     /**
      * Gets array of style strings to be used for inline selected style. This may include
      * the {@link #inlineAllStyles} string and/or the {@link #inlineSelectedStyles} string.
@@ -811,10 +813,10 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 return null;
             }
-
+                    
         }
     }
-
+    
     /**
      * Gets array of style strings to be used for inline pressed style. This may include
      * the {@link #inlineAllStyles} string and/or the {@link #inlinePressedStyles} string.
@@ -834,10 +836,10 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 return null;
             }
-
+                    
         }
     }
-
+    
     /**
      * Gets array of style strings to be used for inline disabled style. This may include
      * the {@link #inlineAllStyles} string and/or the {@link #inlineDisabledStyles} string.
@@ -857,11 +859,11 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 return null;
             }
-
+                    
         }
     }
-
-
+    
+    
     private void initStyle() {
         if (hasInlineUnselectedStyle()) {
             unSelectedStyle = getUIManager().parseComponentStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), getInlineUnselectedStyleStrings());
@@ -899,18 +901,18 @@ public class Component implements Animation, StyleListener, Editable {
         if(parent == null){
             return UIManager.getInstance();
         }
-        return parent.getUIManager();
+        return parent.getUIManager();        
     }
-
+    
     /**
      * Returns the current component x location relatively to its parent container
-     *
+     * 
      * @return the current x coordinate of the components origin
      */
     public int getX() {
         return bounds.getX();
     }
-
+    
     /**
      * Gets the x-coordinate of the outer bounds of this component.  The outer bounds are formed
      * by the bounds outside the margin of the component.  (i.e. {@code x - leftMargin}).
@@ -919,7 +921,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterX() {
         return getX() - getStyle().getMarginLeftNoRTL();
     }
-
+    
     /**
      * Gets x-coordinate of the inner bounds of this component.  The inner bounds are formed by 
      * the bounds of the padding of the component.  i.e. {@code x + leftPadding}.
@@ -931,13 +933,13 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns the component y location relatively to its parent container
-     *
+     * 
      * @return the current y coordinate of the components origin
      */
     public int getY() {
         return bounds.getY();
     }
-
+    
     /**
      * Gets the Y-coordinate of the outer bounds of this component.  The outer bounds are formed
      * by the bound of the margin of the component.  i.e. {@code y - leftMargin}.
@@ -946,7 +948,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterY() {
         return getY() - getStyle().getMarginTop();
     }
-
+    
     /**
      * Gets the inner y-coordinate of the inner bounds of this component. The inner bounds are formed
      * by the bound of the padding of the component.  i.e. {@code y + leftPadding}.
@@ -958,20 +960,20 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns whether the component is visible or not
-     *
+     * 
      * @return true if component is visible; otherwise false 
      */
     public boolean isVisible() {
         return visible;
     }
-
+    
     void getVisibleRect(Rectangle r, boolean init) {
         if (!isVisible() || !initialized) {
             r.setWidth(0);
             r.setHeight(0);
             return;
         }
-
+        
         int w = getWidth();
         int h = getHeight();
         int x = getAbsoluteX();
@@ -987,26 +989,26 @@ public class Component implements Animation, StyleListener, Editable {
                 return;
             }
         }
-
-
+        
+        
         Container parent = getParent();
         if (parent != null) {
             parent.getVisibleRect(r, false);
-
+            
         }
-
+        
     }
     private static Rectangle tmpRect = new Rectangle();
-    protected boolean isVisibleOnForm() {
+    boolean isVisibleOnForm() {
         getVisibleRect(tmpRect, true);
-        return (tmpRect.getWidth() > 0 && tmpRect.getHeight() > 0);
+        return (tmpRect.getWidth() > 0 && tmpRect.getHeight() > 0);   
     }
 
     /**
      * Client properties allow the association of meta-data with a component, this
      * is useful for some applications that construct GUI's on the fly and need
      * to track the connection between the UI and the data. 
-     *
+     * 
      * @param key the key used for putClientProperty
      * @return the value set to putClientProperty or null if no value is set to the property
      */
@@ -1030,20 +1032,20 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Clears all client properties from this Component
-     */
+     */ 
     public void clearClientProperties(){
         if(clientProperties != null){
             clientProperties.clear();
             clientProperties = null;
         }
     }
-
+    
     /**
      * Client properties allow the association of meta-data with a component, this
      * is useful for some applications that construct GUI's on the fly and need
      * to track the connection between the UI and the data. Setting the value to
      * null will remove the client property from the component.
-     *
+     * 
      * @param key arbitrary key for the property
      * @param value the value assigned to the given client property
      */
@@ -1067,7 +1069,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * gets the Component dirty region,  this method is for internal use only and SHOULD NOT be invoked by user code.
      * Use repaint(int,int,int,int)
-     *
+     * 
      * @return returns the region that needs repainting or null for the whole component
      */
     public final Rectangle getDirtyRegion() {
@@ -1077,7 +1079,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * sets the Component dirty region, this method is for internal use only and SHOULD NOT be invoked by user code.
      * Use repaint(int,int,int,int)
-     *
+     * 
      * @param dirty the region that needs repainting or null for the whole component
      */
     public final void setDirtyRegion(Rectangle dirty) {
@@ -1089,7 +1091,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Toggles visibility of the component
-     *
+     * 
      * @param visible true if component is visible; otherwise false 
      */
     public void setVisible(boolean visible) {
@@ -1103,7 +1105,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void setOpaque(boolean opaque) {
         this.opaque = opaque;
     }
-
+    
     /**
      * Checks whether the component's background should be painted.
      * @return {@literal true} if the component's background should be painted.
@@ -1111,16 +1113,16 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isOpaque() {
         return opaque;
     }
-
+    
     /**
      * Returns the component width
-     *
+     * 
      * @return the component width
      */
     public int getWidth() {
         return bounds.getSize().getWidth();
     }
-
+    
     /**
      * Gets the outer width of this component. This is the width of the component including horizontal margins.
      * @return The outer width.
@@ -1128,7 +1130,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterWidth() {
         return getWidth() + getStyle().getHorizontalMargins();
     }
-
+    
     /**
      * Gets the inner width of this component.  This is the width of the component removing horizontal padding.
      * @return The inner width.
@@ -1139,13 +1141,13 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns the component height
-     *
+     * 
      * @return the component height
      */
     public int getHeight() {
         return bounds.getSize().getHeight();
     }
-
+    
     /**
      * Gets the outer height of this component.  This is the height of the component including vertical margins.
      * @return The outer height.
@@ -1153,7 +1155,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterHeight() {
         return getHeight() + getStyle().getVerticalMargins();
     }
-
+    
     /**
      * Gets the inner height of this component.  This is the height of the component removing vertical padding.
      * @return The inner height.
@@ -1161,13 +1163,13 @@ public class Component implements Animation, StyleListener, Editable {
     public int getInnerHeight() {
         return getHeight() - getStyle().getVerticalPadding();
     }
-
+    
 
     /**
      * Sets the Component x location relative to the parent container, this method
      * is exposed for the purpose of external layout managers and should not be invoked
      * directly.
-     *
+     * 
      * @param x the current x coordinate of the components origin
      */
     public void setX(int x) {
@@ -1181,7 +1183,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Sets the Component y location relative to the parent container, this method
      * is exposed for the purpose of external layout managers and should not be invoked
      * directly.
-     *
+     * 
      * @param y the current y coordinate of the components origin
      */
     public void setY(int y) {
@@ -1190,7 +1192,7 @@ public class Component implements Animation, StyleListener, Editable {
             onParentPositionChange();
         }
     }
-
+    
     /**
      * Indicates if the section within the X/Y area is a "drag region" where
      * we expect people to drag and never actually "press" in which case we
@@ -1204,7 +1206,7 @@ public class Component implements Animation, StyleListener, Editable {
     protected boolean isDragRegion(int x, int y) {
         return isDraggable();
     }
-
+        
     /**
      * Indicates if the section within the X/Y area is a "drag region" where
      * we expect people to drag or press in which case we
@@ -1246,19 +1248,19 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return DRAG_REGION_NOT_DRAGGABLE;
     }
-
+    
     /**
      * This callback allows subcomponents who are interested in following position change of their parents
      * to receive such an event
      */
-    void onParentPositionChange() {
+    void onParentPositionChange() {        
     }
-
+    
     /**
      * The baseline for the component text according to which it should be aligned
      * with other components for best visual look.
-     *
-     *
+     * 
+     * 
      * @param width the component width
      * @param height the component height
      * @return baseline value from the top of the component
@@ -1277,14 +1279,14 @@ public class Component implements Animation, StyleListener, Editable {
     public int getBaselineResizeBehavior() {
         return BRB_OTHER;
     }
-
+    
     /**
      * Sets the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
      * smaller than its preferred size or even larger than the size.<br>
      * The Layout manager can take this value into consideration, but there is
      * no guarantee or requirement.
-     *
+     * 
      * @param d the component dimension
      * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
      * to reach similar functionality
@@ -1301,14 +1303,14 @@ public class Component implements Animation, StyleListener, Editable {
         dim.setHeight(d.getHeight());
         sizeRequestedByUser = true;
     }
-
+    
     /**
-     * Optional string the specifies the preferred size of the component. Format is {@literal <width> <height>}
+     * Optional string the specifies the preferred size of the component. Format is {@literal <width> <height>} 
      * where {@literal <width>} and {@literal <height>} are both scalar values.  E.g. "15px", "20.5mm", or "inherit"
      * to indicate that it should inherit the value returned from {@link #calcPreferredSize() } for that coordinate.
      */
     private String preferredSizeStr;
-
+    
     /**
      * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
      * to reach similar functionality 
@@ -1319,19 +1321,19 @@ public class Component implements Animation, StyleListener, Editable {
         preferredSizeStr = value;
         setPreferredSize(null);
     }
-
+    
     /**
      * Returns the preferred size string that can be used to specify the preferred size of the component
      * using pixels or millimetres.  This string is applied to the preferred size just after is is initially
      * calculated using {@link #calcPreferredSize() }. 
-     * @return
+     * @return 
      * @deprecated This method is primarily for use by the GUI builder.  Use {@link #getPreferredSize() } to find
      * the preferred size of a component.
      */
     public String getPreferredSizeStr() {
         return preferredSizeStr;
     }
-
+    
     public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
         String strVal = (String)preferredSize;
         int spacePos = strVal.indexOf(" ");
@@ -1343,8 +1345,8 @@ public class Component implements Animation, StyleListener, Editable {
         int unitPos=-1;
         float pixelsPerMM = Display.getInstance().convertToPixels(1000f)/1000f;
         try {
-
-
+            
+            
             if ((unitPos=wStr.indexOf("mm")) != -1) {
                 baseSize.setWidth((int)Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
             } else if ((unitPos=wStr.indexOf("px")) != -1) {
@@ -1353,7 +1355,7 @@ public class Component implements Animation, StyleListener, Editable {
                 baseSize.setWidth(Integer.parseInt(wStr));
             }
         } catch (Throwable t){}
-
+        
         try {
             if ((unitPos=hStr.indexOf("mm")) != -1) {
                 baseSize.setHeight((int)Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
@@ -1365,14 +1367,14 @@ public class Component implements Animation, StyleListener, Editable {
         } catch (Throwable t){}
         return baseSize;
     }
-
+    
     /**
      * Returns the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
      * smaller than its preferred size or even larger than the size.<br>
      * The Layout manager can take this value into consideration, but there is
      * no guarantee or requirement.
-     *
+     * 
      * @return the component preferred size
      */
     public Dimension getPreferredSize() {
@@ -1388,7 +1390,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Returns the Components dimension in scrolling, this is very similar to the
      * preferred size aspect only it represents actual scrolling limits.
-     *
+     * 
      * @return the component actual size with all scrolling
      */
     public Dimension getScrollDimension() {
@@ -1402,7 +1404,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Method that can be overriden to represent the actual size of the component 
      * when it differs from the desireable size for the viewport
-     *
+     * 
      * @return scroll size, by default this is the same as the preferred size
      */
     protected Dimension calcScrollSize() {
@@ -1411,7 +1413,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Set the size for the scroll area
-     *
+     * 
      * @param d dimension of the scroll area
      */
     public void setScrollSize(Dimension d) {
@@ -1427,7 +1429,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Helper method to set the preferred width of the component.
-     *
+     * 
      * @param preferredW the preferred width of the component
      * @see #setPreferredSize
      * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
@@ -1439,7 +1441,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Helper method to set the preferred height of the component.
-     *
+     * 
      * @param preferredH the preferred height of the component
      * @see #setPreferredSize
      * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
@@ -1451,7 +1453,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Helper method to retrieve the preferred width of the component.
-     *
+     * 
      * @return preferred width of the component
      * @see #getPreferredSize
      */
@@ -1461,14 +1463,14 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Helper method to retrieve the preferred height of the component.
-     *
+     * 
      * @return preferred height of the component
      * @see #getPreferredSize
      */
     public int getPreferredH() {
         return getPreferredSize().getHeight();
     }
-
+    
     /**
      * Gets the preferred height including the vertical margins.
      * @return The preferred outer height.
@@ -1476,7 +1478,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterPreferredH() {
         return getPreferredH() + getStyle().getVerticalMargins();
     }
-
+    
     /**
      * Gets the preferred height removing vertical padding.
      * @return The preferred inner height.
@@ -1484,7 +1486,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getInnerPreferredH() {
         return getPreferredH() - getStyle().getVerticalPadding();
     }
-
+    
     /**
      * Gets the preferred width including horizontal margins.
      * @return The preferred outer width.
@@ -1492,10 +1494,10 @@ public class Component implements Animation, StyleListener, Editable {
     public int getOuterPreferredW() {
         return getPreferredW() + getStyle().getHorizontalMargins();
     }
-
+    
     /**
      * Gets the preferred width removing horizontal padding.
-     * @return
+     * @return 
      */
     public int getInnerPreferredW() {
         return getPreferredW() - getStyle().getHorizontalPadding();
@@ -1506,7 +1508,7 @@ public class Component implements Animation, StyleListener, Editable {
      * external layout managers and should not be invoked directly.<br>
      * If a user wishes to effect the component size setPreferredSize should
      * be used.
-     *
+     * 
      * @param width the width of the component
      * @see #setPreferredSize
      */
@@ -1519,7 +1521,7 @@ public class Component implements Animation, StyleListener, Editable {
      * external layout managers and should not be invoked directly.<br>
      * If a user wishes to effect the component size setPreferredSize should
      * be used.
-     *
+     * 
      * @param height the height of the component
      * @see #setPreferredSize
      */
@@ -1532,7 +1534,7 @@ public class Component implements Animation, StyleListener, Editable {
      * external layout managers and should not be invoked directly.<br>
      * If a user wishes to effect the component size setPreferredSize should
      * be used.
-     *
+     * 
      * @param d the component dimension
      * @see #setPreferredSize
      */
@@ -1545,7 +1547,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Unique identifier for a component.
      * This id is used to retrieve a suitable Style.
-     *
+     * 
      * @return unique string identifying this component for the style sheet
      */
     public String getUIID() {
@@ -1561,7 +1563,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This method sets the Component the Unique identifier.
      * This method should be used before a component has been initialized
-     *
+     * 
      * @param id UIID unique identifier for component type
      */
     public void setUIID(String id) {
@@ -1575,7 +1577,7 @@ public class Component implements Animation, StyleListener, Editable {
             preferredSize = null;
         }
     }
-
+    
     boolean onOrientationChange() {
         if(landscapeUiid != null) {
             unSelectedStyle = null;
@@ -1590,10 +1592,10 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return false;
     }
-
+    
     /**
      * This method sets the Component the Unique identifier.
-     *
+     * 
      * @param portraitUiid UIID unique identifier for component type in portrait mode
      * @param landscapeUiid UIID unique identifier for component type in landscape mode
      */
@@ -1601,7 +1603,7 @@ public class Component implements Animation, StyleListener, Editable {
         this.landscapeUiid = landscapeUiid;
         setUIID(portraitUiid);
     }
-
+    
     /**
      * Gets inline styles that are to be applied to all states of this component.
      * @return Inline styles applied to all states.
@@ -1609,7 +1611,7 @@ public class Component implements Animation, StyleListener, Editable {
     public String getInlineAllStyles() {
         return inlineAllStyles;
     }
-
+    
     /**
      * Gets inline styles that are to be applied to the selected state of this component.
      * @return Inline styles applied to selected state
@@ -1617,7 +1619,7 @@ public class Component implements Animation, StyleListener, Editable {
     public String getInlineSelectedStyles() {
         return this.inlineSelectedStyles;
     }
-
+    
     /**
      * Gets inline styles that are to be applied to the unselected state of this component.
      * @return Inline styles applied to unselected state
@@ -1625,7 +1627,7 @@ public class Component implements Animation, StyleListener, Editable {
     public String getInlineUnselectedStyles() {
         return this.inlineUnselectedStyles;
     }
-
+    
     /**
      * Gets inline styles that are to be applied to the disabled state of this component.
      * @return Inline styles applied to disabled state
@@ -1633,19 +1635,19 @@ public class Component implements Animation, StyleListener, Editable {
     public String getInlineDisabledStyles() {
         return this.inlineDisabledStyles;
     }
-
+    
     /**
      * Gets inline styles that are to be applied to the pressed state of this component.
      * @return Inline styles applied to pressed state
      */
     public String getInlinePressedStyles() {
         return this.inlinePressedStyles;
-
+        
     }
-
+    
     /**
      * Registers inline styles that should be applied to all states of the component.  
-     * @param styles
+     * @param styles 
      * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
      */
     public void setInlineAllStyles(String styles) {
@@ -1664,10 +1666,10 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
-
+    
     /**
      * Registers inline styles that should be applied to the unselected state of the component.  
-     * @param styles
+     * @param styles 
      * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
      */
     public void setInlineUnselectedStyles(String styles) {
@@ -1686,12 +1688,12 @@ public class Component implements Animation, StyleListener, Editable {
                 preferredSize = null;
             }
         }
-
+        
     }
-
+    
     /**
      * Registers inline styles that should be applied to the selected state of the component.  
-     * @param styles
+     * @param styles 
      * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
      */
     public void setInlineSelectedStyles(String styles) {
@@ -1710,12 +1712,12 @@ public class Component implements Animation, StyleListener, Editable {
                 preferredSize = null;
             }
         }
-
+        
     }
-
+    
     /**
      * Registers inline styles that should be applied to the disabled state of the component.  
-     * @param styles
+     * @param styles 
      * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
      */
     public void setInlineDisabledStyles(String styles) {
@@ -1734,10 +1736,10 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
-
+    
     /**
      * Registers inline styles that should be applied to the pressed state of the component.  
-     * @param styles
+     * @param styles 
      * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
      */
     public void setInlinePressedStyles(String styles) {
@@ -1767,7 +1769,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns the container in which this component is contained
-     *
+     * 
      * @return the parent container in which this component is contained
      */
     public Container getParent() {
@@ -1777,7 +1779,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Sets the Component Parent.
      * This method should not be called by the user.
-     *
+     * 
      * @param parent the parent container
      */
     void setParent(Container parent) {
@@ -1786,14 +1788,14 @@ public class Component implements Animation, StyleListener, Editable {
         }
         this.parent = parent;
     }
-
+    
     /**
      * Sets the owner of this component to the specified component.  This can be useful
      * for denoting a hierarchical relationship that is outside the actual parent-child
      * component hierarchy.  E.g. If there is a popup dialog that allows the user to select
      * input for a text field, then you could set the text field as the owner of the popup
      * dialog to denote a virtual parent-child relationship.
-     *
+     * 
      * <p>This is used by {@link InteractionDialog#setDisposeWhenPointerOutOfBounds(boolean) } to figure out whether a
      * pointer event actually occurred outside the bounds of the dialog.  The {@link #containsOrOwns(int, int) } method
      * is used instead of {@link #contains(int, int) } so that it can cover the case where the pointer event occurred
@@ -1801,15 +1803,15 @@ public class Component implements Animation, StyleListener, Editable {
      * popup dialog is opened, then 
      * @param owner The component to set as the owner of this component.
      * @since 6.0
-     * @see #isOwnedBy(com.codename1.ui.Component)
-     * @see #containsOrOwns(int, int)
+     * @see #isOwnedBy(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
      */
     public void setOwner(Component owner) {
         if (this.owner != null) {
             if (this.owner.owned != null) {
                 this.owner.owned.remove(this);
             }
-
+            
         }
         this.owner = owner;
         if (owner != null) {
@@ -1819,7 +1821,7 @@ public class Component implements Animation, StyleListener, Editable {
             owner.owned.add(this);
         }
     }
-
+    
     /**
      * Checks to see if this component is owned by the given other component.  A component {@literal A} is
      * deemed to be owned by another component {@literal B} if any of the following conditions are true:
@@ -1831,8 +1833,8 @@ public class Component implements Animation, StyleListener, Editable {
      * @param cmp
      * @return True if this component is owned by {@literal cmp}.
      * @since 6.0
-     * @see #setOwner(com.codename1.ui.Component)
-     * @see #containsOrOwns(int, int)
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #containsOrOwns(int, int) 
      */
     public boolean isOwnedBy(Component cmp) {
         Component c = this.owner;
@@ -1855,10 +1857,10 @@ public class Component implements Animation, StyleListener, Editable {
             }
             c = c.getParent();
         }
-
+        
         return false;
     }
-
+    
     /**
      * Checks to see if this component either contains the given point, or
      * if it owns the component that contains the given point.
@@ -1867,8 +1869,8 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if the coordinate is either inside the bounds of this component
      * or a component owned by this component.
      * @since 6.0
-     * @see #setOwner(com.codename1.ui.Component)
-     * @see #isOwnedBy(com.codename1.ui.Component)
+     * @see #setOwner(com.codename1.ui.Component) 
+     * @see #isOwnedBy(com.codename1.ui.Component) 
      */
     public boolean containsOrOwns(int x, int y) {
         if (contains(x, y)) {
@@ -1884,15 +1886,15 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         return false;
-
+        
     }
-
+    
 
     /**
      * Registers interest in receiving callbacks for focus gained events, a focus event 
      * is invoked when the component accepts the focus. A special case exists for the
      * Form which sends a focus even for every selection within the form.
-     *
+     * 
      * @param l listener interface implementing the observable pattern
      */
     public void addFocusListener(FocusListener l) {
@@ -1904,7 +1906,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Deregisters interest in receiving callbacks for focus gained events
-     *
+     * 
      * @param l listener interface implementing the observable pattern
      */
     public void removeFocusListener(FocusListener l) {
@@ -1917,19 +1919,19 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Registers interest in receiving callbacks for scroll gained events, 
      * a scroll event is invoked when the component is scrolled.
-     *
+     * 
      * @param l listener interface implementing the observable pattern
      */
     public void addScrollListener(ScrollListener l) {
         if(scrollListeners == null){
-            scrollListeners = new EventDispatcher();
+            scrollListeners = new EventDispatcher();                    
         }
         scrollListeners.addListener(l);
     }
 
     /**
      * Deregisters interest in receiving callbacks for scroll gained events
-     *
+     * 
      * @param l listener interface implementing the observable pattern
      */
     public void removeScrollListener(ScrollListener l) {
@@ -1941,7 +1943,7 @@ public class Component implements Animation, StyleListener, Editable {
             scrollListeners = null;
         }
     }
-
+    
     /**
      * When working in 3 softbutton mode "fire" key (center softbutton) is sent to this method
      * in order to allow 3 button devices to work properly. When overriding this method
@@ -1954,7 +1956,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This method allows a component to indicate that it is interested in an "implicit" select
      * command to appear in the "fire" button when 3 softbuttons are defined in a device.
-     *
+     * 
      * @return true if this is a selectable interaction
      */
     protected boolean isSelectableInteraction() {
@@ -2048,7 +2050,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Allows us to indicate the label associated with this component thus providing
      * visual feedback related for this component e.g. starting the ticker when 
      * the component receives focus.
-     *
+     * 
      * @param componentLabel a label associated with this component
      */
     public void setLabelForComponent(Label componentLabel) {
@@ -2113,7 +2115,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * This method paints all the parents Components Background.
-     *
+     * 
      * @param g the graphics object
      */
     public void paintBackgrounds(Graphics g) {
@@ -2128,7 +2130,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Returns the absolute X location based on the component hierarchy, this method
      * calculates a location on the screen for the component rather than a relative
      * location as returned by getX()
-     *
+     * 
      * @return the absolute x location of the component
      * @see #getX
      */
@@ -2145,7 +2147,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Returns the absolute Y location based on the component hierarchy, this method
      * calculates a location on the screen for the component rather than a relative
      * location as returned by getX()
-     *
+     * 
      * @return the absolute y location of the component
      * @see #getY
      */
@@ -2162,7 +2164,7 @@ public class Component implements Animation, StyleListener, Editable {
      * This method performs the paint of the component internally including drawing
      * the scrollbars and scrolling the component. This functionality is hidden
      * from developers to prevent errors
-     *
+     * 
      * @param g the component graphics
      */
     final void paintInternal(Graphics g) {
@@ -2209,7 +2211,7 @@ public class Component implements Animation, StyleListener, Editable {
         int oHeight = g.getClipHeight();
         return bounds.intersects(oX, oY, oWidth, oHeight);
     }
-
+    
     private void paintInternalImpl(Graphics g, boolean paintIntersects) {
         int oX = g.getClipX();
         int oY = g.getClipY();
@@ -2219,7 +2221,7 @@ public class Component implements Animation, StyleListener, Editable {
             Style s = getStyle();
             if(s.getOpacity() < 255 && g.isAlphaSupported()) {
                 int oldAlpha = g.getAlpha();
-                g.setAlpha(s.getOpacity());
+                g.setAlpha(s.getOpacity());                
                 internalPaintImpl(g, paintIntersects);
                 g.setAlpha(oldAlpha);
             } else {
@@ -2232,21 +2234,13 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    // We use this one for getting the *actual* scrollable value of this component
-    // since Form proxies its content pane.  Sometimes (e.g. when painting Form) we
-    // really want to know if the component itself is scrollable
-    boolean isScrollableInternal() {
-        return isScrollable();
-    }
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
         paintComponentBackground(g);
 
-        // We use isScrollabelInternal() here because Form's isScrollable()
-        // actually reports scrollability of the content pane.
-        if (isScrollableInternal()) {
-            if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() &&
-                    (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
+        if (isScrollable()) {
+            if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() && 
+                (draggedMotionY == null || getClientProperty("$pullToRelease") != null)){
                 paintPullToRefresh(g);
             }
             int scrollX = getScrollX();
@@ -2272,7 +2266,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Paints intersecting components that appear above this component.
-     *
+     * 
      * @param g Graphics context
      * @deprecated For internal use only
      */
@@ -2304,20 +2298,18 @@ public class Component implements Animation, StyleListener, Editable {
      * Paints the UI for the scrollbars on the component, this will be invoked only
      * for scrollable components. This method invokes the appropriate X/Y versions
      * to do all the work.
-     *
+     * 
      * @param g the component graphics
      */
     protected void paintScrollbars(Graphics g) {
-        if (isScrollableInternal()) {
-            if (isScrollableX()) {
-                paintScrollbarX(g);
-            }
-            if (isScrollableY()) {
-                paintScrollbarY(g);
-            }
+        if (isScrollableX()) {
+            paintScrollbarX(g);
+        }
+        if (isScrollableY()) {
+            paintScrollbarY(g);
         }
     }
-
+    
     private void paintPullToRefresh(Graphics g) {
         if (!dragActivated && scrollY == -getUIManager().getLookAndFeel().getPullToRefreshHeight()
                 && getClientProperty("$pullToRelease") != null
@@ -2332,7 +2324,7 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshTask.run();
                     //once the task has finished scroll to 0
                     startTensile(scrollY, 0, true);
-                    putClientProperty("$pullToRelease", null);
+                    putClientProperty("$pullToRelease", null);                    
                 }
             });
         }
@@ -2345,7 +2337,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Paints the UI for the scrollbar on the X axis, this method allows component
      * subclasses to customize the look of a scrollbar
-     *
+     * 
      * @param g the component graphics
      */
     protected void paintScrollbarX(Graphics g) {
@@ -2364,7 +2356,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This method is used internally by the look and feel to implement the fading scrollbar
      * behavior.
-     *
+     * 
      * @return the opacity of the scrollbar
      */
     public int getScrollOpacity() {
@@ -2389,7 +2381,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Paints the UI for the scrollbar on the Y axis, this method allows component
      * subclasses to customize the look of a scrollbar
-     *
+     * 
      * @param g the component graphics
      */
     protected void paintScrollbarY(Graphics g) {
@@ -2412,7 +2404,7 @@ public class Component implements Animation, StyleListener, Editable {
      * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
      * that creates an image for sharing on social media</p>
      * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
-     *
+     * 
      * @param g the graphics to paint this Component on
      */
     final public void paintComponent(Graphics g) {
@@ -2427,8 +2419,8 @@ public class Component implements Animation, StyleListener, Editable {
      * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
      * that creates an image for sharing on social media</p>
      * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
-     *
-     *
+     * 
+     * 
      * @param g the graphics to paint this Component on
      * @param background if true paints all parents background
      */
@@ -2448,13 +2440,11 @@ public class Component implements Animation, StyleListener, Editable {
             translateX += parent.getX();
             translateY += parent.getY();
             //if (parent.isScrollable()) {
-            if (parent.isScrollableInternal()) {
-                if (parent.isScrollableX()) {
-                    translateX -= parent.getScrollX();
-                }
-                if (parent.isScrollableY()) {
-                    translateY -= parent.getScrollY();
-                }
+            if (parent.isScrollableX()) {
+                translateX -= parent.getScrollX();
+            }
+            if (parent.isScrollableY()) {
+                translateY -= parent.getScrollY();
             }
             // since scrollability can translate everything... we should clip based on the
             // current scroll
@@ -2467,19 +2457,19 @@ public class Component implements Animation, StyleListener, Editable {
 
             parent = parent.getParent();
         }
-
+        
         g.clipRect(translateX + getX(), translateY + getY(), getWidth(), getHeight());
         if (background) {
             paintBackgrounds(g);
         }
-
-
+        
+        
         g.translate(translateX, translateY);
         paintInternal(g);
         g.translate(-translateX, -translateY);
 
         paintGlassImpl(g);
-
+        
         g.setClip(clipX, clipY, clipW, clipH);
         //g.popClip();
     }
@@ -2500,7 +2490,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns the area of this component that is currently hidden by the virtual keyboard.
-     * @return
+     * @return 
      */
     private int getInvisibleAreaUnderVKB() {
         Form f = getComponentForm();
@@ -2518,7 +2508,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return 0;
     }
-
+    
     void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
             int i = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
@@ -2531,11 +2521,11 @@ public class Component implements Animation, StyleListener, Editable {
                     tensileHighlightIntensity = 0;
                 }
             }
-        }
+        }        
     }
-
+    
     private void drawPainters(com.codename1.ui.Graphics g, Component par, Component c,
-                              int x, int y, int w, int h) {
+            int x, int y, int w, int h) {
         if(flatten && getWidth() > 0 && getHeight() > 0) {
             Image i = (Image)getClientProperty("$FLAT");
             int absX = getAbsoluteX() + getScrollX();
@@ -2559,7 +2549,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void drawPaintersImpl(com.codename1.ui.Graphics g, Component par, Component c,
-                                  int x, int y, int w, int h) {
+            int x, int y, int w, int h) {
         if (par == null) {
             return;
         } else {
@@ -2576,8 +2566,8 @@ public class Component implements Animation, StyleListener, Editable {
         int transY = par.getAbsoluteY() + par.getScrollY();
 
         g.translate(transX, transY);
-
-
+        
+        
         if (par.isBorderPainted()) {
             Border b = par.getBorder();
             if (b.isBackgroundPainter()) {
@@ -2609,13 +2599,13 @@ public class Component implements Animation, StyleListener, Editable {
     private void paintRippleEffect(Graphics g) {
         if(isRippleEffect() && Form.rippleComponent == this && Form.rippleMotion != null) {
             paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
-        }
+        } 
     }
-
+    
     /**
      * Normally returns getStyle().getBorder() but some subclasses might use this 
      * to programmatically replace the border in runtime e.g. for a pressed border effect
-     *
+     * 
      * @return the border that is drawn according to the current component state
      */
     protected Border getBorder() {
@@ -2625,7 +2615,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Paints the background of the component, invoked with the clipping region
      * and appropriate scroll translation.
-     *
+     * 
      * @param g the component graphics
      */
     void paintComponentBackground(Graphics g) {
@@ -2640,7 +2630,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return the component itself or its parent which is scrollable
      */
     public Component getScrollable() {
-        if(isScrollableInternal()) {
+        if(isScrollable()) {
             return this;
         }
         Component p = getParent();
@@ -2649,7 +2639,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return p.getScrollable();
     }
-
+    
     /**
      * Returns the scrollable parent of this component
      */
@@ -2679,21 +2669,21 @@ public class Component implements Animation, StyleListener, Editable {
         paintBackground(g);
         paintRippleEffect(g);
     }
-
+    
     /**
      * This method paints the Component background, it should be overriden
      * by subclasses to perform custom background drawing.
-     *
+     * 
      * @param g the component graphics
      */
     protected void paintBackground(Graphics g) {
     }
-
+    
     /**
      * This method paints the Component on the screen, it should be overriden
      * by subclasses to perform custom drawing or invoke the UI API's to let
      * the PLAF perform the rendering.
-     *
+     * 
      * @param g the component graphics
      */
     public void paint(Graphics g) {
@@ -2702,7 +2692,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Indicates whether the component should/could scroll by default a component
      * is not scrollable.
-     *
+     * 
      * @return whether the component is scrollable
      */
     protected boolean isScrollable() {
@@ -2711,7 +2701,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Indicates whether the component should/could scroll on the X axis
-     *
+     * 
      * @return whether the component is scrollable on the X axis
      */
     public boolean isScrollableX() {
@@ -2719,25 +2709,12 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /**
-     * To be overridden by form which proxies isScrollableX() so that 
-     * we can get if the component is *actually* scrollable.
-     * @return
-     */
-    boolean isScrollableXInternal() {
-        return isScrollableX();
-    }
-
-    /**
      * Indicates whether the component should/could scroll on the Y axis
-     *
+     * 
      * @return whether the component is scrollable on the X axis
      */
     public boolean isScrollableY() {
         return false;
-    }
-
-    boolean isScrollableYInternal() {
-        return isScrollableY();
     }
 
     boolean scrollableXFlag() {
@@ -2752,7 +2729,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates the X position of the scrolling, this number is relative to the
      * component position and so a position of 0 would indicate the x position
      * of the component.
-     *
+     * 
      * @return the X position of the scrolling
      */
     public int getScrollX() {
@@ -2763,7 +2740,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates the Y position of the scrolling, this number is relative to the
      * component position and so a position of 0 would indicate the x position
      * of the component.
-     *
+     * 
      * @return the Y position of the scrolling
      */
     public int getScrollY() {
@@ -2779,7 +2756,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     protected void onScrollX(int scrollX) {
     }
-
+    
     /**
      * This method can be overriden to receive scroll events, unlike overriding setScrollY
      * it will receive all calls for scrolling. Normally you should not override this method
@@ -2789,12 +2766,12 @@ public class Component implements Animation, StyleListener, Editable {
      */
     protected void onScrollY(int scrollY) {
     }
-
+    
     /**
      * Indicates the X position of the scrolling, this number is relative to the
      * component position and so a position of 0 would indicate the x position
      * of the component.
-     *
+     * 
      * @param scrollX the X position of the scrolling
      */
     protected void setScrollX(int scrollX) {
@@ -2816,7 +2793,7 @@ public class Component implements Animation, StyleListener, Editable {
         this.scrollX = scrollXtmp;
         onScrollX(scrollX);
     }
-
+    
     void resetScroll() {
         if(scrollListeners != null){
             if(scrollX != 0 || scrollY != 0){
@@ -2831,13 +2808,13 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates the X position of the scrolling, this number is relative to the
      * component position and so a position of 0 would indicate the x position
      * of the component.
-     *
+     * 
      * @param scrollY the Y position of the scrolling
      */
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
-
+            
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
                 Component editingText = ci.getEditingText();
                 if (editingText != null && this instanceof Container && ((Container)this).contains(editingText)) {
@@ -2854,7 +2831,7 @@ public class Component implements Animation, StyleListener, Editable {
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
         }
-        if (isScrollableYInternal()) {
+        if (isScrollableY()) {
             if(Form.activePeerCount > 0) {
                 onParentPositionChange();
             }
@@ -2883,8 +2860,8 @@ public class Component implements Animation, StyleListener, Editable {
         return draggedy;
     }
 
-
-
+    
+    
     private void updateTensileHighlightIntensity(int lastScroll, int scroll, boolean motion) {
         if(tensileHighlightEnabled) {
             int h = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
@@ -2911,11 +2888,10 @@ public class Component implements Animation, StyleListener, Editable {
      * Returns the gap to be left for the bottom scrollbar on the X axis. This
      * method is used by layout managers to determine the room they should
      * leave for the scrollbar
-     *
+     * 
      * @return the gap to be left for the bottom scrollbar on the X axis
      */
     public int getBottomGap() {
-        if (!isScrollableInternal()) return 0;
         if (isScrollableX() && isScrollVisible()) {
             return getUIManager().getLookAndFeel().getHorizontalScrollHeight();
         }
@@ -2927,11 +2903,10 @@ public class Component implements Animation, StyleListener, Editable {
      * method is used by layout managers to determine the room they should
      * leave for the scrollbar. (note: side scrollbar rather than left scrollbar
      * is used for a future version that would support bidi).
-     *
+     * 
      * @return the gap to be left for the side scrollbar on the Y axis
      */
     public int getSideGap() {
-        if (!isScrollableInternal()) return 0;
         if (isScrollableY() && isScrollVisible()) {
             return getUIManager().getLookAndFeel().getVerticalScrollWidth();
         }
@@ -2940,36 +2915,36 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns true if the given absolute coordinate is contained in the Component
-     *
+     * 
      * <p>NOTE: This will return true upon a "hit" even if the component is not
      * visible, or if that part of the component is currently clipped by a parent
      * component.  To check if a point is contained in the visible component bounds
      * use {@link #visibleBoundsContains(int, int) }</p>
-     *
+     * 
      * @param x the given absolute x coordinate
      * @param y the given absolute y coordinate
      * @return true if the given absolute coordinate is contained in the 
      * Component; otherwise false
-     *
-     * @see #visibleBoundsContains(int, int)
+     * 
+     * @see #visibleBoundsContains(int, int) 
      */
     public boolean contains(int x, int y) {
         int absX = getAbsoluteX() + getScrollX();
         int absY = getAbsoluteY() + getScrollY();
         return (x >= absX && x < absX + getWidth() && y >= absY && y < absY + getHeight());
     }
-
+    
     /**
      * Returns true if the given absolute coordinate is contained inside the visible bounds
      * of the component.  This differs from {@link #contains(int, int) } in that it will
      * return {@literal false} if the component or any of its ancestors are not visible,
      * or if (x, y) are contained inside the bounds of the component, but are clipped.
-     *
+     * 
      * @param x the given absolute x coordinate
      * @param y the given absolute y coordinate
      * @return true if the given absolute coordinate is contained in the 
      * Component's visible bounds; otherwise false
-     * @see #contains(int, int)
+     * @see #contains(int, int) 
      */
     public boolean visibleBoundsContains(int x, int y) {
         boolean contains = true;
@@ -2994,7 +2969,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Calculates the preferred size based on component content. This method is
      * invoked lazily by getPreferred size.
-     *
+     * 
      * @return the calculated preferred size based on component content
      */
     protected Dimension calcPreferredSize() {
@@ -3020,7 +2995,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return preferredSize;
     }
-
+    
     private Dimension preferredSize() {
         if(sameWidth != null || sameHeight != null) {
             if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
@@ -3057,7 +3032,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Returns the component bounds which is sometimes more convenient than invoking
      * getX/Y/Width/Height. Bounds are relative to parent container.<br>
      * Changing values within the bounds can lead to unpredicted behavior.
-     *
+     * 
      * @see #getX
      * @see #getY
      * @return the component bounds
@@ -3080,7 +3055,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns true if this component can receive focus and is enabled
-     *
+     * 
      * @return true if this component can receive focus; otherwise false
      */
     public boolean isFocusable() {
@@ -3093,10 +3068,10 @@ public class Component implements Animation, StyleListener, Editable {
     protected void resetFocusable() {
         setFocusable(false);
     }
-
+    
     /**
      * A simple setter to determine if this Component can get focused
-     *
+     * 
      * @param focusable indicate whether this component can get focused
      */
     public void setFocusable(boolean focusable) {
@@ -3108,61 +3083,61 @@ public class Component implements Animation, StyleListener, Editable {
      * preferred tab index, use {@link #setPreferredTabIndex(int) }
      * @param index The tab index.
      * @deprecated This method is called internally by the layout manager each time the traversal order of the form is queried.  Use {@link #setPreferredTabIndex(int) } instead.
-     * @see #getPreferredTabIndex()
-     * @see #setPreferredTabIndex(int)
-     * @see #getTabIndex()
-     * @see Form#getTabIterator(com.codename1.ui.Component)
+     * @see #getPreferredTabIndex() 
+     * @see #setPreferredTabIndex(int) 
+     * @see #getTabIndex() 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
      */
     public void setTabIndex(int index) {
         tabIndex = index;
     }
-
+    
     /**
      * Gets the tab index of the component. This value is only useful immediately
      * after calling {@link Form#getTabIterator(com.codename1.ui.Component) } on the 
      * form or {@link Container#updateTabIndices(int) } in the parent component.
      * @return The tab index of the component.
-     * @see #getPreferredTabIndex()
-     * @see #setTabIndex(int)
-     * @see #setPreferredTabIndex(int)
-     * @see Form#getTabIterator(com.codename1.ui.Component)
-     * @see Container#updateTabIndices(int)
+     * @see #getPreferredTabIndex() 
+     * @see #setTabIndex(int) 
+     * @see #setPreferredTabIndex(int) 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
+     * @see Container#updateTabIndices(int) 
      * @deprecated This method is used internally when querying the traversal order of the form.  Use {@link #getPreferredTabIndex() } to get the preferred tab index.
-     *
+     * 
      */
     public int getTabIndex() {
         return tabIndex;
     }
-
+    
     /**
      * Sets the preferred tab index of the component.
      * @param index The preferred tab index
-     * @see #getPreferredTabIndex()
-     * @see Form#getTabIterator(com.codename1.ui.Component)
-     * @see Container#updateTabIndices(int)
+     * @see #getPreferredTabIndex() 
+     * @see Form#getTabIterator(com.codename1.ui.Component) 
+     * @see Container#updateTabIndices(int) 
      */
     public void setPreferredTabIndex(int index) {
         preferredTabIndex = index;
     }
-
+    
     /**
      * Gets the preferred tab index of this component.  Tab indices are used to specify the traversal order
      * when tabbing from component to component in a form.  
-     *
+     * 
      * <p>Tab index meanings work similar to the HTML {@literal tabIndex}
      * attribute. A tab Index of {@literal -1} (the default value) results in the field not being traversable
      * using the keyboard (or using the next/prev buttons in devices' virtual keyboards).  A tab index of {@literal 0}
      * results in the component's traversal order being dictated by the natural traversal order of the form.</p>
-     *
+     * 
      * <p>Use {@link Form#getTabIterator(com.codename1.ui.Component) } to obtain the complete traversal order for
      * all components in the form.</p>
-     *
+     * 
      * <p>Best practice is to only explicitly set preferred tabIndex values of {@literal 0} if you want the component
      * to be traversable, or {@literal -1} if you don't want the component to be traversable.  Explicitly setting 
      * a positive preferred tab index may result in unexpected results.</p>
-     *
+     * 
      * <h3>How the Preferred Tab Index is Used</h3>
-     *
+     * 
      * <p>When the user tries to "tab" to the next field (or presses the "Next" button on the virtual keyboard), this 
      * triggers a call to {@link Form#getTabIterator(com.codename1.ui.Component) }, crawls the component hierarchy and
      * returns a {@link java.util.ListIterator} of all of the traversable fields in the form in the order they should 
@@ -3170,7 +3145,7 @@ public class Component implements Animation, StyleListener, Editable {
      * sensible traversal orders by default.  If you have a custom layout manager, you can override its traversal
      * order by implementing the {@link com.codename1.ui.layouts.Layout#overridesTabIndices(com.codename1.ui.Container) } and
      * {@link com.codename1.ui.layouts.Layout#getChildrenInTraversalOrder(com.codename1.ui.Container) } methods.</p>
-     * @return
+     * @return 
      */
     public int getPreferredTabIndex() {
         if (isEnabled() && isVisible() && isFocusable()) {
@@ -3178,14 +3153,14 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return -1;
     }
-
+    
     /**
      * Sets whether this component is traversable using the keyboard using tab, next, previous keys.  This is 
      * just a wrapper around {@link #setPreferredTabIndex(int) } that sets the tab index to 0 if the component
      * should be traversable, and -1 if it shouldn't be.
-     *
+     * 
      * <p>Note:  This method is marked final because this is just a convenience wrapper around {@link #setPreferredTabIndex(int) }</p>
-     *
+     * 
      * @param traversable True to make the component traversable.
      */
     public final void setTraversable(boolean traversable) {
@@ -3195,22 +3170,22 @@ public class Component implements Animation, StyleListener, Editable {
             setPreferredTabIndex(-1);
         }
     }
-
+    
     /**
      * Checks if this component should be traversable using the keyboard using tab, next, previous keys.
-     *
+     * 
      * <p>Note: This method is marked final because it is just a convenience wrapper around {@link #getPreferredTabIndex() }</p>
-     * @return
+     * @return 
      */
     public final boolean isTraversable() {
         return getPreferredTabIndex() >= 0;
     }
-
-
+    
+    
     /**
      * Indicates the values within the component have changed and preferred 
      * size should be recalculated
-     *
+     * 
      * @param shouldCalcPreferredSize indicate whether this component need to 
      * recalculate his preferred size
      */
@@ -3244,7 +3219,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Prevents key events from being grabbed for focus traversal. E.g. a list component
      * might use the arrow keys for internal navigation so it will switch this flag to
      * true in order to prevent the focus manager from moving to the next component.
-     *
+     * 
      * @return true if key events are being used for focus traversal
      * ; otherwise false
      */
@@ -3256,7 +3231,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Prevents key events from being grabbed for focus traversal. E.g. a list component
      * might use the arrow keys for internal navigation so it will switch this flag to
      * true in order to prevent the focus manager from moving to the next component.
-     *
+     * 
      * @param handlesInput indicates whether key events can be grabbed for 
      * focus traversal
      */
@@ -3266,7 +3241,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns true if the component has focus
-     *
+     * 
      * @return true if the component has focus; otherwise false
      * @see #requestFocus
      */
@@ -3278,10 +3253,10 @@ public class Component implements Animation, StyleListener, Editable {
      * This flag doesn't really give focus, its a state that determines
      * what colors from the Style should be used when painting the component.
      * Actual focus is determined by the parent form
-     *
+     * 
      * @param focused sets the state that determines what colors from the 
      * Style should be used when painting a focused component
-     *
+     * 
      * @see #requestFocus
      * @deprecated this method shouldn't be invoked by user code, use requestFocus() instead
      */
@@ -3292,7 +3267,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Returns the Component Form or null if this Component
      * is not added yet to a form
-     *
+     * 
      * @return the Component Form
      */
     public Form getComponentForm() {
@@ -3304,10 +3279,10 @@ public class Component implements Animation, StyleListener, Editable {
         return retVal;
     }
 
-
+   
     /**
      * Repaint the given component to the screen
-     *
+     * 
      * @param cmp the given component on the screen
      */
     void repaint(Component cmp) {
@@ -3317,7 +3292,7 @@ public class Component implements Animation, StyleListener, Editable {
         // null parent repaint can happen when a component is removed and modified which
         // is common for a popup
         Component parent = getParent();
-
+        
         if (parent != null && parent.isVisible()) {
             parent.repaint(cmp);
         }
@@ -3326,7 +3301,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Repaint this Component, the repaint call causes a callback of the paint
      * method on the event dispatch thread.
-     *
+     * 
      * @see Display
      */
     public void repaint() {
@@ -3339,7 +3314,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Repaints a specific region within the component
-     *
+     * 
      * @param x boundary of the region to repaint in absolute screen coordinates not component coordinates
      * @param y boundary of the region to repaint in absolute screen coordinates not component coordinates
      * @param w boundary of the region to repaint
@@ -3379,7 +3354,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused this method is invoked when the user presses
      * and holds the key
-     *
+     * 
      * @param keyCode the key code value to indicate a physical key.
      */
     protected void longKeyPress(int keyCode) {
@@ -3388,7 +3363,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the key pressed event
      * will call this method
-     *
+     * 
      * @param keyCode the key code value to indicate a physical key.
      */
     public void keyPressed(int keyCode) {
@@ -3397,7 +3372,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the key released event
      * will call this method
-     *
+     * 
      * @param keyCode the key code value to indicate a physical key.
      */
     public void keyReleased(int keyCode) {
@@ -3406,7 +3381,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the key repeat event
      * will call this method.
-     *
+     * 
      * @param keyCode the key code value to indicate a physical key.
      */
     public void keyRepeated(int keyCode) {
@@ -3417,7 +3392,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows defining the physics for the animation motion behavior directly 
      * by plugging in an alternative motion object
-     *
+     * 
      * @param motion new motion object
      */
     private void setAnimationMotion(Motion motion) {
@@ -3427,7 +3402,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows defining the physics for the animation motion behavior directly 
      * by plugging in an alternative motion object
-     *
+     * 
      * @return the component motion object
      */
     private Motion getAnimationMotion() {
@@ -3449,7 +3424,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
-     *
+     * 
      * @return scroll animation speed in milliseconds
      */
     public int getScrollAnimationSpeed() {
@@ -3510,12 +3485,12 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Gets the theme that is used by inline styles to reference images.
      * @return the inlineStylesTheme
-     * @see #setInlineStylesTheme(com.codename1.ui.util.Resources)
-     * @see #getInlineAllStyles()
-     * @see #getInlineSelectedStyles()
+     * @see #setInlineStylesTheme(com.codename1.ui.util.Resources) 
+     * @see #getInlineAllStyles() 
+     * @see #getInlineSelectedStyles() 
      * @see #getInlinePressedStyles()
-     * @see #getInlineUnselectedStyles()
-     * @see #getInlineDisabledStyles()
+     * @see #getInlineUnselectedStyles() 
+     * @see #getInlineDisabledStyles() 
      */
     public Resources getInlineStylesTheme() {
         return inlineStylesTheme;
@@ -3525,12 +3500,12 @@ public class Component implements Animation, StyleListener, Editable {
      * Sets the theme that is used by inline styles to reference images.  Inline styles will be
      * disabled unless an inlineStylesTheme is registered with the component.
      * @param inlineStylesTheme the theme that inline styles use to reference images.
-     * @see #getInlineStylesTheme()
-     * @see #setInlineAllStyles(java.lang.String)
-     * @see #setInlinePressedStyles(java.lang.String)
-     * @see #setInlineSelectedStyles(java.lang.String)
-     * @see #setInlineDisabledStyles(java.lang.String)
-     * @see #setInlineUnselectedStyles(java.lang.String)
+     * @see #getInlineStylesTheme() 
+     * @see #setInlineAllStyles(java.lang.String) 
+     * @see #setInlinePressedStyles(java.lang.String) 
+     * @see #setInlineSelectedStyles(java.lang.String) 
+     * @see #setInlineDisabledStyles(java.lang.String) 
+     * @see #setInlineUnselectedStyles(java.lang.String) 
      */
     public void setInlineStylesTheme(Resources inlineStylesTheme) {
         this.inlineStylesTheme = inlineStylesTheme;
@@ -3594,11 +3569,11 @@ public class Component implements Animation, StyleListener, Editable {
             unSelectedStyle.setBgTransparency(opa);
             unSelectedStyle = originalStyle;
             g.setAlpha(oAlpha);
-        }
+        }        
     }
-
-
-
+    
+    
+    
     /**
      * Creates an animation that will transform the current component to the styling of the destination UIID when
      * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
@@ -3614,25 +3589,25 @@ public class Component implements Animation, StyleListener, Editable {
                 getUIManager().parseComponentStyle(getInlineStylesTheme(), destUIID, getInlineStylesUIID(destUIID), getInlineUnselectedStyleStrings())
                 :getUIManager().getComponentStyle(destUIID);
         return createStyleAnimation(sourceStyle, destStyle, duration, destUIID);
-
+        
     }
-
+    
     ComponentAnimation createStyleAnimation(final Style sourceStyle, final Style destStyle, final int duration, final String destUIID) {
         int d = duration;
-
+        
         Motion m = null;
         if(sourceStyle.getFgColor() != destStyle.getFgColor()) {
             m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
         }
         final Motion fgColorMotion = m;
         m = null;
-
+        
         if(sourceStyle.getOpacity() != destStyle.getOpacity()) {
             m = Motion.createLinearColorMotion(sourceStyle.getOpacity(), destStyle.getOpacity(), d);
         }
         final Motion opacityMotion = m;
         m = null;
-
+        
         if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
             // allows for fractional font sizes
             m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, d);
@@ -3698,7 +3673,7 @@ public class Component implements Animation, StyleListener, Editable {
             sourceStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
             sourceStyle.setPadding(top, bottom, left, right);
         }
-
+        
         if(marginLeft != null || marginRight != null || marginTop != null || marginBottom != null) {
             // convert the margin to pixels for smooth animation
             int left = sourceStyle.getMarginLeftNoRTL();
@@ -3711,8 +3686,8 @@ public class Component implements Animation, StyleListener, Editable {
 
         final AnimationTransitionPainter ap = new AnimationTransitionPainter();
         if(sourceStyle.getBgTransparency() != 0 || destStyle.getBgTransparency() != 0 ||
-                (sourceStyle.getBorder() != null && sourceStyle.getBorder().isEmptyBorder()) ||
-                (destStyle.getBorder() != null && destStyle.getBorder().isEmptyBorder()) ||
+                (sourceStyle.getBorder() != null && sourceStyle.getBorder().isEmptyBorder()) || 
+                (destStyle.getBorder() != null && destStyle.getBorder().isEmptyBorder()) || 
                 sourceStyle.getBgImage() != null || destStyle.getBgImage() != null) {
             ap.original = sourceStyle.getBgPainter();
             ap.dest = destStyle.getBgPainter();
@@ -3723,14 +3698,14 @@ public class Component implements Animation, StyleListener, Editable {
             }
             sourceStyle.setBgPainter(ap);
         }
-
+        
         final Motion bgMotion = Motion.createLinearMotion(0, 255, d);
-
+        
         return new ComponentAnimation() {
             private boolean finished;
             private boolean stepMode;
             private boolean started;
-
+            
             @Override
             public boolean isStepModeSupported() {
                 return true;
@@ -3741,7 +3716,7 @@ public class Component implements Animation, StyleListener, Editable {
                 return duration;
             }
 
-
+            
             @Override
             public void setStep(int step) {
                 stepMode = true;
@@ -3785,25 +3760,25 @@ public class Component implements Animation, StyleListener, Editable {
                 }
                 super.setStep(step);
             }
-
+            
             @Override
             public boolean isInProgress() {
                 if(!stepMode && !started) {
                     return true;
                 }
                 return stepMode ||
-                        !((bgMotion == null || bgMotion.isFinished()) &&
-                                (opacityMotion == null || opacityMotion.isFinished()) &&
-                                (fgColorMotion == null || fgColorMotion.isFinished()) &&
-                                (paddingLeft == null || paddingLeft.isFinished()) &&
-                                (paddingRight == null || paddingRight.isFinished()) &&
-                                (paddingTop == null || paddingTop.isFinished()) &&
-                                (paddingBottom == null || paddingBottom.isFinished()) &&
-                                (marginLeft == null || marginLeft.isFinished()) &&
-                                (marginRight == null || marginRight.isFinished()) &&
-                                (marginTop == null || marginTop.isFinished()) &&
-                                (marginBottom == null || marginBottom.isFinished()) &&
-                                (fontMotion == null || fontMotion.isFinished()));
+                        !((bgMotion == null || bgMotion.isFinished()) && 
+                        (opacityMotion == null || opacityMotion.isFinished()) &&
+                        (fgColorMotion == null || fgColorMotion.isFinished()) &&
+                        (paddingLeft == null || paddingLeft.isFinished()) &&
+                        (paddingRight == null || paddingRight.isFinished()) &&
+                        (paddingTop == null || paddingTop.isFinished()) &&
+                        (paddingBottom == null || paddingBottom.isFinished()) &&
+                        (marginLeft == null || marginLeft.isFinished()) &&
+                        (marginRight == null || marginRight.isFinished()) &&
+                        (marginTop == null || marginTop.isFinished()) &&
+                        (marginBottom == null || marginBottom.isFinished()) &&
+                        (fontMotion == null || fontMotion.isFinished()));
             }
 
             @Override
@@ -3811,7 +3786,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if(finished) {
                     return;
                 }
-
+                
                 if(!started && !stepMode) {
                     started = true;
                     if(bgMotion != null) {
@@ -3851,7 +3826,7 @@ public class Component implements Animation, StyleListener, Editable {
                         marginRight.start();
                     }
                 }
-
+                                
                 if(!isInProgress()) {
                     finished = true;
                     if (destUIID != null) {
@@ -3941,11 +3916,11 @@ public class Component implements Animation, StyleListener, Editable {
             }
         };
     }
-
+    
     /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
-     *
+     * 
      * @param animationSpeed scroll animation speed in milliseconds
      */
     public void setScrollAnimationSpeed(int animationSpeed) {
@@ -3954,7 +3929,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Indicates that scrolling through the component should work as an animation
-     *
+     * 
      * @return whether this component use smooth scrolling
      */
     public boolean isSmoothScrolling() {
@@ -3963,7 +3938,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Indicates that scrolling through the component should work as an animation
-     *
+     * 
      * @param smoothScrolling indicates if a component uses smooth scrolling
      */
     public void setSmoothScrolling(boolean smoothScrolling) {
@@ -3972,17 +3947,17 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Disable smooth scrolling on all components
-     * @param disableSmoothScrolling
+     * @param disableSmoothScrolling 
      */
     static void setDisableSmoothScrolling(boolean disableSmoothScrolling) {
         Component.disableSmoothScrolling = disableSmoothScrolling;
     }
-
+    
     /**
      * Invoked for devices where the pointer can hover without actually clicking
      * the display. This is true for PC mouse pointer as well as some devices such
      * as the BB storm.
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4015,8 +3990,8 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         draggedMotionX = null;
-        draggedMotionY = null;
-
+        draggedMotionY = null;        
+        
         Component parent = getParent();
         if(parent != null){
             parent.clearDrag();
@@ -4048,11 +4023,11 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public void pointerHoverPressed(int[] x, int[] y) {
     }
-
+    
     /**
      * Invoked by subclasses interested in handling pinch to zoom events, if true is returned 
      * other drag events will not be broadcast
-     *
+     * 
      * @param scale the scaling of the pinch operation a number larger than 1 means scaling up and smaller than 1 means scaling down.
      * It is recommended that code would threshold the number (so a change between 1.0 and 1.02 shouldn't necessarily trigger zoom).
      * Notice that this number is relevant to current zoom levels and unaware of them so you should also enforce limits of maximum/minimum
@@ -4070,7 +4045,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private boolean inPinch;
-
+    
     /**
      * To be implemented by subclasses interested in being notified when a pinch zoom has
      * ended (i.e the user has removed one of their fingers, but is still dragging).
@@ -4079,13 +4054,13 @@ public class Component implements Animation, StyleListener, Editable {
      * @since 7.0
      */
     protected void pinchReleased(int x, int y) {
-
+        
     }
-
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4113,11 +4088,11 @@ public class Component implements Animation, StyleListener, Editable {
         }
         pointerDragged(x[0], y[0]);
     }
-
+    
     /**
      * This method returns an image representing the dragged component, it can be overriden by subclasses to customize the look
      * of the image, the image will be overlaid on top of the form during a drag and drop operation
-     *
+     * 
      * @return an image
      */
     protected Image getDragImage() {
@@ -4157,7 +4132,7 @@ public class Component implements Animation, StyleListener, Editable {
         g.translate(getX(), getY());
         return image;
     }
-
+    
     /**
      * Invoked on the focus component to let it know that drag has started on the parent container
      * for the case of a component that doesn't support scrolling
@@ -4186,12 +4161,12 @@ public class Component implements Animation, StyleListener, Editable {
         g.drawImage(img, x, y);
     }
 
-
+    
     /**
      * This method allows a component to indicate if it is a drop target for the given component at the given x/y location
      * (in component coordiate space). This method can also update the drop tagets appearance to indicate the
      * drop location.
-     *
+     * 
      * @param dragged the component being dragged
      * @param x the x location over the component
      * @param y the y location over the component
@@ -4233,7 +4208,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Finds the drop target in the given screen coordinates
-     *
+     * 
      * @param source  the component being dragged
      * @param x the screen x coordinate
      * @param y the screen y coordinate
@@ -4256,16 +4231,16 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * <p>This method adds a refresh task to the Component, the task will be 
      * executed if the user has pulled the scroll beyond a certain height.</p>
-     *
+     * 
      * <script src="https://gist.github.com/codenameone/da87714157f97c739b2a.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/pull-to-refresh.png" alt="Simple pull to refresh demo" />
-     *
+     * 
      * @param task the refresh task to execute.
-     */
+     */ 
     public void addPullToRefresh(Runnable task){
         this.refreshTask = task;
     }
-
+    
     /**
      * Checks if the component responds to pointer events.  A component is considered
      * to respond to pointer events if it is visible and enabled, and is either scrollable,
@@ -4273,9 +4248,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if the pointer responds to pointer events.
      */
     public boolean respondsToPointerEvents() {
-        return isVisible() && isEnabled() && (isScrollableInternal() || isFocusable() || isGrabsPointerEvents());
+        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents());
     }
-
+    
     private boolean pointerReleaseMaterialPullToRefresh() {
         if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
             Container c = getComponentForm().getLayeredPane(InfiniteProgress.class, true);
@@ -4290,12 +4265,12 @@ public class Component implements Animation, StyleListener, Editable {
                     final InfiniteProgress ip = new InfiniteProgress();
                     ip.setUIID("RefreshLabel");
                     ip.getUnselectedStyle().
-                            setBorder(RoundBorder.create().
-                                    color(getUnselectedStyle().getBgColor()).
-                                    shadowX(0).
-                                    shadowY(0).
-                                    shadowSpread(1, true).
-                                    shadowOpacity(100));
+                        setBorder(RoundBorder.create().
+                            color(getUnselectedStyle().getBgColor()).
+                            shadowX(0).
+                            shadowY(0).
+                            shadowSpread(1, true).
+                            shadowOpacity(100));
                     Style s = ip.getUnselectedStyle();
                     s.setMarginUnit(Style.UNIT_TYPE_DIPS);
                     s.setMarginTop(10);
@@ -4307,18 +4282,18 @@ public class Component implements Animation, StyleListener, Editable {
                             ip.remove();
                         }
                     });
-                }
+                } 
                 c.revalidate();
                 return true;
             }
         }
         return false;
     }
-
+    
     private boolean updateMaterialPullToRefresh(final Form p, int y) {
         if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
-                pullY < getHeight() / 4 &&
-                scrollableYFlag() && getScrollY() == 0) {
+            pullY < getHeight() / 4 &&
+            scrollableYFlag() && getScrollY() == 0) {
             int mm = Display.INSTANCE.convertToPixels(1);
             if(mm < y - pullY) {
                 if(p.buttonsAwatingRelease != null) {
@@ -4333,18 +4308,18 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel = new Label("", "RefreshLabel");
                     FontImage.setMaterialIcon(refreshLabel, FontImage.MATERIAL_REFRESH, 5);
                     refreshLabel.
-                            getUnselectedStyle().setBorder(RoundBorder.create().
+                        getUnselectedStyle().setBorder(RoundBorder.create().
                             color(getUnselectedStyle().getBgColor()).
                             shadowX(0).
                             shadowY(0).
                             shadowSpread(1, true).
                             shadowOpacity(100));
                     opacityMotion = Motion.createLinearMotion(
-                            40, 255, getHeight() / 4);
+                        40, 255, getHeight() / 4);
                     opacityMotion.setStartTime(pullY);
 
                     rotationMotion = Motion.createLinearMotion(
-                            0, 360, getHeight() / 4);
+                        0, 360, getHeight() / 4);
                     rotationMotion.setStartTime(pullY);
                     refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
@@ -4363,7 +4338,7 @@ public class Component implements Animation, StyleListener, Editable {
                     }
                     refreshLabel = (Label)cc;
                     opacityMotion = (Motion)refreshLabel.getClientProperty("cn1$opacityMotion");
-                    rotationMotion = (Motion)refreshLabel.getClientProperty("cn1$rotationMotion");
+                    rotationMotion = (Motion)refreshLabel.getClientProperty("cn1$rotationMotion");                    
                 }
                 rotationMotion.setCurrentMotionTime(y);
                 opacityMotion.setCurrentMotionTime(y);
@@ -4379,11 +4354,11 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return false;
     }
-
+    
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4392,7 +4367,7 @@ public class Component implements Animation, StyleListener, Editable {
         if(p == null){
             return;
         }
-
+        
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
@@ -4410,7 +4385,7 @@ public class Component implements Animation, StyleListener, Editable {
                     }
                 });
             }
-
+                      
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -4446,7 +4421,7 @@ public class Component implements Animation, StyleListener, Editable {
             oldy = y;
             p.repaint(draggedx , draggedy, getWidth(), getHeight());
             Container scrollParent = getParent();
-            while(scrollParent != null && !scrollParent.isScrollableInternal()){
+            while(scrollParent != null && !scrollParent.isScrollable()){
                 scrollParent = scrollParent.getParent();
             }
             if(scrollParent != null){
@@ -4459,8 +4434,8 @@ public class Component implements Animation, StyleListener, Editable {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
                 //if the dragging component is out of bounds move the scrollable parent
                 if(!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())){
-                    if((scrollParent.isScrollableY() && scrollParent.getScrollY() >= 0 && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
-                            (scrollParent.isScrollableX() && scrollParent.getScrollX() >= 0 && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth()) ){
+                    if((scrollParent.isScrollableY() && scrollParent.getScrollY() >= 0 && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) || 
+                       (scrollParent.isScrollableX() && scrollParent.getScrollX() >= 0 && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth()) ){
                         int yposition = draggedy - scrollParent.getAbsoluteY() - 40;
                         if( yposition  < 0){
                             yposition = 0;
@@ -4469,34 +4444,41 @@ public class Component implements Animation, StyleListener, Editable {
                         if( xposition  < 0){
                             xposition = 0;
                         }
-                        int height = getHeight() + 80;
+                        int height;
+                        int width;
+                        if (isHidden() && dragImage != null) {
+                            height = dragImage.getHeight() + 80;
+                            width = dragImage.getWidth() + 80;
+                        } else {
+                            height = getHeight() + 80;
+                            width = getWidth() + 80;
+                        }
                         if(scrollParent.getScrollY() + draggedy + height >= scrollParent.getScrollDimension().getHeight()){
                             yposition = draggedy - scrollParent.getAbsoluteY();
                             height = scrollParent.getScrollDimension().getHeight() - yposition;
-                        }
-                        int width = getWidth()+ 80;
+                        }                        
                         if(scrollParent.getScrollX() + draggedx + width >= scrollParent.getScrollDimension().getWidth()){
                             xposition = draggedx - scrollParent.getAbsoluteX();
                             width = scrollParent.getScrollDimension().getWidth() - xposition;
-                        }
-
-                        scrollParent.scrollRectToVisible(xposition, yposition, width, height, scrollParent);
+                        }                        
+                                
+                        scrollParent.scrollRectToVisible(xposition, yposition, width, height, scrollParent);            
                     }
                 }
-            }
-
+            }    
+                
             return;
         }
         if(dragActivated && p.getDraggedComponent() == null){
             dragActivated = false;
         }
-
+        
         if(!dragActivated){
             boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
             shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
         }
-
-        if (isScrollableInternal() && isSmoothScrolling() && shouldGrabScrollEvents) {
+        
+        if (isScrollable() && isSmoothScrolling() && shouldGrabScrollEvents) {
             if (!dragActivated) {
                 dragActivated = true;
                 lastScrollY = y;
@@ -4522,7 +4504,7 @@ public class Component implements Animation, StyleListener, Editable {
                     tl = 0;
                 }
                 int scroll = getScrollY() + (lastScrollY - y);
-
+                
                 if(isAlwaysTensile() && getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() <= getHeight()) {
                     if (scroll >= -tl && scroll < getHeight() + tl) {
                         setScrollY(scroll);
@@ -4569,7 +4551,7 @@ public class Component implements Animation, StyleListener, Editable {
     protected boolean isStickyDrag() {
         return false;
     }
-
+    
     private void initScrollMotion() {
         // the component might not be registered for animation if it started off 
         // as smaller than the screen and grew (e.g. by adding components to the container
@@ -4587,7 +4569,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the pointer pressed event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4601,7 +4583,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This method allows a developer to define only a specific portion of a component as draggable
      * by default it returns true if the component is defined as "draggable"
-     *
+     * 
      * @param x the x coordinate relative to the component
      * @param y the y coordinate relative to the component
      * @return true if a press in this point might indicate the desire to begin a drag operation
@@ -4613,7 +4595,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the pointer pressed event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4639,7 +4621,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the pointer released event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4650,7 +4632,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused this method is invoked when the user presses
      * and holds the pointer on the Component
-     *
+     * 
      */
     public void longPointerPress(int x, int y) {
         if (longPressListeners != null && longPressListeners.hasListeners()) {
@@ -4665,7 +4647,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * If this Component is focused, the pointer released event
      * will call this method
-     *
+     * 
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4703,11 +4685,11 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isTensileDragEnabled() {
         return tensileDragEnabled;
     }
-
+    
     /**
      * Returns text selection support object for this component.  Only used by 
      * components that support text selection (e.g. Labels, un-editable text fields, etc..).
-     * @return
+     * @return 
      * @since 7.0
      */
     public TextSelectionSupport getTextSelectionSupport() {
@@ -4731,10 +4713,10 @@ public class Component implements Animation, StyleListener, Editable {
         if (parent != null) {
             return parent.isScrollDecelerationMotionInProgress();
         }
-
+        
         return false;
     }
-
+    
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
@@ -4745,11 +4727,11 @@ public class Component implements Animation, StyleListener, Editable {
             draggedMotion.start();
         }
         decelerationMotion = draggedMotion;
-
+        
         if(vertical){
             draggedMotionY = draggedMotion;
         }else{
-            draggedMotionX = draggedMotion;
+            draggedMotionX = draggedMotion;        
         }
         // just to be sure, there are some cases where this doesn't work as expected
         Form p = getComponentForm();
@@ -4781,7 +4763,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         dropListener.addListener(l);
     }
-
+    
     /**
      * Removes an action listener to drop events which are invoked when this component is dropped on a target
      * @param l the callback
@@ -4795,7 +4777,7 @@ public class Component implements Animation, StyleListener, Editable {
             dropListener = null;
         }
     }
-
+    
     /**
      * Broadcasts an event when dragging over a component
      * @param l the listener
@@ -4806,7 +4788,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         dragOverListener.addListener(l);
     }
-
+    
     /**
      * Removes an action listener to drag over events 
      * @param l the callback
@@ -4820,7 +4802,7 @@ public class Component implements Animation, StyleListener, Editable {
             dragOverListener = null;
         }
     }
-
+    
     /**
      * Callback indicating that the drag has finished either via drop or by releasing the component
      * @param x the x location 
@@ -4875,7 +4857,7 @@ public class Component implements Animation, StyleListener, Editable {
             dragImage = null;
             dropTargetComponent = null;
         }
-        if(getUIManager().getLookAndFeel().isFadeScrollBar() && isScrollableInternal()) {
+        if(getUIManager().getLookAndFeel().isFadeScrollBar() && isScrollable()) {
             Form frm = getComponentForm();
             if(frm != null) {
                 frm.registerAnimatedInternal(this);
@@ -4915,7 +4897,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         pointerPressedListeners.addListener(l);
     }
-
+    
     /**
      * Adds a listener to the pointer event
      *
@@ -4955,7 +4937,7 @@ public class Component implements Animation, StyleListener, Editable {
         g.setAlpha(a);
         g.setColor(c);
     }
-
+    
     /**
      * Removes the listener from the pointer event
      *
@@ -4966,7 +4948,7 @@ public class Component implements Animation, StyleListener, Editable {
             pointerPressedListeners.removeListener(l);
         }
     }
-
+    
     /**
      * Removes the listener from the pointer event
      *
@@ -4978,7 +4960,7 @@ public class Component implements Animation, StyleListener, Editable {
             longPressListeners.removeListener(l);
         }
     }
-
+    
     /**
      * Removes the listener from the drag finished event
      *
@@ -5035,7 +5017,7 @@ public class Component implements Animation, StyleListener, Editable {
             pointerDraggedListeners.removeListener(l);
         }
     }
-
+    
     private void pointerReleaseImpl(int x, int y) {
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
@@ -5045,37 +5027,35 @@ public class Component implements Animation, StyleListener, Editable {
             dragActivated = false;
             boolean startedTensileX = false;
             boolean startedTensileY = false;
-            if (isScrollableInternal()) {
-                if(isScrollableX()){
-                    if (scrollX < 0) {
-                        startTensile(scrollX, 0, false);
+            if(isScrollableX()){
+                if (scrollX < 0) {
+                    startTensile(scrollX, 0, false);
+                    startedTensileX = true;
+                } else {
+                    if(scrollX > getScrollDimension().getWidth() - getWidth()) {
+                        startTensile(scrollX, Math.max(getScrollDimension().getWidth() - getWidth(), 0), false);
                         startedTensileX = true;
-                    } else {
-                        if(scrollX > getScrollDimension().getWidth() - getWidth()) {
-                            startTensile(scrollX, Math.max(getScrollDimension().getWidth() - getWidth(), 0), false);
-                            startedTensileX = true;
-                        }
                     }
                 }
-                if(isScrollableY()){
-                    if (scrollY < 0) {
-                        if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode()){
-                            putClientProperty("$pullToRelease", "normal");
-                            if(scrollY < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
-                                putClientProperty("$pullToRelease", "update");
-                                startTensile(scrollY, -getUIManager().getLookAndFeel().getPullToRefreshHeight(), true);
-                                startedTensileY = true;
-                            }
-                        }else{
-                            startTensile(scrollY, 0, true);
+            }
+            if(isScrollableY()){
+                if (scrollY < 0) {
+                    if(refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode()){
+                        putClientProperty("$pullToRelease", "normal");
+                        if(scrollY < - getUIManager().getLookAndFeel().getPullToRefreshHeight()){
+                            putClientProperty("$pullToRelease", "update");                  
+                            startTensile(scrollY, -getUIManager().getLookAndFeel().getPullToRefreshHeight(), true);
                             startedTensileY = true;
                         }
-                    } else {
-                        int scrh = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
-                        if(scrollY > scrh) {
-                            startTensile(scrollY, Math.max(scrh, 0), true);
-                            startedTensileY = true;
-                        }
+                    }else{
+                        startTensile(scrollY, 0, true);
+                        startedTensileY = true;
+                    }
+                } else {
+                    int scrh = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
+                    if(scrollY > scrh) {
+                        startTensile(scrollY, Math.max(scrh, 0), true);
+                        startedTensileY = true;
                     }
                 }
             }
@@ -5083,7 +5063,7 @@ public class Component implements Animation, StyleListener, Editable {
             if(shouldScrollX && startedTensileX || !shouldScrollX && startedTensileY){
                 return;
             }
-
+            
             int scroll = scrollY;
             if(shouldScrollX){
                 scroll = scrollX;
@@ -5102,7 +5082,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if(speed < 0) {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
-
+                        
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, -tl/2, speed, timeConstant);
                     } else {
                         draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
@@ -5110,10 +5090,10 @@ public class Component implements Animation, StyleListener, Editable {
                 } else {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
-                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() -
+                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
                                 getHeight() + getInvisibleAreaUnderVKB() + tl/2,  speed, timeConstant);
                     } else {
-                        draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() -
+                        draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
                                 getHeight() + getInvisibleAreaUnderVKB() + tl/2, speed, 0.0007f);
                     }
                 }
@@ -5144,12 +5124,12 @@ public class Component implements Animation, StyleListener, Editable {
     protected float getDragSpeed(boolean vertical) {
         return Display.getInstance().getDragSpeed(vertical);
     }
-
+    
     /**
      * Returns the current Component Style allowing code to draw the current component, you
      * should normally use getUnselected/Pressed/DisabledStyle() and not this method since
      * it will return different values based on component state.
-     *
+     * 
      * @return the component Style object
      */
     public Style getStyle() {
@@ -5297,7 +5277,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Changes the Component Style by replacing the Component Style with the given Style
-     *
+     * 
      * @param style the component Style object
      */
     public void setUnselectedStyle(Style style) {
@@ -5351,7 +5331,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Allows subclasses to create their own custom style types and install the background painter into them
-     *
+     * 
      * @param s the custom style
      */
     protected void installDefaultPainter(Style s) {
@@ -5372,11 +5352,11 @@ public class Component implements Animation, StyleListener, Editable {
             Component.setDisableSmoothScrolling(false);
         }
     }
-
-
+    
+    
     /**
      * Finds all children (and self) that have negative scroll positions.
-     *
+     * 
      * <p>This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476</p>
      * @param out A set to add found components to.
      * @return The set of found components (reference to the same set that is passed as an arg).
@@ -5392,11 +5372,11 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return out;
     }
-
+    
 
     /**
      * Overriden to return a useful value for debugging purposes
-     *
+     * 
      * @return a string representation of this component
      */
     public String toString() {
@@ -5411,7 +5391,7 @@ public class Component implements Animation, StyleListener, Editable {
      * content and format of the returned string may vary between 
      * implementations. The returned string may be empty but may not be 
      * <code>null</code>.
-     *
+     * 
      * @return  a string representation of this component's state
      */
     protected String paramString() {
@@ -5431,24 +5411,24 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public void refreshTheme(boolean merge) {
         refreshTheme(getUIID(), merge);
-        initLaf(getUIManager());
+        initLaf(getUIManager());        
     }
 
     /**
      * Makes sure the component is up to date with the given UIID
-     *
+     * 
      * @param id The Style Id to update the Component with
      * @param merge indicates if the current styles should be merged with the new styles
      */
     protected void refreshTheme(String id, boolean merge) {
         UIManager manager = getUIManager();
-
+   
         if(merge){
             Style unSelected = getUnselectedStyle();
             if (hasInlineUnselectedStyle()) {
                 setUnselectedStyle(mergeStyle(unSelected, manager.parseComponentStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), getInlineUnselectedStyleStrings())));
             } else {
-                setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));
+                setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));            
             }
             if (selectedStyle != null) {
                 if (hasInlineSelectedStyle()) {
@@ -5476,9 +5456,9 @@ public class Component implements Animation, StyleListener, Editable {
             unSelectedStyle = getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
-            pressedStyle = null;
+            pressedStyle = null;       
             allStyles = null;
-
+            
         }
         checkAnimation();
         manager.getLookAndFeel().bind(this);
@@ -5498,7 +5478,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates whether we are in the middle of a drag operation, this method allows
      * developers overriding the pointer released events to know when this is a drag
      * operation.
-     *
+     * 
      * @return true if we are in the middle of a drag; otherwise false
      */
     protected boolean isDragActivated() {
@@ -5526,7 +5506,7 @@ public class Component implements Animation, StyleListener, Editable {
                     pf.registerAnimated(this);
                 }
             } else {
-                if (scrollOpacity == 0xff && isScrollableInternal() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
+                if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
                     // trigger initial fade process on a fresh view.
                     Form pf = getComponentForm();
                     if (pf != null) {
@@ -5534,7 +5514,7 @@ public class Component implements Animation, StyleListener, Editable {
                     }
                 }
             }
-        }
+        } 
     }
 
     void deregisterAnimatedInternal() {
@@ -5543,11 +5523,11 @@ public class Component implements Animation, StyleListener, Editable {
             f.deregisterAnimatedInternal(this);
         }
     }
-
+    
     /**
      * This method should be implemented correctly by subclasses to make snap to grid functionality work
      * as expected. Returns the ideal grid Y position closest to the current Y position.
-     *
+     * 
      * @return a valid Y position in the grid
      */
     protected int getGridPosY() {
@@ -5567,7 +5547,7 @@ public class Component implements Animation, StyleListener, Editable {
     boolean isTensileMotionInProgress() {
         return draggedMotionY != null && !draggedMotionY.isFinished();
     }
-
+    
     /**
      * {@inheritDoc}
      */
@@ -5578,7 +5558,7 @@ public class Component implements Animation, StyleListener, Editable {
         Image bgImage = getStyle().getBgImage();
         boolean animateBackground = bgImage != null && bgImage.isAnimation() && bgImage.animate();
         Motion m = getAnimationMotion();
-
+        
         // perform regular scrolling
         if (m != null && destScrollY != -1 && destScrollY != getScrollY()) {
             // change the variable directly for efficiency both in removing redundant
@@ -5631,10 +5611,10 @@ public class Component implements Animation, StyleListener, Editable {
                         }
                     }
                 }
-
+                
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
-                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);
+                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);            
             }
 
             if(scrollListeners != null){
@@ -5675,7 +5655,7 @@ public class Component implements Animation, StyleListener, Editable {
                         }
                     }
                 }
-
+                
                 // special callback to scroll X to allow developers to override the setScrollY method effectively
                 setScrollX(dragVal);
             }
@@ -5690,16 +5670,16 @@ public class Component implements Animation, StyleListener, Editable {
         if(animateY || animateX){
             return true;
         }
-
+        
         if(getClientProperty("$pullToRelease") != null){
             return true;
         }
-
-
+        
+        
         Painter bgp = getStyle().getBgPainter();
         boolean animateBackgroundB = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
         animateBackground = animateBackgroundB || animateBackground;
-
+                
         if(getUIManager().getLookAndFeel().isFadeScrollBar()) {
             if(tensileHighlightIntensity > 0) {
                 tensileHighlightIntensity = Math.max(0, tensileHighlightIntensity - (scrollOpacityChangeSpeed * 2));
@@ -5729,14 +5709,14 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Makes sure the component is visible in the scroll if this container 
      * is scrollable
-     *
+     * 
      * @param rect the rectangle that need to be visible
      * @param coordinateSpace the component according to whose coordinates 
      * rect is defined. Rect's x/y are relative to that component 
      * (they are not absolute).
      */
     protected void scrollRectToVisible(Rectangle rect, Component coordinateSpace) {
-        scrollRectToVisible(rect.getX(), rect.getY(),
+        scrollRectToVisible(rect.getX(), rect.getY(), 
                 rect.getSize().getWidth(), rect.getSize().getHeight(), coordinateSpace);
     }
 
@@ -5744,16 +5724,16 @@ public class Component implements Animation, StyleListener, Editable {
      * Makes sure the component is visible in the scroll if this container 
      * is scrollable
      *
-     * @param x
-     * @param y
-     * @param width
-     * @param height
+     * @param x 
+     * @param y 
+     * @param width 
+     * @param height  
      * @param coordinateSpace the component according to whose coordinates 
      * rect is defined. Rect's x/y are relative to that component 
      * (they are not absolute).
      */
     public void scrollRectToVisible(int x, int y, int width, int height, Component coordinateSpace) {
-        if (isScrollableInternal()) {
+        if (isScrollable()) {
             int scrollPosition = getScrollY();
             Style s = getStyle();
             int w = getWidth() - s.getHorizontalPadding();
@@ -5761,10 +5741,10 @@ public class Component implements Animation, StyleListener, Editable {
 
             Rectangle view;
             int invisibleAreaUnderVKB = getInvisibleAreaUnderVKB();
-
+            
             if (isSmoothScrolling() && destScrollY > -1) {
                 view = new Rectangle(getScrollX(), destScrollY, w, h - invisibleAreaUnderVKB);
-
+                
             } else {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
             }
@@ -5801,7 +5781,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if (getScrollX() > relativeX) {
                     setScrollX(relativeX);
                 }
-                int rightX = relativeX + width -
+                int rightX = relativeX + width - 
                         s.getHorizontalPadding();
                 if (getScrollX() + w < rightX) {
                     setScrollX(getScrollX() + (rightX - (getScrollX() + w)));
@@ -5816,7 +5796,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if (getScrollY() > relativeY) {
                     scrollPosition = relativeY;
                 }
-                int bottomY = relativeY + height -
+                int bottomY = relativeY + height - 
                         s.getVerticalPadding();
                 if (getScrollY() + h < bottomY + invisibleAreaUnderVKB) {
                     scrollPosition = getScrollY() + (bottomY - (getScrollY() + h)) + invisibleAreaUnderVKB;
@@ -5839,7 +5819,7 @@ public class Component implements Animation, StyleListener, Editable {
             Container parent = getParent();
             if (parent != null) {
                 parent.scrollRectToVisible(getAbsoluteX() - parent.getAbsoluteX() + x,
-                        getAbsoluteY() - parent.getAbsoluteY() + y,
+                        getAbsoluteY() - parent.getAbsoluteY() + y, 
                         width, height, parent);
             }
         }
@@ -5858,7 +5838,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Draws the component border if such a border exists. The border unlike the content
      * of the component will not be affected by scrolling for a scrollable component.
-     *
+     * 
      * @param g graphics context on which the border is painted
      */
     protected void paintBorder(Graphics g) {
@@ -5871,7 +5851,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Draws the component border background if such a border exists.
-     *
+     * 
      * @param g graphics context on which the border is painted
      */
     protected void paintBorderBackground(Graphics g) {
@@ -5880,11 +5860,11 @@ public class Component implements Animation, StyleListener, Editable {
             b.paintBorderBackground(g, this);
         }
     }
-
+    
     /**
      * Used as an optimization to mark that this component is currently being
      * used as a cell renderer
-     *
+     * 
      * @param cellRenderer indicate whether this component is currently being
      * used as a cell renderer
      */
@@ -5900,7 +5880,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Used as an optimization to mark that this component is currently being
      * used as a cell renderer
-     *
+     * 
      * @return true is this component is currently being used as a cell renderer
      */
     public boolean isCellRenderer() {
@@ -5909,7 +5889,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Indicate whether this component scroll is visible
-     *
+     * 
      * @return true is this component scroll is visible; otherwise false
      */
     public boolean isScrollVisible() {
@@ -5927,7 +5907,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Set whether this component scroll is visible
-     *
+     * 
      * @param isScrollVisible Indicate whether this component scroll is visible
      * @deprecated replaced by setScrollVisible to match the JavaBeans spec
      */
@@ -5946,7 +5926,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
-
+    
     /**
      * Invoked internally to initialize and bind the component
      */
@@ -5958,7 +5938,7 @@ public class Component implements Animation, StyleListener, Editable {
             lockStyleImages(stl);
             manager.getLookAndFeel().bind(this);
             checkAnimation();
-            if(isRTL() && isScrollableXInternal()){
+            if(isRTL() && isScrollableX()){
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
             initComponent();
@@ -6010,7 +5990,7 @@ public class Component implements Animation, StyleListener, Editable {
             Painter p = stl.getBgPainter();
             if(p instanceof BGPainter) {
                 ((BGPainter)p).radialCache = null;
-            }
+            }           
             deinitialize();
             if(refreshTaskDragListener != null) {
                 Form f = getComponentForm();
@@ -6024,12 +6004,12 @@ public class Component implements Animation, StyleListener, Editable {
      * If the component {@link #isEditable() }, then this will start the editing
      * process.  For TextFields, this results in showing the keyboard and allowing
      * the user to edit the input.  For the Picker, this will display the popup.
-     *
-     * @see #stopEditing(java.lang.Runnable)
-     * @see #isEditing()
-     * @see #isEditable()
-     * @see #getEditingDelegate()
-     * @see #setEditingDelegate(com.codename1.ui.Editable)
+     * 
+     * @see #stopEditing(java.lang.Runnable) 
+     * @see #isEditing() 
+     * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public void startEditingAsync() {
         // Empty implementation overridden by subclass
@@ -6037,31 +6017,31 @@ public class Component implements Animation, StyleListener, Editable {
             editingDelegate.startEditingAsync();
         }
     }
-
+    
     /**
      * Stops the editing process.
      * @param onFinish Callback called when the editing is complete.
-     * @see #startEditingAsync()
-     * @see #isEditing()
-     * @see #isEditable()
-     * @see #getEditingDelegate()
-     * @see #setEditingDelegate(com.codename1.ui.Editable)
+     * @see #startEditingAsync() 
+     * @see #isEditing() 
+     * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public void stopEditing(Runnable onFinish) {
         if (editingDelegate != null) {
             editingDelegate.stopEditing(onFinish);
         }
     }
-
+    
     /**
      * Checks if the component is currently being edited.
-     *
+     * 
      * @return True if the component is currently being edited.
-     * @see #startEditingAsync()
-     * @see #stopEditing(java.lang.Runnable)
-     * @see #isEditable()
-     * @see #getEditingDelegate()
-     * @see #setEditingDelegate(com.codename1.ui.Editable)
+     * @see #startEditingAsync() 
+     * @see #stopEditing(java.lang.Runnable) 
+     * @see #isEditable() 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
      */
     public boolean isEditing() {
         if (editingDelegate != null) {
@@ -6069,16 +6049,16 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return false;
     }
-
+    
     /**
      * Checks to see if the component is editable.   This is used for next/previous
      * focus traversal on forms.
-     * @return
-     * @see #getEditingDelegate()
-     * @see #setEditingDelegate(com.codename1.ui.Editable)
-     * @see #isEditing()
-     * @see #startEditingAsync()
-     * @see #stopEditing(java.lang.Runnable)
+     * @return 
+     * @see #getEditingDelegate() 
+     * @see #setEditingDelegate(com.codename1.ui.Editable) 
+     * @see #isEditing() 
+     * @see #startEditingAsync() 
+     * @see #stopEditing(java.lang.Runnable) 
      */
     public boolean isEditable() {
         if (editingDelegate != null) {
@@ -6086,7 +6066,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return false;
     }
-
+    
     /**
      * This is a callback method to inform the Component when it's been laidout
      * on the parent Container
@@ -6099,19 +6079,19 @@ public class Component implements Animation, StyleListener, Editable {
             }
             Form f = getComponentForm();
             int ivk = getInvisibleAreaUnderVKB();
-
-            if (isScrollableYInternal() && getScrollY() > 0 && getScrollY() + getHeight() >
+            
+            if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {
                 setScrollY(getScrollDimension().getHeight() - getHeight() + ivk);
             }
-            if (isScrollableXInternal() && getScrollX() > 0 && getScrollX() + getWidth() >
+            if (isScrollableX() && getScrollX() > 0 && getScrollX() + getWidth() >
                     getScrollDimension().getWidth()) {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
-            if(!isScrollableYInternal() && getScrollY() > 0){
+            if(!isScrollableY() && getScrollY() > 0){
                 setScrollY(0);
             }
-            if(!isScrollableXInternal() && getScrollX() > 0){
+            if(!isScrollableX() && getScrollX() > 0){
                 setScrollX(0);
             }
             updateNativeOverlay();
@@ -6138,7 +6118,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates if the component is in the initialized state, a component is initialized
      * when its initComponent() method was invoked. The initMethod is invoked before showing the
      * component to the user.
-     *
+     * 
      * @return true if the component is in the initialized state
      */
     protected boolean isInitialized() {
@@ -6149,7 +6129,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Indicates if the component is in the initialized state, a component is initialized
      * when its initComponent() method was invoked. The initMethod is invoked before showing the
      * component to the user.
-     *
+     * 
      * @param initialized Indicates if the component is in the initialized state
      */
     protected void setInitialized(boolean initialized) {
@@ -6158,7 +6138,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Invoked to indicate a change in a propertyName of a Style
-     *
+     * 
      * @param propertyName the property name that was changed
      * @param source The changed Style object
      */
@@ -6168,8 +6148,8 @@ public class Component implements Animation, StyleListener, Editable {
         if ((!shouldCalcPreferredSize &&
                 source == getStyle()) &&
                 (propertyName.equals(Style.FONT) ||
-                        propertyName.equals(Style.MARGIN) ||
-                        propertyName.equals(Style.PADDING))) {
+                propertyName.equals(Style.MARGIN) ||
+                propertyName.equals(Style.PADDING))) {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
@@ -6178,22 +6158,22 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-
-
+    
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
-     *
+     * 
      * @return the next focus component
      */
     public Component getNextFocusDown() {
         return nextFocusDown;
     }
-
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
-     *
+     * 
      * @param nextFocusDown the next focus component
      */
     public void setNextFocusDown(Component nextFocusDown) {
@@ -6203,7 +6183,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the up key. 
-     *
+     * 
      * @return the nxt focus component
      */
     public Component getNextFocusUp() {
@@ -6213,7 +6193,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the up key, this method doesn't affect the general focus behavior.
-     *
+     * 
      * @param nextFocusUp next focus component
      */
     public void setNextFocusUp(Component nextFocusUp) {
@@ -6223,7 +6203,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the left key. 
-     *
+     * 
      * @return the next focus component
      */
     public Component getNextFocusLeft() {
@@ -6233,7 +6213,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the left key, this method doesn't affect the general focus behavior.
-     *
+     * 
      * @param nextFocusLeft the next focus component
      */
     public void setNextFocusLeft(Component nextFocusLeft) {
@@ -6243,7 +6223,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the right key
-     *
+     * 
      * @return the next focus component
      */
     public Component getNextFocusRight() {
@@ -6253,7 +6233,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the right key
-     *
+     * 
      * @param nextFocusRight the next focus component
      */
     public void setNextFocusRight(Component nextFocusRight) {
@@ -6263,7 +6243,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Indicates whether component is enabled or disabled thus allowing us to prevent
      * a component from receiving input events and indicate so visually
-     *
+     * 
      * @return true if enabled
      */
     public boolean isEnabled() {
@@ -6273,7 +6253,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Used to reduce coupling between the {@link TextArea} component and display/implementation
      * classes thus reduce the size of the hello world 
-     *
+     * 
      * @param text text after editing is completed
      */
     void onEditComplete(String text) {
@@ -6282,7 +6262,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Indicates whether component is enabled or disabled thus allowing us to prevent
      * a component from receiving input events and indicate so visually
-     *
+     * 
      * @param enabled true to enable false to disable
      */
     public void setEnabled(boolean enabled) {
@@ -6357,7 +6337,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Elaborate components might not provide tactile feedback for all their areas (e.g. Lists)
      * this method defaults to returning the value of isTactileTouch
-     *
+     * 
      * @param x the x position
      * @param y the y position
      * @return True if the device should vibrate
@@ -6389,7 +6369,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * A component may expose mutable property names for a UI designer to manipulate, this
      * API is designed for usage internally by the GUI builder code
-     *
+     * 
      * @return the property names allowing mutation
      */
     public String[] getPropertyNames() {
@@ -6402,7 +6382,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return the types of the properties
      */
     public Class[] getPropertyTypes() {
-        return null;
+       return null;
     }
 
     /**
@@ -6414,7 +6394,7 @@ public class Component implements Animation, StyleListener, Editable {
     public String[] getPropertyTypeNames() {
         return null;
     }
-
+    
     /**
      * Returns the current value of the property name, this method is used by the GUI builder
      *
@@ -6459,7 +6439,7 @@ public class Component implements Animation, StyleListener, Editable {
      * If the component is not opaque null is always returned!
      * <p>Duplicate calls to this method won't produce duplicate locks, in case of 
      * a soft lock the return value will always be null.
-     *
+     * 
      * @param hardLock indicates whether the lock uses a hard or a soft reference to the image
      * @return the image in case of a hard lock
      */
@@ -6495,7 +6475,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return null;
     }
-
+    
     /**
      * This is a callback method for the peer component class
      */
@@ -6532,7 +6512,7 @@ public class Component implements Animation, StyleListener, Editable {
      * on top of said component.
      */
     protected boolean shouldBlockSideSwipe() {
-        return isScrollableXInternal() || (parent != null && parent.shouldBlockSideSwipe());
+        return isScrollableX() || (parent != null && parent.shouldBlockSideSwipe());
     }
 
     /**
@@ -6656,7 +6636,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
-     *
+     * 
      * @param grabsPointerEvents the grabsPointerEvents to set
      */
     public void setGrabsPointerEvents(boolean grabsPointerEvents) {
@@ -6706,7 +6686,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return the alwaysTensile
      */
     public boolean isAlwaysTensile() {
-        return alwaysTensile && !isScrollableXInternal() || (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode());
+        return alwaysTensile && !isScrollableX() || (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode());
     }
 
     /**
@@ -6745,7 +6725,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Indicates whether this component can receive dropped components into it, notice that when dropping on a component
      * or container the parents will be checked recursively to find a valid drop target
-     *
+     * 
      * @param dropTarget the dropTarget to set
      */
     public void setDropTarget(boolean dropTarget) {
@@ -6764,7 +6744,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         return parent != null && parent.isChildOf(cnt);
     }
-
+    
     /**
      * Indicates that this component and all its children should be hidden when the device is switched to portrait mode
      * @return the hideInPortrait
@@ -6780,7 +6760,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void setHideInPortrait(boolean hideInPortrait) {
         this.hideInPortrait = hideInPortrait;
     }
-
+    
     /**
      * remove this component from the painting queue
      */
@@ -6797,7 +6777,7 @@ public class Component implements Animation, StyleListener, Editable {
     public String[] getBindablePropertyNames() {
         return null;
     }
-
+    
     /**
      * Returns the types of the properties that are bindable within this component
      * @return the class for binding
@@ -6806,7 +6786,7 @@ public class Component implements Animation, StyleListener, Editable {
     public Class[] getBindablePropertyTypes() {
         return null;
     }
-
+    
     /**
      * Binds the given property name to the given bind target
      * @param prop the property name
@@ -6815,7 +6795,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public void bindProperty(String prop, BindTarget target) {
     }
-
+    
     /**
      * Removes a bind target from the given property name
      * @param prop the property names
@@ -6824,7 +6804,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public void unbindProperty(String prop, BindTarget target) {
     }
-
+    
     /**
      * Allows the binding code to extract the value of the property
      * @param prop the property
@@ -6838,14 +6818,14 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Sets the value of a bound property within this component, notice that this method MUST NOT fire
      * the property change event when invoked to prevent recursion!
-     *
+     * 
      * @param prop the property whose value should be set
      * @param value the value
      * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setBoundPropertyValue(String prop, Object value) {
     }
-
+    
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @return the cloudBoundProperty
@@ -6879,7 +6859,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * The destination property of the CloudObject
-     *
+     * 
      * @return the cloudDestinationProperty
      * @deprecated this mapped to an older iteration of properties that is no longer used
      */
@@ -6898,7 +6878,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void setCloudDestinationProperty(String cloudDestinationProperty) {
         this.cloudDestinationProperty = cloudDestinationProperty;
     }
-
+    
     /**
      * Some components may optionally generate a state which can then be restored
      * using setCompnentState(). This method is used by the UIBuilder.
@@ -6912,7 +6892,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
      * This method also optionally sets the margin to 0 so the component will be truly hidden. Notice that this might 
      * not behave as expected with scrollable containers or layouts that ignore preferred size.
-     *
+     * 
      * @param b true to hide the component and false to show it
      * @param changeMargin indicates margin should be set to 0
      */
@@ -6920,7 +6900,7 @@ public class Component implements Animation, StyleListener, Editable {
         if(b) {
             if(!sizeRequestedByUser) {
                 if(changeMargin) {
-                    getAllStyles().cacheMargins(false); //if a margins cache already exists because the component is already hidden it would be kept else it would be created
+                	getAllStyles().cacheMargins(false); //if a margins cache already exists because the component is already hidden it would be kept else it would be created
                     getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
@@ -6928,27 +6908,27 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                getAllStyles().restoreCachedMargins(); //restore margins to the values they had before the component being hidden and flush the margins cache
+            	getAllStyles().restoreCachedMargins(); //restore margins to the values they had before the component being hidden and flush the margins cache
 //                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
 //                    setUIID(getUIID());
 //                }
             }
         }
     }
-
+    
     /**
      * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
      * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
      * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
      * hide a component within the UI. Notice that this might 
      * not behave as expected with scrollable containers or layouts that ignore preferred size.
-     *
+     * 
      * @param b true to hide the component and false to show it
      */
     public void setHidden(boolean b) {
         setHidden(b, true);
-    }
-
+    }    
+    
     /**
      * Returns true if the component was explicitly hidden by the user
      * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
@@ -6956,7 +6936,7 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isHidden() {
         return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
     }
-
+    
     /**
      * If getComponentState returned a value the setter can update the value and restore
      * the prior state.
@@ -6964,7 +6944,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public void setComponentState(Object state) {
     }
-
+    
     class BGPainter implements Painter, Animation {
         private Motion wMotion, hMotion;
         private Form previousTint;
@@ -7157,8 +7137,8 @@ public class Component implements Animation, StyleListener, Editable {
                     }
                     x = oldX;
                     y = oldY;
-                }
-
+                } 
+                
                 impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);
             }
         }
