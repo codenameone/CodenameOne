@@ -1982,7 +1982,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics(Object image) {
-        return new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
+        return g;
     }
 
     @Override

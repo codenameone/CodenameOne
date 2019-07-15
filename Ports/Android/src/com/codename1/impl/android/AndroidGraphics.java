@@ -113,10 +113,12 @@ class AndroidGraphics {
         if(canvas != null) {
             canvas.save();
         }
+        clipSet = false;
     }
 
     void setCanvasNoSave(Canvas canvas) {
         this.canvas = canvas;
+        clipSet = false;
     }
 
     Paint getFont() {
@@ -1318,21 +1320,33 @@ class AndroidGraphics {
         return this.tmprect.top;
     }
 
+    private boolean clipSet = false;
+    
     public void setClip(int x, int y, int width, int height) {
         //System.out.println("Setting clip  "+x+","+y+","+width+", "+height);
+        if (clipSet) {
+            canvas.restore();
+        }
+        canvas.save();
+        clipSet = true;
         clipFresh = false;
         if (getTransform().isIdentity() || transformSemaphore > 0) {
-            canvas.clipRect(x, y, x + width, y + height, Region.Op.REPLACE);
+            canvas.clipRect(x, y, x + width, y + height, Region.Op.INTERSECT);
         } else {
             this.tmppath.rewind();
             this.tmppath.addRect((float) x, (float) y, (float) width + x, (float) height + y, Path.Direction.CW);
             this.tmppath.transform(getTransformMatrix());
-            canvas.clipPath(this.tmppath, Region.Op.REPLACE);
+            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);
         }
     }
 
     public void setClipRaw(int x, int y, int width, int height) {
         //System.out.println("Setting clip raw "+x+","+y+","+width+", "+height);
+        if (clipSet) {
+            canvas.restore();
+        }
+        canvas.save();
+        clipSet = true;
         clipFresh = false;
         if (!getTransform().isIdentity() && transformSemaphore > 0) {
             // If the transform is currently applied, then we need to
@@ -1341,21 +1355,26 @@ class AndroidGraphics {
             this.tmppath.rewind();
             this.tmppath.addRect((float) x, (float) y, (float) width + x, (float) height + y, Path.Direction.CW);
             this.tmppath.transform(getInverseTransform());
-            canvas.clipPath(this.tmppath, Region.Op.REPLACE);
+            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);
         } else {
-            canvas.clipRect(x, y, x + width, y + height, Region.Op.REPLACE);
+            canvas.clipRect(x, y, x + width, y + height, Region.Op.INTERSECT);
         }
     }
 
     public void setClip(Shape clipShape) {
         //System.out.println("Setting clip to shape "+clipShape);
+        if (clipSet) {
+            canvas.restore();
+        }
+        canvas.save();
+        clipSet = true;
         clipFresh = false;
         this.tmppath.rewind();
         AndroidImplementation.cn1ShapeToAndroidPath(clipShape, this.tmppath);
         if (!getTransform().isIdentity() && transformSemaphore == 0) {
             this.tmppath.transform(getTransformMatrix());
         }
-        canvas.clipPath(this.tmppath, Region.Op.REPLACE);
+        canvas.clipPath(this.tmppath, Region.Op.INTERSECT);
     }
 
     /**
@@ -1365,6 +1384,11 @@ class AndroidGraphics {
      */
     public void setClipRaw(Path path) {
         //System.out.println("setting clip to raw "+path);
+        if (clipSet) {
+            canvas.restore();
+        }
+        canvas.save();
+        clipSet = true;
         clipFresh = false;
         if (!getTransform().isIdentity() && transformSemaphore > 0) {
             // If the transform is currently applied, then we need to
@@ -1372,9 +1396,9 @@ class AndroidGraphics {
             // the "raw" variant always passes clips in global "screen" coordinates.
             this.tmppath.set(path);
             this.tmppath.transform(getInverseTransform());
-            canvas.clipPath(this.tmppath, Region.Op.REPLACE);
+            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);
         } else {
-            canvas.clipPath(path, Region.Op.REPLACE);
+            canvas.clipPath(path, Region.Op.INTERSECT);
         }
     }
     
