@@ -1781,12 +1781,20 @@ bool lockDrawing;
         [touchesArray removeAllObjects];
     }
     int currentWidth = (int)self.view.bounds.size.width * scaleValue;
-    if(currentWidth != displayWidth) {
-        [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-        displayWidth = currentWidth;
-        displayHeight = (int)self.view.bounds.size.height * scaleValue;
-        screenSizeChanged(displayWidth, displayHeight);
-    }
+    //if(currentWidth != displayWidth) {
+    // Note:  While it may be tempting to only update the frame buffer if the size has changed,
+    // doing that causes a bug whereby the app may paint with the wrong dimensions 
+    // when opening from the background on iPad with multitasking enabled.
+    // https://github.com/codenameone/CodenameOne/issues/2819
+    // This may be caused by the fact the getDisplayWidthImpl() and getDisplayHeightImpl() update
+    // the display width/height each time to match the view, without performing other resizing
+    // details, so it is possible that the size change event still needs to be sent
+    // even if the display width already matches the value we're given here.
+    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    displayWidth = currentWidth;
+    displayHeight = (int)self.view.bounds.size.height * scaleValue;
+    screenSizeChanged(displayWidth, displayHeight);
+    //}
     
 }
 
