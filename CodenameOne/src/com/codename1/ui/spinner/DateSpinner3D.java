@@ -30,6 +30,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import java.util.Calendar;
@@ -63,12 +64,14 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     private String monthRenderingPrototype = "WWW";
     private SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
+    private Container wrapper = new Container(BoxLayout.x());
     
     /**
      * Default constructor
      */
     public DateSpinner3D() {
-        setLayout(BoxLayout.x());
+        setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+        add(BorderLayout.CENTER, wrapper);
         Calendar c = Calendar.getInstance();
         currentDay = c.get(Calendar.DAY_OF_MONTH);
         currentMonth = c.get(Calendar.MONTH) + 1;
@@ -140,7 +143,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if(year != null) {
             Label l = new Label("December", "Spinner3DRow");
             if(monthDayYear) {
-                addComponent(month);
+                wrapper.addComponent(month);
                 
                 month.setPreferredW((int)(l.getPreferredW() * 1.5f));
                 Style monthStyle = Style.createProxyStyle(month.getRowStyle(), month.getSelectedRowStyle());
@@ -156,7 +159,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 //addComponent(createSeparator());
                 l.setText("00");
                 day.setPreferredW((int)(l.getPreferredW() * 1.5f) + convertToPixels(3f));
-                addComponent(day);
+                wrapper.addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
                 dayStyle.setPaddingRight(3f);
@@ -164,7 +167,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 //addComponent(createSeparator());
                 l.setText("0000");
                 year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
-                addComponent(year);
+                wrapper.addComponent(year);
                 
                 Style yearStyle = Style.createProxyStyle(year.getRowStyle(), year.getSelectedRowStyle());
                 yearStyle.setAlignment(Component.RIGHT);
@@ -182,13 +185,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 l.setText("0000");
                 year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
                 
-                addComponent(day);
+                wrapper.addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
                 dayStyle.setPaddingRight(3f);
                 //day.refreshStyles();
                 //addComponent(createSeparator());
-                addComponent(month);
+                wrapper.addComponent(month);
                 Style monthStyle = Style.createProxyStyle(month.getRowStyle(), month.getSelectedRowStyle());
                 monthStyle.setAlignment(Component.LEFT);
                 monthStyle.setPaddingLeft(3f);
@@ -201,7 +204,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 
                 //year.refreshStyles();
                 
-                addComponent(year);
+                wrapper.addComponent(year);
                 //LayeredLayout ll = (LayeredLayout)getLayout();
                 //ll.setInsets(day, "0 67% 0 0")
                 //        .setInsets(month, "0 33% 0 33%")
@@ -482,7 +485,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setMonthDayYear(boolean monthDayYear) {
         this.monthDayYear = monthDayYear;
-        removeAll();
+        wrapper.removeAll();
         addComponents();
     }
 

@@ -28,6 +28,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -53,6 +54,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private boolean markToday = true;
     private boolean includeYear;
     private int off;
+    private Container wrapper = new Container(BoxLayout.x());
 
     /**
      * Default constructor
@@ -96,9 +98,10 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     void addComponents() {
         if(date != null) {
             //setLayout(new LayeredLayout());
-            setLayout(BoxLayout.x());
-            addComponent(date);
-            addComponent(time);
+            setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+            add(BorderLayout.CENTER, wrapper);
+            wrapper.addComponent(date);
+            wrapper.addComponent(time);
             //LayeredLayout ll = (LayeredLayout)getLayout();
             //ll.setInsets(date, "0 auto 0 0")
             //        .setInsets(time, "0 auto 0 0")
