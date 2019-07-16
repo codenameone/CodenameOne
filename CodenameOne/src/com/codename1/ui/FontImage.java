@@ -6938,7 +6938,7 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters, or -1 to use the default height of the font
     */
     public static void setMaterialIcon(Label l, char icon, float size) {
-        setFontIcon(l, getMaterialDesignFont(), icon, -1);
+        setFontIcon(l, getMaterialDesignFont(), icon, size);
     }
 
 
