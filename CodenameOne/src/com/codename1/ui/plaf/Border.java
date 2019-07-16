@@ -1425,7 +1425,7 @@ public class Border {
                 int arrowPosition = 0;
 
                 // we need to draw an arrow on one of the sides
-                if(trackComponent != null) {
+                if(trackComponent != null && specialTile != null) {
                     int cabsY = c.getAbsoluteY();
                     int trackY = trackComponent.getY();
                     int trackX = trackComponent.getX();

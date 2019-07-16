@@ -225,7 +225,7 @@ public class DateFormatSymbols implements Cloneable {
 		String shortForms[] = new String[longForms.length];
                 int sflen = shortForms.length;
 		for (int i = 0; i < sflen; i++) {
-                        String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
+            String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
 			String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), defaultVal);
 			if (shortForm != null) {
 				shortForms[i] = shortForm;
@@ -300,6 +300,9 @@ public class DateFormatSymbols implements Cloneable {
 
         private String[] platformLocalizedMonths;
         private String[] getPlatformLocalizedMonths() {
+            if(!localized) {
+                return MONTHS;
+            }
             if (platformLocalizedMonths == null) {
                 int len = MONTHS.length;
                 platformLocalizedMonths = new String[len];
@@ -321,6 +324,9 @@ public class DateFormatSymbols implements Cloneable {
         
         private String[] platformLocalizedShortMonths;
         private String[] getPlatformLocalizedShortMonths() {
+            if(!localized) {
+                return MONTHS;
+            }
             if (platformLocalizedShortMonths == null) {
                 int len = MONTHS.length;
                 platformLocalizedShortMonths = new String[len];
