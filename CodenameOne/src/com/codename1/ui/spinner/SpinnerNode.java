@@ -281,7 +281,7 @@ class SpinnerNode extends Node {
     
     public void setSelectedIndex(int index) {
         if (index < 0 || index > listModel.getSize()-1) {
-            throw new ArrayIndexOutOfBoundsException("Index out of bounds");
+            throw new ArrayIndexOutOfBoundsException("Index out of bounds:"+index+", must be between 0 and "+listModel.getSize());
         }
         
         setScrollY(index * calcFlatListHeight() / listModel.getSize());
