@@ -39,7 +39,7 @@ import netscape.javascript.JSObject;
  */
 public class LocationSimulation extends javax.swing.JFrame {
 
-    private WebView webView;
+    //private WebView webView;
     private double iLastLat = 0.1;
     private double iLastLon = 0.1;
     public static final int E_MeasUnit_Default = -1;
@@ -116,7 +116,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 //+ "if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}"
                 //+"  </script>"
                 + "    <script type=\"text/javascript\"\n"
-                + "      src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyA6cHeMqVVOHlZ0i9A2oD3jIg56Slvq0Aw\">\n"
+                + "      src=\"https://maps.googleapis.com/maps/api/js?key=API_KEY\">\n"
                 + "    </script>\n"
                 + "    <script type=\"text/javascript\">\n"
                 + "function moveToLocation(lat, lng){\n"
@@ -163,10 +163,10 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + " </body>"
                 + "</html>";
 
-        final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
-        mapPanel.setLayout(new BorderLayout());
-        mapPanel.add(BorderLayout.CENTER, webContainer);
-        Platform.runLater(new Runnable() {
+        //final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
+        //mapPanel.setLayout(new BorderLayout());
+        //mapPanel.add(BorderLayout.CENTER, webContainer);
+        /*Platform.runLater(new Runnable() {
             private boolean firstRun;
 
             @Override
@@ -235,7 +235,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 }, 1000, 1000);
 
             }
-        });
+        });*/
     }
 
     private double getTextVal(String aText) {
@@ -553,7 +553,7 @@ public class LocationSimulation extends javax.swing.JFrame {
             final Double la = new Double(lat);
             final Double lo = new Double(lon);
 
-            Platform.runLater(new Runnable() {
+            /*Platform.runLater(new Runnable() {
 
                 public void run() {
                     Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
@@ -563,7 +563,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                     p.putFloat("direction", getDirection());
                     webView.getEngine().executeScript("moveToLocation(" + la.toString() + "," + lo.toString() + ");");
                 }
-            });
+            });*/
 
         } catch (Exception e) {
             e.printStackTrace();
