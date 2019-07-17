@@ -347,7 +347,7 @@ class AndroidGraphics {
     public void drawString(String str, int x, int y) {
         canvas.save();
         applyTransform();
-        canvas.drawText(str, x, y - font.getFontAscent(), font);
+        canvas.drawText(str, x, y - font.top(), font);
         unapplyTransform();
         canvas.restore();
     }
@@ -1233,7 +1233,7 @@ class AndroidGraphics {
                 drawString(nativeFont, str, x, y, textDecoration, fontHeight);
                 return;
             }
-            canvas.drawText(str, x, y - font.getFontAscent(), font);
+            canvas.drawText(str, x, y - font.top(), font);
             if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE) != 0) {
                 paint.setStyle(Paint.Style.FILL);
                 canvas.drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1, paint);
@@ -1247,7 +1247,7 @@ class AndroidGraphics {
                 canvas.drawLine(x, y, x + impl.stringWidth(nativeFont, str), y, paint);
             }
         } else {
-            canvas.drawText(str, x, y - font.getFontAscent(), font);
+            canvas.drawText(str, x, y - font.top(), font);
         }
     }
 

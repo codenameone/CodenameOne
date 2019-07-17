@@ -34,26 +34,38 @@ import android.text.TextPaint;
 public class CodenameOneTextPaint extends TextPaint {
     int fontHeight = -1;
     private int ascent = -1;
+    private int top = -9999;
+
 
     public CodenameOneTextPaint(CodenameOneTextPaint paint) {
         super(paint);
         this.fontHeight = paint.fontHeight;
         this.ascent = paint.ascent;
+        this.top = paint.top;
     }
 
     public CodenameOneTextPaint(Typeface tf) {
+
         super.setTypeface(tf);
     }
 
     public int getFontAscent() {
-        if(ascent < 0) {
+        if(ascent == -1) {
             ascent = getFontMetricsInt().ascent;
         }
         return ascent;
     }
+
+    public int top() {
+        if (top == -9999) {
+            top = getFontMetricsInt().top;
+        }
+        return top;
+    }
     
     public CodenameOneTextPaint() {
     }
+
 
     public CodenameOneTextPaint(Paint p) {
         super(p);
