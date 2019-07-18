@@ -226,14 +226,17 @@ public class InPlaceEditView extends FrameLayout{
      * @return The Android equivalent of the given input type
      */
     private int getAndroidInputType(int codenameOneInputType) {
+        return getAndroidInputType(codenameOneInputType, false);
+    }
+    private int getAndroidInputType(int codenameOneInputType, boolean multiline) {
         int type = mInputTypeMap.get(codenameOneInputType, -1);
         if (type == -1) {
             
-            if (hasConstraint(codenameOneInputType, TextArea.NUMERIC)) {
+            if (!multiline && hasConstraint(codenameOneInputType, TextArea.NUMERIC)) {
                 type = InputType.TYPE_CLASS_NUMBER;
-            } else if (hasConstraint(codenameOneInputType, TextArea.DECIMAL)) {
+            } else if (!multiline && hasConstraint(codenameOneInputType, TextArea.DECIMAL)) {
                 type = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
-            } else if (hasConstraint(codenameOneInputType, TextArea.EMAILADDR)) {
+            } else if (!multiline && hasConstraint(codenameOneInputType, TextArea.EMAILADDR)) {
                 type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                 
             } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_SENTENCE)) {
@@ -242,11 +245,11 @@ public class InPlaceEditView extends FrameLayout{
             } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_WORD)) {
                 type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
 
-            } else if (hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {
+            } else if (!multiline && hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {
                 type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
-            } else if (hasConstraint(codenameOneInputType, TextArea.PHONENUMBER)) {
+            } else if (!multiline && hasConstraint(codenameOneInputType, TextArea.PHONENUMBER)) {
                 type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_PHONE);
-            } else if (hasConstraint(codenameOneInputType, TextArea.URL)) {
+            } else if (!multiline && hasConstraint(codenameOneInputType, TextArea.URL)) {
                 type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
             } else {
                 type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
@@ -968,7 +971,7 @@ public class InPlaceEditView extends FrameLayout{
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
         } else {
-
+            mEditText.setInputType(getAndroidInputType(codenameOneInputType, true));
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
