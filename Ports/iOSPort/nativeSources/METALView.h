@@ -20,31 +20,31 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#ifdef CN1_USE_METAL
 #import <UIKit/UIKit.h>
 
-#import <OpenGLES/ES1/gl.h>
-#import <OpenGLES/ES1/glext.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
+@import Metal;
 #import "GLUIImage.h"
 
-@class EAGLContext;
 
 // This class wraps the CAEAGLLayer from CoreAnimation into a convenient UIView subclass.
 // The view content is basically an EAGL surface you render your OpenGL scene into.
 // Note that setting the view non-opaque will only work if the EAGL surface has an alpha channel.
-@interface EAGLView : UIView<UITextViewDelegate, UITextFieldDelegate> {
+@interface METALView : UIView<UITextViewDelegate, UITextFieldDelegate> {
 @private
     // The pixel dimensions of the CAEAGLLayer.
-    GLint framebufferWidth;
-    GLint framebufferHeight;
+    int framebufferWidth;
+    int framebufferHeight;
     
     // The OpenGL ES names for the framebuffer and renderbuffer used to render to this view.
     GLuint defaultFramebuffer, colorRenderbuffer;
     
 }
-
-@property (nonatomic, retain) EAGLContext *context;
+@property (nonatomic, retain) MTLCommandQueue* commandQueue;
+@property (nonatomic, retain) MTLCommandBuffer* commandBuffer;
+@property (nonatomic, retain) MTLRenderPassDescriptor* renderPassDescriptor;
+@property (nonatomic, retain) MTLRenderCommandEncoder* renderCommandEncoder;
+@property (nonatomic, retain) MTLDrawable* drawable;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
 
 -(void)textViewDidChange:(UITextView *)textView;
@@ -58,3 +58,4 @@
 -(void) addPeerComponent:(UIView*) view;
 -(void) removePeerComponent:(UIView*) view;
 @end
+#endif
