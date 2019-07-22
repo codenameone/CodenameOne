@@ -21,6 +21,9 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
+#ifdef CN1_USE_METAL
+@import Metal;
+#endif
 
 extern void logGlErrorAt(const char *f, int l);
 extern int nextPowerOf2(int val);
@@ -58,4 +61,8 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 -(void)execute;
 -(void)executeWithLog;
 -(NSString*)getName;
+#ifdef CN1_USE_METAL
+-(id<MTLCommandEncoder>)makeRenderCommandEncoder;
+-(void)applyClip:(id<MTLCommandEncoder>)encoder;
+#endif
 @end

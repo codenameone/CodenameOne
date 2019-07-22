@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #define USE_ES2 1
+//#define CN1_USE_METAL 1
 enum CN1GLenum {
     CN1_GL_ALPHA_TEXTURE,
     CN1_GL_VERTEX_COLORS

@@ -44,10 +44,10 @@ extern void repaintUI();
 
 @implementation METALView
 
+@synthesize device;
 @synthesize commandQueue;
 @synthesize commandBuffer;
 @synthesize renderPassDescriptor;
-@synthesize renderCommandEncoder;
 @synthesize peerComponentsLayer;
 
 // You must implement this method
@@ -117,10 +117,11 @@ extern BOOL isRetinaBug();
         }
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
         metalLayer.device = MTLCreateSystemDefaultDevice();
+        self.device = metalLayer.device;
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         metalLayer.framebufferOnly = YES;
-        self.commandQueue = [metalLayer.device makeCommandQueue];
+        self.commandQueue = [metalLayer.device newCommandQueue];
         
     }
     
@@ -155,24 +156,23 @@ extern BOOL isRetinaBug();
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     self.renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
     self.drawable = [layer nextDrawable];
-    MTLRenderPipelineColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
+    MTLRenderPassColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = self.drawable.texture;
     colorAttachment.loadAction = MTLLoadActionClear;
-    colorAttachment.isBlendingEnabled = YES;
-    colorAttachment.sourceRGBBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    colorAttachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+    //colorAttachment.isBlendingEnabled = YES;
+    //colorAttachment.sourceRGBBlendFactor = MTLBlendFactorOne;
+    //colorAttachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    //colorAttachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
+    //colorAttachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
 }
 
 - (void)setFramebuffer
 {
     
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    self.commandBuffer = [self.commandQueue makeCommandBuffer];
+    self.commandBuffer = [self.commandQueue commandBuffer];
     [self createRenderPassDescriptor];
-    self.renderCommandEncoder = [self.commandBuffer makeRenderCommandEncoderWithDescriptor:self.renderPassDescriptor];
-    [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, layer.drawableSize.width, layer.drawableSize.height, 0.0, 1.0 }];
     
     _glMatrixMode(GL_PROJECTION);
     _glLoadIdentity();
@@ -185,8 +185,7 @@ extern BOOL isRetinaBug();
 {
     BOOL success = FALSE;
     
-    if (self.renderCommandEncoder) {
-        [self.renderCommandEncoder ]
+    if (self.commandBuffer) {
         [self.commandBuffer present:self.drawable];
         [self.commandBuffer commit];
     }
@@ -322,6 +321,11 @@ extern int currentlyEditingMaxLength;
  [[CodenameOne_GLViewController instance] drawFrame:rect];
  }*/
 
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
+    id<MTLCommandEncoder> enc = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    
+    return enc;
+}
 
 @end
 #endif

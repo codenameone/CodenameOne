@@ -93,9 +93,25 @@ static GLuint getOGLProgram(){
 }
 
 #endif
-
+#ifdef CN1_USE_METAL
+static id<MTLRenderPipelineState> renderPipelineState = nil;
+static id<MTLRenderPipelineState> getRenderPipelineState() {
+    if (renderPipelineState == nil) {
+        MTLRenderPipelineDescriptor *renderPipelineDescriptor  = [MTLRenderPipelineDescriptor new];
+        renderPipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        id <MTLLibrary> lib = [mtlDevice newDefaultLibrary];
+        renderPipelineDescriptor.vertexFunction = [lib newFunctionWithName:@"FillRectVertexColor"];
+        renderPipelineDescriptor.fragmentFunction = [lib newFunctionWithName:@"FillRectFragmentColor"];
+        renderPipelineState = [mtlDevice newRenderPipelineStateWithDescriptor:renderPipelineDescriptor error: nil];
+    }
+    return renderPipelineState;
+}
+#endif
 
 @implementation FillRect
+
+
+
 -(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos w:(int)w h:(int)h {
     color = c;
     alpha = a;
@@ -105,7 +121,76 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+
+-(void)execute {
+    //[UIColorFromRGB(color, alpha) set];
+    //CGContextFillRect(context, CGRectMake(x, y, width, height));
+    //GlColorFromRGB(color, alpha);
+    
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    [encoder setRenderPipelineState:getRenderPipelineState()];
+    
+    float alph = ((float)alpha)/255.0;
+    
+    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0 * alph,
+                                       ((float)((color >> 8) & 0xff))/255.0 * alph, ((float)(color & 0xff))/255.0 * alph, alph);
+    GLfloat xOffset = 0;
+    GLfloat yOffset = 0;
+    
+#if (TARGET_OS_SIMULATOR)
+    xOffset = 0;
+    yOffset = 0;
+#endif
+    
+    GLfloat vertexes[] = {
+        x+xOffset, y+yOffset,
+        x + width, y+yOffset,
+        x+xOffset, y + height,
+        x + width, y + height
+    };
+    glEnableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        GLErrorLog;
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        GLErrorLog;
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
+    glUniform4fv(colorUniform, 1, colorV.v);
+    GLErrorLog;
+    
+    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    //GLErrorLog;
+    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
+    GLErrorLog;
+    
+    
+    //GLErrorLog;
+    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
+    //_glEnableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    //GLErrorLog;
+    //_glDisableClientState(GL_VERTEX_ARRAY);
+    //GLErrorLog;
+    
+    glDisableVertexAttribArray(vertexCoordAtt);
+    GLErrorLog;
+    
+    //glUseProgram(CN1activeProgram);
+    //GL
+#elif defined(USE_ES2)
 -(void)execute {
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));

@@ -25,6 +25,9 @@
 #import "CodenameOne_GLViewController.h"
 #import <mach/mach.h>
 #import <mach/mach_host.h>
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#endif
 
 
 extern void logGlErrorAt(const char *f, int l) {
@@ -119,5 +122,16 @@ static BOOL blockDrawing = NO;
 -(NSString*)getName {
     return nil;
 }
+
+#ifdef CN1_USE_METAL
+-(id<MTLCommandEncoder>)makeRenderCommandEncoder {
+    METALView* v = [[CodenameOne_GLViewController instance] eaglView];
+    return [v makeRenderCommandEncoder];
+   
+}
+-(void)applyClip:(id<MTLCommandEncoder>)encoder {
+    
+}
+#endif
 
 @end

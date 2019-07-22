@@ -40,11 +40,11 @@
     GLuint defaultFramebuffer, colorRenderbuffer;
     
 }
-@property (nonatomic, retain) MTLCommandQueue* commandQueue;
-@property (nonatomic, retain) MTLCommandBuffer* commandBuffer;
+@property (nonatomic, retain) id<MTLDevice> device;
+@property (nonatomic, retain) id<MTLCommandQueue> commandQueue;
+@property (nonatomic, retain) id<MTLCommandBuffer> commandBuffer;
 @property (nonatomic, retain) MTLRenderPassDescriptor* renderPassDescriptor;
-@property (nonatomic, retain) MTLRenderCommandEncoder* renderCommandEncoder;
-@property (nonatomic, retain) MTLDrawable* drawable;
+@property (nonatomic, retain) id<CAMetalDrawable> drawable;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
 
 -(void)textViewDidChange:(UITextView *)textView;
@@ -57,5 +57,6 @@
 -(void) keyboardNextClicked;
 -(void) addPeerComponent:(UIView*) view;
 -(void) removePeerComponent:(UIView*) view;
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder;
 @end
 #endif

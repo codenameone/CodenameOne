@@ -1913,15 +1913,52 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     }
     return img;
 }
-
+#ifdef CN1_USE_METAL
+METALView* lastFoundEaglView;
+#else
 EAGLView* lastFoundEaglView;
+#endif
 /**
  * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
  * if there are peer components, and they are to be painted behind, then the view hierarchy
  * is re-rooted with a parent.  This method is a convenience method in cases where
  * we need to obtain the EAGLView.
  */
+#ifdef CN1_USE_METAL
+-(METALView*) eaglView {
+
+    if ([self.view class] == [METALView class]) {
+        lastFoundEaglView = (METALView*)self.view;
+        return (METALView*)self.view;
+    }
+    for (UIView* child in self.view.subviews) {
+        
+        if ([child class] == [METALView class]) {
+            lastFoundEaglView = (METALView*)child;
+            return (METALView*)child;
+        }
+    }
+    if (lastFoundEaglView != nil && lastFoundEaglView.peerComponentsLayer != nil) {
+        // This is an edge case that occurs if we add a peer component for the first time while
+        // the app is in transition.  In this case, the new root would be added
+        // to the UITransitionView, and when the transition is complete, the 
+        // AutoLayoutView has the original EAGL view added to it, but our view controller
+        // would lose the reference to the eagl view.
+        // We need to re-do the re-rooting of the METAL view and peer components layer in this case.
+        UIView* parent = [lastFoundEaglView superview];
+        UIView* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
+        [lastFoundEaglView removeFromSuperview];
+        [newRoot addSubview:lastFoundEaglView];
+        [parent addSubview:newRoot];
+        self.view = newRoot;
+        return lastFoundEaglView;
+    }
+    NSLog(@"METALView not found.  This is not good!!");
+    return nil;
+}
+#else
 -(EAGLView*) eaglView {
+
     if ([self.view class] == [EAGLView class]) {
         lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
@@ -1951,6 +1988,8 @@ EAGLView* lastFoundEaglView;
     NSLog(@"EAGLView not found.  This is not good!!");
     return nil;
 }
+#endif
+
 
 - (void)awakeFromNib
 {
@@ -1968,6 +2007,7 @@ EAGLView* lastFoundEaglView;
     }
     sharedSingleton = self;
     [self initVars];
+#ifndef CN1_USE_METAL
 #ifdef USE_ES2
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 #else
@@ -1988,6 +2028,7 @@ EAGLView* lastFoundEaglView;
 #endif
 	
     [[self eaglView] setContext:context];
+#endif
     [[self eaglView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
@@ -1999,11 +2040,13 @@ EAGLView* lastFoundEaglView;
     animating = FALSE;
     animationFrameInterval = 1;
     self.displayLink = nil;
-    
+#ifndef CN1_USE_METAL
     const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
     drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
     //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
-    
+#else
+    drawTextureSupported = YES;
+#endif
     // register for keyboard notifications
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(keyboardWillShow:)
