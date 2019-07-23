@@ -22,7 +22,11 @@
  */
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#else
 #import "EAGLView.h"
+#endif
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"

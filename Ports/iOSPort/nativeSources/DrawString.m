@@ -26,7 +26,7 @@
 #include "xmlvm.h"
 
 extern float scaleValue;
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -126,8 +126,11 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
-
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#elif defined(USE_ES2)
 -(void)execute {
     glUseProgram(getOGLProgram());
     GLuint textureName = 0;

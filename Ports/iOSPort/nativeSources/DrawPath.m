@@ -42,6 +42,12 @@
     renderer = r;
     return self;
 }
+#ifdef CN1_USE_METAL
+-(void)execute
+{
+    
+}
+#else
 -(void)execute
 {
     
@@ -123,9 +129,12 @@
 
     
 }
+#endif
 -(void)dealloc
 {
+#ifndef CN1_USE_METAL
     glDeleteTextures(1, &tex);
+#endif
     Renderer_destroy(renderer);
 #ifndef CN1_USE_ARC
     [super dealloc];

@@ -90,7 +90,11 @@ static CGRect drawingRect;
     NSTimeInterval t = [finish timeIntervalSinceDate:start];
     CN1Log(@"%@ took %f", [self getName], t);
 }
-
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#else
 -(void)execute {
 #ifdef USE_ES2
     if ( texture != 0 || numPoints > 0 ){
@@ -212,7 +216,7 @@ static CGRect drawingRect;
     }
 
 }
-
+#endif
 
 +(void)updateClipToScale {
     if ( clipIsTexture ){
@@ -222,7 +226,9 @@ static CGRect drawingRect;
     if(currentScaleX == 1 && currentScaleY == 1) {
         //_glEnable(GL_SCISSOR_TEST);
         //CN1Log(@"Updating clip to scale");
+#ifndef CN1_USE_METAL
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
+#endif
     }
 
 }

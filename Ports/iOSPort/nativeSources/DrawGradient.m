@@ -24,7 +24,7 @@
 #import "CodenameOne_GLViewController.h"
 #import "DrawGradientTextureCache.h"
 
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -121,7 +121,11 @@ static GLuint getOGLProgram(){
 
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#elif defined(USE_ES2)
 -(void)execute {
     glUseProgram(getOGLProgram());
     GLuint textureName = [DrawGradientTextureCache checkCache:type startColorA:startColor endColorA:endColor widthA:width heightA:height relativeXA:relativeX relativeYA:relativeY relativeSizeA:relativeSize];

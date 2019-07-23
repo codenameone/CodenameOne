@@ -35,7 +35,7 @@
 #import "xmlvm.h"
 
 
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -120,6 +120,11 @@ static GLuint getOGLProgram(){
     //CN1Log(@"Num points: %d", numPoints);
     return self;
 }
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#else
 -(void)execute
 {
     glUseProgram(getOGLProgram());
@@ -192,7 +197,7 @@ static GLuint getOGLProgram(){
     
 
 }
-
+#endif
 -(void)dealloc
 {
     free(x);

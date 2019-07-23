@@ -24,7 +24,11 @@
 #import <UIKit/UIKit.h>
 
 #import <OpenGLES/EAGL.h>
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#else
 #import "EAGLView.h"
+#endif
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
@@ -212,8 +216,11 @@
 - (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error;
 - (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
 #endif
-
+#ifdef CN1_USE_METAL
+-(METALView*)eaglView;
+#else
 -(EAGLView*)eaglView;
+#endif
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;

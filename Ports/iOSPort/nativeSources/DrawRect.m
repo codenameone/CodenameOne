@@ -24,7 +24,7 @@
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -103,7 +103,12 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+
+#elif defined(USE_ES2)
 -(void)execute {
     glUseProgram(getOGLProgram());
     

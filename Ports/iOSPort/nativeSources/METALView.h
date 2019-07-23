@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import <UIKit/UIKit.h>
 

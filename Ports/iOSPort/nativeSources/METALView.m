@@ -20,10 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#ifdef CN1_USE_METAL
+
 #import <QuartzCore/QuartzCore.h>
 
 #import "METALView.h"
+#ifdef CN1_USE_METAL
 #import "ExecutableOp.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
