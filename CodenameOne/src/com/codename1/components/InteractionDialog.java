@@ -23,7 +23,6 @@
 
 package com.codename1.components;
 
-import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.Component.BOTTOM;
 import static com.codename1.ui.Component.LEFT;
@@ -65,6 +64,7 @@ public class InteractionDialog extends Container {
     private boolean repositionAnimation = true;
     private boolean disposed;
     private boolean disposeWhenPointerOutOfBounds;
+    private Runnable rOutOfBoundListener = null;
     
     /**
      * Whether the interaction dialog uses the form layered pane of the regular layered pane
@@ -603,6 +603,8 @@ public class InteractionDialog extends Container {
                             f.removePointerPressedListener(pressedListener);
                             f.removePointerReleasedListener(releasedListener);
                             dispose();
+                            if (rOutOfBoundListener!=null)
+                                rOutOfBoundListener.run();
                         }
                     }
                 };
@@ -853,5 +855,12 @@ public class InteractionDialog extends Container {
      */
     public void setFormMode(boolean formMode) {
         this.formMode = formMode;
+    }
+    /**
+     * Set out of bounds listener
+     * @param onFinish
+     */
+    public void setDisposeWhenPointerOutOfBoundsListener(Runnable r){
+        this.rOutOfBoundListener = r;
     }
 }
