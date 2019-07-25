@@ -111,11 +111,11 @@ public class FlowLayout extends Layout{
      */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
-        int containerPaddingLeft = s.getPaddingLeft(parent.isRTL());
-        int x = containerPaddingLeft;
-        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL()) - x;
-        
         boolean rtl = parent.isRTL();
+        int containerPaddingLeft = s.getPaddingLeft(rtl);
+        int x = containerPaddingLeft;
+        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(rtl) - x;
+
         if(rtl) {
             x += parent.getSideGap();
         }
@@ -142,7 +142,7 @@ public class FlowLayout extends Layout{
                 // We take the actual LEFT since drawing is done in reverse
                 x += cmp.getStyle().getMarginLeftNoRTL();
                 if(rtl) {
-                	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+                    cmp.setX(width - x - cmp.getWidth());
                 } else {
                     cmp.setX(x);
                 }
