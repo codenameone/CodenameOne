@@ -137,6 +137,26 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * When set to true (the default), the global error handler in
+     * {@code NetworkManager} should receive errors for response code as well
+     * @return the handleErrorCodesInGlobalErrorHandler
+     */
+    public static boolean isHandleErrorCodesInGlobalErrorHandler() {
+        return handleErrorCodesInGlobalErrorHandler;
+    }
+
+    /**
+     * When set to true (the default), the global error handler in
+     * {@code NetworkManager} should receive errors for response code as well
+     * @param aHandleErrorCodesInGlobalErrorHandler the handleErrorCodesInGlobalErrorHandler to set
+     */
+    public static void setHandleErrorCodesInGlobalErrorHandler(
+        boolean aHandleErrorCodesInGlobalErrorHandler) {
+        handleErrorCodesInGlobalErrorHandler =
+            aHandleErrorCodesInGlobalErrorHandler;
+    }
+
+    /**
      * There are 4 caching modes: OFF is the default  meaning no caching.
      * SMART means all get requests are cached intelligently and caching is "mostly" seamless
      * MANUAL means that the developer is responsible for the actual caching but the system
@@ -328,6 +348,12 @@ public class ConnectionRequest implements IOProgressListener {
     private String destinationStorage;
     private SSLCertificate[] sslCertificates;
     private boolean checkSSLCertificates;
+    
+    /**
+     * When set to true (the default), the global error handler in 
+     * {@code NetworkManager} should receive errors for response code as well
+     */
+    private static boolean handleErrorCodesInGlobalErrorHandler = true;
     
     /**
      * The request body can be used instead of arguments to pass JSON data to a restful request,
@@ -1316,6 +1342,15 @@ public class ConnectionRequest implements IOProgressListener {
             failureErrorCode = code;
             return;
         }
+        
+        if(handleErrorCodesInGlobalErrorHandler) {
+            if(NetworkManager.getInstance().handleErrorCode(this, code, message)) {
+                failureErrorCode = code;
+                return;
+            }
+        }
+        
+        Log.p("Unhandled error code: " + code + " for " + url);
         if(Display.isInitialized() && !Display.getInstance().isMinimized() &&
                 Dialog.show("Error", code + ": " + message, "Retry", "Cancel")) {
             retry();
