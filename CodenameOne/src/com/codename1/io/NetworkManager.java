@@ -158,6 +158,15 @@ public class NetworkManager {
         autoDetected = false;
     }
 
+    boolean handleErrorCode(ConnectionRequest r, int code, String message) {
+        if(errorListeners != null) {
+            ActionEvent ev = new NetworkEvent(r, code, message);
+            errorListeners.fireActionEvent(ev);
+            return ev.isConsumed();
+        }
+        return false;
+    }
+    
     private boolean handleException(ConnectionRequest r, Exception o) {
         if(errorListeners != null) {
             ActionEvent ev = new NetworkEvent(r, o);

@@ -596,22 +596,22 @@ public class LocationSimulation extends javax.swing.JFrame {
   }//GEN-LAST:event_longitudeActionPerformed
 
   private void locationStateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_locationStateActionPerformed
-      Platform.runLater(new Runnable() {
+      /*Platform.runLater(new Runnable() {
 
-          public void run() {
+          public void run() {*/
               Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
               p.putInt("state", locationState.getSelectedIndex());
-          }
-      });
+      /*    }
+      });*/
   }//GEN-LAST:event_locationStateActionPerformed
 
   private void unitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unitActionPerformed
-      Platform.runLater(new Runnable() {
-          public void run() {
+      /*Platform.runLater(new Runnable() {
+          public void run() {*/
               Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
               p.putInt("unit", unit.getSelectedIndex());
-          }
-      });
+      /*    }
+      });*/
       // updateSave(evt);    
   }//GEN-LAST:event_unitActionPerformed
 

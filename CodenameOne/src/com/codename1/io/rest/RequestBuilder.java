@@ -315,10 +315,13 @@ public class RequestBuilder {
     }
     
     private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
-        ConnectionRequest request = createRequest(false);
+        final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 try {
                     res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
@@ -377,10 +380,13 @@ public class RequestBuilder {
     }
     
     private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
-        ConnectionRequest request = createRequest(false);
+        final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
                 if(callback instanceof Callback) {
@@ -425,10 +431,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsJsonMap(final OnComplete<Response<Map>> callback) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 res = new Response(evt.getResponseCode(), response, evt.getMessage());
@@ -448,10 +457,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 try {
@@ -490,10 +502,13 @@ public class RequestBuilder {
      * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
      */ 
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 if(onError != null) {
                     // this is an error response code and should be handled as an error
                     if(evt.getResponseCode() > 310) {
@@ -582,10 +597,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 List<Map> lst = (List<Map>)response.get("root");
@@ -644,7 +662,7 @@ public class RequestBuilder {
     
     class Connection extends GZConnectionRequest {
         private boolean parseJSON;
-        private boolean errorCode;
+        boolean errorCode;
         Map json;
         private ErrorCodeHandler errorHandler;
         private Object errorObject;
@@ -722,8 +740,8 @@ public class RequestBuilder {
         
     }
     
-    private ConnectionRequest createRequest(boolean parseJson) {
-        ConnectionRequest req = new Connection(parseJson);
+    private Connection createRequest(boolean parseJson) {
+        Connection req = new Connection(parseJson);
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
         }       
