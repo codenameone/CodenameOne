@@ -64,7 +64,7 @@ public class InteractionDialog extends Container {
     private boolean repositionAnimation = true;
     private boolean disposed;
     private boolean disposeWhenPointerOutOfBounds;
-    private Runnable rOutOfBoundListener = null;
+    private ActionListener rOutOfBoundListener = null;
     
     /**
      * Whether the interaction dialog uses the form layered pane of the regular layered pane
@@ -604,7 +604,7 @@ public class InteractionDialog extends Container {
                             f.removePointerReleasedListener(releasedListener);
                             dispose();
                             if (rOutOfBoundListener!=null)
-                                rOutOfBoundListener.run();
+                                rOutOfBoundListener.actionPerformed(new ActionEvent(true));
                         }
                     }
                 };
@@ -860,7 +860,7 @@ public class InteractionDialog extends Container {
      * Set out of bounds listener
      * @param onFinish
      */
-    public void setDisposeWhenPointerOutOfBoundsListener(Runnable r){
+    public void setDisposeWhenPointerOutOfBoundsListener(ActionListener r){
         this.rOutOfBoundListener = r;
     }
 }
