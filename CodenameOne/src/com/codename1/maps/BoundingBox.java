@@ -21,6 +21,8 @@ package com.codename1.maps;
 
 import java.util.Vector;
 
+import com.codename1.location.LatLng;
+
 /**
  * This class declares a bounding box of coordinates on the map.
  * 
@@ -95,7 +97,7 @@ public class BoundingBox {
      * @param cur coordinate to check
      * @return true if the given coordinate is contained in the bounding box
      */
-    public boolean contains(Coord cur) {
+    public boolean contains(LatLng cur) {
         double latitude = cur.getLatitude();
         if (latitude > getNorthEast().getLatitude() || latitude < getSouthWest().getLatitude()) {
             return false;

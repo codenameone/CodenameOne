@@ -44,7 +44,7 @@ import java.util.Comparator;
  * <p>The sample below demonstrates the usage of the background geofencing API:</p>
  * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  */
-public class Location {
+public class Location extends LatLng {
     
     private int status;
     
@@ -222,7 +222,7 @@ public class Location {
      * @param l2 The location to measure distance to.
      * @return The number of metres between the current location and {@literal l2}.
      */
-    public double getDistanceTo(Location l2) {
+    public double getDistanceTo(LatLng l2) {
         return haversine(getLatitude(), getLongitude(), l2.getLatitude(), l2.getLongitude()) * 1000;
     }
     
@@ -255,10 +255,10 @@ public class Location {
      * location.
      * @return 
      */
-    public Comparator<Location> createDistanceCompartor() {
-        return new Comparator<Location>() {
+    public Comparator<LatLng> createDistanceCompartor() {
+        return new Comparator<LatLng>() {
 
-            public int compare(Location o1, Location o2) {
+            public int compare(LatLng o1, LatLng o2) {
                 double d1 = Location.this.getDistanceTo(o1);
                 double d2 = Location.this.getDistanceTo(o2);
                 return d1 < d2 ? -1 : d2 < d1 ? 1 : 0;
@@ -274,9 +274,59 @@ public class Location {
      * @param l
      * @return True if l has same latitude and longitude as this location.
      */
-    boolean equalsLatLng(Location l) {
-
-        return l != null && l.latitude == latitude && l.longitude == longitude;
-
+    boolean equalsLatLng(LatLng l) {
+    	return super.equals(l); //return l != null && l.latitude == latitude && l.longitude == longitude;
     }
+
+    
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + Float.floatToIntBits(accuracy);
+		long temp;
+		temp = Double.doubleToLongBits(altitude);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		result = prime * result + Float.floatToIntBits(direction);
+		temp = Double.doubleToLongBits(latitude);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		temp = Double.doubleToLongBits(longitude);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		result = prime * result + status;
+		result = prime * result + (int) (timeStamp ^ (timeStamp >>> 32));
+		result = prime * result + Float.floatToIntBits(velocity);
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Location other = (Location) obj;
+		if (Float.floatToIntBits(accuracy) != Float.floatToIntBits(other.accuracy))
+			return false;
+		if (Double.doubleToLongBits(altitude) != Double.doubleToLongBits(other.altitude))
+			return false;
+		if (Float.floatToIntBits(direction) != Float.floatToIntBits(other.direction))
+			return false;
+		if (Double.doubleToLongBits(latitude) != Double.doubleToLongBits(other.latitude))
+			return false;
+		if (Double.doubleToLongBits(longitude) != Double.doubleToLongBits(other.longitude))
+			return false;
+		if (status != other.status)
+			return false;
+		if (timeStamp != other.timeStamp)
+			return false;
+		if (Float.floatToIntBits(velocity) != Float.floatToIntBits(other.velocity))
+			return false;
+		return true;
+	}
+    
+    
+    
+    
 }

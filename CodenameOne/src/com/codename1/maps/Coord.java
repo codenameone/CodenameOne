@@ -19,6 +19,7 @@
  */
 package com.codename1.maps;
 
+import com.codename1.location.LatLng;
 import com.codename1.ui.geom.Dimension;
 
 /**
@@ -26,7 +27,7 @@ import com.codename1.ui.geom.Dimension;
  * 
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class Coord {
+public class Coord extends LatLng {
 
     private double longitude;
     private double latitude;
