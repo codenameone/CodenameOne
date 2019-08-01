@@ -44,7 +44,7 @@ import java.util.Comparator;
  * <p>The sample below demonstrates the usage of the background geofencing API:</p>
  * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  */
-public class Location extends LatLng {
+public class Location implements LatLng {
     
     private int status;
     
@@ -275,7 +275,7 @@ public class Location extends LatLng {
      * @return True if l has same latitude and longitude as this location.
      */
     boolean equalsLatLng(LatLng l) {
-    	return super.equals(l); //return l != null && l.latitude == latitude && l.longitude == longitude;
+    	return l != null && l.getLatitude() == latitude && l.getLongitude() == longitude; 
     }
 
     

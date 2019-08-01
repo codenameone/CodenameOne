@@ -27,7 +27,7 @@ import com.codename1.ui.geom.Dimension;
  * 
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class Coord extends LatLng {
+public class Coord implements LatLng {
 
     private double longitude;
     private double latitude;
