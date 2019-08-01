@@ -430,7 +430,7 @@ public class DateFormatSymbols implements Cloneable {
     
     String limitLength(String s, int len) {
         if(s.length() > len) {
-            return s.substring(len);
+            return s.substring(0, len);
         }
         return s;
     }
