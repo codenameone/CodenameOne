@@ -21,6 +21,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 
 
 /**
@@ -55,6 +56,18 @@ public class ListFilesTest {
         });        
     }
     
+    private void appendChildren(StringBuilder sb, File f, int indent) {
+        for (File child : f.listFiles()) {
+            for (int i=0; i<indent; i++) {
+                sb.append(' ');
+            }
+            sb.append(child.getName()).append("\n");
+            if (child.isDirectory()) {
+                appendChildren(sb, child, indent+2);
+            }
+        }
+    }
+    
     public void start() {
         if(current != null){
             current.show();
@@ -76,19 +89,33 @@ public class ListFilesTest {
                 }
             });
         });
+        
+        Button rename = new Button("Rename File");
+        rename.addActionListener(e->{
+            callSerially(()->{
+                Command ok = new Command("OK");
+                Command cancel = new Command("Cancel");
+                TextField fileName = new TextField("", "File Path", 20, TextField.NON_PREDICTIVE);
+                TextField newName = new TextField("", "New Name", 20, TextField.NON_PREDICTIVE);
+                if (ok == Dialog.show("File Path", BoxLayout.encloseY(fileName, newName), new Command[]{ok, cancel})) {
+                    File f = new File(fileName.getText());
+                    FileSystemStorage fs = FileSystemStorage.getInstance();
+                    fs.rename(f.getPath(), newName.getText());
+                }
+            });
+        });
+        
         TextArea listing = new TextArea();
         Button refresh = new Button("Refresh");
         refresh.addActionListener(e->{
             File f = new File(FileSystemStorage.getInstance().getAppHomePath());
             StringBuilder sb = new StringBuilder();
-            for (File child : f.listFiles()) {
-                sb.append(child.getName()).append("\n");
-            }
+            appendChildren(sb, f, 0);
             listing.setText(sb.toString());
                     
         });
         
-        hi.add(BorderLayout.NORTH, add).add(BorderLayout.CENTER, listing).add(BorderLayout.SOUTH, refresh);
+        hi.add(BorderLayout.NORTH, FlowLayout.encloseCenter(add, rename)).add(BorderLayout.CENTER, listing).add(BorderLayout.SOUTH, refresh);
         
         hi.show();
     }

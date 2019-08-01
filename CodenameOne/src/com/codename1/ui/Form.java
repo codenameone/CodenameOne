@@ -1411,7 +1411,7 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
-        if (menuBar != null && menuBar.contains(x, y)) {
+        if (menuBar != null && menuBar.contains(x, y)) {   
             return menuBar;
         }
         return getActualPane();
@@ -2404,7 +2404,7 @@ public class Form extends Container {
             super.repaint(cmp);
             return;
         }
-        if (isVisible()) {
+        if (isVisible() && CN.getCurrentForm() == this) {
             Display.getInstance().repaint(cmp);
         }
     }
