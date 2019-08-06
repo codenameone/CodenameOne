@@ -102,7 +102,11 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#elif defined(USE_ES2)
 -(void)execute {
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);

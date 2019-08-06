@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 @import Metal;
 #endif
@@ -62,7 +63,8 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 -(void)executeWithLog;
 -(NSString*)getName;
 #ifdef CN1_USE_METAL
--(id<MTLCommandEncoder>)makeRenderCommandEncoder;
+-(id<MTLDevice>)device;
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder;
 -(void)applyClip:(id<MTLCommandEncoder>)encoder;
 #endif
 @end

@@ -124,13 +124,17 @@ static BOOL blockDrawing = NO;
 }
 
 #ifdef CN1_USE_METAL
--(id<MTLCommandEncoder>)makeRenderCommandEncoder {
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
     METALView* v = [[CodenameOne_GLViewController instance] eaglView];
     return [v makeRenderCommandEncoder];
    
 }
 -(void)applyClip:(id<MTLCommandEncoder>)encoder {
     
+}
+
+-(id<MTLDevice>)device {
+    return [[CodenameOne_GLViewController instance] eaglView].device;
 }
 #endif
 

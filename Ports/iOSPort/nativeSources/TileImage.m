@@ -140,7 +140,11 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
 #endif
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    
+}
+#elif defined(USE_ES2)
 -(void)execute {
     if (width <= 0 || height <= 0) {
         return;

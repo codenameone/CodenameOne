@@ -109,8 +109,8 @@ static id<MTLRenderPipelineState> getRenderPipelineState() {
         id<MTLDevice> mtlDevice = [[CodenameOne_GLViewController instance] eaglView].device;
         id <MTLLibrary> lib = [mtlDevice newDefaultLibrary];
         
-        renderPipelineDescriptor.vertexFunction = [lib newFunctionWithName:@"FillRectVertexColor"];
-        renderPipelineDescriptor.fragmentFunction = [lib newFunctionWithName:@"FillRectFragmentColor"];
+        renderPipelineDescriptor.vertexFunction = [lib newFunctionWithName:@"FillRect_vertex"];
+        renderPipelineDescriptor.fragmentFunction = [lib newFunctionWithName:@"FillRect_fragment"];
         renderPipelineState = [mtlDevice newRenderPipelineStateWithDescriptor:renderPipelineDescriptor error: nil];
     }
     
@@ -135,14 +135,44 @@ static id<MTLRenderPipelineState> getRenderPipelineState() {
 #ifdef CN1_USE_METAL
 
 -(void)execute {
+    
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));
     //GlColorFromRGB(color, alpha);
-    
+    id<MTLDevice> device = [self device];
     id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
     [encoder setRenderPipelineState:getRenderPipelineState()];
+
+    static const float positions[] =
+    {
+        0.0,  0.5, 0, 1,
+        -0.5, -0.5, 0, 1,
+        0.5, -0.5, 0, 1,
+    };
+    
+    static const float colors[] =
+    {
+        1, 0, 0, 1,
+        0, 1, 0, 1,
+        0, 0, 1, 1,
+    };
+    
+    positionBuffer = [device newBufferWithBytes:positions
+                                                   length:sizeof(positions)
+                                                  options:MTLResourceOptionCPUCacheModeDefault];
+    colorBuffer = [device newBufferWithBytes:colors
+                                                length:sizeof(colors)
+                                               options:MTLResourceOptionCPUCacheModeDefault];
+
+    
+    [encoder setVertexBuffer:positionBuffer offset:0 atIndex:0 ];
+    [encoder setVertexBuffer:colorBuffer offset:0 atIndex:1 ];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3 instanceCount:1];
+    [encoder endEncoding];
     
 }
+
+
 #elif defined(USE_ES2)
 -(void)execute {
     //[UIColorFromRGB(color, alpha) set];

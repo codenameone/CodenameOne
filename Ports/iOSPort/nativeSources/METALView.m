@@ -187,7 +187,7 @@ extern BOOL isRetinaBug();
     BOOL success = FALSE;
     
     if (self.commandBuffer) {
-        [self.commandBuffer present:self.drawable];
+        [self.commandBuffer presentDrawable:self.drawable];
         [self.commandBuffer commit];
     }
     
@@ -323,7 +323,7 @@ extern int currentlyEditingMaxLength;
  }*/
 
 -(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
-    id<MTLCommandEncoder> enc = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    id<MTLRenderCommandEncoder> enc = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
     
     return enc;
 }
