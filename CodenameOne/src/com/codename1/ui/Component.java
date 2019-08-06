@@ -2805,8 +2805,8 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /**
-     * Indicates the X position of the scrolling, this number is relative to the
-     * component position and so a position of 0 would indicate the x position
+     * Indicates the Y position of the scrolling, this number is relative to the
+     * component position and so a position of 0 would indicate the y position
      * of the component.
      * 
      * @param scrollY the Y position of the scrolling

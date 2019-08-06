@@ -471,6 +471,9 @@ public class BrowserComponent extends Container {
         s.setPadding(0, 0, 0, 0);
         s.setMargin(0, 0, 0, 0);
         s.setBgTransparency(255);
+        
+        s = getUnselectedStyle();
+        s.setPadding(0, 0, 0, 0);
         addWebEventListener(onStart, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
