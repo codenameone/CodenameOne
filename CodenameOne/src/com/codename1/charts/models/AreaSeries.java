@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A series that includes 0 to many XYSeries.
+ * A series for the category charts like the radar ones.
  */
 public class AreaSeries {
 
@@ -40,7 +40,7 @@ public class AreaSeries {
     private List<String> mSeries = new ArrayList<>();
 
     /**
-     * Adds a new Category series to the list.
+     * Adds a new Category series to the table.
      *
      * @param series the Category series to add
      */
@@ -62,7 +62,7 @@ public class AreaSeries {
     }
 
     /**
-     * Removes all the Category series from the list.
+     * Removes all data.
      */
     public synchronized void clear() {
         mTable.clear();
@@ -71,27 +71,49 @@ public class AreaSeries {
     }
 
     /**
-     * Returns the Category series count.
+     * Returns the Categories count.
      *
-     * @return the Category series count
+     * @return the Categories count
      */
-    public synchronized int getSeriesCount() {
+    public synchronized int getCategoriesCount() {
         return mCategories.size();
     }
 
-    public synchronized int getItemCount() {
+    /**
+     * Returns the Series count.
+     *
+     * @return the Series series count
+     */
+    public synchronized int getSeriesCount() {
         return mSeries.size();
     }
 
+    /**
+     * Returns an array of the Categories.
+     *
+     * @return the Categories array
+     */
     public synchronized String[] getCategories() {
         return mCategories.toArray(new String[mCategories.size()]);
     }
 
+    /**
+     * Returns an array of the Series.
+     *
+     * @return the Series array
+     */
     public synchronized String[] getSeries() {
         return mSeries.toArray(new String[mSeries.size()]);
     }
 
-    public synchronized double getData(int index, String category) {
+    /**
+     * Returns the value at the specific index and category.
+     *
+     * @param index the index
+     * @param category the category
+     * @return the value
+     */
+    public synchronized double getValue(int index, String category) {
         if (!mTable.containsKey(category)) {
             return 0;
         }

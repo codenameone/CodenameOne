@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The doughnut chart rendering class.
+ * The radar chart rendering class.
  */
 public class RadarChart extends RoundChart {
 
@@ -42,7 +42,7 @@ public class RadarChart extends RoundChart {
     private int mStep;
 
     /**
-     * Builds a new doughnut chart instance.
+     * Builds a new radar chart instance.
      *
      * @param dataset the series dataset
      * @param renderer the series renderer
@@ -53,7 +53,7 @@ public class RadarChart extends RoundChart {
     }
 
     /**
-     * The graphical representation of the doughnut chart.
+     * The graphical representation of the radar chart.
      *
      * @param canvas the canvas to paint to
      * @param x the top left x value of the view to draw to
@@ -72,7 +72,7 @@ public class RadarChart extends RoundChart {
         int top = y;
         int right = x + width;
 
-        int sLength = mDataset.getSeriesCount();
+        int cLength = mDataset.getCategoriesCount();
         String[] categories = mDataset.getCategories();
 
         int bottom = y + height - legendSize;
@@ -94,11 +94,11 @@ public class RadarChart extends RoundChart {
         List<Rectangle2D> prevLabelsBounds = new ArrayList<>();
 
         float currentAngle = mRenderer.getStartAngle();
-        float angle = 360f / mDataset.getSeriesCount();
+        float angle = 360f / cLength;
 
 // Draw web
         float centerX = (left + right) / 2, centerY = (top + bottom) / 2;
-        for (int i = 0; i < sLength; i++) {
+        for (int i = 0; i < cLength; i++) {
             paint.setColor(ColorUtil.GRAY);
             float thisRad = (float) Math.toRadians(90 - currentAngle);
             float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));
@@ -120,13 +120,13 @@ public class RadarChart extends RoundChart {
         }
 
 // Draw area
-        int cLength = mDataset.getItemCount();
-        for (int i = 0; i < cLength; i++) {
+        int sLength = mDataset.getSeriesCount();
+        for (int i = 0; i < sLength; i++) {
             currentAngle = mRenderer.getStartAngle();
             paint.setColor(mRenderer.getSeriesRendererAt(i).getColor());
-            for (int j = 0; j < sLength; j++) {
-                float thisValue = (float) mDataset.getData(i, categories[j]);
-                float nextValue = (float) mDataset.getData(i, categories[(j + 1) % sLength]);
+            for (int j = 0; j < cLength; j++) {
+                float thisValue = (float) mDataset.getValue(i, categories[j]);
+                float nextValue = (float) mDataset.getValue(i, categories[(j + 1) % sLength]);
                 float thisRad = (float) Math.toRadians(90 - currentAngle);
                 float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));
                 float thisX = (float) (centerX - Math.sin(thisRad) * radius * thisValue);
