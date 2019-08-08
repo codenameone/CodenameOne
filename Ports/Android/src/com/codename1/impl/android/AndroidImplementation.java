@@ -1667,7 +1667,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
                 : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
         if(font.fontHeight < 0) {
-            font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());
+            Paint.FontMetrics fm = font.getFontMetrics();
+            font.fontHeight = (int)Math.ceil(fm.bottom - fm.top);
         }
         return font.fontHeight;
     }
