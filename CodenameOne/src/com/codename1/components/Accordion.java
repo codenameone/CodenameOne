@@ -77,12 +77,8 @@ public class Accordion extends Container {
      */ 
     public Accordion() {
         super.setLayout(BoxLayout.y());
-        UIManager uim = getUIManager();
-        if (uim == null) {
-            uim = UIManager.getInstance();
-        }
-        LookAndFeel lf = uim.getLookAndFeel();
-        this.closeIcon = lf.isRTL() ?
+        
+        this.closeIcon = isRTL() ?
                 FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon)) :
                 FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
