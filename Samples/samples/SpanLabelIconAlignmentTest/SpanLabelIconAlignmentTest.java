@@ -15,6 +15,8 @@ import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
+import static com.codename1.ui.ComponentSelector.$;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 
 /**
@@ -66,11 +68,32 @@ public class SpanLabelIconAlignmentTest {
 
         for (String str : text) {
             SpanLabel l = new SpanLabel(str);
+            $("*", l).selectAllStyles().setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR).derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN));
             l.setIcon(icon);
             hi.add(l);
         }
         for (String str : text) {
             SpanButton l = new SpanButton(str);
+            l.setIcon(icon);
+            hi.add(l);
+        }
+        
+        icon = FontImage.createMaterial(FontImage.MATERIAL_FIBER_MANUAL_RECORD, new Label().getStyle(), 4);
+        for (String str : text) {
+            SpanLabel l = new SpanLabel(str);
+            $("*", l).selectAllStyles()
+                    //.setPaddingMillimeters(3)
+                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR).derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN));
+            l.setIcon(icon);
+            hi.add(l);
+        }
+        for (String str : text) {
+            SpanLabel l = new SpanLabel();
+            l.setText(str); // set text after the fact to test different flow
+            
+            $("*", l).selectAllStyles()
+                    //.setPaddingMillimeters(3)
+                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR).derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN));
             l.setIcon(icon);
             hi.add(l);
         }

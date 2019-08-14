@@ -163,11 +163,11 @@ public class SpanLabel extends Container {
      * @param t text of the label
      */
     public void setText(String t) {
-        if(shouldLocalize) {
-            text.setText(getUIManager().localize(t, t));
-        } else {
-            text.setText(t);
-        }
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
+        text.setText(t);
+        
+        // We need to update the columns for rendering, otherwise it will still wrap at the old number of columns.
+        text.setColumns(text.getText().length() + 1);
     }
 
     /**
