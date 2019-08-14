@@ -1340,6 +1340,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int x = cmpX + leftPadding;
         int y = cmpY + topPadding;
         boolean opposite = false;
+        boolean stateButtonOnLeft = false;
         if (stateIcon != null) {
             stateIconSize = stateIcon.getWidth(); //square image width == height
             preserveSpaceForState = stateIconSize + gap;
@@ -1350,18 +1351,22 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (((Button) l).isOppositeSide()) {
                 if (rtl) {
                     tX += leftPadding;
+                    stateButtonOnLeft = true;
+                    x = cmpX + leftPadding + preserveSpaceForState;
                 } else {
                     tX = tX + cmpWidth - leftPadding - stateIconSize;
                 }
-                cmpWidth -= leftPadding - stateIconSize;
-                preserveSpaceForState = 0;
+                //cmpWidth -= leftPadding - stateIconSize;
+                //preserveSpaceForState = 0;
                 opposite = true;
             } else {
-                x = cmpX + leftPadding + preserveSpaceForState;
+                
                 if (rtl) {
                     tX = tX + cmpWidth - leftPadding - stateIconSize;
                 } else {
+                    x = cmpX + leftPadding + preserveSpaceForState;
                     tX += leftPadding;
+                    stateButtonOnLeft = true;
                 }
             }
 
@@ -1394,11 +1399,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             rightPadding +
                             ((icon != null) ? icon.getWidth() + l.getGap() : 0) +
                             l.getStringWidth(font))) / 2;
-                    if(!opposite){
-                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
-                    }else{
-                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
-                    }
+
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             Math.max(((icon != null) ? icon.getHeight() : 0),
@@ -1428,19 +1429,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     x = cmpX + cmpWidth - rightPadding -
                             ( ((icon != null) ? (icon.getWidth() + gap) : 0) +
                             l.getStringWidth(font));
-                    if(l.isRTL()) {
-                        if(!opposite){
-                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
-                        }else{
-                            x = Math.min(x - preserveSpaceForState, cmpX + leftPadding);                        
-                        }
-                    } else {
-                        if(!opposite){
-                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
-                        }else{
-                            x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                        
-                        }
-                    }
+                    x = stateButtonOnLeft ? x : x - preserveSpaceForState;
+
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             Math.max(((icon != null) ? icon.getHeight() : 0),
@@ -1466,19 +1456,20 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
 
         int textSpaceW = cmpWidth - rightPadding - leftPadding;
+        int textSpaceX = cmpX + leftPadding;
+        
 
         if (icon != null && (textPos == Label.RIGHT || textPos == Label.LEFT)) {
             textSpaceW = textSpaceW - icon.getWidth();
+            textSpaceX = (textPos == Label.RIGHT) ? textSpaceX + icon.getWidth() :
+                    textSpaceX;
         }
 
-        if (stateIcon != null) {
-            textSpaceW = textSpaceW - stateIconSize;
-        } else {
-            textSpaceW = textSpaceW - preserveSpaceForState;
-        }
+        textSpaceW = textSpaceW - preserveSpaceForState;
+        textSpaceX = stateButtonOnLeft ? textSpaceX + preserveSpaceForState : textSpaceX;
 
         if (icon == null) { // no icon only string 
-            drawLabelString(g, l, text, x, y, textSpaceW);
+            drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
         } else {
             int strWidth = l.getStringWidth(font);
             int iconWidth = icon.getWidth();
@@ -1490,12 +1481,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.LEFT:
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
-                        strWidth = drawLabelStringValign(g, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        strWidth = drawLabelStringValign(g, l, text, x, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);
 
                         g.drawImage(icon, x + strWidth + gap, y);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
-                        strWidth = drawLabelString(g, l, text, x, y, textSpaceW);
+                        strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
 
                         g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
                     }
@@ -1504,11 +1495,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         g.drawImage(icon, x, y);
-                        drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
+                        drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         g.drawImage(icon, x, y + iconStringHGap);
-                        drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceW);
+                        drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceX, textSpaceW);
                     }
                     break;
                 case Label.BOTTOM:
@@ -1516,23 +1507,23 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         g.drawImage(icon, x, y);
-                        drawLabelString(g, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);
+                        drawLabelString(g, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceX, textSpaceW);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         g.drawImage(icon, x + iconStringWGap, y);
                         
-                        drawLabelString(g, l, text, x, y + iconHeight + gap, textSpaceW);
+                        drawLabelString(g, l, text, x, y + iconHeight + gap, textSpaceX, textSpaceW);
                     }
                     break;
                 case Label.TOP:
                     if (iconWidth > strWidth) { //center align the smaller
 
                         iconStringWGap = (iconWidth - strWidth) / 2;
-                        drawLabelString(g, l, text, x + iconStringWGap, y, textSpaceW);
+                        drawLabelString(g, l, text, x + iconStringWGap, y, textSpaceX, textSpaceW);
                         g.drawImage(icon, x, y + fontHeight + gap);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
-                        drawLabelString(g, l, text, x, y, textSpaceW);
+                        drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
                         g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
                     }
                     break;
@@ -1545,14 +1536,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * assuming the icon is in one of the sides
      */
     private int drawLabelStringValign(Graphics g, Label l, String str, int x, int y,
-            int iconStringHGap, int iconHeight, int textSpaceW, int fontHeight) {
+            int iconStringHGap, int iconHeight, int textSpaceX, int textSpaceW, int fontHeight) {
         switch (l.getVerticalAlignment()) {
             case Component.TOP:
-                return drawLabelString(g, l, str, x, y, textSpaceW);
+                return drawLabelString(g, l, str, x, y, textSpaceX, textSpaceW);
             case Component.CENTER:
-                return drawLabelString(g, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW);
+                return drawLabelString(g, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceX, textSpaceW);
             default:
-                return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceW);
+                return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceX, textSpaceW);
         }
     }
     
@@ -1572,7 +1563,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
      */
-    private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceW) {
+    private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceX, int textSpaceW) {
         Style style = l.getStyle();
 
         int cx = g.getClipX();
@@ -1580,7 +1571,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
         //g.pushClip();
-        g.clipRect(x, cy, textSpaceW, ch);
+        g.clipRect(textSpaceX, cy, textSpaceW, ch);
 
         if (l.isTickerRunning()) {
             Font font = style.getFont();
@@ -1653,7 +1644,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 	            		g.drawString(points, l.getShiftText() + x, y,l.getStyle().getTextDecoration());
 	            		g.clipRect(pointsW+l.getShiftText() + x, y, textSpaceW - pointsW, f.getHeight());
                 	}
-            		x = x - txtW + textSpaceW;
+            		//x = x - txtW + textSpaceW;
                 } else {
                     if (l.isEndsWith3Points()) {
                         String points = "...";
