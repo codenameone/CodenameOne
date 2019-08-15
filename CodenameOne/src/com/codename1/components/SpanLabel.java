@@ -75,7 +75,7 @@ public class SpanLabel extends Container {
         icon = new Label();
         icon.setUIID("icon");
         addComponent(BorderLayout.WEST, icon);
-        addComponent(BorderLayout.CENTER, text);
+        addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
     }
     
     /**
@@ -163,11 +163,11 @@ public class SpanLabel extends Container {
      * @param t text of the label
      */
     public void setText(String t) {
-        if(shouldLocalize) {
-            text.setText(getUIManager().localize(t, t));
-        } else {
-            text.setText(t);
-        }
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
+        text.setText(t);
+        
+        // We need to update the columns for rendering, otherwise it will still wrap at the old number of columns.
+        text.setColumns(text.getText().length() + 1);
     }
 
     /**
@@ -204,7 +204,7 @@ public class SpanLabel extends Container {
                 if(text.getParent() != this) {
                     removeComponent(text.getParent());
                     text.getParent().removeAll();
-                    addComponent(BorderLayout.CENTER, text);
+                    addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
                 }
         }
     }
@@ -225,7 +225,7 @@ public class SpanLabel extends Container {
         Container parent = text.getParent();
         if(parent == this) {
             parent.removeComponent(text);
-            parent = new Container(new FlowLayout(alignment));
+            parent = new Container(new FlowLayout(alignment, CENTER));
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
         } else {

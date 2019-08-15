@@ -2576,7 +2576,7 @@ public class Form extends Container {
                     } else {
                         leadParent = focused.getParent().getLeadParent();
                     }
-                    leadParent.longPointerPress(x, y);
+                    leadParent.getLeadComponent().longPointerPress(x, y);
                 } else {
                     focused.longPointerPress(x, y);
                 }

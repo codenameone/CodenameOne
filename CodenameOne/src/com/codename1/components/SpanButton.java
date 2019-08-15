@@ -29,6 +29,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
@@ -84,7 +85,7 @@ public class SpanButton extends Container {
         actualButton = new Button();
         actualButton.setUIID("icon");
         addComponent(BorderLayout.WEST, actualButton);
-        addComponent(BorderLayout.CENTER, text);
+        addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
         setLeadComponent(actualButton);
     }
 

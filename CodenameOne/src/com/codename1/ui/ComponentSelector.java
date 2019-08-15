@@ -2627,6 +2627,19 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
+     * Adds long pointer pressed listener to all components in found set.
+     * Wraps {@link Component#addLongPressListener(com.codename1.ui.events.ActionListener) }
+     * @param l
+     * @return 
+     */
+    public ComponentSelector addLongPressListener(ActionListener l) {
+        for (Component c : this) {
+            c.addLongPressListener(l);
+        }
+        return this;
+    }
+    
+    /**
      * Removes pointer pressed listener from all components in found set.
      * Wraps {@link Component#removePointerPressedListener(com.codename1.ui.events.ActionListener) }
      * @param l
@@ -2635,6 +2648,19 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     public ComponentSelector removePointerPressedListener(ActionListener l) {
         for (Component c : this) {
             c.removePointerPressedListener(l);
+        }
+        return this;
+    }
+    
+    /**
+     * Removes long pointer pressed listener from all components in found set.
+     * Wraps {@link Component#removeLongPressListener(com.codename1.ui.events.ActionListener) }
+     * @param l
+     * @return 
+     */
+    public ComponentSelector removeLongPressListener(ActionListener l) {
+        for (Component c : this) {
+            c.removeLongPressListener(l);
         }
         return this;
     }
