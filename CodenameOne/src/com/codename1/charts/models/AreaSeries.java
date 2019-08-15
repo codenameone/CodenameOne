@@ -28,16 +28,16 @@ public class AreaSeries {
     /**
      * The series data table.
      */
-    private Map<String, HashMap<Integer, Double>> mTable = new HashMap<>();
+    private Map<String, HashMap<Integer, Double>> mTable = new HashMap<String, HashMap<Integer, Double>>();
 
     /**
      * The categories.
      */
-    private List<String> mCategories = new ArrayList<>();
+    private List<String> mCategories = new ArrayList<String>();
     /**
      * The series.
      */
-    private List<String> mSeries = new ArrayList<>();
+    private List<String> mSeries = new ArrayList<String>();
 
     /**
      * Adds a new Category series to the table.
@@ -51,7 +51,7 @@ public class AreaSeries {
             HashMap<Integer, Double> col;
             if (!mTable.containsKey(category)) {
                 mCategories.add(category);
-                col = new HashMap<>();
+                col = new HashMap<Integer, Double>();
             } else {
                 col = mTable.get(category);
             }

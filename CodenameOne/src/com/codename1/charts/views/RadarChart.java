@@ -91,7 +91,7 @@ public class RadarChart extends RoundChart {
         }
         float shortRadius = radius;
         float longRadius = radius * 1.1f;
-        List<Rectangle2D> prevLabelsBounds = new ArrayList<>();
+        List<Rectangle2D> prevLabelsBounds = new ArrayList<Rectangle2D>();
 
         float currentAngle = mRenderer.getStartAngle();
         float angle = 360f / cLength;
