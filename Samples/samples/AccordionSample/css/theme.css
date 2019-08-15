@@ -1,0 +1,12 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+@font-face {
+    font-family: "ArialBD";
+    src: url(https://weblite.ca/cn1tests/arialbd.ttf);
+}
+
+BDFont {
+    font-family: 'ArialBD';
+}
