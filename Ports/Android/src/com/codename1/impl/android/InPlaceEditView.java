@@ -1583,6 +1583,10 @@ public class InPlaceEditView extends FrameLayout{
 
         }
 
+        final boolean resizeEditMode = "resize".equalsIgnoreCase(String.valueOf(component.getClientProperty("android.editMode")));
+        final boolean panEditMode = "pan".equalsIgnoreCase(String.valueOf(component.getClientProperty("android.editMode")));
+        
+        
         //if true, then in async mode we are currently editing and are switching to another field
         final boolean isEditedFieldSwitch;
 
@@ -1696,8 +1700,15 @@ public class InPlaceEditView extends FrameLayout{
 
 
 		}
-                if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
+
+		        if (panEditMode) {
+		            setEditMode(false);
+                } else if (resizeEditMode) {
+		            setEditMode(true);
+                } else if( parentForm.isFormBottomPaddingEditingMode()) {
                     setEditMode(true);
+                } else if (scrollableParent) {
+                    setEditMode(false);
                 }else{
                     trySetEditMode(true);
                 }
