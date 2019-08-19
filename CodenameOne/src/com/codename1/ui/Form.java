@@ -1787,6 +1787,31 @@ public class Form extends Container {
         }
     }
 
+    /**
+     * The form itself should 
+     * @return 
+     */
+    @Override
+    public int getSideGap() {
+        if (getParent() == null) {
+            // Top-level form shouldn't have its own sidegap.  The contentpane will.
+            return 0;
+        }
+        return super.getSideGap();
+    }
+
+    @Override
+    protected void paintScrollbars(Graphics g) {
+        if (getParent() == null) {
+            // Don't paint scrollbars on top-level form.  
+            // Let the content pane do that.
+        } else {
+            super.paintScrollbars(g);
+        }
+    }
+
+    
+    
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
