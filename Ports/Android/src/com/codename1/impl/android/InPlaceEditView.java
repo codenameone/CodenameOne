@@ -266,6 +266,9 @@ public class InPlaceEditView extends FrameLayout{
         if ((type & InputType.TYPE_CLASS_TEXT) != 0) {
             type |= InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE;
         }
+        if (multiline) {
+            type |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+        }
         return type;
     }
 
