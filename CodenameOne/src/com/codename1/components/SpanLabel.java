@@ -27,6 +27,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
@@ -80,7 +81,7 @@ public class SpanLabel extends Container {
         iconWrapper.getStyle().setPadding(0, 0, 0, 0);
         iconWrapper.add(icon);
         addComponent(BorderLayout.WEST, iconWrapper);
-        addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
+        addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
     }
     
     /**
@@ -227,7 +228,7 @@ public class SpanLabel extends Container {
                 if(text.getParent() != this) {
                     removeComponent(text.getParent());
                     text.getParent().removeAll();
-                    addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
+                    addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
                 }
         }
     }
@@ -247,6 +248,12 @@ public class SpanLabel extends Container {
     private void wrapText(int alignment) {
         Container parent = text.getParent();
         if(parent == this) {
+            parent.removeComponent(text);
+            parent = new Container(new FlowLayout(alignment, CENTER));
+            parent.addComponent(text);
+            addComponent(BorderLayout.CENTER, parent);
+        } else if (parent.getLayout() instanceof BoxLayout) {
+            removeComponent(parent);
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
             parent.addComponent(text);
