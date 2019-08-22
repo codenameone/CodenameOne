@@ -398,8 +398,16 @@ public class AsyncResource<V> extends Observable  {
      * @param resources The resources to wait for.
      * @since 7.0
      */
-    public static void await(java.util.Collection<AsyncResource> resources) throws AsyncException {
+    public static void await(java.util.Collection<AsyncResource> resources) throws AsyncExecutionException {
          await(resources.toArray(new AsyncResource[resources.size()]));
+    }
+    
+    /**
+     * Waits and blocks until this AsyncResource is done.
+     * @throws com.codename1.util.AsyncResource.AsyncExecutionException 
+     */
+    public void await() throws AsyncExecutionException {
+        await(this);
     }
 
     /**
@@ -408,7 +416,7 @@ public class AsyncResource<V> extends Observable  {
      * @param resources The resources to wait for.
      * @since 7.0
      */
-    public static void await(AsyncResource... resources) throws AsyncException {
+    public static void await(AsyncResource... resources) throws AsyncExecutionException {
         final boolean[] complete = new boolean[1];
         final Throwable[] t = new Throwable[1];
         all(resources)
@@ -447,7 +455,7 @@ public class AsyncResource<V> extends Observable  {
         }
 
         if (t[0] != null) {
-            throw new AsyncException(t[0]);
+            throw new AsyncExecutionException(t[0]);
         }
 
     }
