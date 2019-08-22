@@ -28,6 +28,9 @@ package com.codename1.impl.javase;
  * @author Shai Almog
  */
 public class NetworkRequestObject {
+
+    
+
     private String url;
     private String method = "POST";
     private String headers;
@@ -36,6 +39,8 @@ public class NetworkRequestObject {
     private String responseBody;
     private String responseCode;
     private String contentLength;
+    private long timeQueued, timeSent, timeServerResponse, timeComplete;
+    
 
     /**
      * @return the url
@@ -147,5 +152,116 @@ public class NetworkRequestObject {
      */
     public void setContentLength(String contentLength) {
         this.contentLength = contentLength;
+    }
+    
+    
+    /**
+     * The timestamp of when the request is sent.
+     * @return the timeSent
+     * @since 7.0
+     */
+    public long getTimeSent() {
+        return timeSent;
+    }
+
+    /**
+     * The timestamp of when the request is sent.
+     * @param timeSent the timeSent to set
+     * @since 7.0
+     */
+    public void setTimeSent(long timeSent) {
+        this.timeSent = timeSent;
+    }
+
+    /**
+     * The timestamp of when the server response is received.
+     * @return the timeServerResponse
+     * @since 7.0
+     */
+    public long getTimeServerResponse() {
+        return timeServerResponse;
+    }
+
+    /**
+     * The timestamp of when the server response is received.
+     * @param timeServerResponse the timeServerResponse to set
+     * @since 7.0
+     */
+    public void setTimeServerResponse(long timeServerResponse) {
+        this.timeServerResponse = timeServerResponse;
+    }
+    
+    /**
+     * The timestamp of when the request is complete (including download).
+     * @return the timeComplete
+     * @since 7.0
+     */
+    public long getTimeComplete() {
+        return timeComplete;
+    }
+
+    /**
+     * The timestamp of when the request is complete (including download).
+     * @param timeComplete the timeComplete to set
+     * @since 7.0
+     */
+    public void setTimeComplete(long timeComplete) {
+        this.timeComplete = timeComplete;
+    }
+    
+    /**
+     * @return the timeQueued
+     */
+    public long getTimeQueued() {
+        return timeQueued;
+    }
+
+    /**
+     * @param timeQueued the timeQueued to set
+     */
+    public void setTimeQueued(long timeQueued) {
+        this.timeQueued = timeQueued;
+    }
+
+    
+    
+    public long getWaitTime() {
+        if (getTimeSent() <= 0) {
+            return -1;
+        }
+        if (getTimeServerResponse() <= 0) {
+            return System.currentTimeMillis() - getTimeSent();
+        }
+        return getTimeServerResponse() - getTimeSent();
+    }
+    
+    public long getTotalTime() {
+        if (getTimeSent() <= 0) {
+            return -1;
+        }
+        if (getTimeComplete() <= 0) {
+            return System.currentTimeMillis() - getTimeSent();
+        }
+        return getTimeComplete() - getTimeSent();
+    }
+    
+    public long getDownloadTime() {
+        if (getTimeServerResponse() <= 0) {
+            return -1;
+        }
+        if (getTimeComplete() <= 0) {
+            return System.currentTimeMillis() - getTimeServerResponse();
+        }
+        return getTimeComplete() - getTimeServerResponse();
+    }
+
+    public long getQueuedTime() {
+        if (getTimeQueued() <= 0) {
+            return -1;
+        }
+        if (getTimeSent() <= 0) {
+            return System.currentTimeMillis() - getTimeQueued();
+        }
+        return getTimeSent() - getTimeQueued();
     }
 }
