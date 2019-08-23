@@ -25,9 +25,13 @@ package com.codename1.util;
 
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
+import static com.codename1.ui.CN.invokeAndBlock;
 import static com.codename1.ui.CN.isEdt;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Set;
 
 /**
  * A wrapper for an object that needs to be loaded asynchronously.  This can serve
@@ -329,6 +333,131 @@ public class AsyncResource<V> extends Observable  {
         if (errorCallback != null) {
             errorCallback.onSucess(error);
         }
+    }
+    
+    /**
+     * Creates a single AsyncResource that will fire its ready() only when all of the provided resources
+     * are ready.  And will fire an exception if any of the provided resources fires an exception.
+     * @param resources One ore more resources to wrap.
+     * @return A combined AsyncResource.
+     * @since 7.0
+     */
+    public static AsyncResource all(AsyncResource... resources) {
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Set<AsyncResource> pending = new HashSet<AsyncResource>(Arrays.asList(resources));
+        final boolean[] complete = new boolean[1];
+        for (final AsyncResource<Boolean> res : resources) {
+            res.ready(new SuccessCallback() {
+                public void onSucess(Object arg) {
+                    synchronized (complete) {
+                        if (complete[0]) {
+                            return;
+                        }
+                        pending.remove(res);
+                        if (pending.isEmpty()) {
+                            complete[0] = true;
+                            //out.complete(true);
+                        } else {
+                            return;
+                        }
+                    }
+                    out.complete(true);
+                }
+            });
+            res.except(new SuccessCallback<Throwable>() {
+                public void onSucess(Throwable ex) {
+                    synchronized (complete) {
+                        if (complete[0]) {
+                            return;
+                        }
+                        complete[0] = true;
+                    }
+
+                    out.error(ex);
+
+                }
+            });
+        }
+        return out;
+    }
+
+    /**
+     * Creates a single AsyncResource that will fire its ready() only when all of the provided resources
+     * are ready.  And will fire an exception if any of the provided resources fires an exception.
+     * @param resources One ore more resources to wrap.
+     * @return A combined AsyncResource.
+     * @since 7.0
+     */
+    public static AsyncResource all(java.util.Collection<AsyncResource> resources) {
+        return all(resources.toArray(new AsyncResource[resources.size()]));
+    }
+
+    /**
+     * Waits for a set of AsyncResources to be complete.  If any of them fires an exception,
+     * then this method will throw a RuntimeException with that exception as the cause.
+     * @param resources The resources to wait for.
+     * @since 7.0
+     */
+    public static void await(java.util.Collection<AsyncResource> resources) throws AsyncExecutionException {
+         await(resources.toArray(new AsyncResource[resources.size()]));
+    }
+    
+    /**
+     * Waits and blocks until this AsyncResource is done.
+     * @throws com.codename1.util.AsyncResource.AsyncExecutionException 
+     */
+    public void await() throws AsyncExecutionException {
+        await(this);
+    }
+
+    /**
+     * Waits for a set of AsyncResources to be complete.  If any of them fires an exception,
+     * then this method will throw a RuntimeException with that exception as the cause.
+     * @param resources The resources to wait for.
+     * @since 7.0
+     */
+    public static void await(AsyncResource... resources) throws AsyncExecutionException {
+        final boolean[] complete = new boolean[1];
+        final Throwable[] t = new Throwable[1];
+        all(resources)
+                .ready(new SuccessCallback() {
+                    @Override
+                    public void onSucess(Object arg) {
+                        synchronized (complete) {
+                            complete[0] = true;
+                            complete.notify();
+                        }
+                    }
+                }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable ex) {
+                synchronized (complete) {
+                    t[0] = ex;
+                    complete[0] = true;
+                    complete.notify();
+                }
+            }
+        });
+        while (!complete[0]) {
+            if (isEdt()) {
+                invokeAndBlock(new Runnable() {
+                    public void run() {
+                        synchronized (complete) {
+                            Util.wait(complete);
+                        }
+                    }
+                });
+            } else {
+                synchronized (complete) {
+                    Util.wait(complete);
+                }
+            }
+        }
+
+        if (t[0] != null) {
+            throw new AsyncExecutionException(t[0]);
+        }
+
     }
     
 }

@@ -27,6 +27,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
@@ -40,6 +41,7 @@ import com.codename1.ui.plaf.Style;
  */
 public class SpanLabel extends Container {
     private Label icon;
+    private Container iconWrapper;
     private TextArea text;
     private boolean shouldLocalize = true;
     
@@ -74,8 +76,12 @@ public class SpanLabel extends Container {
         text.setFocusable(false);
         icon = new Label();
         icon.setUIID("icon");
-        addComponent(BorderLayout.WEST, icon);
-        addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
+        iconWrapper = new Container(new FlowLayout(CENTER, CENTER));
+        iconWrapper.getStyle().setMargin(0, 0, 0, 0);
+        iconWrapper.getStyle().setPadding(0, 0, 0, 0);
+        iconWrapper.add(icon);
+        addComponent(BorderLayout.WEST, iconWrapper);
+        addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
     }
     
     /**
@@ -179,6 +185,24 @@ public class SpanLabel extends Container {
     }
     
     /**
+     * Sets the vertical alignment of the icon with respect to the text of the span label.  Default value is {@link #CENTER}
+     * @param align One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
+     * @since 7.0
+     */
+    public void setIconValign(int align) {
+        ((FlowLayout)iconWrapper.getLayout()).setValign(align);
+    }
+    
+    /**
+     * Gets the vertical alignment of the icon with respect to the text of the span label.
+     * @return The alignment.  One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
+     * @since 7.0
+     */
+    public int getIconValign() {
+        return ((FlowLayout)iconWrapper.getLayout()).getValign();
+    }
+    
+    /**
      * Returns the text of the label
      * @return the text
      */
@@ -204,7 +228,7 @@ public class SpanLabel extends Container {
                 if(text.getParent() != this) {
                     removeComponent(text.getParent());
                     text.getParent().removeAll();
-                    addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
+                    addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
                 }
         }
     }
@@ -228,6 +252,12 @@ public class SpanLabel extends Container {
             parent = new Container(new FlowLayout(alignment, CENTER));
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
+        } else if (parent.getLayout() instanceof BoxLayout) {
+            removeComponent(parent);
+            parent.removeComponent(text);
+            parent = new Container(new FlowLayout(alignment, CENTER));
+            parent.addComponent(text);
+            addComponent(BorderLayout.CENTER, parent);
         } else {
             ((FlowLayout)parent.getLayout()).setAlign(alignment);
         }
@@ -247,8 +277,8 @@ public class SpanLabel extends Container {
      * @param t position either North/South/East/West
      */
     public void setIconPosition(String t) {
-        removeComponent(icon);
-        addComponent(t, icon);
+        removeComponent(iconWrapper);
+        addComponent(t, iconWrapper);
         revalidate();
     }
     
@@ -258,7 +288,7 @@ public class SpanLabel extends Container {
      * @return position either North/South/East/West
      */
     public String getIconPosition() {
-        return (String)getLayout().getComponentConstraint(icon);
+        return (String)getLayout().getComponentConstraint(iconWrapper);
     }
     
 

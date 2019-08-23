@@ -734,6 +734,7 @@ public class NetworkManager {
      * @param request network request for execution
      */
     void addToQueue(ConnectionRequest request, boolean retry) {
+        Util.getImplementation().addConnectionToQueue(request);
         if(!running) {
             start();
         }
