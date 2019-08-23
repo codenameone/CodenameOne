@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 rm -Rf dist/javadoc
 rm -Rf build/tempJavaSources
