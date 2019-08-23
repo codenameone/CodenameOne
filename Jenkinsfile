@@ -5,7 +5,10 @@ pipeline {
       steps {
         ws(dir: 'cn1build') {
           git(url: 'https://github.com/codenameone/CodenameOne.git', branch: 'master')
-          withAnt()
+          withAnt() {
+            sh 'ant jar'
+          }
+
           cleanWs()
         }
 
