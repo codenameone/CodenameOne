@@ -4232,9 +4232,9 @@ hi.show();}</pre></noscript>
     }
     
     /**
-     * Returns the file path of the Database if exists and if supported on 
-     * the platform.
-     * @return the file path of the database or null if not exists
+     * Returns the file path of the Database if support for database exists 
+     * on the platform.
+     * @return the file path of the database or null if database isn't supported
      */
     public String getDatabasePath(String databaseName) {
         return impl.getDatabasePath(databaseName);
