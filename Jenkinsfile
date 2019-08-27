@@ -4,11 +4,15 @@ pipeline {
     stage('Build') {
       steps {
         ws(dir: 'cn1build') {
+          git(url: 'https://github.com/codenameone/CodenameOne.git', branch: 'master')
+          withAnt(installation: 'ant', jdk: 'JDK 8') {
+            sh '''
+cd CodenameOne && ant release'''
+          }
+
           cleanWs()
         }
 
-        git(url: 'https://github.com/codenameone/CodenameOne.git', branch: 'master')
-        withAnt(installation: '/home/builder/apache-ant-1.9.14')
       }
     }
   }

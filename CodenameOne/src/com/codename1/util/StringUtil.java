@@ -71,6 +71,32 @@ public class StringUtil {
 
         return sb.toString();
     }
+
+    /**
+     * This method replaces the first occurrence of the pattern with the 
+     * replacement String
+     * 
+     * @param source the String source
+     * @param pattern String to replace in the source
+     * @param replace replacement String
+     * @return string with replaced elements
+     */
+    public static String replaceFirst(String source, String pattern, String replace) {
+        StringBuilder sb = new StringBuilder();
+        int idx = 0;
+        String workingSource = source;
+        idx = workingSource.indexOf(pattern);
+        if(idx == -1){
+            return source;
+        }
+        
+        sb.append(workingSource.substring(0, idx));
+        sb.append(replace);
+        workingSource = workingSource.substring(idx + pattern.length());
+        sb.append(workingSource);
+
+        return sb.toString();
+    }
     
     /**
      * Breaks a String to multiple strings.
