@@ -1152,7 +1152,9 @@ public class ConnectionRequest implements IOProgressListener {
                         "EEE, dd-MMM-yy HH:mm:ss Z", 
                         "EEE dd-MMM-yy HH:mm:ss Z",
                         "EEE, dd MMM yy HH:mm:ss Z",
-                        "EEE dd MMM yy HH:mm:ss Z"
+                        "EEE dd MMM yy HH:mm:ss Z",
+                        "dd-MMM-yy HH:mm:ss z",
+                        "EEE, dd-MMM-yy HH:mm:ss z"
                         );
                 if (dt != null) {
                     c.setExpires(dt.getTime());
