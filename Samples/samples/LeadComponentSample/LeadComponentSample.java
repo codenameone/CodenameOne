@@ -1,6 +1,7 @@
 package com.codename1.samples;
 
 
+import com.codename1.components.MultiButton;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -62,19 +63,24 @@ public class LeadComponentSample {
         Label label = new Label("Label");
         cnt.setLayout(new BorderLayout());
         cnt.add(BorderLayout.CENTER, label).add(BorderLayout.EAST, leadBtn);
+        
         cnt.setLeadComponent(leadBtn);
         hi.add(cnt);
         
         Button justButton = new Button("Just Button");
         hi.add(justButton);
         
+        MultiButton mb = new MultiButton("A MultiButton");
+        hi.add(mb);
         /*
         Add the listeners. All pointer events on the Container cnt should
         report that the component is the leadBtn.
         Events on the justButton should report that they were from the justButton
         component.
+        
+        In the case of the multibutton, its emblem (a child button) should receive the events.
         */
-        $(cnt, leadBtn, label, justButton)
+        $(cnt, leadBtn, label, justButton, mb)
                 .addActionListener(e->{
                     System.out.println("Action Event received by "+$(e).asComponent());
                 })
