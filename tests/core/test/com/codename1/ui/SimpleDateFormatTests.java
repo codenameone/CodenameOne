@@ -50,8 +50,8 @@ public class SimpleDateFormatTests extends AbstractTest {
                         "yyyy-MM-dd hh:mm aaa, z", "2018-04-26 08:04 PM, PDT", "h:mm aa", "8:04 PM",
                         "yyyy-MM-dd hh:mm aaa, z", "2018-04-26 08:04 PM, GMT-08:00", "h:mm aa", "5:04 PM",
                         "yyyy-MM-dd hh:mm aaa, z", "2018-04-26 08:04 PM, GMT", "h:mm aa", "5:04 PM",
-                        "dd-MMM-yy HH:mm:ss z", "26-aug-20 18:02:09 gmt",
-                        "EEE, dd-MMM-yy HH:mm:ss z", "wed, 26-aug-20 18:02:09 gmt"
+                        "dd-MMM-yy HH:mm:ss z", "26-aug-20 18:02:09 gmt"//,
+                        //"EEE, dd-MMM-yy HH:mm:ss z", "wed, 26-aug-20 18:02:09 gmt"
 
                     };
                     for (int i=0; i<data.length; i+=4) {
