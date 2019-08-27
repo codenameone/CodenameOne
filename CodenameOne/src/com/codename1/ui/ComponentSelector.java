@@ -23,6 +23,7 @@
 package com.codename1.ui;
 
 
+import com.codename1.components.MultiButton;
 import com.codename1.components.OnOffSwitch;
 import com.codename1.components.SpanButton;
 import com.codename1.components.SpanLabel;
@@ -4087,6 +4088,34 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 ((OnOffSwitch)c).addActionListener(l);
             } else if (c instanceof SpanButton) {
                 ((SpanButton)c).addActionListener(l);
+            } else if (c instanceof MultiButton) {
+                ((MultiButton)c).addActionListener(l);
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Removes action listeners from components in set.
+     * @param l The listener to remove
+     * @since 7.0
+     */ 
+    public ComponentSelector removeActionListener(ActionListener l) {
+        for (Component c : this) {
+            if (c instanceof Button) {
+                ((Button)c).removeActionListener(l);
+            } else if (c instanceof com.codename1.ui.List) {
+                ((com.codename1.ui.List)c).addActionListener(l);
+            } else if (c instanceof Slider) {
+                ((Slider)c).removeActionListener(l);
+            } else if (c instanceof TextArea) {
+                ((TextArea)c).removeActionListener(l);
+            } else if (c instanceof OnOffSwitch) {
+                ((OnOffSwitch)c).removeActionListener(l);
+            } else if (c instanceof SpanButton) {
+                ((SpanButton)c).removeActionListener(l);
+            } else if (c instanceof MultiButton) {
+                ((MultiButton)c).removeActionListener(l);
             }
         }
         return this;
