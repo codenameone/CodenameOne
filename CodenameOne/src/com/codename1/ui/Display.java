@@ -4234,6 +4234,8 @@ hi.show();}</pre></noscript>
     /**
      * Returns the file path of the Database if support for database exists 
      * on the platform.
+     * @param databaseName the name of the database with out / or path 
+     * elements e.g. {@code mydatabase.db}
      * @return the file path of the database or null if database isn't supported
      */
     public String getDatabasePath(String databaseName) {
