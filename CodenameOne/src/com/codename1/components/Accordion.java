@@ -32,6 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
@@ -76,8 +77,12 @@ public class Accordion extends Container {
      */ 
     public Accordion() {
         super.setLayout(BoxLayout.y());
-        this.closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
+        
+        this.closeIcon = isRTL() ?
+                FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon)) :
+                FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
+        
         setScrollableY(true);
     }
     

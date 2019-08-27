@@ -22,10 +22,13 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.IOAccessor;
 import java.awt.Component;
 import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +47,7 @@ import javax.swing.event.ListSelectionListener;
 public class NetworkMonitor extends javax.swing.JFrame {
 
     private Map<URLConnection, NetworkRequestObject> requests = new HashMap<URLConnection, NetworkRequestObject>();
+    private Map<ConnectionRequest, NetworkRequestObject> queuedRequests = new HashMap<ConnectionRequest, NetworkRequestObject>();
     
     /** Creates new form NetworkMonitor */
     public NetworkMonitor() {
@@ -76,12 +80,43 @@ public class NetworkMonitor extends javax.swing.JFrame {
         });
     }
 
-    public void addRequest(URLConnection con, NetworkRequestObject r) {
+    public synchronized void addRequest(URLConnection con, NetworkRequestObject r) {
         requests.put(con, r);
         ((DefaultListModel)request.getModel()).addElement(r);
     }
     
-    public NetworkRequestObject getByConnection(URLConnection con) {
+    public synchronized void addQueuedRequest(ConnectionRequest req, NetworkRequestObject r) {
+        queuedRequests.put(req, r);
+       
+    }
+    
+    public synchronized void removeQueuedRequest(NetworkRequestObject r) {
+        ConnectionRequest key = null;
+        for (ConnectionRequest req : queuedRequests.keySet()) {
+            if (queuedRequests.get(req) == r) {
+                key = req;
+                break;
+            }
+        }
+        if (key != null) {
+            queuedRequests.remove(key);
+        }
+    }
+   
+    public synchronized NetworkRequestObject findQueuedRequest(int id) {
+        for (ConnectionRequest req : queuedRequests.keySet()) {
+            if (id == IOAccessor.getId(req)) {
+                return queuedRequests.get(req);
+            }
+        }
+        return null;
+    }
+    
+    public synchronized NetworkRequestObject getByConnectionRequest(ConnectionRequest req) {
+        return queuedRequests.get(req);
+    }
+    
+    public synchronized NetworkRequestObject getByConnection(URLConnection con) {
         return requests.get(con);
     }
     
@@ -107,6 +142,16 @@ public class NetworkMonitor extends javax.swing.JFrame {
         jLabel8 = new javax.swing.JLabel();
         responseLength = new javax.swing.JLabel();
         url = new javax.swing.JTextField();
+        jLabel9 = new javax.swing.JLabel();
+        requestTime = new javax.swing.JLabel();
+        jLabel11 = new javax.swing.JLabel();
+        responseTime = new javax.swing.JLabel();
+        jLabel13 = new javax.swing.JLabel();
+        downloadTime = new javax.swing.JLabel();
+        jLabel15 = new javax.swing.JLabel();
+        totalTime = new javax.swing.JLabel();
+        jLabel16 = new javax.swing.JLabel();
+        timeQueued = new javax.swing.JLabel();
         jPanel2 = new javax.swing.JPanel();
         jLabel6 = new javax.swing.JLabel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -154,6 +199,26 @@ public class NetworkMonitor extends javax.swing.JFrame {
 
         url.setEditable(false);
 
+        jLabel9.setText("Request Time");
+
+        requestTime.setText("-1");
+
+        jLabel11.setText("Response Time");
+
+        responseTime.setText("-1");
+
+        jLabel13.setText("Download Time");
+
+        downloadTime.setText("-1");
+
+        jLabel15.setText("Total Time");
+
+        totalTime.setText("-1");
+
+        jLabel16.setText("Time Queued");
+
+        timeQueued.setText("-1");
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -164,16 +229,26 @@ public class NetworkMonitor extends javax.swing.JFrame {
                     .addComponent(jLabel5)
                     .addComponent(jLabel2)
                     .addComponent(jLabel1)
-                    .addComponent(jLabel8))
+                    .addComponent(jLabel8)
+                    .addComponent(jLabel9)
+                    .addComponent(jLabel11)
+                    .addComponent(jLabel13)
+                    .addComponent(jLabel15)
+                    .addComponent(jLabel16))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(timeQueued, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(totalTime, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(downloadTime, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(responseTime, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(url)
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(responseLength)
                             .addComponent(responseCode)
                             .addComponent(requestType))
-                        .addGap(0, 312, Short.MAX_VALUE)))
+                        .addGap(0, 312, Short.MAX_VALUE))
+                    .addComponent(requestTime, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -195,7 +270,27 @@ public class NetworkMonitor extends javax.swing.JFrame {
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel8)
                     .addComponent(responseLength))
-                .addContainerGap(269, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel9)
+                    .addComponent(requestTime))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel11)
+                    .addComponent(responseTime))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel13)
+                    .addComponent(downloadTime))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel15)
+                    .addComponent(totalTime))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel16)
+                    .addComponent(timeQueued))
+                .addContainerGap(126, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Basics", jPanel1);
@@ -275,7 +370,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
                 .addGap(41, 41, 41)
                 .addComponent(jLabel7)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 109, Short.MAX_VALUE)
+                .addComponent(jScrollPane2)
                 .addGap(18, 18, 18)
                 .addComponent(jLabel4)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -356,6 +451,11 @@ public class NetworkMonitor extends javax.swing.JFrame {
             responseCode.setText(nr.getResponseCode());
             responseHeaders.setText(nr.getResponseHeaders());
             url.setText(nr.getUrl());
+            requestTime.setText("" + new Date(nr.getTimeSent())+" ("+nr.getTimeSent()+")");
+            responseTime.setText("" + nr.getWaitTime()+"ms ("+nr.getTimeServerResponse()+")");
+            downloadTime.setText("" + nr.getDownloadTime()+"ms ("+nr.getTimeComplete()+")");
+            totalTime.setText("" + nr.getTotalTime()+"ms");
+            timeQueued.setText("" + nr.getQueuedTime()+"ms ("+nr.getTimeQueued()+")");
         }
     }//GEN-LAST:event_requestValueChanged
 
@@ -367,8 +467,13 @@ public class NetworkMonitor extends javax.swing.JFrame {
 
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JLabel downloadTime;
     private javax.swing.JButton jButton1;
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel11;
+    private javax.swing.JLabel jLabel13;
+    private javax.swing.JLabel jLabel15;
+    private javax.swing.JLabel jLabel16;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
@@ -376,6 +481,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
+    private javax.swing.JLabel jLabel9;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
@@ -390,11 +496,17 @@ public class NetworkMonitor extends javax.swing.JFrame {
     private javax.swing.JTextArea postBody;
     private javax.swing.JList request;
     private javax.swing.JTextArea requestHeaders;
+    private javax.swing.JLabel requestTime;
     private javax.swing.JLabel requestType;
     private javax.swing.JTextArea responseBody;
     private javax.swing.JLabel responseCode;
     private javax.swing.JTextArea responseHeaders;
     private javax.swing.JLabel responseLength;
+    private javax.swing.JLabel responseTime;
+    private javax.swing.JLabel timeQueued;
+    private javax.swing.JLabel totalTime;
     private javax.swing.JTextField url;
     // End of variables declaration//GEN-END:variables
+
+    
 }

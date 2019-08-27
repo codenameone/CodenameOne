@@ -234,7 +234,7 @@ public class DateFormatSymbols implements Cloneable {
 				if (len < 3) {
 					shortForms[i] = longForms[i];
 				} else {
-					shortForms[i] = longForms[i].substring(0, 3);
+					shortForms[i] = limitLength(longForms[i], 3);
 				}
 			}
 		}
@@ -337,9 +337,9 @@ public class DateFormatSymbols implements Cloneable {
                     cal.set(Calendar.MONTH, i);
                     String fmt = l10n.formatDateLongStyle(cal.getTime());
                     try {
-                        platformLocalizedShortMonths[i] = extractMonthName(fmt).substring(0, 3);
+                        platformLocalizedShortMonths[i] = limitLength(extractMonthName(fmt), 3);
                     } catch (ParseException ex) {
-                        platformLocalizedShortMonths[i] = MONTHS[i].substring(0, 3);
+                        platformLocalizedShortMonths[i] = limitLength(MONTHS[i], 3);
                     }
                 }
             }
@@ -426,5 +426,12 @@ public class DateFormatSymbols implements Cloneable {
      */
     public void setLocalized(boolean localized) {
         this.localized = localized;
+    }
+    
+    String limitLength(String s, int len) {
+        if(s.length() > len) {
+            return s.substring(0, len);
+        }
+        return s;
     }
 }

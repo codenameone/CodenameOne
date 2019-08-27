@@ -53,6 +53,21 @@ extern BOOL CN1useTapGestureRecognizer;
     
 }
 
+/**
+ * Some events need to be ignored.  We only want to receive events originating from our view hierarchy
+ * that is controlled by the GLViewController.
+ */
+-(BOOL)ignoreEvent:(UITouch*)touch {
+    CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    // touchesForView should return all of the touches in the GLViewController.view and descendents.
+    // the "view" member will either be the EAGLView itself, or a container that includes the
+    // EAGLView and peer components.
+    // We DO want to process touches from peer components
+    // We DO NOT want to process touches from popovers like datepickers and openGallery.
+    // See the OpenGalleryTest2793 sample to test events for openGallery.
+    return (touch == nil || ![touch.view isDescendantOfView:ctrl.view]);
+}
+
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {   
     [super touchesBegan:touches withEvent:event];
@@ -66,8 +81,8 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
@@ -106,8 +121,7 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touchesArray count]];
     int yArray[[touchesArray count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
@@ -152,8 +166,7 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
@@ -196,8 +209,7 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:

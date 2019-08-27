@@ -266,6 +266,8 @@ NSString* fixFilePath(NSString* ns) {
     return ns;
 }
 
+bool galleryPopover = NO;
+
 #ifndef NEW_CODENAME_ONE_VM
 JAVA_OBJECT utf8String = NULL;
 
@@ -3621,6 +3623,7 @@ void openGalleryMultiple(JAVA_INT type) {
 #endif
                 popoverController = nil;
             }
+            galleryPopover = YES;
             popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
                                  initWithContentViewController:pickerController];
             
@@ -3694,6 +3697,8 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
 #endif
                 popoverController = nil;
             }
+            galleryPopover = YES;
+            
             popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
                                  initWithContentViewController:pickerController];
             
@@ -6067,7 +6072,6 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STA
     
     return c;
 }
-
 
 bool datepickerPopover = NO;
 #ifndef NEW_CODENAME_ONE_VM

@@ -1411,7 +1411,7 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
-        if (menuBar != null && menuBar.contains(x, y)) {
+        if (menuBar != null && menuBar.contains(x, y)) {   
             return menuBar;
         }
         return getActualPane();
@@ -1787,6 +1787,31 @@ public class Form extends Container {
         }
     }
 
+    /**
+     * The form itself should 
+     * @return 
+     */
+    @Override
+    public int getSideGap() {
+        if (getParent() == null) {
+            // Top-level form shouldn't have its own sidegap.  The contentpane will.
+            return 0;
+        }
+        return super.getSideGap();
+    }
+
+    @Override
+    protected void paintScrollbars(Graphics g) {
+        if (getParent() == null) {
+            // Don't paint scrollbars on top-level form.  
+            // Let the content pane do that.
+        } else {
+            super.paintScrollbars(g);
+        }
+    }
+
+    
+    
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
@@ -2404,7 +2429,7 @@ public class Form extends Container {
             super.repaint(cmp);
             return;
         }
-        if (isVisible()) {
+        if (isVisible() && CN.getCurrentForm() == this) {
             Display.getInstance().repaint(cmp);
         }
     }
@@ -2576,7 +2601,7 @@ public class Form extends Container {
                     } else {
                         leadParent = focused.getParent().getLeadParent();
                     }
-                    leadParent.longPointerPress(x, y);
+                    leadParent.getLeadComponent().longPointerPress(x, y);
                 } else {
                     focused.longPointerPress(x, y);
                 }

@@ -120,6 +120,7 @@ public class URL {
     
 
     public abstract class URLConnection {
+        final Map<String,String> properties = new HashMap<String,String>();
         int connectTimeout;
         int readTimeout;
         boolean doInput = true;
@@ -150,6 +151,18 @@ public class URL {
         public abstract java.util.Map<java.lang.String, java.util.List<java.lang.String>> getHeaderFields();
         public abstract java.io.InputStream getInputStream() throws java.io.IOException;
         public abstract java.io.OutputStream getOutputStream() throws java.io.IOException;
+        
+        /**
+         * Sets the request property, replacing existing property with same key, if it already exists.
+         * @param key The key of the request property.
+         * @param value The value of the request property.
+         * @since 7.0
+         */
+        public void setRequestProperty(String key,
+                      String value) {
+            properties.put(key, value);
+            
+        }
         public void setDoInput(boolean i) {
             doInput = i;
         }
@@ -214,6 +227,7 @@ public class URL {
         private String url;
         private Object connection;
         private CodenameOneImplementation impl;
+        private String requestMethod = "GET";
         HttpURLConnection(String url) {
             this.url = url;
             impl = Util.getImplementation();
@@ -222,6 +236,23 @@ public class URL {
         @Override
         public void connect() throws IOException {
             connection = impl.connect(url, doInput, doOutput);
+            impl.setHttpMethod(connection, requestMethod);
+            if (properties != null && !properties.isEmpty()) {
+                for (String key : properties.keySet()) {
+                    impl.setHeader(connection, key, properties.get(key));
+                }
+            }
+        }
+        
+        public void setRequestMethod(String method) {
+            requestMethod = method;
+            if (connection != null) {
+                try {
+                    impl.setHttpMethod(connection, requestMethod);
+                } catch (IOException ex) {
+                    throw new IllegalArgumentException("Failed to set request method "+method+". "+ex.getMessage());
+                }
+            }
         }
 
         @Override
@@ -264,12 +295,21 @@ public class URL {
 
         @Override
         public InputStream getInputStream() throws IOException {
+            if (connection == null) {
+                connect();
+            }
             return impl.openInputStream(connection);
         }
 
         @Override
         public OutputStream getOutputStream() throws IOException {
+            if (connection == null) {
+                connect();
+            }
             return impl.openOutputStream(connection);
         }
+        
+        
+        
     }
 }
