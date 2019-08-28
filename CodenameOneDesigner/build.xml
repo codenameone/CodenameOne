@@ -98,6 +98,7 @@
       <jar destfile="dist/designer.jar" basedir="build/onejar" compress="true" manifest="onejar.manifest">
       </jar -->
       
+      <mkdir dir="dist/lib" />
       <jar destfile="dist/tempJar.jar">
         <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>          
       </jar>
