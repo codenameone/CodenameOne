@@ -117,7 +117,7 @@ public class FacebookConnect extends Login{
         if(t != null){
             return t;
         }
-        return new AccessToken(getToken(), null);
+        return new AccessToken(getToken(), (String)null);
     }
 
     /**

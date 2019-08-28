@@ -72,6 +72,7 @@ public class Oauth2 {
     }
     private String token;
     private static String expires;
+    
     private String clientId;
     private String redirectURI;
     private String scope;
@@ -291,25 +292,31 @@ public class Oauth2 {
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
                         String t = new String(tok);
-                        
+                        boolean expiresRelative = true;
                         if(t.startsWith("{")){
                             JSONParser p = new JSONParser();
                             Map map = p.parseJSON(new StringReader(t));
                             token = (String) map.get("access_token");
                             Object ex = map.get("expires_in");
                             if(ex == null){
-                                ex = map.get("expires");                            
+                                ex = map.get("expires");
+                                expiresRelative = false;
                             }
                             if(ex != null){
                                 expires = ex.toString();
+                                if (expiresRelative) {
+                                    expires = String.valueOf(System.currentTimeMillis() + new Double(Double.parseDouble(expires) * 1000).longValue());
+                                }
                             }
                         }else{
                             token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
                             int off = t.indexOf("expires=");
                             int start = 8;
+                            expiresRelative = false;
                             if(off == -1){
                                 off = t.indexOf("expires_in=");
                                 start = 11;
+                                expiresRelative = true;
                             }
                             if (off > -1) {
                                 int end = t.indexOf('&', off);
@@ -317,6 +324,9 @@ public class Oauth2 {
                                     end = t.length();
                                 }
                                 expires = t.substring(off + start, end);
+                                if (expiresRelative) {
+                                    expires = String.valueOf(System.currentTimeMillis() + new Double(Double.parseDouble(expires) * 1000).longValue());
+                                }
                             }
                         }
                         if (login != null) {
