@@ -133,7 +133,7 @@ public class GoogleImpl extends GoogleConnect implements
                                 protected void readResponse(InputStream input) throws IOException {
                                     Map<String, Object> json = new JSONParser().parseJSON(new InputStreamReader(input, "UTF-8"));
                                     if (json.containsKey("access_token")) {
-                                        setAccessToken(new AccessToken((String) json.get("access_token"), null));
+                                        setAccessToken(new AccessToken((String) json.get("access_token"), (String)null));
                                         Display.getInstance().callSerially(new Runnable() {
 
                                             @Override
@@ -142,7 +142,7 @@ public class GoogleImpl extends GoogleConnect implements
                                             }
                                         });
                                     } else {
-                                        setAccessToken(new AccessToken(null, null));
+                                        setAccessToken(new AccessToken());
                                         Log.p("Failed to retrieve the access token from the google auth server.  Login succeeded, but access token is null, so you won't be able to use it to retrieve additional information.");
                                         Log.p("Response was " + json);
                                         Display.getInstance().callSerially(new Runnable() {
@@ -168,7 +168,7 @@ public class GoogleImpl extends GoogleConnect implements
                             req.setReadResponseForErrors(true);
                             NetworkManager.getInstance().addToQueue(req);
                         } else {
-                            setAccessToken(new AccessToken(null, null));
+                            setAccessToken(new AccessToken());
                             Log.p("The access token was set to null because one of clientId, clientSecret, requestIdToken, or auth were null");
                             Log.p("The login succeeded, but you won't be able to make any requests to Google's REST apis using the login token.");
                             Log.p("In order to obtain a token that can be used with Google's REST APIs, you need to set the clientId, and clientSecret of" +

@@ -27,10 +27,14 @@ import com.codename1.io.Log;
 import com.codename1.io.Oauth2;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * The Login abstract base class is used to simplify Oauth2 authentications 
@@ -42,18 +46,107 @@ import java.io.IOException;
  */
 public abstract class Login {
 
+    
+    
     LoginCallback callback = new LoginCallBackProxy();
     
     private LoginCallback loginCallback;
+    private ArrayList<LoginCallback> loginCallbacksSingleUse = new ArrayList<LoginCallback>();
     private boolean callbackEnabled = true;
     private String validateErr = null;
     private AccessToken token;
+    
+    // A flag that is used in the javascript port to optionally use a redirect instead of 
+    // a popup for the signin prompt.  Redirect is better for UX, but it also means that 
+    // you leave the app and restart it after login, which may be a non-starter.
+    // So this needs to be explicitly enabled by the app.
+    private boolean preferRedirectPrompt=false;
 
     String oauth2URL;
     String clientId;
     String redirectURI;
     String clientSecret;
     String scope;
+    
+    /**
+     * Adds the given scopes to the OAuth2 login request.
+     * @param scopes Scopes to add.
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #setScope(java.lang.String) 
+     */
+    public Login addScopes(String... scopes) {
+        ArrayList<String> existing = new ArrayList<String>();
+        if (scope != null) {
+            for (String str : Util.split(scope, " ")) {
+                str = str.trim();
+                if (str.length() == 0) {
+                    continue;
+                }
+                if (!existing.contains(str)) {
+                    existing.add(str);
+                }
+            }
+        }
+        for (String scope : scopes) {
+            if (scope.trim().length() == 0) {
+                continue;
+            }
+            if (!existing.contains(scope)) {
+                existing.add(scope);
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (String scope : existing) {
+            if (first) {
+                first = false;
+            } else {
+                sb.append(" ");
+            }
+            sb.append(scope);
+        }
+        scope = sb.toString();
+        return this;
+    }
+    
+    /**
+     * Connects to the login service asynchronously, automatically logging in 
+     * if not yet logged in.
+     * @return AsyncResource that can be monitored for completion.
+     * @since 7.0
+     */
+    public AsyncResource<Login> connect() {
+        final AsyncResource<Login> out = new AsyncResource<Login>();
+        if (isUserLoggedIn()) {
+            out.complete(this);
+        } else {
+            doLogin(new LoginCallback() {
+                @Override
+                public void loginSuccessful() {
+                    out.complete(Login.this);
+                }
+
+                @Override
+                public void loginFailed(String errorMessage) {
+                    out.error(new RuntimeException(errorMessage));
+                }
+            });
+        }
+        return out;
+    }
+    
+    /**
+     * Initiates login using the given single-use callback.
+     * @param callback Callback to be called if login succeeds or fails.
+     * @since 7.0
+     */
+    public void doLogin(LoginCallback callback) {
+        if (callback != null) {
+            loginCallbacksSingleUse.add(callback);
+        }
+        doLogin();
+    }
     
     /**
      * Logs in the user.
@@ -97,7 +190,7 @@ public abstract class Login {
                     }
                     if (evt.getSource() instanceof String) {
                         String t = (String)evt.getSource();
-                        setAccessToken(new AccessToken(t, null));
+                        setAccessToken(new AccessToken(t, (String)null));
                         if(callback != null){
                             callback.loginSuccessful();
                         }
@@ -312,21 +405,69 @@ public abstract class Login {
                 if(loginCallback != null){
                     loginCallback.loginSuccessful();
                 }
+                while (!loginCallbacksSingleUse.isEmpty()) {
+                    final LoginCallback cb = loginCallbacksSingleUse.remove(0);
+                    if (!CN.isEdt()) {
+                        CN.callSerially(new Runnable() {
+                            public void run() {
+                                cb.loginSuccessful();
+                            }
+                        });
+                    } else {
+                        cb.loginSuccessful();
+                    }
+                }
                 return;
             }
             callbackEnabled = true;
             validateErr = null;
         }
 
-        public void loginFailed(String errorMessage) {
+        public void loginFailed(final String errorMessage) {
             if(callbackEnabled){
                 if(loginCallback != null){
                     loginCallback.loginFailed(errorMessage);
+                    while (!loginCallbacksSingleUse.isEmpty()) {
+                    final LoginCallback cb = loginCallbacksSingleUse.remove(0);
+                    if (!CN.isEdt()) {
+                        CN.callSerially(new Runnable() {
+                            public void run() {
+                                cb.loginFailed(errorMessage);
+                            }
+                        });
+                    } else {
+                        cb.loginFailed(errorMessage);
+                    }
+                }
                 }        
                 return;
             }
             callbackEnabled = true;
             validateErr = errorMessage;
         }    
+    }
+
+    /**
+     * A flag used by the javascript port to indicate that the login will use a redirect
+     * for the prompt instead of a popup.   On the web, a redirect is usually better UX
+     * but it can be problematic since it involves leaving the app, and reloading it
+     * after the login.
+     * @return the preferRedirectPrompt
+     * @since 7.0
+     */
+    public boolean isPreferRedirectPrompt() {
+        return preferRedirectPrompt;
+    }
+
+    /**
+     * A flag used by the javascript port to indicate that the login will use a redirect
+     * for the prompt instead of a popup.   On the web, a redirect is usually better UX
+     * but it can be problematic since it involves leaving the app, and reloading it
+     * after the login.
+     * @param preferRedirectPrompt the preferRedirectPrompt to set
+     * @since 7.0
+     */
+    public void setPreferRedirectPrompt(boolean preferRedirectPrompt) {
+        this.preferRedirectPrompt = preferRedirectPrompt;
     }
 }
