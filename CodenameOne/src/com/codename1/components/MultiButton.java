@@ -73,6 +73,7 @@ public class MultiButton extends Container {
      */
     public MultiButton() {
         setLayout(new BorderLayout());
+        setFocusable(true);
         BorderLayout bl = new BorderLayout();
         //bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
         Container iconContainer = new Container(bl);
@@ -202,6 +203,58 @@ public class MultiButton extends Container {
      */
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @param l 
+     */
+    @Override
+    public void addLongPressListener(ActionListener l) {
+        emblem.addLongPressListener(l);
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param l 
+     */
+    @Override
+    public void removeLongPressListener(ActionListener l) {
+        emblem.removeLongPressListener(l);
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param l 
+     */
+    @Override
+    public void addPointerPressedListener(ActionListener l) {
+        emblem.addPointerPressedListener(l);
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param l 
+     */
+    @Override
+    public void removePointerPressedListener(ActionListener l) {
+        emblem.removePointerPressedListener(l);
+    }
+    
+    /**
+     * {@inheritDoc}
+     * @param l 
+     */
+    public void addPointerReleasedListener(ActionListener l) {
+        emblem.addPointerReleasedListener(l);
+    }
+    
+    /**
+     * {@inheritDoc}
+     * @param l 
+     */
+    public void removePointerReleasedListener(ActionListener l) {
+        emblem.removePointerReleasedListener(l);
     }
     
     /**

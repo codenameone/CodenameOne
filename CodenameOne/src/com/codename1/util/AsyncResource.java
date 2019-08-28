@@ -27,6 +27,7 @@ import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import static com.codename1.ui.CN.isEdt;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Observable;
@@ -136,6 +137,7 @@ public class AsyncResource<V> extends Observable  {
         
         public AsyncExecutionException(Throwable cause) {
             super(cause.getMessage());
+            this.cause = cause;
         }
         
         public Throwable getCause() {
@@ -342,11 +344,11 @@ public class AsyncResource<V> extends Observable  {
      * @return A combined AsyncResource.
      * @since 7.0
      */
-    public static AsyncResource all(AsyncResource... resources) {
+    public static AsyncResource<Boolean> all(AsyncResource<?>... resources) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         final Set<AsyncResource> pending = new HashSet<AsyncResource>(Arrays.asList(resources));
         final boolean[] complete = new boolean[1];
-        for (final AsyncResource<Boolean> res : resources) {
+        for (final AsyncResource<?> res : resources) {
             res.ready(new SuccessCallback() {
                 public void onSucess(Object arg) {
                     synchronized (complete) {
@@ -388,7 +390,7 @@ public class AsyncResource<V> extends Observable  {
      * @return A combined AsyncResource.
      * @since 7.0
      */
-    public static AsyncResource all(java.util.Collection<AsyncResource> resources) {
+    public static AsyncResource<Boolean> all(java.util.Collection<AsyncResource<?>> resources) {
         return all(resources.toArray(new AsyncResource[resources.size()]));
     }
 
@@ -398,7 +400,7 @@ public class AsyncResource<V> extends Observable  {
      * @param resources The resources to wait for.
      * @since 7.0
      */
-    public static void await(java.util.Collection<AsyncResource> resources) throws AsyncExecutionException {
+    public static void await(java.util.Collection<AsyncResource<?>> resources) throws AsyncExecutionException {
          await(resources.toArray(new AsyncResource[resources.size()]));
     }
     
@@ -416,7 +418,7 @@ public class AsyncResource<V> extends Observable  {
      * @param resources The resources to wait for.
      * @since 7.0
      */
-    public static void await(AsyncResource... resources) throws AsyncExecutionException {
+    public static void await(AsyncResource<?>... resources) throws AsyncExecutionException {
         final boolean[] complete = new boolean[1];
         final Throwable[] t = new Throwable[1];
         all(resources)
