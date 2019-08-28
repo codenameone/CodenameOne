@@ -88,7 +88,7 @@
                 <exclude name="*.java"/>
             </fileset>
         </javadoc -->
-        <exec executable="./build_javadoc.sh" />
+        <exec executable="./build_javadoc.sh" failonerror="false" />
         
         <copy todir="${dist.javadoc.dir}">
             <fileset dir="${src.dir}" excludes="${excludes}" includes="${includes}">
