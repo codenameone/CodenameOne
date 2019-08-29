@@ -264,7 +264,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     public String format(Date source) {
-        return format(source, new StringBuffer());
+        return format(source, new StringBuilder());
     }
 
     /*
@@ -274,6 +274,15 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     String format(Date source, StringBuffer toAppendTo) {
+        StringBuilder sb = new StringBuilder();
+        String out = format(source, sb);
+        toAppendTo.append(sb.toString());
+        return toAppendTo.toString();
+        
+    }
+    
+    @Override
+    String format(Date source, StringBuilder toAppendTo) {
         if(source == null) {
             source = new Date();
         }
@@ -321,7 +330,8 @@ public class SimpleDateFormat extends DateFormat {
                     if (names == null) {
                         toAppendTo.append(calendar.getTimeZone().getID());
                     } else {
-                        toAppendTo.append(names[DateFormatSymbols.ZONE_SHORTNAME]);
+                        DateUtil du = new DateUtil(TimeZone.getTimeZone(names[DateFormatSymbols.ZONE_ID]));
+                        toAppendTo.append(names[du.inDaylightTime(source) ? DateFormatSymbols.ZONE_SHORTNAME_DST : DateFormatSymbols.ZONE_SHORTNAME]);
                     }
                     break;
                 case TIMEZONE822_LETTER:
