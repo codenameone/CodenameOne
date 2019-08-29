@@ -1796,6 +1796,12 @@ public class TextArea extends Component {
     /**
      * Sets the vertical alignment of the text field to one of: CENTER, TOP, BOTTOM<br>
      * only applies to single line text field
+     * 
+     * <p><strong>NOTE:</strong> If the text area is an editable, multi-line text field,
+     * and the platform doesn't support vertical alignment with its native text editor,
+     * then {@link #getVerticalAlignment() } will always return {@link Component#TOP}, no
+     * matter what value you set here.  Currently no platforms support
+     * vertical alignment of multiline text areas.</p>
      *
      * @param valign alignment value
      * @see #CENTER
@@ -1811,6 +1817,11 @@ public class TextArea extends Component {
 
     /**
      * Returns the vertical alignment of the text field, this only applies to single line text field
+     * 
+     * <p><strong>NOTE:</strong> If the text area is an editable, multi-line text field,
+     * and the platform doesn't support vertical alignment with its native text editor,
+     * then this will always return {@link Component#TOP}.  Currently no platforms support
+     * vertical alignment of multiline text areas.</p>
      *
      *
      * @return the vertical alignment of the TextField one of: CENTER, TOP, BOTTOM
@@ -1819,6 +1830,15 @@ public class TextArea extends Component {
      * @see #BOTTOM
      */
     public int getVerticalAlignment(){
+        if (valign != TOP && !isSingleLineTextArea() && isEditable() && !Display.impl.supportsNativeTextAreaVerticalAlignment()) {
+            // If this is a multiline text field, then most platforms don't support
+            // vertical alignment in their native text areas, so it looks bad
+            // if the lightweight rendering is in the middle, and then the native is
+            // aligned top.
+            // This is not a perfect solution (forcing it to top in such cases),
+            // but it is better than alternatives.
+            return TOP;
+        }
         return valign;
     }
     

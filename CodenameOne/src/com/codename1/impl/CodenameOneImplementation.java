@@ -8121,5 +8121,13 @@ public abstract class CodenameOneImplementation {
     public void onCanInstallOnHomescreen(Runnable r) {
         
     }
+    
+    /**
+     * Checks whether the platform's native text areas support vertical alignment.
+     * @return 
+     */
+    public boolean supportsNativeTextAreaVerticalAlignment() {
+        return false;
+    }
 
 }
