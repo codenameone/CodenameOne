@@ -29,6 +29,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
@@ -85,7 +86,7 @@ public class SpanButton extends Container {
         actualButton = new Button();
         actualButton.setUIID("icon");
         addComponent(BorderLayout.WEST, actualButton);
-        addComponent(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(text));
+        addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
         setLeadComponent(actualButton);
     }
 
@@ -421,9 +422,21 @@ public class SpanButton extends Container {
     /**
      * Sets the auto released mode of this button, by default it's not an auto
      * released Button
-     */
+     */ 
     public void setAutoRelease(boolean autoRelease) {
         this.actualButton.setAutoRelease(autoRelease);
     }
-
+    
+    
+    @Override
+    public void layoutContainer() {
+        // We may need to layout the container twice due to the preferred size calculation
+        // of the TextArea depending on its width at the time of the calculation.
+        // https://github.com/codenameone/CodenameOne/issues/2897
+        super.layoutContainer();
+        setShouldCalcPreferredSize(true);
+        super.layoutContainer();
+    }
+    
+    
 }
