@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -464,7 +465,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return A new set of components.
      */
     public ComponentSelector map(ComponentMapper mapper) {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             Component res = mapper.map(c);
             if (res != null) {
@@ -481,7 +482,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return A new set with the results of the filter.
      */
     public ComponentSelector filter(Filter filter) {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             boolean res = filter.filter(c);
             if (res) {
@@ -499,7 +500,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector parent(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
-        HashSet<Component> matches = new HashSet<Component>();
+        LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
         for (Component c : this) {
             Component parent = c.getParent();
             if (parent != null && matcher.match(parent)) {
@@ -517,7 +518,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector parents(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
-        HashSet<Component> matches = new HashSet<Component>();
+        LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
         for (Component c : this) {
             Component parent = c.getParent();
             while (parent != null) {
@@ -539,7 +540,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector closest(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
-        HashSet<Component> matches = new HashSet<Component>();
+        LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
         for (Component c : this) {
             Component parent = c.getParent();
             while (parent != null) {
@@ -559,7 +560,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return New set with first child of each component in current set.
      */
     public ComponentSelector firstChild() {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             if (c instanceof Container) {
                 Container cnt = (Container)c;
@@ -576,7 +577,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return New set with last child of each component in current set.
      */
     public ComponentSelector lastChild() {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             if (c instanceof Container) {
                 Container cnt = (Container)c;
@@ -593,7 +594,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return New ComponentSelector with next siblings of this set.
      */
     public ComponentSelector nextSibling() {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             Container parent = c.getParent();
             if (parent != null) {
@@ -611,7 +612,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return New ComponentSelector with previous siblings of this set.
      */
     public ComponentSelector prevSibling() {
-        HashSet<Component> out = new HashSet<Component>();
+        LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
             Container parent = c.getParent();
             if (parent != null) {
@@ -1180,7 +1181,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector replace(ComponentMapper mapper, Transition t) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
-        HashSet<Component> replacements = new HashSet<Component>();
+        LinkedHashSet<Component> replacements = new LinkedHashSet<Component>();
         for (Component c : this) {
             Container parent = c.getParent();
             Component replacement = mapper.map(c);
@@ -1219,7 +1220,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector replaceAndWait(ComponentMapper mapper, Transition t) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
-        HashSet<Component> replacements = new HashSet<Component>();
+        LinkedHashSet<Component> replacements = new LinkedHashSet<Component>();
         for (Component c : this) {
             Container parent = c.getParent();
             Component replacement = mapper.map(c);
@@ -1254,8 +1255,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param cmps Components to add to this selector results.
      */
     public ComponentSelector(Component... cmps) {
-        this.roots = new HashSet<Component>();
-        this.results = new HashSet<Component>();
+        this.roots = new LinkedHashSet<Component>();
+        this.results = new LinkedHashSet<Component>();
         for (Component cmp : cmps) {
             this.results.add(cmp);
         }
