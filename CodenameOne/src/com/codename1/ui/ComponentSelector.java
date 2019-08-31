@@ -1288,8 +1288,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param cmps Components to add to this selector results.
      */
     public ComponentSelector(Set<Component> cmps) {
-        this.roots = new HashSet<Component>();
-        this.results = new HashSet<Component>();
+        this.roots = new LinkedHashSet<Component>();
+        this.results = new LinkedHashSet<Component>();
         this.results.addAll(cmps);
 
     }
@@ -1322,7 +1322,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param selector The selector string.
      */
     public ComponentSelector(String selector) {
-        this.roots = new HashSet<Component>();
+        this.roots = new LinkedHashSet<Component>();
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
             this.roots.add(f);
@@ -1360,7 +1360,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param roots The roots for this selector.
      */
     public ComponentSelector(String selector, Component... roots) {
-        this.roots = new HashSet<Component>();
+        this.roots = new LinkedHashSet<Component>();
         for (Component root : roots) {
             this.roots.add(root);
         }
@@ -1395,7 +1395,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param roots The roots for this selector.
      */
     public ComponentSelector(String selector, Collection<Component> roots) {
-        this.roots = new HashSet<Component>();
+        this.roots = new LinkedHashSet<Component>();
         this.roots.addAll(roots);
         parse(selector);
     }
@@ -1417,7 +1417,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             // this is an aggregate selector
             String[] parts = Util.split(selector, ",");
             
-            aggregateSelectors = new HashSet<ComponentSelector>();
+            aggregateSelectors = new LinkedHashSet<ComponentSelector>();
             for (String part : parts) {
                 part = part.trim();
                 if (part.length() == 0) {
@@ -1557,7 +1557,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     
     private Set<Component> resultsImpl() {
         if (results == null) {
-            results = new HashSet<Component>();
+            results = new LinkedHashSet<Component>();
             
             if (aggregateSelectors != null) {
                 for (ComponentSelector sel : aggregateSelectors) {
