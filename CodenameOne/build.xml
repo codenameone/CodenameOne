@@ -586,7 +586,7 @@
         
 
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
-        <ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
+        <ant inheritall="true" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="build" / -->
         <zip basedir="${codenameone.dir}/NBPlugin/CodenameOneSuite/build/updates" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
 
