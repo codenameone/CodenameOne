@@ -586,7 +586,10 @@
         
 
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
-        <ant inheritall="true" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
+        <ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="nbms">
+            <property name="nbplatform.default.netbeans.dest.dir" value="/usr/local/share/applications/netbeans8.1"/>
+            <property name="nbplatform.default.harness.dir" value="/usr/local/share/alications/netbeans8.1/harness"/>
+        </ant>
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="build" / -->
         <zip basedir="${codenameone.dir}/NBPlugin/CodenameOneSuite/build/updates" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
 
