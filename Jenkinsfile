@@ -1,8 +1,5 @@
 pipeline {
   agent any
-  options {
-    checkoutToSubdirectory('cn1')
-  }
   stages {
     stage('Build') {
       steps {
@@ -14,11 +11,21 @@ pipeline {
         sh '/usr/local/share/upload-jenkins-result.sh'
       }
     }
+    stage('Checkout') {
+      steps {
+        git 'https://github.com/codenameone/cn1-binaries.git'
+      }
+    }
   }
   post {
     always {
       echo 'Running cleanup'
-      deleteDir() /* clean up our workspace */
+      deleteDir()
+
     }
+
+  }
+  options {
+    checkoutToSubdirectory('cn1')
   }
 }
