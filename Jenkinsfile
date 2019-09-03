@@ -110,6 +110,7 @@ pipeline {
           steps {
             sh 'mkdir CodenameOne && cd CodenameOne'
             git 'https://github.com/codenameone/CodenameOneSettings.git'
+            sh 'cd .. && ls'
           }
         }
       }
