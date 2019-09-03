@@ -1,7 +1,7 @@
 pipeline {
   agent any
   stages {
-    stage('Checkout') {
+    stage('Checkout Stage 1') {
       parallel {
         stage('Checkout cn1-binaries') {
           steps {
@@ -88,33 +88,41 @@ pipeline {
             git(url: 'https://github.com/codenameone/SocialBoo.git', credentialsId: 'codenameone')
           }
         }
+      }
+    }
+
+    stage('Checkout Stage 2') {
+      steps {
+        echo 'Checkout Stage 2 reached'
+        sh 'ls && mkdir CodenameOne && cd CodenameOne'
+      }
+    }
+
+    stage('Checkout Stage 3') {
+      parallel {
         stage('Checkout BuildClient') {
           steps {
-            sh 'mkdir CodenameOne && cd CodenameOne'
             git(url: 'https://github.com/codenameone/BuildClient.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout NBPlugin') {
           steps {
-            sh 'mkdir CodenameOne && cd CodenameOne'
             git(url: 'https://github.com/codenameone/NBPlugin.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout GUIBuilder') {
           steps {
-            sh 'mkdir CodenameOne && cd CodenameOne'
             git(url: 'https://github.com/codenameone/GUIBuilder.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout CodenameOneSettings') {
           steps {
-            sh 'mkdir CodenameOne && cd CodenameOne'
             git(url: 'https://github.com/codenameone/CodenameOneSettings.git', credentialsId: 'codenameone')
-            sh 'cd .. && ls'
           }
         }
       }
     }
+    
     stage('Build') {
       steps {
         sh '/usr/local/share/build-cn1.sh'
@@ -130,7 +138,6 @@ pipeline {
     always {
       echo 'Running cleanup'
       deleteDir()
-
     }
 
   }
