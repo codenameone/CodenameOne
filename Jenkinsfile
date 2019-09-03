@@ -12,4 +12,10 @@ pipeline {
       }
     }
   }
+  post {
+    always {
+      echo 'Running cleanup'
+      deleteDir() /* clean up our workspace */
+    }
+  }
 }
