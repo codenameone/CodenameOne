@@ -1,6 +1,10 @@
 pipeline {
-  agent {
-    node {
+  agent any
+  options {
+    checkoutToSubdirectory('cn1')
+  }
+  stages {
+    stage('Checkout') {
       dir('cn1-binaries') {
           git url: 'https://github.com/codenameone/cn1-binaries.git'
       }
@@ -65,11 +69,6 @@ pipeline {
           git url: 'https://github.com/codenameone/CodenameOneSettings.git'
       }
     }
-  }
-  options {
-    checkoutToSubdirectory('cn1')
-  }
-  stages {
     stage('Build') {
       steps {
         sh '/usr/local/share/build-cn1.sh'
