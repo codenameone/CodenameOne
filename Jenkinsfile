@@ -5,111 +5,111 @@ pipeline {
       parallel {
         stage('Checkout cn1-binaries') {
           steps {
-            git 'https://github.com/codenameone/cn1-binaries.git'
+            git(url: 'https://github.com/codenameone/cn1-binaries.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout codenameone-skins') {
           steps {
-            git 'https://github.com/codenameone/codenameone-skins.git'
+            git(url: 'https://github.com/codenameone/codenameone-skins.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout codenameone-demos') {
           steps {
-            git 'https://github.com/codenameone/codenameone-demos.git'
+            git(url: 'https://github.com/codenameone/codenameone-demos.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout KitchenSink') {
           steps {
-            git 'https://github.com/codenameone/KitchenSink.git'
+            git(url: 'https://github.com/codenameone/KitchenSink.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout CameraDemo') {
           steps {
-            git 'https://github.com/codenameone/CameraDemo.git'
+            git(url: 'https://github.com/codenameone/CameraDemo.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout SQLSample') {
           steps {
-            git 'https://github.com/codenameone/SQLSample.git'
+            git(url: 'https://github.com/codenameone/SQLSample.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout Chrome') {
           steps {
-            git 'https://github.com/codenameone/Chrome.git'
+            git(url: 'https://github.com/codenameone/Chrome.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout PheonixUI') {
           steps {
-            git 'https://github.com/codenameone/PheonixUI.git'
+            git(url: 'https://github.com/codenameone/PheonixUI.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout CleanModernUIKit') {
           steps {
-            git 'https://github.com/codenameone/CleanModernUIKit.git'
+            git(url: 'https://github.com/codenameone/CleanModernUIKit.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout DeviceTester') {
           steps {
-            git 'https://github.com/codenameone/DeviceTester.git'
+            git(url: 'https://github.com/codenameone/DeviceTester.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout MaterialScreensUIKit') {
           steps {
-            git 'https://github.com/codenameone/MaterialScreensUIKit.git'
+            git(url: 'https://github.com/codenameone/MaterialScreensUIKit.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout PsdToAppTutorial') {
           steps {
-            git 'https://github.com/codenameone/PsdToAppTutorial.git'
+            git(url: 'https://github.com/codenameone/PsdToAppTutorial.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout SwiftnotesCN1') {
           steps {
-            git 'https://github.com/codenameone/SwiftnotesCN1.git'
+            git(url: 'https://github.com/codenameone/SwiftnotesCN1.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout UpdateCodenameOne') {
           steps {
-            git 'https://github.com/codenameone/UpdateCodenameOne.git'
+            git(url: 'https://github.com/codenameone/UpdateCodenameOne.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout DrSbaitso') {
           steps {
-            git 'https://github.com/codenameone/DrSbaitso.git'
+            git(url: 'https://github.com/codenameone/DrSbaitso.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout PropertyCross') {
           steps {
-            git 'https://github.com/codenameone/PropertyCross.git'
+            git(url: 'https://github.com/codenameone/PropertyCross.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout SocialBoo') {
           steps {
-            git 'https://github.com/codenameone/SocialBoo.git'
+            git(url: 'https://github.com/codenameone/SocialBoo.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout BuildClient') {
           steps {
             sh 'mkdir CodenameOne && cd CodenameOne'
-            git 'https://github.com/codenameone/BuildClient.git'
+            git(url: 'https://github.com/codenameone/BuildClient.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout NBPlugin') {
           steps {
             sh 'mkdir CodenameOne && cd CodenameOne'
-            git 'https://github.com/codenameone/NBPlugin.git'
+            git(url: 'https://github.com/codenameone/NBPlugin.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout GUIBuilder') {
           steps {
             sh 'mkdir CodenameOne && cd CodenameOne'
-            git 'https://github.com/codenameone/GUIBuilder.git'
+            git(url: 'https://github.com/codenameone/GUIBuilder.git', credentialsId: 'codenameone')
           }
         }
         stage('Checkout CodenameOneSettings') {
           steps {
             sh 'mkdir CodenameOne && cd CodenameOne'
-            git 'https://github.com/codenameone/CodenameOneSettings.git'
+            git(url: 'https://github.com/codenameone/CodenameOneSettings.git', credentialsId: 'codenameone')
             sh 'cd .. && ls'
           }
         }
