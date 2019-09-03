@@ -1411,7 +1411,11 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
-        if (menuBar != null && menuBar.contains(x, y)) {   
+        // the first part fixes https://github.com/codenameone/CodenameOne/issues/2560
+        // the second part fixes a regression caused by this when we place an overlay
+        // on top of the toolbar. This happens in the Uber clone app when trying to 
+        // go back from the "Where To" menu
+        if (menuBar != null && menuBar.contains(x, y) && !getToolbar().contains(x, y)) {   
             return menuBar;
         }
         return getActualPane();
