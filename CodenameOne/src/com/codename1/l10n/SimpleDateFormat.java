@@ -997,7 +997,7 @@ public class SimpleDateFormat extends DateFormat {
         // handle zulu
         if (len == 1) {
             if (fragment.toLowerCase().equals("z")) {
-                return readSubstring(source, ofs, 1);
+                return readSubstring(source, ofs, ofs + 1);
             }
             return null;
         }
@@ -1046,6 +1046,9 @@ public class SimpleDateFormat extends DateFormat {
             throwInvalid("timezone", ofs);
         }
         char tzSign = source.charAt(0);
+        if(tzSign == 'z' || tzSign == 'Z') {
+            return 0;
+        }
         // handle RFC822 style GMT offset (-0500)
         if (tzSign == SIGN_NEGATIVE || tzSign == SIGN_POSITIVE) {
             source = readSubstring(source, 1);

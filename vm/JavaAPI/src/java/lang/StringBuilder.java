@@ -25,9 +25,8 @@ package java.lang;
 
 /**
  * A string builder implements a mutable sequence of characters. A string builder is like a String, but can be modified. At any point in time it contains some particular sequence of characters, but the length and content of the sequence can be changed through certain method calls.
- * String builders are safe for use by multiple threads. The methods are synchronized where necessary so that all the operations on any particular instance behave as if they occur in some serial order that is consistent with the order of the method calls made by each of the individual threads involved.
- * String builders are used by the compiler to implement the binary string concatenation operator +. For example, the code:
- * is compiled to the equivalent of:
+ * String builders are not threadsafe. 
+ * String builders are used by the compiler to implement the binary string concatenation operator + (see <a href="https://stackoverflow.com/a/57750844">this discussion</a> for more info).
  * The principal operations on a StringBuilder are the append and insert methods, which are overloaded so as to accept data of any type. Each effectively converts a given datum to a string and then appends or inserts the characters of that string to the string builder. The append method always adds these characters at the end of the builder; the insert method adds the characters at a specified point.
  * For example, if z refers to a string builder object whose current contents are "start", then the method call z.append("le") would cause the string builder to contain "startle", whereas z.insert(4, "le") would alter the string builder to contain "starlet".
  * In general, if sb refers to an instance of a StringBuilder, then sb.append(x) has the same effect as sb.insert(sb.length(),x).
