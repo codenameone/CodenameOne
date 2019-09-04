@@ -389,6 +389,29 @@ public class Sample {
         return result;
     }
     
+    //ant -f /Users/shannah/cn1_files/apps/TestApp -Dnb.internal.action.name=debug -Ddebug.class=com.codename1.impl.javase.Simulator debug
+    public int debug(SamplesContext context) throws IOException, InterruptedException {
+        syncChangesToBuildDir(context);
+        //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
+        List<String> cmd = new ArrayList<>();
+        cmd.add(context.getAnt());
+        applyRunProperties(context, cmd);
+        cmd.add("-f");
+        cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("-Dnb.internal.action.name=debug");
+        cmd.add("-Ddebug.class=com.codename1.impl.javase.Simulator");
+        cmd.add("debug-sample");
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        //JPDA_OPTS="-agentlib:jdwp=transport=dt_socket,address=*:4954‌​0,server=y,suspend=n‌​"
+        pb.environment().put("JDPA_OPTS", "-agentlib:jdwp=transport=dt_socket,address=*:4954‌​0,server=y,suspend=n");
+        pb.inheritIO();
+        Process p = pb.start();
+        setThreadLocalProcess(p);
+        int result = p.waitFor();
+       
+        return result;
+    }
+    
     public File getPrivateConfigDir(SamplesContext context) {
         return new File(context.getConfigDir(), name);
     }

@@ -69,6 +69,22 @@ public class SamplesRunner implements SamplesPanel.Delegate {
         }).start();
     }
     
+    
+    @Override
+    public void debugSample(Sample sample) {
+        new Thread(()->{
+            try {
+                sample.debug(ctx);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            Process p = sample.getThreadLocalProcess();
+            if (p != null) {
+                view.removeProcess(p);
+            }
+        }).start();
+    }
+    
     @Override
     public void sendWindowsDesktopBuild(Sample sample) {
         new Thread(()->{
