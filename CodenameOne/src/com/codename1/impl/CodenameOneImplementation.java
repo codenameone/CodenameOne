@@ -7305,7 +7305,7 @@ public abstract class CodenameOneImplementation {
             char current = source.charAt(iter);
             if(current == separator) {
                 if(lastSeparator) {
-                    buf.append(separator);
+                    //buf.append(separator);
                     lastSeparator = false;
                     continue;
                 }
