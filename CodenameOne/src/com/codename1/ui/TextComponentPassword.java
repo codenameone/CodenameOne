@@ -48,7 +48,7 @@ public class TextComponentPassword extends TextComponent {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (field.getConstraint() == TextArea.PASSWORD) {
-                    field.setConstraint(TextField.ANY);
+                    field.setConstraint(TextField.NON_PREDICTIVE);
                     showPassword.setIcon(mask);
                 } else {
                     field.setConstraint(TextField.PASSWORD);
