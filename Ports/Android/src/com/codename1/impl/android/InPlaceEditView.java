@@ -198,7 +198,7 @@ public class InPlaceEditView extends FrameLayout{
         mInputTypeMap.append(TextArea.INITIAL_CAPS_SENTENCE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         mInputTypeMap.append(TextArea.INITIAL_CAPS_WORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
         mInputTypeMap.append(TextArea.UPPERCASE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        mInputTypeMap.append(TextArea.NON_PREDICTIVE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        mInputTypeMap.append(TextArea.NON_PREDICTIVE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
         mInputTypeMap.append(TextArea.NUMERIC, InputType.TYPE_CLASS_NUMBER);
         mInputTypeMap.append(TextArea.PASSWORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         mInputTypeMap.append(TextArea.PHONENUMBER, InputType.TYPE_CLASS_PHONE);
@@ -210,12 +210,15 @@ public class InPlaceEditView extends FrameLayout{
         return ((inputType & constraint) == constraint);
     }
     private boolean isNonPredictive(int inputType) {
-        return hasConstraint(inputType, TextArea.NON_PREDICTIVE);
+        return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);
     }
     
     private int makeNonPredictive(int codenameOneInputType, int inputType) {
         if (isNonPredictive(codenameOneInputType)) {
-            return inputType | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            inputType = inputType | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            if (!hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {
+                inputType = inputType | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
+            }
         }
         return inputType;
     }
@@ -263,7 +266,7 @@ public class InPlaceEditView extends FrameLayout{
         // This generally means that the input method should not be showing candidates itself,
         // but can expect for the editor to supply its own completions/candidates from
         // InputMethodSession.displayCompletions().
-        if ((type & InputType.TYPE_CLASS_TEXT) != 0) {
+        if ((type & InputType.TYPE_CLASS_TEXT) != 0 && (type & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) == 0) {
             type |= InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE;
         }
         if (multiline) {
