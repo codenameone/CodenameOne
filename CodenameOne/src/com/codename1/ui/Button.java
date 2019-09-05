@@ -56,7 +56,7 @@ import java.util.Vector;
  * 
  * @author Chen Fishbein
  */
-public class Button extends Label {
+public class Button extends Label implements IReleasable {
     /**
      * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
      */
@@ -364,6 +364,14 @@ public class Button extends Label {
     
     void setState(int state) {
         this.state = state;
+    }
+    
+    /**
+     * Set the button in released and unfocused state
+     */
+    public void setReleased() {
+    	setState(Button.STATE_DEFAULT);
+    	repaint();
     }
     
     /**
@@ -678,10 +686,7 @@ public class Button extends Label {
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
-            if(f.buttonsAwatingRelease == null) {
-                f.buttonsAwatingRelease = new ArrayList<Component>();
-            }
-            f.buttonsAwatingRelease.add(this);
+        	f.addComponentAwaitingRelease(this);
         }
     }
     
@@ -699,9 +704,7 @@ public class Button extends Label {
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
-            if(f.buttonsAwatingRelease != null) {
-                f.buttonsAwatingRelease.remove(this);
-            }
+        	f.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it

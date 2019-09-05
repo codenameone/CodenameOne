@@ -4296,9 +4296,7 @@ public class Component implements Animation, StyleListener, Editable {
             scrollableYFlag() && getScrollY() == 0) {
             int mm = Display.INSTANCE.convertToPixels(1);
             if(mm < y - pullY) {
-                if(p.buttonsAwatingRelease != null) {
-                    p.buttonsAwatingRelease.clear();
-                }
+                p.clearComponentsAwaitingRelease();
                 Container c = p.getLayeredPane(InfiniteProgress.class, true);
                 c.setLayout(new FlowLayout(CENTER));
                 Motion rotationMotion;
