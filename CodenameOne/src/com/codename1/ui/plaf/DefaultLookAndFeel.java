@@ -1384,6 +1384,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.LEFT:
                 case Label.RIGHT:
                     y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? icon.getHeight() : 0), fontHeight))) / 2;
+                    if (textPos == Label.RIGHT && stateIcon == null) {
+                        x += preserveSpaceForState;
+                    }
                     break;
                 case Label.BOTTOM:
                 case Label.TOP:
@@ -1399,7 +1402,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             rightPadding +
                             ((icon != null) ? icon.getWidth() + l.getGap() : 0) +
                             l.getStringWidth(font))) / 2;
-
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             Math.max(((icon != null) ? icon.getHeight() : 0),

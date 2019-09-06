@@ -627,4 +627,11 @@
         <property value="JavaSE.jar:lib/CLDC11.jar:lib/lib/impl/cls" name="javac.classpath"/>        
     </target>
     <target depends="pre-javadoc,init,-javadoc-build,-javadoc-browse" description="Build Javadoc." name="javadoc"/>
+    <target depends="init,compile" description="Debug project in IDE." name="debug-sample">
+        <echoproperties/>
+        <java classname="com.codename1.impl.javase.Simulator" fork="true" failonerror="true" classpath="${debug.classpath}">
+             <jvmarg value="-Xdebug"/>
+             <jvmarg value="-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=7896"/>
+        </java>
+    </target>
 </project>

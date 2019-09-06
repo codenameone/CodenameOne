@@ -67,6 +67,7 @@ public class SamplesPanel extends JPanel {
     
     public static interface Delegate {
         public void launchSample(Sample sample);
+        public void debugSample(Sample sample);
         public void launchJSSample(Sample sample);
         public void createNewSample();
         public void viewSource(Sample sample);
@@ -176,6 +177,14 @@ public class SamplesPanel extends JPanel {
             preventDoubleClick(viewSource);
             if (delegate != null) {
                 delegate.viewSource(sample);
+            }
+        });
+        JMenuItem debug = new JMenuItem("Debug");
+        debug.setToolTipText("Run this sample with debugging enabled");
+        debug.addActionListener(e->{
+            //preventDoubleClick(launchJS);
+            if (delegate != null) {
+                delegate.debugSample(sample);
             }
         });
         JMenuItem launchJS = new JMenuItem("Launch JS");
@@ -289,6 +298,7 @@ public class SamplesPanel extends JPanel {
             });
             
         });
+        moreMenu.add(debug);
         moreMenu.add(launchJS);
         moreMenu.add(launchIOS);
         moreMenu.add(launchIOSRelease);

@@ -277,11 +277,9 @@ public class MediaPlayer extends Container {
     @Override
     protected void deinitialize() {
         super.deinitialize();
-        if(autoplay) {
-            if(video != null && video.isPlaying()){
-                video.pause();
-                stopProgressSlider();
-            }
+        if(video != null && video.isPlaying()){
+            video.pause();
+            stopProgressSlider();
         }
     }
     
