@@ -204,6 +204,13 @@ pipeline {
             }
           }
         }
+        stage('Checkout JavaCompatibility') {
+          steps {
+            dir('CodenameOne/JavaCompatibility') {
+              git(url: 'https://github.com/codenameone/JavaCompatibility.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
       }
     }
     
