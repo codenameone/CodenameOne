@@ -178,7 +178,7 @@ pipeline {
         }
         stage('Checkout OfflineBuilder') {
           steps {
-            dir('CodenameOne/CodenameOneSettings') {
+            dir('CodenameOne/OfflineBuilder') {
               git(url: 'https://github.com/codenameone/OfflineBuilder.git', credentialsId: 'githubcodenameone')
             }
           }
@@ -192,14 +192,14 @@ pipeline {
         }
         stage('Checkout IntelliJCodenameOneSupport') {
           steps {
-            dir('CodenameOne/Eclipse') {
+            dir('CodenameOne/IntelliJCodenameOneSupport') {
               git(url: 'https://github.com/codenameone/IntelliJCodenameOneSupport.git', credentialsId: 'githubcodenameone')
             }
           }
         }
         stage('Checkout Shooter') {
           steps {
-            dir('CodenameOne/Eclipse') {
+            dir('CodenameOne/Shooter') {
               git(url: 'https://github.com/codenameone/Shooter.git', credentialsId: 'githubcodenameone')
             }
           }
