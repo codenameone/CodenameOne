@@ -179,7 +179,7 @@ pipeline {
   post {
     always {
       echo 'Running cleanup'
-      deleteDir()
+      //deleteDir()
     }
 
   }
