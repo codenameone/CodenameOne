@@ -162,6 +162,48 @@ pipeline {
             }
           }
         }
+        stage('Checkout BuildDaemon') {
+          steps {
+            dir('CodenameOne/BuildDaemon') {
+              git(url: 'https://github.com/codenameone/BuildDaemon.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout BuildDaemonBinaries') {
+          steps {
+            dir('CodenameOne/BuildDaemonBinaries') {
+              git(url: 'https://github.com/codenameone/BuildDaemonBinaries.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout OfflineBuilder') {
+          steps {
+            dir('CodenameOne/CodenameOneSettings') {
+              git(url: 'https://github.com/codenameone/OfflineBuilder.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout Eclipse') {
+          steps {
+            dir('CodenameOne/Eclipse') {
+              git(url: 'https://github.com/codenameone/Eclipse.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout IntelliJCodenameOneSupport') {
+          steps {
+            dir('CodenameOne/Eclipse') {
+              git(url: 'https://github.com/codenameone/IntelliJCodenameOneSupport.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout Shooter') {
+          steps {
+            dir('CodenameOne/Eclipse') {
+              git(url: 'https://github.com/codenameone/Shooter.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
       }
     }
     
