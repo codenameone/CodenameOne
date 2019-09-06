@@ -211,6 +211,13 @@ pipeline {
             }
           }
         }
+        stage('Checkout BuildDaemonDependencies') {
+          steps {
+            dir('CodenameOne/BuildDaemonDependencies') {
+              git(url: 'https://github.com/codenameone/BuildDaemonDependencies.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
       }
     }
     
