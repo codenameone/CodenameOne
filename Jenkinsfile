@@ -190,13 +190,6 @@ pipeline {
             }
           }
         }
-        stage('Checkout IntelliJCodenameOneSupport') {
-          steps {
-            dir('CodenameOne/IntelliJCodenameOneSupport') {
-              git(url: 'https://github.com/codenameone/IntelliJCodenameOneSupport.git', credentialsId: 'githubcodenameone')
-            }
-          }
-        }
         stage('Checkout Shooter') {
           steps {
             dir('CodenameOne/Shooter') {
@@ -215,6 +208,13 @@ pipeline {
           steps {
             dir('CodenameOne/BuildDaemonDependencies') {
               git(url: 'https://github.com/codenameone/BuildDaemonDependencies.git', credentialsId: 'githubcodenameone')
+            }
+          }
+        }
+        stage('Checkout IntelliJGradle') {
+          steps {
+            dir('CodenameOne/IntelliJCodenameOneSupport') {
+              git(url: 'https://github.com/codenameone/IntelliJGradle.git', credentialsId: 'githubcodenameone')
             }
           }
         }
