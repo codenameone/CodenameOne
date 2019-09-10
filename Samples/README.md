@@ -174,6 +174,16 @@ After the sample is running, you can then attach the debugger in your IDE of cho
 5. Port: 7896
 6. Timeout: (leave empty)
 
+## Configuring Push in Samples
+
+### Android
+
+1. Goto https://console.firebase.google.com/ 
+1.1 Add Project
+1.2. Setup Cloud Messaging
+1.3 Download google-services.json
+
+2. Copy google-services.json to config/SAMPLE_NAME/google-services.json
 
 
 
