@@ -64,6 +64,11 @@ public class AutoCompleteTextField extends TextField {
     private String pickedText;
     private int minimumLength;
     
+    public static final int POPUP_POSITION_AUTO = 0;
+    public static final int POPUP_POSITION_OVER = 1;
+    public static final int POPUP_POSITION_UNDER = 2;
+    private int popupPosition = POPUP_POSITION_AUTO;
+    
     /**
      * The number of elements shown for the auto complete popup
      */
@@ -239,7 +244,7 @@ public class AutoCompleteTextField extends TextField {
             Form f = getComponentForm();
 
             if (popup.getComponentCount() > 0) {
-                int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
+                int popupHeight = calcPopupHeight((List)popup.getComponentAt(0));
                 popup.setHeight(popupHeight);
                 dontCalcSize = false;                        
                 popup.forceRevalidate();
@@ -377,7 +382,7 @@ public class AutoCompleteTextField extends TextField {
         }
         popup.getAllStyles().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
         
-        int popupHeight = calcPopuupHeight(l);
+        int popupHeight = calcPopupHeight(l);
         
         popup.setPreferredW(getWidth());
         popup.setHeight(popupHeight);
@@ -435,8 +440,20 @@ public class AutoCompleteTextField extends TextField {
     public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
         this.minimumElementsShownInPopup = minimumElementsShownInPopup;
     }
+    
+    /**
+     * Set the autocomplete popup position in respect of the text field;
+     * POPUP_POSITION_AUTO is the default and it means that the popup is placed
+     * according to the available space.
+     *
+     * @param popupPosition on of POPUP_POSITION_AUTO, POPUP_POSITION_OVER,
+     * POPUP_POSITION_UNDER
+     */
+    public void setPopupPosition(int popupPosition) {
+        this.popupPosition = popupPosition;
+    }
 
-    private int calcPopuupHeight(List l) {
+    private int calcPopupHeight(List l) {
         int y = getAbsoluteY();
         int topMargin;
         int popupHeight;
@@ -450,7 +467,7 @@ public class AutoCompleteTextField extends TextField {
             items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
         }
         int listHeight = items * l.getElementSize(false, true).getHeight();
-        if(y < f.getContentPane().getHeight()/2){
+        if(popupPosition == POPUP_POSITION_UNDER || popupPosition == POPUP_POSITION_AUTO && y < f.getContentPane().getHeight()/2){
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
         }else{
