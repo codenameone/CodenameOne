@@ -597,7 +597,7 @@ public class Tree extends Container {
             return;
         }
         Object nodeParent = nodeComponent.getClientProperty(KEY_PARENT);
-        int depth =  (int)nodeComponent.getClientProperty(KEY_DEPTH);
+        int depth =  ((Integer)nodeComponent.getClientProperty(KEY_DEPTH)).intValue();
         Container parentCnt = nodeComponent.getParent();
         if (parentCnt == null) {
             return;
