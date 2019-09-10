@@ -496,8 +496,23 @@ public class Sample {
         return result;
     }
     
+    private File getBuildNativeDir(SamplesContext context) {
+        return new File(getBuildProjectDir(context), "native");
+    }
+    
+    private File getBuildNativeAndroidDir(SamplesContext context) {
+        return new File(getBuildNativeDir(context), "android"); 
+    }
+    
     public int buildAndroid(SamplesContext context) throws IOException, InterruptedException {
         syncChangesToBuildDir(context);
+        File configDir = getPrivateConfigDir(context);
+        File googleServices = new File(configDir, "google-services.json");
+        if (googleServices.exists()) {
+            
+            File googleServicesDest = new File(getBuildNativeAndroidDir(context), "google-services.json");
+            FileUtil.copy(googleServices, googleServicesDest);
+        }
         //ant -f /Users/shannah/cn1_files/dev/AppleMapsTest1213/build.xml -Dnb.internal.action.name=run run
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
