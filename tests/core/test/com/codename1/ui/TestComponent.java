@@ -570,7 +570,9 @@ public class TestComponent extends AbstractTest {
         });
         hi.add(BorderLayout.SOUTH, loadButton);
         hi.show();
-        TestUtils.waitForFormName(formName, 2000);
+        log("About to wait for form "+formName);
+        TestUtils.waitForFormName(formName, 4000);
+        log("Finished waiting for form "+formName);
         TestUtils.clickButtonByName(buttonName);
         while (!complete[0]) {
             Display.getInstance().invokeAndBlock(()->{
