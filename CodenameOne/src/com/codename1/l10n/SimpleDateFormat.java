@@ -32,9 +32,11 @@ import java.util.Vector;
 
 /**
  * A class for parsing and formatting dates with a given pattern, compatible
- * with the Java 6 API.
- *
- * See http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html
+ * with the Java 6 API, as in the examples here: https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+ * <br /><br />
+ * To localize the formatted dates, see the discussion
+ * <a href="https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one">Format a localized date
+ * in Codename One</a>. 
  *
  * @author Eric Coolman
  */
@@ -437,15 +439,13 @@ public class SimpleDateFormat extends DateFormat {
         return s;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.text.DateFormat#parse(java.lang.String)
+    /**
+     * Parses text from a string to produce a Date. 
      */
     @Override
     public Date parse(String source) throws ParseException {
         if (pattern == null) {
-            return super.parse(source);
+            throw new ParseException("You must provide a template before calling the SimpleDateFormat.parse(...) method", 0);
         }
         int startIndex = 0;
         // parse based on GMT timezone for handling offsets
