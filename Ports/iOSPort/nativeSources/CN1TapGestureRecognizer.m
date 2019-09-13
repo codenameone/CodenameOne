@@ -65,7 +65,9 @@ extern BOOL CN1useTapGestureRecognizer;
     // We DO want to process touches from peer components
     // We DO NOT want to process touches from popovers like datepickers and openGallery.
     // See the OpenGalleryTest2793 sample to test events for openGallery.
-    return (touch == nil || ![touch.view isDescendantOfView:ctrl.view]);
+    BOOL ignore = (touch == nil || pressedView == nil || ![pressedView isDescendantOfView:ctrl.view]);
+
+    return ignore;
 }
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
@@ -76,6 +78,9 @@ extern BOOL CN1useTapGestureRecognizer;
         touchesArray = [[NSMutableArray alloc] init];
     }
     UITouch* touch = [touches anyObject];
+    if (touch != nil) {
+        pressedView = touch.view;
+    }
     NSArray *ts = [touches allObjects];
     [touchesArray addObjectsFromArray:ts];
     int xArray[[touches count]];
