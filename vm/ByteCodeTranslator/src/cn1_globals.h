@@ -159,6 +159,7 @@ struct JavaArrayPrototype {
     int __heapPosition;
     int length;
     int dimensions;
+    int primitiveSize;
     void* data;
 };
 

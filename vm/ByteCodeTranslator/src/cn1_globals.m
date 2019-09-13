@@ -889,6 +889,7 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*), type);
     (*array).length = length;
     (*array).dimensions = dim;
+    (*array).primitiveSize = primitiveSize;
     if(actualSize > 0) {
         void* arr = &(array->data);
         arr += sizeof(void*);
