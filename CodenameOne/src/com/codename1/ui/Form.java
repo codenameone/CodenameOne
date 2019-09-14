@@ -3226,14 +3226,14 @@ public class Form extends Container {
     }
     
     
-    public <C extends Component & IReleasable> void addComponentAwaitingRelease(C c) {
+    public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
       if(componentsAwatingRelease == null) {
 	      componentsAwatingRelease = new ArrayList<Component>();
 	  }
 	  componentsAwatingRelease.add(c);
     }
 
-    public <C extends Component & IReleasable> void removeComponentAwaitingRelease(C c) {
+    public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
     	 if(componentsAwatingRelease != null) {
              componentsAwatingRelease.remove(c);
          }
@@ -3255,8 +3255,8 @@ public class Form extends Container {
             }
             Component pendingC = componentsAwatingRelease.get(0);
             if (atXY != pendingC) {
-                if (pendingC instanceof IReleasable) {
-                	IReleasable rc = (IReleasable) pendingC;
+                if (pendingC instanceof ReleasableComponent) {
+                	ReleasableComponent rc = (ReleasableComponent) pendingC;
                     int relRadius = rc.getReleaseRadius();
                     if (relRadius > 0) {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
@@ -3269,7 +3269,7 @@ public class Form extends Container {
                     componentsAwatingRelease = null;
                     pendingC.dragInitiated();
                 }
-            } else if (pendingC instanceof IReleasable && ((IReleasable) pendingC).isAutoRelease()) {
+            } else if (pendingC instanceof ReleasableComponent && ((ReleasableComponent) pendingC).isAutoRelease()) {
             	componentsAwatingRelease = null;
             	pendingC.dragInitiated();
             }
@@ -3564,8 +3564,8 @@ public class Form extends Container {
                 return;
             }
             
-            if(pendingC instanceof IReleasable) {
-            	IReleasable rc = (IReleasable) pendingC;
+            if(pendingC instanceof ReleasableComponent) {
+            	ReleasableComponent rc = (ReleasableComponent) pendingC;
                 int relRadius = rc.getReleaseRadius();
                 if(relRadius > 0 || pendingC.contains(x, y)) {
                     Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
@@ -3709,8 +3709,8 @@ public class Form extends Container {
         if (componentsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
             for (int iter = 0; iter < componentsAwatingRelease.size(); iter++) {
             	Component c = componentsAwatingRelease.get(iter);
-            	if (c instanceof IReleasable) {
-            		IReleasable rc = (IReleasable) c;
+            	if (c instanceof ReleasableComponent) {
+            		ReleasableComponent rc = (ReleasableComponent) c;
             		rc.setReleased();
             	}
             }

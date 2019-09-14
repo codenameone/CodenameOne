@@ -1,8 +1,14 @@
 package com.codename1.ui;
 
-/** An Interface that any Component that could be released from the parent Form can implement */
+/** 
+ * An Interface that any Component that could be released from the parent 
+ * Form can implement. E.g. when a button is held down with a finger and dragged
+ * outside of the component bounds a release event might be discarded. With
+ * this interface we can register our desire for that release event even in that
+ * case.
+ */
 
-public interface IReleasable {
+public interface ReleasableComponent {
 
 	/**
 	 * Returns true if this is an auto-released Component.

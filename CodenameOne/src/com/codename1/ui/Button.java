@@ -56,7 +56,7 @@ import java.util.Vector;
  * 
  * @author Chen Fishbein
  */
-public class Button extends Label implements IReleasable {
+public class Button extends Label implements ReleasableComponent {
     /**
      * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
      */
