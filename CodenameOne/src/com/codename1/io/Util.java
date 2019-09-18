@@ -1827,7 +1827,7 @@ public class Util {
             inputStream = Storage.getInstance().createInputStream(sourceFile);
         }
 
-        return MimeTypes.guessMimeType(inputStream);
+        return guessMimeType(inputStream);
     }
 
     /**
