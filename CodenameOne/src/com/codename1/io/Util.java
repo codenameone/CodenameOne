@@ -1820,7 +1820,7 @@ public class Util {
      */
     public static String guessMimeType(String sourceFile) throws IOException {
         InputStream inputStream;
-        if (sourceFile.contains("/")) {
+        if (sourceFile.indexOf('/') > -1) {
             inputStream = FileSystemStorage.getInstance().openInputStream(sourceFile);
         } else {
             // Storage is a flat file system
