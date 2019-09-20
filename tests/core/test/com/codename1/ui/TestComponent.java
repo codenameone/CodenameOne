@@ -272,7 +272,7 @@ public class TestComponent extends AbstractTest {
 
     private void testCookies() throws IOException {
         Cookie.clearCookiesFromStorage();
-        String baseUrl = "http://solutions.weblite.ca/cn1tests/cookie";
+        String baseUrl = "https://solutions.weblite.ca/cn1tests/cookie";
         String clearCookiesUrl = baseUrl +"/reset.php";
         String setCookiesUrl = baseUrl + "/set.php";
         String checkCookiesUrl = baseUrl + "/check.php";
@@ -411,7 +411,7 @@ public class TestComponent extends AbstractTest {
         f.add(BorderLayout.CENTER, bc);
         f.show();
         TestUtils.waitForFormName(formName, 2000);
-        String baseUrl = "http://solutions.weblite.ca/cn1tests/cookie";
+        String baseUrl = "https://solutions.weblite.ca/cn1tests/cookie";
         String clearCookiesUrl = baseUrl +"/reset.php";
         String setCookiesUrl = baseUrl + "/set.php";
         String checkCookiesUrl = baseUrl + "/check.php";
