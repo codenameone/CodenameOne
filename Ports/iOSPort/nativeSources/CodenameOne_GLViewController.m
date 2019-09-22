@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+#import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 #import "EAGLView.h"
@@ -320,7 +321,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.tintColor = UIColorFromRGB(color, 255);
             if(hintString != nil) {
                 utf.placeholder = hintString;
-                [utf setValue:UIColorFromRGB(hintColor, 255) forKeyPath:@"_placeholderLabel.textColor"];
+                
+                // On IOS13, we cange set the placeholder lable color
+                // via KVC, because it gives a prohibited error.
+                // Instead we use runtime as described at https://stackoverflow.com/a/56776561
+                Ivar ivar =  class_getInstanceVariable([UITextField class], "_placeholderLabel");
+                UILabel *placeholderLabel = object_getIvar(utf, ivar);
+
+                placeholderLabel.textColor = UIColorFromRGB(hintColor, 255);
             }
             
             // INITIAL_CAPS_WORD
