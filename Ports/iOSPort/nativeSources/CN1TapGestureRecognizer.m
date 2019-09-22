@@ -117,7 +117,9 @@ extern BOOL CN1useTapGestureRecognizer;
 
 - (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    [super touchesMoved:touches withEvent:event];
+    // WARNING: DO NOT try to call super touchesMoved or touchesEnd
+    // event won't be delivered on iOS 13 and up.
+    // See https://groups.google.com/d/msgid/codenameone-discussions/9084cc3f-df2d-47f9-a6a7-036ad6e41a72%40googlegroups.com
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }
