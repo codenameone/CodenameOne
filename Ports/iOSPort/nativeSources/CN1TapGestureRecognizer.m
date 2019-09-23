@@ -47,10 +47,19 @@ extern BOOL CN1useTapGestureRecognizer;
 
 - (void) install:(CodenameOne_GLViewController*)ctrl {
     [self setCancelsTouchesInView:NO];
+    self.delegate = self;
     [ctrl.view.window addGestureRecognizer:self];
     CN1useTapGestureRecognizer = YES;
     
     
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    if (gestureRecognizer == self || otherGestureRecognizer == self) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -88,6 +97,7 @@ extern BOOL CN1useTapGestureRecognizer;
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
 
     if ([self ignoreEvent:touch]) {
+        [touchesArray removeObjectsInArray:ts];
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
