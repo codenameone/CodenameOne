@@ -59,6 +59,7 @@ public class SimpleDateFormatTests extends AbstractTest {
                         SimpleDateFormat messageDateFormat = new SimpleDateFormat(data[i]);
                         messageDateFormat.getDateFormatSymbols().addZoneMapping("America/Vancouver", "Pacific Standard Time", "Pacific Daylight Time", "PST", "PDT");
                         messageDateFormat.getDateFormatSymbols().addZoneMapping("America/New_York", "Eastern Standard Time", "Eastern Daylight Time", "EST", "EDT");
+                        messageDateFormat.getDateFormatSymbols().addZoneMapping("America/Chicago", "Central Standard Time", "Central Daylight Time", "CST", "CDT");
                         Date when0 = messageDateFormat0.parse(data[i+1]);
                         Date when = messageDateFormat.parse(data[i+1]);
                         assertEqual(when0, when, "In timezone "+tzName+", SimpleDateFormat parse deviated from java.text version.  Parsing "+data[i+1]+" with format "+data[i]);
@@ -66,11 +67,11 @@ public class SimpleDateFormatTests extends AbstractTest {
                         //    throw new RuntimeException("Test "+(i/4)+" FAILED.  Expected "+when0+" but found "+when);
                         //}
                         // What is date that is associated with when?
-                        DateFormat displayTimeFormat = new SimpleDateFormat(data[i+2]);
-                        java.text.DateFormat displayTimeFormat0 = new java.text.SimpleDateFormat(data[i+2], java.util.Locale.US);
+                        DateFormat displayTimeFormat = messageDateFormat;
+                        java.text.DateFormat displayTimeFormat0 = new java.text.SimpleDateFormat(data[i], java.util.Locale.US);
                         String output0 = displayTimeFormat0.format(when);
                         String output = displayTimeFormat.format(when);
-                        assertEqual(output0, output, "In timezone "+tzName+" SimpleDateFormat format deviated from java.text version.  Formatting "+data[i+1]+" with format "+data[i+2]);
+                        assertEqual(output0, output, "In timezone "+tzName+" SimpleDateFormat format deviated from java.text version.  Formatting "+data[i+1]+" with format "+data[i]);
 
                     }
                 }

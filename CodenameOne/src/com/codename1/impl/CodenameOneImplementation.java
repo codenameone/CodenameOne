@@ -7305,7 +7305,7 @@ public abstract class CodenameOneImplementation {
             char current = source.charAt(iter);
             if(current == separator) {
                 if(lastSeparator) {
-                    buf.append(separator);
+                    //buf.append(separator);
                     lastSeparator = false;
                     continue;
                 }
@@ -8120,6 +8120,14 @@ public abstract class CodenameOneImplementation {
      */
     public void onCanInstallOnHomescreen(Runnable r) {
         
+    }
+    
+    /**
+     * Checks whether the platform's native text areas support vertical alignment.
+     * @return 
+     */
+    public boolean supportsNativeTextAreaVerticalAlignment() {
+        return false;
     }
 
 }

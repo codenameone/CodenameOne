@@ -1876,12 +1876,17 @@ void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
-    [UIApplication sharedApplication].idleTimerDisabled = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [UIApplication sharedApplication].idleTimerDisabled = YES;
+    });
+    
 }
 
 void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
-    [UIApplication sharedApplication].idleTimerDisabled = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [UIApplication sharedApplication].idleTimerDisabled = NO;
+    });
 }
 
 extern void vibrateDevice();
@@ -5677,13 +5682,13 @@ NSData* arrayToData(JAVA_OBJECT arr) {
     if (arr == JAVA_NULL) return nil;
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
     void* data = (void*)byteArray->data;
-    NSData* d = [NSData dataWithBytes:data length:byteArray->length];
+    NSData* d = [NSData dataWithBytes:data length:byteArray->length * byteArray->primitiveSize];
     return d;
 }
 
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length] / sizeof(JAVA_ARRAY_BYTE), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5691,7 +5696,7 @@ JAVA_OBJECT nsDataToByteArr(NSData *data) {
 
 JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_BOOLEAN), &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5699,7 +5704,7 @@ JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
 
 JAVA_OBJECT nsDataToCharArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_CHAR), &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5707,7 +5712,7 @@ JAVA_OBJECT nsDataToCharArray(NSData *data) {
 
 JAVA_OBJECT nsDataToShortArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_SHORT), &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5715,7 +5720,7 @@ JAVA_OBJECT nsDataToShortArray(NSData *data) {
 
 JAVA_OBJECT nsDataToIntArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_INT), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5723,7 +5728,7 @@ JAVA_OBJECT nsDataToIntArray(NSData *data) {
 
 JAVA_OBJECT nsDataToLongArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_LONG), &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5731,7 +5736,7 @@ JAVA_OBJECT nsDataToLongArray(NSData *data) {
 
 JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_FLOAT), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;
@@ -5739,7 +5744,7 @@ JAVA_OBJECT nsDataToFloatArray(NSData *data) {
 
 JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     NSData* d = data;
-    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length], &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
+    JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_DOUBLE), &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
     memcpy(dtd, d.bytes, d.length);
     return byteArray;

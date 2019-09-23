@@ -82,7 +82,7 @@ public class Form extends Container {
     
     private TextSelection textSelection;
     
-    ArrayList<Component> buttonsAwatingRelease;
+    private ArrayList<Component> componentsAwatingRelease;
     
     private VirtualInputDevice currentInputDevice;
     
@@ -1411,7 +1411,11 @@ public class Form extends Container {
         if (overlay != null && overlay.getResponderAt(x, y) != null) {
             return overlay;
         }
-        if (menuBar != null && menuBar.contains(x, y)) {   
+        // the first part fixes https://github.com/codenameone/CodenameOne/issues/2560
+        // the second part fixes a regression caused by this when we place an overlay
+        // on top of the toolbar. This happens in the Uber clone app when trying to 
+        // go back from the "Where To" menu
+        if (menuBar != null && menuBar.contains(x, y) && !getToolbar().contains(x, y)) {   
             return menuBar;
         }
         return getActualPane();
@@ -2135,7 +2139,7 @@ public class Form extends Container {
         }
         super.deinitializeImpl();
         animMananger.flush();
-        buttonsAwatingRelease = null;
+        componentsAwatingRelease = null;
         dragged = null;
     }
 
@@ -3220,33 +3224,54 @@ public class Form extends Container {
         }
         return false;
     }
+    
+    
+    public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
+      if(componentsAwatingRelease == null) {
+	      componentsAwatingRelease = new ArrayList<Component>();
+	  }
+	  componentsAwatingRelease.add(c);
+    }
 
+    public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
+    	 if(componentsAwatingRelease != null) {
+             componentsAwatingRelease.remove(c);
+         }
+    }
+
+    public void clearComponentsAwaitingRelease() {
+    	if (componentsAwatingRelease != null) {
+    		componentsAwatingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
+    	}
+    }
+   
+    
     private void autoRelease(int x, int y) {
-        if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
+        if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
             if (atXY instanceof Container) {
                 atXY = atXY.getLeadComponent();
             }
-            Component pendingButton = buttonsAwatingRelease.get(0);
-            if (atXY != pendingButton) {
-                if (pendingButton instanceof Button) {
-                    Button b = (Button) pendingButton;
-                    int relRadius = b.getReleaseRadius();
+            Component pendingC = componentsAwatingRelease.get(0);
+            if (atXY != pendingC) {
+                if (pendingC instanceof ReleasableComponent) {
+                	ReleasableComponent rc = (ReleasableComponent) pendingC;
+                    int relRadius = rc.getReleaseRadius();
                     if (relRadius > 0) {
-                        Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
+                        Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                         if (!r.contains(x, y)) {
-                            buttonsAwatingRelease = null;
-                            b.dragInitiated();
+                        	componentsAwatingRelease = null;
+                        	pendingC.dragInitiated();
                         }
                         return;
                     }
-                    buttonsAwatingRelease = null;
-                    b.dragInitiated();
+                    componentsAwatingRelease = null;
+                    pendingC.dragInitiated();
                 }
-            } else if (pendingButton instanceof Button && ((Button) pendingButton).isAutoRelease()) {
-                buttonsAwatingRelease = null;
-                ((Button) pendingButton).dragInitiated();
+            } else if (pendingC instanceof ReleasableComponent && ((ReleasableComponent) pendingC).isAutoRelease()) {
+            	componentsAwatingRelease = null;
+            	pendingC.dragInitiated();
             }
         }
     }
@@ -3510,22 +3535,22 @@ public class Form extends Container {
         setPressedCmp(null);
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane(formLayeredPane, x, y);
-        if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
+        if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = actual.getComponentAt(x, y);
             
-            Component pendingButton = (Component)buttonsAwatingRelease.get(0);
-            if(atXY == pendingButton) {
-                buttonsAwatingRelease = null;
-                if (dragged == pendingButton) {
-                    if (pendingButton.isDragAndDropInitialized()) {
-                        pendingButton.dragFinishedImpl(x, y);
+            Component pendingC = componentsAwatingRelease.get(0);
+            if(atXY == pendingC) {
+            	componentsAwatingRelease = null;
+                if (dragged == pendingC) {
+                    if (pendingC.isDragAndDropInitialized()) {
+                    	pendingC.dragFinishedImpl(x, y);
                     } else {
-                        pendingButton.pointerReleased(x, y);
+                    	pendingC.pointerReleased(x, y);
                     }
                     dragged = null;
                 } else {
-                    pendingButton.pointerReleased(x, y);
+                	pendingC.pointerReleased(x, y);
                     if (dragged != null) {
                         if (dragged.isDragAndDropInitialized()) {
                             dragged.dragFinishedImpl(x, y);
@@ -3539,14 +3564,14 @@ public class Form extends Container {
                 return;
             }
             
-            if(pendingButton instanceof Button) {
-                Button b = (Button)pendingButton;
-                int relRadius = b.getReleaseRadius();
-                if(relRadius > 0 || b.contains(x, y)) {
-                    Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
+            if(pendingC instanceof ReleasableComponent) {
+            	ReleasableComponent rc = (ReleasableComponent) pendingC;
+                int relRadius = rc.getReleaseRadius();
+                if(relRadius > 0 || pendingC.contains(x, y)) {
+                    Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                     if(r.contains(x, y)) {
-                        buttonsAwatingRelease = null;
-                        pointerReleased(b.getAbsoluteX() + 1, b.getAbsoluteY() + 1);
+                    	componentsAwatingRelease = null;
+                        pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
                         return;
                     }
                 }
@@ -3681,13 +3706,15 @@ public class Form extends Container {
             }
         }
         stickyDrag = null;
-        if (buttonsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-            for (int iter = 0; iter < buttonsAwatingRelease.size(); iter++) {
-                Button b = (Button) buttonsAwatingRelease.get(iter);
-                b.setState(Button.STATE_DEFAULT);
-                b.repaint();
+        if (componentsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
+            for (int iter = 0; iter < componentsAwatingRelease.size(); iter++) {
+            	Component c = componentsAwatingRelease.get(iter);
+            	if (c instanceof ReleasableComponent) {
+            		ReleasableComponent rc = (ReleasableComponent) c;
+            		rc.setReleased();
+            	}
             }
-            buttonsAwatingRelease = null;
+            componentsAwatingRelease = null;
         }
     }
 

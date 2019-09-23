@@ -47,10 +47,19 @@ extern BOOL CN1useTapGestureRecognizer;
 
 - (void) install:(CodenameOne_GLViewController*)ctrl {
     [self setCancelsTouchesInView:NO];
+    self.delegate = self;
     [ctrl.view.window addGestureRecognizer:self];
     CN1useTapGestureRecognizer = YES;
     
     
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    if (gestureRecognizer == self || otherGestureRecognizer == self) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -65,7 +74,9 @@ extern BOOL CN1useTapGestureRecognizer;
     // We DO want to process touches from peer components
     // We DO NOT want to process touches from popovers like datepickers and openGallery.
     // See the OpenGalleryTest2793 sample to test events for openGallery.
-    return (touch == nil || ![touch.view isDescendantOfView:ctrl.view]);
+    BOOL ignore = (touch == nil || pressedView == nil || ![pressedView isDescendantOfView:ctrl.view]);
+
+    return ignore;
 }
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
@@ -76,6 +87,9 @@ extern BOOL CN1useTapGestureRecognizer;
         touchesArray = [[NSMutableArray alloc] init];
     }
     UITouch* touch = [touches anyObject];
+    if (touch != nil) {
+        pressedView = touch.view;
+    }
     NSArray *ts = [touches allObjects];
     [touchesArray addObjectsFromArray:ts];
     int xArray[[touches count]];
@@ -83,6 +97,7 @@ extern BOOL CN1useTapGestureRecognizer;
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
 
     if ([self ignoreEvent:touch]) {
+        [touchesArray removeObjectsInArray:ts];
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
@@ -112,7 +127,9 @@ extern BOOL CN1useTapGestureRecognizer;
 
 - (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    [super touchesMoved:touches withEvent:event];
+    // WARNING: DO NOT try to call super touchesMoved or touchesEnd
+    // event won't be delivered on iOS 13 and up.
+    // See https://groups.google.com/d/msgid/codenameone-discussions/9084cc3f-df2d-47f9-a6a7-036ad6e41a72%40googlegroups.com
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }

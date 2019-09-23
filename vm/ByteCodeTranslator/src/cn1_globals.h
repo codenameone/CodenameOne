@@ -159,6 +159,7 @@ struct JavaArrayPrototype {
     int __heapPosition;
     int length;
     int dimensions;
+    int primitiveSize;
     void* data;
 };
 
@@ -532,6 +533,30 @@ if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
 }
 
 #define BC_DUP2_X1() {\
+    if (IS_DOUBLE_WORD(-1)){\
+        (*SP).data.l = SP[-1].data.l; \
+        SP[-1].data.l = SP[-2].data.l; \
+        SP[-2].data.l = (*SP).data.l; \
+        (*SP).type = SP[-1].type; \
+        SP[-1].type = SP[-2].type; \
+        SP[-2].type = (*SP).type; \
+        SP++; \
+    } else {\
+        SP[1].data.l = SP[-1].data.l; \
+        (*SP).data.l = SP[-2].data.l; \
+        SP[-1].data.l = SP[-3].data.l; \
+        SP[-2].data.l = SP[1].data.l; \
+        SP[-3].data.l = (*SP).data.l;\
+        SP[1].type = SP[-1].type;\
+        (*SP).type = SP[-2].type; \
+        SP[-1].type = SP[-3].type; \
+        SP[-2].type = SP[1].type; \
+        SP[-3].type = (*SP).type;\
+        SP+=2;\
+    }\
+}
+
+#define BC_DUP_X1() {\
     (*SP).data.l = SP[-1].data.l; \
     SP[-1].data.l = SP[-2].data.l; \
     SP[-2].data.l = (*SP).data.l; \

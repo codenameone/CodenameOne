@@ -87,10 +87,15 @@ public class AccordionSample {
         for (String label : labels) {
             Font font = UIManager.getInstance().getComponentStyle(acc.getHeaderUIID()).getFont();
             maxLabelWidth = Math.max(maxLabelWidth, font.stringWidth(label));
+            
         }
+        System.out.println("MaxLabelWidth = "+maxLabelWidth);
 
         // Set the "Rigth" padding to be the screen width, less our label widths, and some constant padding.
-        openCloseIconStyle.setPadding(RIGHT, CN.getDisplayWidth() - maxLabelWidth - CN.convertToPixels(25));
+        int rightPadding = CN.getDisplayWidth() - maxLabelWidth - CN.convertToPixels(25);
+        System.out.println("Padding: "+rightPadding);
+        openCloseIconStyle.setPadding(RIGHT, rightPadding);
+        openCloseIconStyle.setFgColor(0x0);
         
         String customUIID = "PaddedOpenCloseIcon"+(CN.isPortrait()?"Portrait":"Landscape");
         String oldCustomUIID = "PaddedOpenCloseIcon"+(CN.isPortrait()?"Landscape":"Portrait");
@@ -100,6 +105,7 @@ public class AccordionSample {
         
         // Now specify that the Accordion should use this newly installed UIID for the open/close arrows.
         acc.setOpenCloseIconUIID(customUIID);
+        
         
         // In the case of screen orientation changes, we will need to update the old UIIDs to the new UIID.
         $(oldCustomUIID, acc).setUIID(customUIID);
@@ -122,6 +128,9 @@ public class AccordionSample {
             
             // Add orientation listener to update the open/close arrow styles to adjust to new screen sizes.
             hi.addOrientationListener(e->{
+                setupOpenCloseArrowStyles(acc);
+            });
+            hi.addSizeChangedListener(e->{
                 setupOpenCloseArrowStyles(acc);
             });
             acc.addContent("Section 1", new Label("Section 1 content"));

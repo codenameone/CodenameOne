@@ -5237,7 +5237,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
-        if (Boolean.TRUE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
+        if (!Boolean.FALSE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
             final String[] res = new String[1];
             final boolean[] complete = new boolean[1];
             nativeInstance.browserExecuteAndReturnStringCallback(get(browserPeer), javaScript, new SuccessCallback<String>() {
@@ -5486,9 +5486,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
-        if (useWKWebView && browserComponent instanceof Component) {
-            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.TRUE);
+        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true"));
+        if (!useWKWebView && browserComponent instanceof Component) {
+            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.FALSE);
         }
         long browserPeer = useWKWebView ? 
                 nativeInstance.createWKBrowserComponent(browserComponent) : 

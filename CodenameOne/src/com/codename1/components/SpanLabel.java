@@ -410,4 +410,14 @@ public class SpanLabel extends Container {
     public boolean isTextSelectionEnabled() {
         return text.isTextSelectionEnabled();
     }
+
+    @Override
+    public void layoutContainer() {
+        // We may need to layout the container twice due to the preferred size calculation
+        // of the TextArea depending on its width at the time of the calculation.
+        // https://github.com/codenameone/CodenameOne/issues/2897
+        super.layoutContainer();
+        setShouldCalcPreferredSize(true);
+        super.layoutContainer();
+    }
 }

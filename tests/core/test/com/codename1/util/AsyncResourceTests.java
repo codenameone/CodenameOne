@@ -19,7 +19,7 @@ public class AsyncResourceTests extends AbstractTest {
 
         AsyncResource r1 = new AsyncResource();
         new Thread(() -> {
-            Util.sleep(100);
+            Util.sleep(500);
             r1.complete(new Integer(1));
         }).start();
         assertTrue(!r1.isCancelled());

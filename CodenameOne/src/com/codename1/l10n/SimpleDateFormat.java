@@ -32,9 +32,11 @@ import java.util.Vector;
 
 /**
  * A class for parsing and formatting dates with a given pattern, compatible
- * with the Java 6 API.
- *
- * See http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html
+ * with the Java 6 API, as in the examples here: https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+ * <br /><br />
+ * To localize the formatted dates, see the discussion
+ * <a href="https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one">Format a localized date
+ * in Codename One</a>. 
  *
  * @author Eric Coolman
  */
@@ -264,7 +266,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     public String format(Date source) {
-        return format(source, new StringBuffer());
+        return format(source, new StringBuilder());
     }
 
     /*
@@ -274,6 +276,15 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     String format(Date source, StringBuffer toAppendTo) {
+        StringBuilder sb = new StringBuilder();
+        String out = format(source, sb);
+        toAppendTo.append(sb.toString());
+        return toAppendTo.toString();
+        
+    }
+    
+    @Override
+    String format(Date source, StringBuilder toAppendTo) {
         if(source == null) {
             source = new Date();
         }
@@ -321,7 +332,8 @@ public class SimpleDateFormat extends DateFormat {
                     if (names == null) {
                         toAppendTo.append(calendar.getTimeZone().getID());
                     } else {
-                        toAppendTo.append(names[DateFormatSymbols.ZONE_SHORTNAME]);
+                        DateUtil du = new DateUtil(TimeZone.getTimeZone(names[DateFormatSymbols.ZONE_ID]));
+                        toAppendTo.append(names[du.inDaylightTime(source) ? DateFormatSymbols.ZONE_SHORTNAME_DST : DateFormatSymbols.ZONE_SHORTNAME]);
                     }
                     break;
                 case TIMEZONE822_LETTER:
@@ -427,15 +439,13 @@ public class SimpleDateFormat extends DateFormat {
         return s;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.text.DateFormat#parse(java.lang.String)
+    /**
+     * Parses text from a string to produce a Date. 
      */
     @Override
     public Date parse(String source) throws ParseException {
         if (pattern == null) {
-            return super.parse(source);
+            throw new ParseException("You must provide a template before calling the SimpleDateFormat.parse(...) method", 0);
         }
         int startIndex = 0;
         // parse based on GMT timezone for handling offsets
@@ -987,7 +997,7 @@ public class SimpleDateFormat extends DateFormat {
         // handle zulu
         if (len == 1) {
             if (fragment.toLowerCase().equals("z")) {
-                return readSubstring(source, ofs, 1);
+                return readSubstring(source, ofs, ofs + 1);
             }
             return null;
         }
@@ -1036,6 +1046,9 @@ public class SimpleDateFormat extends DateFormat {
             throwInvalid("timezone", ofs);
         }
         char tzSign = source.charAt(0);
+        if(tzSign == 'z' || tzSign == 'Z') {
+            return 0;
+        }
         // handle RFC822 style GMT offset (-0500)
         if (tzSign == SIGN_NEGATIVE || tzSign == SIGN_POSITIVE) {
             source = readSubstring(source, 1);

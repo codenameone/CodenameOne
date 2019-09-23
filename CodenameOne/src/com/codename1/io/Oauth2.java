@@ -72,6 +72,7 @@ public class Oauth2 {
     }
     private String token;
     private static String expires;
+    private String refreshToken;
     
     private String clientId;
     private String redirectURI;
@@ -300,23 +301,19 @@ public class Oauth2 {
                             Object ex = map.get("expires_in");
                             if(ex == null){
                                 ex = map.get("expires");
-                                expiresRelative = false;
                             }
                             if(ex != null){
                                 expires = ex.toString();
-                                if (expiresRelative) {
-                                    expires = String.valueOf(System.currentTimeMillis() + new Double(Double.parseDouble(expires) * 1000).longValue());
-                                }
                             }
+                            refreshToken = (String)map.get("refresh_token");
+
                         }else{
                             token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
                             int off = t.indexOf("expires=");
                             int start = 8;
-                            expiresRelative = false;
                             if(off == -1){
                                 off = t.indexOf("expires_in=");
                                 start = 11;
-                                expiresRelative = true;
                             }
                             if (off > -1) {
                                 int end = t.indexOf('&', off);
@@ -324,9 +321,17 @@ public class Oauth2 {
                                     end = t.length();
                                 }
                                 expires = t.substring(off + start, end);
-                                if (expiresRelative) {
-                                    expires = String.valueOf(System.currentTimeMillis() + new Double(Double.parseDouble(expires) * 1000).longValue());
+                                
+                            }
+                            off = t.indexOf("refresh_token=");
+                            refreshToken = null;
+                            start = "refresh_token=".length();
+                            if (off > -1) {
+                                int end = t.indexOf('&', off);
+                                if (end < 0 || end < off) {
+                                    end = t.length();
                                 }
+                                refreshToken = t.substring(off +  start, end);
                             }
                         }
                         if (login != null) {
@@ -348,7 +353,7 @@ public class Oauth2 {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires),ActionEvent.Type.Response));
+                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken),ActionEvent.Type.Response));
                         }
                     }
                 };

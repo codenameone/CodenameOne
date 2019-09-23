@@ -142,7 +142,7 @@ public class StringUtil {
      * @param source the String to break
      * @param separator the characters that can be used to search and break.
      * @return a Vector of Strings
-     * @deprecated use the tokenize() method instead
+     * @deprecated use the {@link #tokenize(java.lang.String, java.lang.String) } method instead
      */
     public static Vector tokenizeString(String source, String separator) {
         if(separator.length() == 1) {
@@ -187,7 +187,7 @@ public class StringUtil {
                 char current = source.charAt(iter);
                 if(current == separator) {
                     if(lastSeparator) {
-                        buf.append(separator);
+                        //buf.append(separator);
                         lastSeparator = false;
                         continue;
                     }

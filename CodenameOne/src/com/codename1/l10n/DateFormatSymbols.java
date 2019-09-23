@@ -158,6 +158,7 @@ public class DateFormatSymbols implements Cloneable {
          * @param shortNameDST The short name of the mapping in daylight saving time. E.g. EDT
          */
         public void addZoneMapping(String zoneId, String longName, String longNameDST, String shortName, String shortNameDST) {
+            localized = true;
             Hashtable<String,String> h = getResourceBundle();
             if (h == null) {
                 h = new Hashtable<String,String>();

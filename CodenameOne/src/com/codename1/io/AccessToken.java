@@ -53,18 +53,32 @@ public class AccessToken implements Externalizable{
      * @since 7.0
      */
     private Date expiryDate;
+    
+    private String refreshToken;
 
     /**
      * Constructor with parameters
      * 
      * @param token the token string
      * @param expires the access token expires date
-     * @deprecated Use {@link #AccessToken(java.lang.String, java.util.Date) }
      */ 
     public AccessToken(String token, String expires) {
+        this(token, expires, null);
+    }
+    
+    /**
+     * Constructor with parameters
+     * 
+     * @param token the token string
+     * @param expires the access token expires date
+     * @param refreshToken The refresh token.
+     * @ince 7.0
+     */ 
+    public AccessToken(String token, String expires, String refreshToken) {
         this.token = token;
         this.expires = expires;
         this.expiryDate = parseDate(expires);
+        this.refreshToken = refreshToken;
     }
     
     /**
@@ -105,7 +119,7 @@ public class AccessToken implements Externalizable{
 
     @Override
     public int getVersion() {
-        return 2;
+        return 3;
     }
 
     @Override
@@ -113,6 +127,7 @@ public class AccessToken implements Externalizable{
         Util.writeUTF(token, out);
         Util.writeUTF(expires, out);
         Util.writeObject(expiryDate, out);
+        Util.writeUTF(refreshToken, out);
     }
 
     @Override
@@ -122,8 +137,30 @@ public class AccessToken implements Externalizable{
         if (version >= 2) {
             expiryDate = (Date)Util.readObject(in);
         }
+        if (version >= 3) {
+            refreshToken = Util.readUTF(in);
+        }
     }
 
+    /**
+     * Gets refresh token.
+     * @return Refresh token.
+     * @since 7.0
+     */
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+    
+    /**
+     * Sets refresh token.
+     * 
+     * @param refreshToken The refresh token.
+     * @since 7.0
+     */
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+    
     @Override
     public String getObjectId() {
         return "AccessToken";
@@ -145,6 +182,13 @@ public class AccessToken implements Externalizable{
         hash = 53 * hash + (this.expiryDate != null ? this.expiryDate.hashCode() : 0);
         return hash;
     }
+
+    @Override
+    public String toString() {
+        return "AccessToken {"+token+", expires="+expiryDate+"}";
+    }
+    
+    
     
     /**
      * Parses an integer value as a string.  Automatically truncates at first

@@ -272,7 +272,7 @@ public class TestComponent extends AbstractTest {
 
     private void testCookies() throws IOException {
         Cookie.clearCookiesFromStorage();
-        String baseUrl = "http://solutions.weblite.ca/cn1tests/cookie";
+        String baseUrl = "https://solutions.weblite.ca/cn1tests/cookie";
         String clearCookiesUrl = baseUrl +"/reset.php";
         String setCookiesUrl = baseUrl + "/set.php";
         String checkCookiesUrl = baseUrl + "/check.php";
@@ -411,7 +411,7 @@ public class TestComponent extends AbstractTest {
         f.add(BorderLayout.CENTER, bc);
         f.show();
         TestUtils.waitForFormName(formName, 2000);
-        String baseUrl = "http://solutions.weblite.ca/cn1tests/cookie";
+        String baseUrl = "https://solutions.weblite.ca/cn1tests/cookie";
         String clearCookiesUrl = baseUrl +"/reset.php";
         String setCookiesUrl = baseUrl + "/set.php";
         String checkCookiesUrl = baseUrl + "/check.php";
@@ -570,13 +570,17 @@ public class TestComponent extends AbstractTest {
         });
         hi.add(BorderLayout.SOUTH, loadButton);
         hi.show();
-        TestUtils.waitForFormName(formName, 2000);
+        log("About to wait for form "+formName);
+        TestUtils.waitForFormName(formName, 4000);
+        log("Finished waiting for form "+formName);
         TestUtils.clickButtonByName(buttonName);
+        log("Waiting for browserComponent to load https://www.google.es");
         while (!complete[0]) {
             Display.getInstance().invokeAndBlock(()->{
                 Util.sleep(50);
             });
         }
+        log("Finished waiting for browserComponent to load https://www.google.es");
         String message = null;
         if (ex[0] != null) {
             message = ex[0].getMessage();
@@ -670,6 +674,7 @@ public class TestComponent extends AbstractTest {
     }
 
     private void findCommandComponent() {
+        log("Testing findCommandComponent()");
         Form f = new Form();
         Toolbar tb = new Toolbar();
         f.setToolbar(tb);
@@ -687,6 +692,7 @@ public class TestComponent extends AbstractTest {
      * https://github.com/codenameone/CodenameOne/issues/2255
      */
     public void testOverflowMenuNPE() {
+        log("Testing testOverflowMenuNPE");
         Form hi = new Form();
         hi.setName("testOverflowMenuNPE");
         hi.getToolbar().addCommandToOverflowMenu("Test", FontImage.createMaterial(FontImage.MATERIAL_3D_ROTATION, new Style()), new ActionListener() {
@@ -787,6 +793,7 @@ public class TestComponent extends AbstractTest {
         }
         
         boolean runOwnerTests() throws Exception {
+            log("Running ownerTests");
             Container cnt = new Container();
             Button b2 = new Button();
             assertTrue(!cnt.isOwnedBy(b2), "cnt is not owned by b2");

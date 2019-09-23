@@ -162,6 +162,28 @@ Once you have copied the iOSCerts directory you need to ensure that the sample's
 
 Now you should be able to send the build using "More..." > "Send iOS Debug Build" (or "Send iOS Release Build"
 
+## Debugging Samples
+
+You can debug the samples, by selecting "Debug" in the "More..." menu for any given sample.  This will start up the sample with JDWP enabled on port 7896.
+After the sample is running, you can then attach the debugger in your IDE of choice.  In Netbeans, you would do this by selecting "Attach Debugger..." from the "Debug" menu, then entering the following options:
+
+1. Debugger: Java Debugger (JDPA)
+2. Connector: SocketAttach
+3. Transport: dt_socket
+4. Host: localhost
+5. Port: 7896
+6. Timeout: (leave empty)
+
+## Configuring Push in Samples
+
+### Android
+
+1. Goto https://console.firebase.google.com/ 
+1.1 Add Project
+1.2. Setup Cloud Messaging
+1.3 Download google-services.json
+
+2. Copy google-services.json to config/SAMPLE_NAME/google-services.json
 
 
 
