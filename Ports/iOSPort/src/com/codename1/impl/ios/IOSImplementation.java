@@ -3176,7 +3176,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst.getPreferredMaxLength());
+        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst != null ? cnst.getPreferredMaxLength() : 0);
         dropEvents = true;
     }
     
