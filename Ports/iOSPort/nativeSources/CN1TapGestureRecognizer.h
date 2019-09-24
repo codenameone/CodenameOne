@@ -25,7 +25,7 @@
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #import "CodenameOne_GLViewController.h"
 
-@interface CN1TapGestureRecognizer : UITapGestureRecognizer<UIGestureRecognizerDelegate> {
+@interface CN1TapGestureRecognizer : UIGestureRecognizer<UIGestureRecognizerDelegate> {
     UIView* pressedView;
 }
 - (void) install:(CodenameOne_GLViewController*)ctrl;

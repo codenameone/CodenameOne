@@ -127,10 +127,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
 - (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
+    [super touchesMoved:touches withEvent:event];
+    self.state = UIGestureRecognizerStateBegan;
     // WARNING: DO NOT try to call super touchesMoved or touchesEnd
     // event won't be delivered on iOS 13 and up.
     // See https://groups.google.com/d/msgid/codenameone-discussions/9084cc3f-df2d-47f9-a6a7-036ad6e41a72%40googlegroups.com
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -143,6 +146,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -170,6 +174,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [super touchesEnded:touches withEvent:event];
     if(skipNextTouch) {
         skipNextTouch = NO;
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -177,6 +182,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [touchesArray removeObjectsInArray:ts];
     if([touchesArray count] > 0) {
         POOL_END();
+        
         return;
     }
     UITouch* touch = [touches anyObject];
@@ -188,6 +194,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -209,6 +216,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         [ctrl foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
+    self.state = UIGestureRecognizerStateEnded;
     POOL_END();
 }
 
@@ -217,6 +225,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [super touchesCancelled:touches withEvent:event];
     if(skipNextTouch) {
         skipNextTouch = NO;
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -231,6 +240,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -250,6 +260,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         [ctrl foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
+    self.state = UIGestureRecognizerStateCancelled;
     POOL_END();
 }
 - (void) ignoreTouch:(UITouch *)touch forEvent:(UIEvent *)event
