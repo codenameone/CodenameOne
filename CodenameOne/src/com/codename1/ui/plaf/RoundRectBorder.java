@@ -84,7 +84,8 @@ public class RoundRectBorder extends Border {
     private int shadowOpacity = 0;
 
     /**
-     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+     * X axis bias of the shadow between 0 and 1 where 0 is to the 
+     and 1 is to the bottom, defaults to 0.5
      */
     private float shadowX = 0.5f;
 
@@ -319,7 +320,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
-        if(topOnlyMode) {
+        if(!topOnlyMode) {
             this.topLeft = false;
             this.topRight = false;
             this.bottomLeft = true;
@@ -338,7 +339,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
-        if(bottomOnlyMode) {
+        if(!bottomOnlyMode) {
             this.topLeft = true;
             this.topRight = true;
             this.bottomLeft = false;
