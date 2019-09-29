@@ -1244,7 +1244,7 @@ public abstract class MathUtil {
 
         d = Math.abs(d);
         if (d == Double.MAX_VALUE) {
-            // If the argument is ±Double.MAX_VALUE, then the result is equal to 2^971.
+            // If the argument is Double.MAX_VALUE, then the result is equal to 2^971.
             return MAX_ULP;
         }
 

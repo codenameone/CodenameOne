@@ -1919,7 +1919,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                     Bitmap bitmap = Bitmap.createBitmap(Math.min(cmpWidth, stringWidth), fontHeight,
                             Bitmap.Config.ARGB_8888);
                     Canvas cnv = new Canvas(bitmap);
-                    cnv.drawText(text, 0, nativeFont.getFontAscent() * -1, nativeFont);
+                    cnv.drawText(text, 0, nativeFont.top() * -1, nativeFont);
                     stringBmp = bitmap;
                     drawStringCache.put(dc, stringBmp);
                 }
@@ -2184,7 +2184,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                     drawString(underlying, nativeFont, str, x, y, textDecoration, fontHeight, textCache);
                     return;
                 }
-                underlying.canvas.drawText(str, x, y - font.getFontAscent(), nativeFont);
+                underlying.canvas.drawText(str, x, y - font.top(), nativeFont);
                 if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE) != 0) {
                     underlying.paint.setStyle(Paint.Style.FILL);
                     underlying.canvas.drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1, underlying.paint);
@@ -2201,7 +2201,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 if(textCache != null) {
                     underlying.canvas.drawBitmap(textCache, x, y, nativeFont);
                 } else {
-                    underlying.canvas.drawText(str, x, y - nativeFont.getFontAscent(), nativeFont);
+                    underlying.canvas.drawText(str, x, y - nativeFont.top(), nativeFont);
                 }
             }
         }
@@ -2268,7 +2268,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         Canvas cnv = new Canvas(bitmap);
                         int c = 0xff000000 | color;
                         font.setColor(c);
-                        cnv.drawText(str, 0, font.getFontAscent() * -1, font);
+                        cnv.drawText(str, 0, font.top() * -1, font);
                         stringBmp = bitmap;
                         drawStringCache.put(dc, stringBmp);
                     }

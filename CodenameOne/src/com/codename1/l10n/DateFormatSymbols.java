@@ -62,6 +62,11 @@ public class DateFormatSymbols implements Cloneable {
 	private String weekdays[];
 	private String shortWeekdays[];
 	private String eras[];
+    
+    /**
+     * Allows turning localization on/off defaults to localization
+     */
+    private boolean localized = true;
 
 	public String[] getAmPmStrings() {
 		synchronized (this) {
@@ -102,12 +107,15 @@ public class DateFormatSymbols implements Cloneable {
 	}
 
 	String getLocalizedValue(String key, String defaultValue) {
-		Hashtable<String, String> resourceBundle = getResourceBundle();
-		if (resourceBundle == null || resourceBundle.containsKey(key) == false) {
-			return defaultValue;
-		}
-		String v = (resourceBundle.get(key));
-		return (v.length() > 0) ? v : defaultValue;
+        if(localized) {
+            Hashtable<String, String> resourceBundle = getResourceBundle();
+            if (resourceBundle == null || resourceBundle.containsKey(key) == false) {
+                return defaultValue;
+            }
+            String v = (resourceBundle.get(key));
+            return (v.length() > 0) ? v : defaultValue;
+        }
+        return defaultValue;
 	}
 
 	public String[][] getZoneStrings() {
@@ -150,6 +158,7 @@ public class DateFormatSymbols implements Cloneable {
          * @param shortNameDST The short name of the mapping in daylight saving time. E.g. EDT
          */
         public void addZoneMapping(String zoneId, String longName, String longNameDST, String shortName, String shortNameDST) {
+            localized = true;
             Hashtable<String,String> h = getResourceBundle();
             if (h == null) {
                 h = new Hashtable<String,String>();
@@ -217,7 +226,7 @@ public class DateFormatSymbols implements Cloneable {
 		String shortForms[] = new String[longForms.length];
                 int sflen = shortForms.length;
 		for (int i = 0; i < sflen; i++) {
-                        String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
+            String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
 			String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), defaultVal);
 			if (shortForm != null) {
 				shortForms[i] = shortForm;
@@ -226,7 +235,7 @@ public class DateFormatSymbols implements Cloneable {
 				if (len < 3) {
 					shortForms[i] = longForms[i];
 				} else {
-					shortForms[i] = longForms[i].substring(0, 3);
+					shortForms[i] = limitLength(longForms[i], 3);
 				}
 			}
 		}
@@ -292,6 +301,9 @@ public class DateFormatSymbols implements Cloneable {
 
         private String[] platformLocalizedMonths;
         private String[] getPlatformLocalizedMonths() {
+            if(!localized) {
+                return MONTHS;
+            }
             if (platformLocalizedMonths == null) {
                 int len = MONTHS.length;
                 platformLocalizedMonths = new String[len];
@@ -313,6 +325,9 @@ public class DateFormatSymbols implements Cloneable {
         
         private String[] platformLocalizedShortMonths;
         private String[] getPlatformLocalizedShortMonths() {
+            if(!localized) {
+                return MONTHS;
+            }
             if (platformLocalizedShortMonths == null) {
                 int len = MONTHS.length;
                 platformLocalizedShortMonths = new String[len];
@@ -323,9 +338,9 @@ public class DateFormatSymbols implements Cloneable {
                     cal.set(Calendar.MONTH, i);
                     String fmt = l10n.formatDateLongStyle(cal.getTime());
                     try {
-                        platformLocalizedShortMonths[i] = extractMonthName(fmt).substring(0, 3);
+                        platformLocalizedShortMonths[i] = limitLength(extractMonthName(fmt), 3);
                     } catch (ParseException ex) {
-                        platformLocalizedShortMonths[i] = MONTHS[i].substring(0, 3);
+                        platformLocalizedShortMonths[i] = limitLength(MONTHS[i], 3);
                     }
                 }
             }
@@ -397,4 +412,27 @@ public class DateFormatSymbols implements Cloneable {
 		dfs.resourceBundle = resourceBundle;
 		return dfs;
 	}
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     * @return the localized
+     */
+    public boolean isLocalized() {
+        return localized;
+    }
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     * @param localized the localized to set
+     */
+    public void setLocalized(boolean localized) {
+        this.localized = localized;
+    }
+    
+    String limitLength(String s, int len) {
+        if(s.length() > len) {
+            return s.substring(0, len);
+        }
+        return s;
+    }
 }

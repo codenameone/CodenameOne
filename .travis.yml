@@ -15,6 +15,7 @@ matrix:
     - language: java
       env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
       jdk: openjdk10
+      dist: trusty
       before_script:
         - "export DISPLAY=:99.0"
         - "sh -e /etc/init.d/xvfb start"
@@ -27,12 +28,14 @@ matrix:
     - language: java
       env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
       jdk: oraclejdk9
+      dist: trusty
       before_script:
         - "export DISPLAY=:99.0"
         - "sh -e /etc/init.d/xvfb start"
     - language: java
       env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
       jdk: oraclejdk8
+      dist: trusty
       before_script:
         - "export DISPLAY=:99.0"
         - "sh -e /etc/init.d/xvfb start"

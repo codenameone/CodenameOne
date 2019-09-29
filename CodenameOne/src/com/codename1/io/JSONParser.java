@@ -507,7 +507,8 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private boolean isStackHash() {
-        return parseStack.get(parseStack.size() - 1) instanceof Map;
+        return parseStack.size() > 0 && 
+            parseStack.get(parseStack.size() - 1) instanceof Map;
     }
 
     private Map getStackHash() {
@@ -703,7 +704,7 @@ public class JSONParser implements JSONParseCallback {
      * <pre>{@code
      * Map<String, Object> person = new LinkedHashMap<>();
      * person.put("firstName", "Paco");
-     * person.put("lastName", "Bellèz");
+     * person.put("lastName", "Bellz");
      * person.put("isAlive", true);
      * person.put("age", 35);
      * person.put("weight (kg)", 70.7);
@@ -716,7 +717,7 @@ public class JSONParser implements JSONParseCallback {
      * <pre>{@code
      * {
      *  "firstName": "Paco",
-     *  "lastName": "Bellèz",
+     *  "lastName": "Bellz",
      *  "isAlive": true,
      *  "age": 35,
      *  "weight (kg)": 70.7
@@ -759,7 +760,7 @@ public class JSONParser implements JSONParseCallback {
      * address2.put("phoneNumbers", phoneNumbers2);
      * Map<String, Object> firstPerson = new LinkedHashMap<>();
      * firstPerson.put("firstName", "Paco");
-     * firstPerson.put("lastName", "Bellèz");
+     * firstPerson.put("lastName", "Bellz");
      * firstPerson.put("isAlive", true);
      * firstPerson.put("age", 35);
      * firstPerson.put("weight (kg)", 70.7);
@@ -783,7 +784,7 @@ public class JSONParser implements JSONParseCallback {
      * <pre>{@code
      * {
      *  "firstName": "Paco",
-     *  "lastName": "Bellèz",
+     *  "lastName": "Bellz",
      *  "isAlive": true,
      *  "age": 35,
      *  "weight (kg)": 70.7,

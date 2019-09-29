@@ -91,6 +91,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
@@ -8273,11 +8274,43 @@ public class JavaSEPort extends CodenameOneImplementation {
             NetworkRequestObject nr = new NetworkRequestObject();
             if (nr != null) {
                 nr.setUrl(url);
+                nr.setTimeSent(System.currentTimeMillis());
             }
             netMonitor.addRequest(con, nr);
         }
         return con;
     }
+
+    @Override
+    public void addConnectionToQueue(ConnectionRequest req) {
+        super.addConnectionToQueue(req);
+        if (netMonitor != null) {
+            NetworkRequestObject o = new NetworkRequestObject();
+            o.setTimeQueued(System.currentTimeMillis());
+            netMonitor.addQueuedRequest(req, o);
+        }
+    }
+
+    
+    
+    @Override
+    public void setConnectionId(Object connection, int id) {
+        super.setConnectionId(connection, id); 
+        if (netMonitor != null && connection instanceof URLConnection) {
+            NetworkRequestObject queuedRequest = netMonitor.findQueuedRequest(id);
+            if (queuedRequest != null) {
+                NetworkRequestObject existingRequest = netMonitor.getByConnection((URLConnection)connection);
+                if (existingRequest != null) {
+                    existingRequest.setTimeQueued(queuedRequest.getTimeQueued());
+                } else {
+                    netMonitor.addRequest((URLConnection)connection, queuedRequest);
+                }
+                netMonitor.removeQueuedRequest(queuedRequest);
+            }
+        }
+    }
+    
+    
    
     /**
      * @inheritDoc
@@ -8453,6 +8486,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Thread.sleep(1000);
                     } catch(Exception e) {}
                 }
+                nr.setTimeServerResponse(System.currentTimeMillis());
                 if(disconnectedMode) {
                     throw new IOException("Unreachable");
                 }
@@ -8500,6 +8534,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         return s;
                     }
+
+                    @Override
+                    public void close() throws IOException {
+                        super.close();
+                        if (nr != null) {
+                            nr.setTimeComplete(System.currentTimeMillis());
+                        }
+                    }
+                    
+                    
                 };
                 return i;
             }

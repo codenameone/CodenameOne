@@ -61,6 +61,8 @@ While Codename One itself works with all major IDE's the code in this repository
 
 <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
 
+Please notice that while we fully support IntelliJ/IDEA (both CE and Ultimate), we don't support Android Studio which diverted too much from the mainline IDE.
+
 ### Quick Start
 
 **Getting and Building Sources**

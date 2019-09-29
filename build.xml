@@ -83,6 +83,7 @@
         <arg value="-s"/>
         <arg value="-e"/>
         <arg value="-skipCompileCn1Sources"/>
+        <!--<arg value="-v"/>-->
       </exec>
     </target>
 

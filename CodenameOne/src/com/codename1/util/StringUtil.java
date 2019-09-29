@@ -71,6 +71,32 @@ public class StringUtil {
 
         return sb.toString();
     }
+
+    /**
+     * This method replaces the first occurrence of the pattern with the 
+     * replacement String
+     * 
+     * @param source the String source
+     * @param pattern String to replace in the source
+     * @param replace replacement String
+     * @return string with replaced elements
+     */
+    public static String replaceFirst(String source, String pattern, String replace) {
+        StringBuilder sb = new StringBuilder();
+        int idx = 0;
+        String workingSource = source;
+        idx = workingSource.indexOf(pattern);
+        if(idx == -1){
+            return source;
+        }
+        
+        sb.append(workingSource.substring(0, idx));
+        sb.append(replace);
+        workingSource = workingSource.substring(idx + pattern.length());
+        sb.append(workingSource);
+
+        return sb.toString();
+    }
     
     /**
      * Breaks a String to multiple strings.
@@ -116,7 +142,7 @@ public class StringUtil {
      * @param source the String to break
      * @param separator the characters that can be used to search and break.
      * @return a Vector of Strings
-     * @deprecated use the tokenize() method instead
+     * @deprecated use the {@link #tokenize(java.lang.String, java.lang.String) } method instead
      */
     public static Vector tokenizeString(String source, String separator) {
         if(separator.length() == 1) {
@@ -161,7 +187,7 @@ public class StringUtil {
                 char current = source.charAt(iter);
                 if(current == separator) {
                     if(lastSeparator) {
-                        buf.append(separator);
+                        //buf.append(separator);
                         lastSeparator = false;
                         continue;
                     }

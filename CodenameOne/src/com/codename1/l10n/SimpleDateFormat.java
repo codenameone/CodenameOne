@@ -32,9 +32,11 @@ import java.util.Vector;
 
 /**
  * A class for parsing and formatting dates with a given pattern, compatible
- * with the Java 6 API.
- *
- * See http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html
+ * with the Java 6 API, as in the examples here: https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+ * <br /><br />
+ * To localize the formatted dates, see the discussion
+ * <a href="https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one">Format a localized date
+ * in Codename One</a>. 
  *
  * @author Eric Coolman
  */
@@ -264,7 +266,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     public String format(Date source) {
-        return format(source, new StringBuffer());
+        return format(source, new StringBuilder());
     }
 
     /*
@@ -274,6 +276,15 @@ public class SimpleDateFormat extends DateFormat {
      */
     @Override
     String format(Date source, StringBuffer toAppendTo) {
+        StringBuilder sb = new StringBuilder();
+        String out = format(source, sb);
+        toAppendTo.append(sb.toString());
+        return toAppendTo.toString();
+        
+    }
+    
+    @Override
+    String format(Date source, StringBuilder toAppendTo) {
         if(source == null) {
             source = new Date();
         }
@@ -321,7 +332,8 @@ public class SimpleDateFormat extends DateFormat {
                     if (names == null) {
                         toAppendTo.append(calendar.getTimeZone().getID());
                     } else {
-                        toAppendTo.append(names[DateFormatSymbols.ZONE_SHORTNAME]);
+                        DateUtil du = new DateUtil(TimeZone.getTimeZone(names[DateFormatSymbols.ZONE_ID]));
+                        toAppendTo.append(names[du.inDaylightTime(source) ? DateFormatSymbols.ZONE_SHORTNAME_DST : DateFormatSymbols.ZONE_SHORTNAME]);
                     }
                     break;
                 case TIMEZONE822_LETTER:
@@ -427,15 +439,13 @@ public class SimpleDateFormat extends DateFormat {
         return s;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.text.DateFormat#parse(java.lang.String)
+    /**
+     * Parses text from a string to produce a Date. 
      */
     @Override
     public Date parse(String source) throws ParseException {
         if (pattern == null) {
-            return super.parse(source);
+            throw new ParseException("You must provide a template before calling the SimpleDateFormat.parse(...) method", 0);
         }
         int startIndex = 0;
         // parse based on GMT timezone for handling offsets
@@ -777,15 +787,22 @@ public class SimpleDateFormat extends DateFormat {
         if (fragment == null) {
             return null;
         }
-        for (String weekday : getDateFormatSymbols().getWeekdays()) {
+        DateFormatSymbols ds = getDateFormatSymbols();
+        for (String weekday : ds.getWeekdays()) {
             if (fragment.equalsIgnoreCase(weekday)) {
                 return readSubstring(source, ofs, ofs + weekday.length());
             }
         }
-        for (String weekday : getDateFormatSymbols().getShortWeekdays()) {
+        for (String weekday : ds.getShortWeekdays()) {
             if (fragment.equalsIgnoreCase(weekday)) {
                 return readSubstring(source, ofs, ofs + weekday.length());
             }
+        }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            String s = readDayOfWeek(source, ofs);
+            ds.setLocalized(true);
+            return s;
         }
         return null;
     }
@@ -807,7 +824,8 @@ public class SimpleDateFormat extends DateFormat {
         if (fragment == null) {
             return null;
         }
-        String markers[] = getDateFormatSymbols().getAmPmStrings();
+        DateFormatSymbols ds = getDateFormatSymbols();
+        String markers[] = ds.getAmPmStrings();
         for (String marker : markers) {
             if (fragment.toLowerCase().startsWith(marker.toLowerCase())) {
                 return readSubstring(source, ofs, ofs + marker.length());
@@ -817,6 +835,12 @@ public class SimpleDateFormat extends DateFormat {
             if (fragment.toLowerCase().charAt(0) == marker.toLowerCase().charAt(0)) {
                 return readSubstring(source, ofs, ofs + 1);
             }
+        }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            String s = readAmPmMarker(source, ofs);
+            ds.setLocalized(true);
+            return s;
         }
         return null;
     }
@@ -833,6 +857,7 @@ public class SimpleDateFormat extends DateFormat {
      * @throws ParseException if the source could not be parsed.
      */
     int parseAmPmMarker(String source, int ofs) throws ParseException {
+        DateFormatSymbols ds = getDateFormatSymbols();
         String markers[] = getDateFormatSymbols().getAmPmStrings();
         int mlen = markers.length;
         for (int i = 0; i < mlen; i++) {
@@ -846,6 +871,12 @@ public class SimpleDateFormat extends DateFormat {
         }
         if (ch == markers[1].charAt(0)) {
             return Calendar.PM;
+        }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            int i = parseAmPmMarker(source, ofs);
+            ds.setLocalized(true);
+            return i;
         }
         return throwInvalid("am/pm marker", ofs);
     }
@@ -875,15 +906,22 @@ public class SimpleDateFormat extends DateFormat {
         if (fragment == null) {
             return null;
         }
-        for (String month : getDateFormatSymbols().getMonths()) {
+        DateFormatSymbols ds = getDateFormatSymbols();
+        for (String month : ds.getMonths()) {
             if (fragment.equalsIgnoreCase(month)) {
                 return readSubstring(source, ofs, ofs + month.length());
             }
         }
-        for (String month : getDateFormatSymbols().getShortMonths()) {
+        for (String month : ds.getShortMonths()) {
             if (fragment.equalsIgnoreCase(month)) {
                 return readSubstring(source, ofs, ofs + month.length());
             }
+        }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            String s = readMonth(source, ofs, token, adjacent);
+            ds.setLocalized(true);
+            return s;
         }
         return null;
     }
@@ -904,20 +942,32 @@ public class SimpleDateFormat extends DateFormat {
         if (month.length() < 3) {
             return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
         }
-        String months[] = getDateFormatSymbols().getMonths();
+        DateFormatSymbols ds = getDateFormatSymbols();
+        String months[] = ds.getMonths();
         int mlen = months.length;
         for (int i = 0; i < mlen; i++) {
             if (month.equalsIgnoreCase(months[i])) {
                 return i + Calendar.JANUARY;
             }
         }
-        months = getDateFormatSymbols().getShortMonths();
+        months = ds.getShortMonths();
         mlen = months.length;
         for (int i = 0; i < mlen; i++) {
             if (month.equalsIgnoreCase(months[i])) {
                 return i + Calendar.JANUARY;
             }
         }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            int i = 0;
+            try {
+                i = parseMonth(month, offset);
+            } finally {
+                ds.setLocalized(true);
+            }
+            return i;
+        }
+        
         return throwInvalid("month", offset);
     }
 
@@ -947,7 +997,7 @@ public class SimpleDateFormat extends DateFormat {
         // handle zulu
         if (len == 1) {
             if (fragment.toLowerCase().equals("z")) {
-                return readSubstring(source, ofs, 1);
+                return readSubstring(source, ofs, ofs + 1);
             }
             return null;
         }
@@ -959,12 +1009,19 @@ public class SimpleDateFormat extends DateFormat {
         if (len >= 5 && (ch == SIGN_NEGATIVE || ch == SIGN_POSITIVE)) {
             return readSubstring(source, ofs, ofs + 5);
         }
-        for (String timezone[] : getDateFormatSymbols().getZoneStrings()) {
+        DateFormatSymbols ds = getDateFormatSymbols();
+        for (String timezone[] : ds.getZoneStrings()) {
             for (String z : timezone) {
                 if (z.equalsIgnoreCase(fragment)) {
                     return readSubstring(source, ofs, ofs + z.length());
                 }
             }
+        }
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            String s = readTimeZone(source, ofs);
+            ds.setLocalized(true);
+            return s;
         }
         return null;
     }
@@ -989,6 +1046,9 @@ public class SimpleDateFormat extends DateFormat {
             throwInvalid("timezone", ofs);
         }
         char tzSign = source.charAt(0);
+        if(tzSign == 'z' || tzSign == 'Z') {
+            return 0;
+        }
         // handle RFC822 style GMT offset (-0500)
         if (tzSign == SIGN_NEGATIVE || tzSign == SIGN_POSITIVE) {
             source = readSubstring(source, 1);
@@ -1028,8 +1088,10 @@ public class SimpleDateFormat extends DateFormat {
             }
             return parseTimeZone(source, ofs, res);
         }
+        DateFormatSymbols ds = getDateFormatSymbols();
+
         // Handle timezone based on ID or full name
-        for (String timezone[] : getDateFormatSymbols().getZoneStrings()) {
+        for (String timezone[] : ds.getZoneStrings()) {
             for (String z : timezone) {
                 if (z.equalsIgnoreCase(source)) {
                     TimeZone tz = TimeZone.getTimeZone(timezone[DateFormatSymbols.ZONE_ID]);
@@ -1038,6 +1100,18 @@ public class SimpleDateFormat extends DateFormat {
                 }
             }
         }
+        
+        if(ds.isLocalized()) {
+            ds.setLocalized(false);
+            int i = 0;
+            try {
+                i = parseTimeZone(source, ofs, res);
+            } finally {
+                ds.setLocalized(true);
+            }
+            return i;
+        }
+        
         return throwInvalid("timezone", ofs);
     }
 

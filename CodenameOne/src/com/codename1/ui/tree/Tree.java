@@ -31,7 +31,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
-import com.codename1.ui.Label;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
@@ -357,7 +356,7 @@ public class Tree extends Container {
         }
         c.putClientProperty(KEY_EXPANDED, "true");
         if(openFolder == null) {
-            FontImage.setMaterialIcon(c, FontImage.MATERIAL_FOLDER, 3);
+            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER, c, 3);
         } else {
             setNodeIcon(openFolder, c);
         }
@@ -368,8 +367,10 @@ public class Tree extends Container {
         parent.addComponent(BorderLayout.CENTER, dest);
         buildBranch(o, depth, dest);
         if(isInitialized() && animate) {
-            // prevent a race condition on node expansion contraction
-            parent.animateHierarchyAndWait(300);
+            dest.setHeight(0);
+            dest.setVisible(true);
+            animateLayoutAndWait(300);
+            //parent.animateHierarchyAndWait(300);
             if(multilineMode) {
                 revalidate();
             }
@@ -433,6 +434,44 @@ public class Tree extends Container {
             }
         }
     }
+    
+    /**
+     * Finds the component for a model node.
+     * @param node The node from the model.
+     * @return The corresponding component in the UI or null if not found.
+     * @since 7.0
+     */
+    public Component findNodeComponent(Object node) {
+        return findNodeComponent(node, this);
+    }
+    
+    /**
+     * Finds the component for a model node.
+     * @param node Model node whose view we seek.
+     * @param root A root component - we check root and its descendents.
+     * @return The corresponding UI component for node, or null if not found.
+     * @since 7.0
+     */
+    public Component findNodeComponent(Object node, Component root) {
+        if (root == null) {
+            return findNodeComponent(node, this);
+        }
+        Object rootNode = (Object)root.getClientProperty(KEY_OBJECT);
+        
+        if (node.equals(rootNode)) {
+            return root;
+        }
+        if (root instanceof Container) {
+            int len = ((Container)root).getComponentCount();
+            for (int i=0; i<len; i++) {
+                Component found = findNodeComponent(node, ((Container) root).getComponentAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
 
     /**
      * Expands the tree path
@@ -481,7 +520,11 @@ public class Tree extends Container {
             c = lead;
         }
         c.putClientProperty(KEY_EXPANDED, null);
-        setNodeIcon(folder, c);
+        if(folder == null) {
+            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER, c, 3);
+        } else {
+            setNodeIcon(folder, c);
+        }
         Container p = c.getParent();
         for(int iter = 0 ; iter < p.getComponentCount() ; iter++) {
             if(p.getComponentAt(iter) != c) {
@@ -489,9 +532,12 @@ public class Tree extends Container {
                     p.removeComponent(p.getComponentAt(iter));
                     break; // there should only be one container with all children
                 } else {
-                    Label dummy = new Label();
-                    p.replaceAndWait(p.getComponentAt(iter), dummy, t, true);
-                    p.removeComponent(dummy);
+                    Component dest = p.getComponentAt(iter);
+                    dest.setHidden(true);
+                    
+                    animateLayoutAndWait(300);
+                    p.removeComponent(dest);
+
                 }
             }
         }
@@ -509,6 +555,77 @@ public class Tree extends Container {
         }
         return null;
     }
+
+    /**
+     * Gets the parent model node for a component.
+     * @param nodeComponent The UI for a node.
+     * @return The model node's parent, or null if not found.
+     */
+    public Object getParentNode(Component nodeComponent) {
+        if (nodeComponent == null) {
+            return null;
+        }
+        return nodeComponent.getClientProperty(KEY_PARENT);
+        
+    }
+    
+    /**
+     * Gets the UI component corresponding to the parent model mode of the node
+     * corresponding with the given UI component.
+     * @param nodeComponent UI component, whose node we seek the parent.
+     * @return UI component for the given node's parent.
+     * @since 7.0
+     */
+    public Component getParentComponent(Component nodeComponent) {
+        if (nodeComponent == null) {
+            return null;
+        }
+        return findNodeComponent(getParentNode(nodeComponent));
+    }
+    
+    /**
+     * Refreshes a node of the tree.
+     * @param nodeComponent The node component.
+     * @since 7.0
+     */
+    public void refreshNode(Component nodeComponent) {
+        if (nodeComponent == null) {
+            throw new IllegalArgumentException("refreshNode expects a non-null argument");
+        }
+        Object node = nodeComponent.getClientProperty(KEY_OBJECT);
+        if (node == null) {
+            return;
+        }
+        Object nodeParent = nodeComponent.getClientProperty(KEY_PARENT);
+        int depth =  ((Integer)nodeComponent.getClientProperty(KEY_DEPTH)).intValue();
+        Container parentCnt = nodeComponent.getParent();
+        if (parentCnt == null) {
+            return;
+        }
+        boolean expanded = isExpanded(nodeComponent);
+        Component newCmp = createNode(node, depth);
+        Object current = node;
+        newCmp.putClientProperty(KEY_OBJECT, current);
+        newCmp.putClientProperty(KEY_PARENT, nodeParent);
+        newCmp.putClientProperty(KEY_DEPTH, depth);
+        newCmp.getAllStyles().setMarginLeft(nodeComponent.getStyle().getMarginLeft(nodeComponent.isRTL()));
+        if(model.isLeaf(current)) {
+            parentCnt.replace(nodeComponent, newCmp, null);
+            bindNodeListener(new Handler(current), newCmp);
+        } else {
+            Container componentArea = new Container(new BorderLayout());
+            componentArea.addComponent(BorderLayout.NORTH, newCmp);
+            parentCnt.getParent().replace(parentCnt, componentArea, null);
+            bindNodeListener(expansionListener, newCmp);
+            if (expanded) {
+                expandNode(false, newCmp, false);
+            }
+        }
+        
+        
+        revalidateWithAnimationSafety();
+    }
+    
 
     /**
      * Adds the child components of a tree branch to the given container.
@@ -592,6 +709,17 @@ public class Tree extends Container {
     }
     
     /**
+     * Sets material icon for the node.
+     * @param c Material icon code.  See {@link FontImage}
+     * @param node The node to set the icon for.
+     * @param size The size in millimetres for the icon.
+     * @since 7.0
+     */
+    protected void setNodeMaterialIcon(char c, Component node, float size) {
+        FontImage.setMaterialIcon(node, FontImage.MATERIAL_FOLDER, 3);
+    }
+    
+    /**
      * Creates a node within the tree, this method is protected allowing tree to be
      * subclassed to replace the rendering logic of individual tree buttons.
      *
@@ -648,6 +776,16 @@ public class Tree extends Container {
         leafListener.removeListener(l);
     }
 
+    /**
+     * Gets the model for a component in the tree.
+     * @param node The component whose model we want to obtain.
+     * @return The model.
+     * @since 7.0
+     */
+    protected Object getModel(Component node) {
+        return node.getClientProperty(KEY_OBJECT);
+    }
+    
     /**
      * {@inheritDoc}
      */

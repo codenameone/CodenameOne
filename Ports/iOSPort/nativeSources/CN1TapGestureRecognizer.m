@@ -47,10 +47,36 @@ extern BOOL CN1useTapGestureRecognizer;
 
 - (void) install:(CodenameOne_GLViewController*)ctrl {
     [self setCancelsTouchesInView:NO];
+    self.delegate = self;
     [ctrl.view.window addGestureRecognizer:self];
     CN1useTapGestureRecognizer = YES;
     
     
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    if (gestureRecognizer == self || otherGestureRecognizer == self) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Some events need to be ignored.  We only want to receive events originating from our view hierarchy
+ * that is controlled by the GLViewController.
+ */
+-(BOOL)ignoreEvent:(UITouch*)touch {
+    CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
+    // touchesForView should return all of the touches in the GLViewController.view and descendents.
+    // the "view" member will either be the EAGLView itself, or a container that includes the
+    // EAGLView and peer components.
+    // We DO want to process touches from peer components
+    // We DO NOT want to process touches from popovers like datepickers and openGallery.
+    // See the OpenGalleryTest2793 sample to test events for openGallery.
+    BOOL ignore = (touch == nil || pressedView == nil || ![pressedView isDescendantOfView:ctrl.view]);
+
+    return ignore;
 }
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
@@ -61,13 +87,17 @@ extern BOOL CN1useTapGestureRecognizer;
         touchesArray = [[NSMutableArray alloc] init];
     }
     UITouch* touch = [touches anyObject];
+    if (touch != nil) {
+        pressedView = touch.view;
+    }
     NSArray *ts = [touches allObjects];
     [touchesArray addObjectsFromArray:ts];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+
+    if ([self ignoreEvent:touch]) {
+        [touchesArray removeObjectsInArray:ts];
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
@@ -98,7 +128,12 @@ extern BOOL CN1useTapGestureRecognizer;
 - (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesMoved:touches withEvent:event];
+    self.state = UIGestureRecognizerStateBegan;
+    // WARNING: DO NOT try to call super touchesMoved or touchesEnd
+    // event won't be delivered on iOS 13 and up.
+    // See https://groups.google.com/d/msgid/codenameone-discussions/9084cc3f-df2d-47f9-a6a7-036ad6e41a72%40googlegroups.com
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -106,12 +141,12 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touchesArray count]];
     int yArray[[touchesArray count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -139,6 +174,7 @@ extern BOOL CN1useTapGestureRecognizer;
     [super touchesEnded:touches withEvent:event];
     if(skipNextTouch) {
         skipNextTouch = NO;
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -146,18 +182,19 @@ extern BOOL CN1useTapGestureRecognizer;
     [touchesArray removeObjectsInArray:ts];
     if([touchesArray count] > 0) {
         POOL_END();
+        
         return;
     }
     UITouch* touch = [touches anyObject];
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -179,6 +216,7 @@ extern BOOL CN1useTapGestureRecognizer;
         [ctrl foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
+    self.state = UIGestureRecognizerStateEnded;
     POOL_END();
 }
 
@@ -187,6 +225,7 @@ extern BOOL CN1useTapGestureRecognizer;
     [super touchesCancelled:touches withEvent:event];
     if(skipNextTouch) {
         skipNextTouch = NO;
+        self.state = UIGestureRecognizerStateCancelled;
         return;
     }
     POOL_BEGIN();
@@ -196,12 +235,12 @@ extern BOOL CN1useTapGestureRecognizer;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
-    UIWindow *win = [[ctrl view] window];
-    if (win == nil) {
+    if ([self ignoreEvent:touch]) {
         // If the main GLView isn't showing, then just
         // skip this.  We were getting pointer events
         // handled here when the gallery was opened:
         // https://github.com/codenameone/CodenameOne/issues/2793
+        self.state = UIGestureRecognizerStateCancelled;
         POOL_END();
         return;
     }
@@ -221,6 +260,7 @@ extern BOOL CN1useTapGestureRecognizer;
         [ctrl foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
+    self.state = UIGestureRecognizerStateCancelled;
     POOL_END();
 }
 - (void) ignoreTouch:(UITouch *)touch forEvent:(UIEvent *)event

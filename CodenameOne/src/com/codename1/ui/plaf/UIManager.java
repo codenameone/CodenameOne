@@ -703,8 +703,14 @@ public class UIManager {
 
         if (installedTheme == null || !installedTheme.containsKey("PopupDialog.derive")) {
             themeProps.put("PopupDialog.derive", "Dialog");
-        }
-        
+            themeProps.put("PopupDialog.border", RoundRectBorder.create().
+                cornerRadius(2f).
+                shadowOpacity(60).shadowSpread(3.0f));
+            themeProps.put("PopupDialog.transparency", "255");
+            themeProps.put("PopupDialog.bgColor", "ffffff");
+            themeProps.put("PopupDialog.padding", "4,4,4,4");
+            themeProps.put("PopupDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+        }        
        
         
         if(installedTheme == null || !installedTheme.containsKey("DialogContentPane.derive")) {

@@ -111,13 +111,16 @@ public class FlowLayout extends Layout{
      */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
-        int containerPaddingLeft = s.getPaddingLeft(parent.isRTL());
-        int x = containerPaddingLeft;
-        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL()) - x;
-        
         boolean rtl = parent.isRTL();
+        int containerPaddingLeft = s.getPaddingLeftNoRTL();
+        int containerPaddingRight = s.getPaddingRightNoRTL();
+        int sideGap = parent.getSideGap();
+        int x = containerPaddingLeft;
+        int layoutWidth = parent.getLayoutWidth();
+        int width = layoutWidth - sideGap - containerPaddingRight - containerPaddingLeft;
+
         if(rtl) {
-            x += parent.getSideGap();
+            x += sideGap;
         }
         int initX = x;
 
@@ -125,7 +128,7 @@ public class FlowLayout extends Layout{
         int rowH=0;
         int start=0;
         int rowBaseline=0;
-
+        
         int maxComponentWidth = width;
 
         int numOfcomponents = parent.getComponentCount();
@@ -138,11 +141,12 @@ public class FlowLayout extends Layout{
 
             // first component never breaks the line. Since width already removed padding and X already includes the 
             // left padding we need to re-add the left padding to the width
-            if((x == s.getPaddingLeft(rtl)) || ( x+ cmp.getPreferredW() <= width + containerPaddingLeft) ) {
+            if((x == initX) || ( x+ cmp.getPreferredW() <= width + containerPaddingLeft) ) {
                 // We take the actual LEFT since drawing is done in reverse
                 x += cmp.getStyle().getMarginLeftNoRTL();
                 if(rtl) {
-                	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+                    cmp.setX(layoutWidth - x - cmp.getWidth());
+                    //cmp.setX(width - x - cmp.getWidth());
                 } else {
                     cmp.setX(x);
                 }
@@ -159,16 +163,18 @@ public class FlowLayout extends Layout{
                     rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH-cmpBaseline);
                 }
             } else {
-                moveComponents(parent, s.getPaddingLeft(rtl), y, width - s.getPaddingLeft(rtl) - x, rowH, start, i, rowBaseline);
+                moveComponents(parent, 0, y, width - (x-initX), rowH, start, i, rowBaseline);
                 if(fillRows) {
                     fillRow(parent, width, start, i);
                 }
-                x = initX+cmp.getStyle().getMarginLeftNoRTL();
+                x = initX;
                 y += rowH;
                 rowBaseline = 0;
 
                 if(rtl) {
-                	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+                	//cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+                        cmp.setX(layoutWidth - x - cmp.getWidth());
+                        
                 } else {
                 	cmp.setX(x);
                 }
@@ -187,9 +193,25 @@ public class FlowLayout extends Layout{
 
             }
         }
-        moveComponents(parent, s.getPaddingLeft(rtl), y, width - s.getPaddingLeft(rtl) - x, rowH, start, numOfcomponents, rowBaseline);
+        moveComponents(parent, 0, y, width - (x-initX), rowH, start, numOfcomponents, rowBaseline);
         if(fillRows) {
             fillRow(parent, width, start, numOfcomponents);
+        }
+        if (!vAlignByRow) {
+            
+            if (valign == Component.BOTTOM) {
+                int dy = parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH);
+                for(int i=0; i< numOfcomponents; i++){
+                    Component cmp = parent.getComponentAt(i);
+                    cmp.setY(cmp.getY() + dy);
+                }
+            } else if (valign == Component.CENTER) {
+                int dy = (parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH))/2;
+                for(int i=0; i< numOfcomponents; i++){
+                    Component cmp = parent.getComponentAt(i);
+                    cmp.setY(cmp.getY() + dy);
+                }
+            }
         }
     }
 
@@ -242,21 +264,23 @@ public class FlowLayout extends Layout{
         
     }
 
+    
+    
     private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline ) {
         switch (orientation) {
             case Component.CENTER:
                 // this will remove half of last gap
                 if (target.isRTL()) {
-                	x -= (width) / 2;
+                	x = -(width) / 2;
                 } else {
-                	x += (width) / 2;
+                	x = (width) / 2;
                 }
                 break;
             case Component.RIGHT:
-                if(!target.isRTL()) {
-                    x+=width;  // this will remove the last gap                    
+                if(target.isRTL()) {
+                    x=-width;  // this will remove the last gap                    
                 } else {
-                    x -= width;
+                    x = width;
                 }
                 break;
         }
@@ -271,20 +295,21 @@ public class FlowLayout extends Layout{
             if(m.getWidth() + marginX < target.getWidth() - parentPadding){
                 m.setX(m.getX()+ x);
             }
+            
             int marginTop = style.getMarginTop();
             switch(valign) {
                 case Component.BOTTOM:
                     if (vAlignByRow) {
-                        m.setY(y + Math.max(marginTop, height - m.getHeight()) - style.getMarginBottom());
+                        m.setY(y + Math.max(marginTop, height - m.getHeight() - style.getMarginBottom()));
                     } else {
-                        m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()) - style.getMarginBottom());
+                        //m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()) - style.getMarginBottom());
                     }
                     break;
                 case Component.CENTER:
                     if (vAlignByRow) {
-                        m.setY(y + Math.max(marginTop, (height - m.getHeight()) / 2));                    
+                        m.setY(y + Math.max(marginTop, (height - m.getOuterHeight()) / 2 + style.getMarginTop()));                    
                     } else {
-                        m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
+                        //m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
                     }
                     break;
                 case Component.BASELINE:
@@ -295,6 +320,7 @@ public class FlowLayout extends Layout{
                     m.setY(y + marginTop);
                     break;
             }
+            
         }
     }
 

@@ -24,6 +24,7 @@
 package com.codename1.io.rest;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Data;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
@@ -31,6 +32,7 @@ import com.codename1.io.gzip.GZConnectionRequest;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.FailureCallback;
@@ -39,6 +41,7 @@ import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -65,7 +68,7 @@ public class RequestBuilder {
     
     private Integer timeout;
     
-    private String body;
+    private Data body;
         
     private String contentType;
     
@@ -74,7 +77,8 @@ public class RequestBuilder {
     private ErrorCodeHandler<String> stringErrorCallback;
     private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
     private Class errorHandlerPropertyType;
-    private ActionListener<NetworkEvent> errorCallback;
+    //private ActionListener<NetworkEvent> errorCallback;
+    private ArrayList<ActionListener<NetworkEvent>> errorCallbacks = new ArrayList<ActionListener<NetworkEvent>>();
     private ConnectionRequest.CachingMode cache;
     private boolean fetched;
     
@@ -156,10 +160,33 @@ public class RequestBuilder {
     /**
      * Sets the request body
      * 
-     * @param body request body 
+     * @param body request bodyContent 
      * @return RequestBuilder instance
      */ 
-    public RequestBuilder body(String body) {
+    public RequestBuilder body(final String bodyContent) {
+        checkFetched();
+        this.body = new Data() {
+            @Override
+            public void appendTo(OutputStream output) throws IOException {
+                output.write(bodyContent.getBytes("UTF-8"));
+            }
+
+            @Override
+            public long getSize() throws IOException {
+                return bodyContent.getBytes("UTF-8").length;
+            }
+        };
+        return this;
+    }
+    
+    /**
+     * Sets the request body lazily.
+     * @param body Wrapper for the request body that knows how to append to an output stream.
+     * @return RequestBuilder instances
+     * @since 7.0
+     * @see #body(java.lang.String) 
+     */
+    public RequestBuilder body(Data body) {
         checkFetched();
         this.body = body;
         return this;
@@ -172,8 +199,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder body(PropertyBusinessObject body) {
-        checkFetched();
-        this.body = body.getPropertyIndex().toJSON();
+        body(body.getPropertyIndex().toJSON());
         return this;
     }
         
@@ -229,14 +255,31 @@ public class RequestBuilder {
     }
     
     /**
-     * Invoked for exceptions or failures such as disconnect
+     * Invoked for exceptions or failures such as disconnect.  Replaces any existing
+     * callbacks previously registered with {@link #onError(com.codename1.ui.events.ActionListener) }
      * @param error callback for a networking error
      * @return RequestBuilder instance
+     * @see #onError(com.codename1.ui.events.ActionListener, boolean) 
      * 
      */
     public RequestBuilder onError(ActionListener<NetworkEvent> error) {
+        return onError(error, true);
+    }
+    
+    /**
+     * Invoked for exceptions or failures such as disconnect
+     * @param error callback for a networking error
+     * @param replace If true, replaces the existing errorCallback(s) with the handler
+     * provided.
+     * @return RequestBuilder instance
+     * @since 7.0
+     */
+    public RequestBuilder onError(ActionListener<NetworkEvent> error, boolean replace) {
         checkFetched();
-        errorCallback = error;
+        if (replace) {
+            errorCallbacks.clear();
+        }
+        errorCallbacks.add(error);
         return this;
     }
     
@@ -315,10 +358,13 @@ public class RequestBuilder {
     }
     
     private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
-        ConnectionRequest request = createRequest(false);
+        final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 try {
                     res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
@@ -377,10 +423,13 @@ public class RequestBuilder {
     }
     
     private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
-        ConnectionRequest request = createRequest(false);
+        final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
                 if(callback instanceof Callback) {
@@ -425,10 +474,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsJsonMap(final OnComplete<Response<Map>> callback) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 res = new Response(evt.getResponseCode(), response, evt.getMessage());
@@ -448,10 +500,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 try {
@@ -490,10 +545,13 @@ public class RequestBuilder {
      * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
      */ 
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 if(onError != null) {
                     // this is an error response code and should be handled as an error
                     if(evt.getResponseCode() > 310) {
@@ -582,10 +640,13 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
-        ConnectionRequest request = createRequest(true);
+        final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(request.errorCode) {
+                    return;
+                }
                 Response res = null;
                 Map response = (Map)evt.getMetaData();
                 List<Map> lst = (List<Map>)response.get("root");
@@ -644,7 +705,7 @@ public class RequestBuilder {
     
     class Connection extends GZConnectionRequest {
         private boolean parseJSON;
-        private boolean errorCode;
+        boolean errorCode;
         Map json;
         private ErrorCodeHandler errorHandler;
         private Object errorObject;
@@ -722,8 +783,8 @@ public class RequestBuilder {
         
     }
     
-    private ConnectionRequest createRequest(boolean parseJson) {
-        ConnectionRequest req = new Connection(parseJson);
+    private Connection createRequest(boolean parseJson) {
+        Connection req = new Connection(parseJson);
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
         }       
@@ -752,10 +813,10 @@ public class RequestBuilder {
         for (String key : headers.keySet()) {
             req.addRequestHeader(key, headers.get(key));
         }
-        if(errorCallback != null) {
-            req.addExceptionListener(errorCallback);
+        for (ActionListener<NetworkEvent> l : errorCallbacks) {
+            req.addExceptionListener(l);
         }
-
+        
         return req;
     }
 }

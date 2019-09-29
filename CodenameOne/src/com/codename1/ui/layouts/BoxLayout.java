@@ -89,6 +89,10 @@ public class BoxLayout extends Layout{
      */
     public static final int Y_AXIS_BOTTOM_LAST = 4;
     
+    /**
+     * @since 7.0
+     */
+    private int align=Component.TOP;
     
     private int axis;
     
@@ -119,11 +123,75 @@ public class BoxLayout extends Layout{
     }
     
     /**
+     * Creates a new layout with {@link #Y_AXIS}, and align center.
+     * @return BoxLayout with center alignment on Y_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout yCenter() {
+        BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
+        out.setAlign(Component.CENTER);
+        return out;
+    }
+    
+    /**
+     * Creates a new layout with {@link #Y_AXIS}, and align bottom.
+     * @return BoxLayout with bottom alignment on Y_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout yBottom() {
+        BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
+        out.setAlign(Component.BOTTOM);
+        return out;
+    }
+    
+    /**
      * Shorthand for {@code new BoxLayout(BoxLayout.X_AXIS)}
      * @return a new X axis {@code BoxLayout}
      */
     public static BoxLayout x() {
         return new BoxLayout(BoxLayout.X_AXIS);
+    }
+    
+    /**
+     * Creates a new layout with {@link #X_AXIS}, and align center.
+     * @return BoxLayout with center alignment on X_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout xCenter() {
+        BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
+        out.setAlign(Component.CENTER);
+        return out;
+    }
+    
+    /**
+     * Creates a new layout with {@link #X_AXIS}, and align right.
+     * @return BoxLayout with right alignment on X_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout xRight() {
+        BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
+        out.setAlign(Component.RIGHT);
+        return out;
+    }
+    
+    /**
+     * Sets the alignment of this layout. By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
+     * @param align One of {@link Component#CENTER}, {@link Component#BOTTOM}, {@link Component#RIGHT}, to adjust the alignment of children.
+     * @since 7.0
+     */
+    public void setAlign(int align) {
+        this.align = align;
+    }
+    
+    /**
+     * Gets the alignment of this layout.  By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
+     * @return The alignment.
+     * @since 7.0
+     */
+    public int getAlign() {
+        return this.align;
     }
 
     /**
@@ -227,7 +295,80 @@ public class BoxLayout extends Layout{
             if(cmp.getY() + cmp.getHeight() < height) {
                 cmp.setY(height - cmp.getHeight());
             }
-        }        
+        }
+        if (axis == Y_AXIS) {
+            
+            if (numOfcomponents > 0) {
+                int containerBottomInner = parent.getLayoutHeight() - parent.getStyle().getPaddingBottom();
+                Component lastCmp = parent.getComponentAt(numOfcomponents-1);
+                int lastCmpBottomOuter = lastCmp.getY() + lastCmp.getHeight() + lastCmp.getStyle().getMarginBottom();
+                int dy = 0;
+                switch (align) {
+                    case Component.CENTER: {
+                        dy = (containerBottomInner - lastCmpBottomOuter) / 2;
+                        break;
+                    }
+                    case Component.BOTTOM: {
+                        dy = (containerBottomInner - lastCmpBottomOuter);
+                        break;
+                    }
+                }
+                if (dy > 0) {
+                    for (int i=0; i<numOfcomponents; i++) {
+                        Component cmp = parent.getComponentAt(i);
+                        cmp.setY(cmp.getY() + dy);
+                    }
+                }
+            }
+            
+        } else if (axis == X_AXIS) {
+            if (numOfcomponents > 0) {
+                if (rtl) {
+                    int containerLeftInner = parent.getStyle().getPaddingLeftNoRTL();
+                    Component lastCmp = parent.getComponentAt(numOfcomponents-1);
+                    int lastCmpLeftOuter = lastCmp.getX() - lastCmp.getStyle().getMarginLeftNoRTL();
+                    int dx = 0;
+                    switch (align) {
+                        case Component.CENTER: {
+                            dx = (lastCmpLeftOuter - containerLeftInner) / 2;
+                            break;
+                        }
+                        case Component.RIGHT: {
+                            dx = (lastCmpLeftOuter - containerLeftInner);
+                            break;
+                        }
+                    }
+                    if (dx > 0) {
+                        for (int i=0; i<numOfcomponents; i++) {
+                            Component cmp = parent.getComponentAt(i);
+                            cmp.setX(cmp.getX() - dx);
+                        }
+                    }
+                } else {
+                    int containerRightInner = parent.getLayoutWidth() - parent.getStyle().getPaddingRightNoRTL();
+                    Component lastCmp = parent.getComponentAt(numOfcomponents-1);
+                    int lastCmpRightOuter = lastCmp.getX() + lastCmp.getWidth() + lastCmp.getStyle().getMarginRightNoRTL();
+                    int dx = 0;
+                    switch (align) {
+                        case Component.CENTER: {
+                            dx = (containerRightInner - lastCmpRightOuter) / 2;
+                            break;
+                        }
+                        case Component.RIGHT: {
+                            dx = (containerRightInner - lastCmpRightOuter);
+                            break;
+                        }
+                    }
+                    if (dx > 0) {
+                        for (int i=0; i<numOfcomponents; i++) {
+                            Component cmp = parent.getComponentAt(i);
+                            cmp.setX(cmp.getX() + dx);
+                        }
+                    }
+                }
+                
+            }
+        }
     }
     
     private Dimension dim = new Dimension(0, 0);
@@ -297,6 +438,26 @@ public class BoxLayout extends Layout{
     }
     
     /**
+     * The equivalent of Container.enclose() with a box layout Y, with center alignment.
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseYCenter(Component... cmps) {
+        return Container.encloseIn(yCenter(), cmps);
+    }
+    
+    /**
+     * The equivalent of Container.enclose() with a box layout Y, with bottom alignment.
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseYBottom(Component... cmps) {
+        return Container.encloseIn(yBottom(), cmps);
+    }
+    
+    /**
      * The equivalent of Container.enclose() with a box layout Y in bottom 
      * last mode
      * @param cmps the set of components
@@ -324,5 +485,25 @@ public class BoxLayout extends Layout{
      */
     public static Container encloseXNoGrow(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS_NO_GROW), cmps);
+    }
+    
+    /**
+     * The equivalent of Container.enclose() with a box layout X, with center alignment.
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseXCenter(Component... cmps) {
+        return Container.encloseIn(xCenter(), cmps);
+    }
+    
+    /**
+     * The equivalent of Container.enclose() with a box layout X, with right alignment.
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseXRight(Component... cmps) {
+        return Container.encloseIn(xRight(), cmps);
     }
 }

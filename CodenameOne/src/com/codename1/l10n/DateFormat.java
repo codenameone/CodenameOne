@@ -85,9 +85,37 @@ public class DateFormat extends Format {
 	 */
 	@Override
 	public String format(Object obj) throws IllegalArgumentException {
-            return format(obj, new StringBuffer());
+            return format(obj, new StringBuilder());
 	}
 
+        /**
+	 * Format a given object.
+	 * 
+	 * @param source object to be formatted.
+	 * @param toAppendTo buffer to which to append output.
+	 * @return  formatted date.
+	 * @throws IllegalArgumentException of the source can not be formatted.
+	 */
+        String format(Object obj, StringBuilder toAppendTo) throws IllegalArgumentException {
+            if(obj instanceof Long) {
+                obj = new Date(((Long)obj).longValue());
+            }
+            Date source = null;
+            if (obj instanceof Date) {
+                    source = (Date) obj;
+            } else if (obj instanceof String) {
+                    try {
+                            source = parse((String) obj);
+                    } catch (ParseException pe) {
+                            throw new RuntimeException(pe.toString());
+                    }
+            }
+            if (source == null) {
+                    throw new IllegalArgumentException((obj == null) ? "null" : obj.toString());
+            }
+            return format(source, toAppendTo);
+        }
+        
 	/**
 	 * Format a given object.
 	 * 
@@ -97,23 +125,10 @@ public class DateFormat extends Format {
 	 * @throws IllegalArgumentException of the source can not be formatted.
 	 */
 	String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
-                if(obj instanceof Long) {
-                    obj = new Date(((Long)obj).longValue());
-                }
-		Date source = null;
-		if (obj instanceof Date) {
-			source = (Date) obj;
-		} else if (obj instanceof String) {
-			try {
-				source = parse((String) obj);
-			} catch (ParseException pe) {
-				throw new RuntimeException(pe.toString());
-			}
-		}
-		if (source == null) {
-			throw new IllegalArgumentException((obj == null) ? "null" : obj.toString());
-		}
-		return format(source, toAppendTo);
+            StringBuilder sb = new StringBuilder();
+            format(obj, sb);
+            toAppendTo.append(sb.toString());
+            return toAppendTo.toString();
 	}
 
 	/**
@@ -123,7 +138,7 @@ public class DateFormat extends Format {
 	 * @return  formatted date.
 	 */
 	public String format(Date source) {
-		return format(source, new StringBuffer());
+		return format(source, new StringBuilder());
 	}
 
 	/**
@@ -134,56 +149,20 @@ public class DateFormat extends Format {
 	 * @return  formatted date.
 	 */
 	String format(Date source, StringBuffer toAppendTo) {
-		/*if (source == null) {
-			throw new IllegalArgumentException();
-		}
-		switch (dateStyle) {
-			case MEDIUM :
-				String medium = getL10NManager().formatDateTimeMedium(source);
-				int i = medium.indexOf(' ');
-				if (i != -1) {
-					toAppendTo.append(medium.substring(0, i));
-				}
-				// default to long style
-			case LONG :
-			case FULL :
-				toAppendTo.append(getL10NManager().formatDateLongStyle(source));
-				break;
-			case SHORT :
-			default :
-				toAppendTo.append(getL10NManager().formatDateShortStyle(source));
-				break;
-		}
-		if (timeStyle != DEFAULT) {
-			String fulldate = null;
-			switch (timeStyle) {
-				case MEDIUM :
-					fulldate = getL10NManager().formatDateTimeMedium(source);
-					break;
-				case LONG :
-				case FULL :
-					// there's no 'long' format method for datetime.
-					fulldate = getL10NManager().formatDateTime(source);
-					break;
-				case SHORT :
-				default :
-					fulldate = getL10NManager().formatDateTimeShort(source);
-					break;
-			}
-			if (fulldate != null) {
-				int i = fulldate.indexOf(' ');
-				if (i != -1) {
-					if (dateStyle != DEFAULT) {
-						toAppendTo.append(' ');
-					}
-					toAppendTo.append(fulldate.substring(i + 1));
-				}
-			}
-		}
-		return toAppendTo.toString();*/
             return source.toString();
 	}
 
+        /**
+	 * Format a given date.
+	 * 
+	 * @param source date to be formatted.
+	 * @param toAppendTo buffer to which to append output.
+	 * @return  formatted date.
+	 */
+	String format(Date source, StringBuilder toAppendTo) {
+            return source.toString();
+	}
+        
 	/**
 	 * NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
 	 */

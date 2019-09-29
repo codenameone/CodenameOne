@@ -152,6 +152,17 @@ public class TableLayout extends Layout {
             setVerticalSpan(span);
             return this;
         }
+        
+        
+        /**
+         * Sets the cells to span vertically, this number must never be smaller than 1
+         *
+         * @param span a number larger than 1
+         * @return this
+         */
+        public Constraint vs(int span) {
+            return verticalSpan(span);
+        }
 
         /**
          * Sets the cells to span horizontally, this number must never be smaller than 1
@@ -176,6 +187,15 @@ public class TableLayout extends Layout {
         }
 
         /**
+         * Sets the cells to span horizontally, this number must never be smaller than 1
+         *
+         * @param span a number larger than 1
+         */
+        public Constraint hs(int span) {
+            return horizontalSpan(span);
+        }
+        
+        /**
          * Sets the column width based on percentage of the parent
          *
          * @param width negative number indicates ignoring this member
@@ -194,6 +214,15 @@ public class TableLayout extends Layout {
             return this;
         }
 
+        /**
+         * Sets the column width based on percentage of the parent
+         *
+         * @param width negative number indicates ignoring this member
+         */
+        public Constraint wp(int width) {
+            return widthPercentage(width);
+        }
+        
         /**
          * Sets the row height based on percentage of the parent
          *
@@ -214,6 +243,16 @@ public class TableLayout extends Layout {
         }
 
         /**
+         * Sets the row height based on percentage of the parent
+         *
+         * @param height negative number indicates ignoring this member
+         */
+        public Constraint hp(int height) {
+            return heightPercentage(height);
+        }
+        
+        
+        /**
          * Sets the horizontal alignment of the table cell
          *
          * @param align Component.LEFT/RIGHT/CENTER
@@ -233,6 +272,15 @@ public class TableLayout extends Layout {
         }
 
         /**
+         * Sets the horizontal alignment of the table cell
+         *
+         * @param align Component.LEFT/RIGHT/CENTER
+         */
+        public Constraint ha(int align) {
+            return horizontalAlign(align);
+        }
+        
+        /**
          * Sets the vertical alignment of the table cell
          *
          * @param valign Component.TOP/BOTTOM/CENTER
@@ -251,6 +299,15 @@ public class TableLayout extends Layout {
             return this;
         }
 
+        /**
+         * Sets the vertical alignment of the table cell
+         *
+         * @param valign Component.TOP/BOTTOM/CENTER
+         */
+        public Constraint va(int valign) {
+            return verticalAlign(valign);
+        }
+        
         /**
          * @return the row
          */
@@ -1027,6 +1084,28 @@ public class TableLayout extends Layout {
         return new Constraint();
     }
 
+    /**
+     * Creates a new Constraint instance to add to the layout, same as 
+     * {@code createConstraint} only shorter syntax
+     *
+     * @return the default constraint
+     */
+    public Constraint cc() {
+        return new Constraint();
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout, same as 
+     * {@code createConstraint} only shorter syntax
+     *
+     * @param row the row for the table starting with 0
+     * @param column the column for the table starting with 0
+     * @return the new constraint
+     */
+    public Constraint cc(int row, int column) {
+        return createConstraint(row, column);
+    }
+    
     /**
      * Creates a new Constraint instance to add to the layout
      *

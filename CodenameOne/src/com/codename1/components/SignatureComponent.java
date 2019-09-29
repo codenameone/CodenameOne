@@ -398,6 +398,7 @@ public class SignatureComponent extends Container {
             private final Stroke stroke = new Stroke();
             private final Rectangle signatureRect = new Rectangle();
             private final Font xFont;
+            private boolean initialized;
             
             SignaturePanel() {
                 stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true)/2));
@@ -478,6 +479,7 @@ public class SignatureComponent extends Container {
             @Override
             public void pointerPressed(int x, int y) {
                 path.moveTo(x(x), y(y));
+                initialized = true;
                 
                 value = null;
                 repaint();
@@ -485,7 +487,12 @@ public class SignatureComponent extends Container {
 
             @Override
             public void pointerDragged(int x, int y) {
-                path.lineTo(x(x), y(y));
+                if(!initialized) {
+                    initialized = true;
+                    path.moveTo(x(x), y(y));
+                } else {
+                    path.lineTo(x(x), y(y));
+                }
                 value = null;
                 repaint();
             }

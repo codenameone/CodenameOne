@@ -1667,7 +1667,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
                 : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
         if(font.fontHeight < 0) {
-            font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());
+            Paint.FontMetrics fm = font.getFontMetrics();
+            font.fontHeight = (int)Math.ceil(fm.bottom - fm.top);
         }
         return font.fontHeight;
     }
@@ -1982,7 +1983,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics(Object image) {
-        return new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
+        return g;
     }
 
     @Override
@@ -4387,46 +4390,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     try {
                         WebView wv = new WebView(getActivity()) {
 
-                            public boolean onKeyDown(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
-                                        }
-                                }
-                                if(Display.getInstance().getProperty(
-                                    "android.propogateKeyEvents", "false").
-                                        equalsIgnoreCase("true") && 
-                                    myView instanceof AndroidAsyncView) {
-                                    ((AndroidAsyncView)myView).onKeyDown(keyCode, event);
-                                }
-                                return super.onKeyDown(keyCode, event);
-                            }
+                            @Override
+                            public boolean dispatchKeyEvent(KeyEvent event) {
 
-                            public boolean onKeyUp(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
+                                int keycode = event.getKeyCode();
+                                keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
+                                if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK || 
+                                    (keycode == KeyEvent.KEYCODE_MENU && 
+                                        Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE)) {
+                                    switch (event.getAction()) {
+                                        case KeyEvent.ACTION_DOWN:
+                                            Display.getInstance().keyPressed(keycode);
+                                            break;
+                                        case KeyEvent.ACTION_UP:
+                                            Display.getInstance().keyReleased(keycode);
+                                            break;
+                                    }
+                                    return true;
+                                } else {
+                                    if(Display.getInstance().getProperty(
+                                        "android.propogateKeyEvents", "false").
+                                            equalsIgnoreCase("true") && 
+                                        myView instanceof AndroidAsyncView) {
+                                        switch (event.getAction()) {
+                                            case KeyEvent.ACTION_DOWN:
+                                                Display.getInstance().keyPressed(keycode);
+                                                break;
+                                            case KeyEvent.ACTION_UP:
+                                                Display.getInstance().keyReleased(keycode);
+                                                break;
                                         }
+                                        return true;
+                                    }                                    
+                                                                        
+                                    return super.dispatchKeyEvent(event);
                                 }
-                                if(Display.getInstance().getProperty(
-                                    "android.propogateKeyEvents", "false").
-                                        equalsIgnoreCase("true") && 
-                                    myView instanceof AndroidAsyncView) {
-                                    ((AndroidAsyncView)myView).onKeyUp(keyCode, event);
-                                }
-                                return super.onKeyUp(keyCode, event);
                             }
                         };
                         wv.setOnTouchListener(new View.OnTouchListener() {

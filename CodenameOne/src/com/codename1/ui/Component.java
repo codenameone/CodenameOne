@@ -27,6 +27,7 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Point;
@@ -2804,8 +2805,8 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /**
-     * Indicates the X position of the scrolling, this number is relative to the
-     * component position and so a position of 0 would indicate the x position
+     * Indicates the Y position of the scrolling, this number is relative to the
+     * component position and so a position of 0 would indicate the y position
      * of the component.
      * 
      * @param scrollY the Y position of the scrolling
@@ -4295,9 +4296,7 @@ public class Component implements Animation, StyleListener, Editable {
             scrollableYFlag() && getScrollY() == 0) {
             int mm = Display.INSTANCE.convertToPixels(1);
             if(mm < y - pullY) {
-                if(p.buttonsAwatingRelease != null) {
-                    p.buttonsAwatingRelease.clear();
-                }
+                p.clearComponentsAwaitingRelease();
                 Container c = p.getLayeredPane(InfiniteProgress.class, true);
                 c.setLayout(new FlowLayout(CENTER));
                 Motion rotationMotion;
@@ -4443,12 +4442,19 @@ public class Component implements Animation, StyleListener, Editable {
                         if( xposition  < 0){
                             xposition = 0;
                         }
-                        int height = getHeight() + 80;
+                        int height;
+                        int width;
+                        if (isHidden() && dragImage != null) {
+                            height = dragImage.getHeight() + 80;
+                            width = dragImage.getWidth() + 80;
+                        } else {
+                            height = getHeight() + 80;
+                            width = getWidth() + 80;
+                        }
                         if(scrollParent.getScrollY() + draggedy + height >= scrollParent.getScrollDimension().getHeight()){
                             yposition = draggedy - scrollParent.getAbsoluteY();
                             height = scrollParent.getScrollDimension().getHeight() - yposition;
                         }                        
-                        int width = getWidth()+ 80;
                         if(scrollParent.getScrollX() + draggedx + width >= scrollParent.getScrollDimension().getWidth()){
                             xposition = draggedx - scrollParent.getAbsoluteX();
                             width = scrollParent.getScrollDimension().getWidth() - xposition;

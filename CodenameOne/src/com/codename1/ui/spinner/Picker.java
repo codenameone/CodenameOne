@@ -690,7 +690,7 @@ public class Picker extends Button {
                 
                 
                 spinnerC = (Component)spinner;
-                Container wrapper = BorderLayout.centerAbsolute(spinnerC);
+                Container wrapper = BorderLayout.center(spinnerC);
                 ComponentSelector.select(wrapper).addTags("SpinnerWrapper");
                 ComponentSelector.select(wrapper).selectAllStyles()
                         .setBorder(Border.createEmpty())

@@ -28,6 +28,7 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
@@ -48,14 +49,22 @@ class SpinnerDateModel implements ListModel {
 
     void setValue(Date value) {
         int oldIndex = getSelectedIndex();
-        currentValue = value.getTime() - value.getTime() % DAY + 12 * 60 * 60000;
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(value);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //currentValue = value.getTime() - value.getTime() % DAY + 12 * 60 * 60000;
+        currentValue = cal.getTime().getTime();
         if (oldIndex != getSelectedIndex()) {
             selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
         }
     }
 
     Object getValue() {
-        return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
+        //return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
+        return new Date(currentValue);
     }
 
     /**
@@ -66,16 +75,38 @@ class SpinnerDateModel implements ListModel {
      * @param currentValue the starting value for the mode
      */
     public SpinnerDateModel(long min, long max, long currentValue) {
-        this.max = max - max % DAY;
-        this.min = min - min % DAY;
-        this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(new Date(max));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.max = max - max % DAY;
+        this.max = cal.getTime().getTime();
+        
+        cal.setTime(new Date(min));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.min = min - min % DAY;
+        this.min = cal.getTime().getTime();
+        
+        cal.setTime(new Date(currentValue));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
+        this.currentValue = cal.getTime().getTime();
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getItemAt(int index) {
-        return new Date(min + DAY * index + 12 * 60 * 60000);
+        //return new Date(min + DAY * index + 12 * 60 * 60000);
+        return new Date(min + DAY * index);
     }
 
 
@@ -83,7 +114,7 @@ class SpinnerDateModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / DAY);
+        return (int)((max - min) / DAY) + 1;
     }
 
 
@@ -91,7 +122,8 @@ class SpinnerDateModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
-        return (int)((currentValue - min) / DAY);
+        int out = (int)((currentValue - min) / DAY);
+        return out;
     }
 
 

@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+#import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 #import "EAGLView.h"
@@ -92,6 +93,7 @@ extern void repaintUI();
 extern NSDate* currentDatePickerDate;
 extern JAVA_LONG currentDatePickerDuration;
 extern bool datepickerPopover;
+extern bool galleryPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 
@@ -319,7 +321,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.tintColor = UIColorFromRGB(color, 255);
             if(hintString != nil) {
                 utf.placeholder = hintString;
-                [utf setValue:UIColorFromRGB(hintColor, 255) forKeyPath:@"_placeholderLabel.textColor"];
+                
+                // On IOS13, we cange set the placeholder lable color
+                // via KVC, because it gives a prohibited error.
+                // Instead we use runtime as described at https://stackoverflow.com/a/56776561
+                Ivar ivar =  class_getInstanceVariable([UITextField class], "_placeholderLabel");
+                UILabel *placeholderLabel = object_getIvar(utf, ivar);
+
+                placeholderLabel.textColor = UIColorFromRGB(hintColor, 255);
             }
             
             // INITIAL_CAPS_WORD
@@ -1781,12 +1790,20 @@ bool lockDrawing;
         [touchesArray removeAllObjects];
     }
     int currentWidth = (int)self.view.bounds.size.width * scaleValue;
-    if(currentWidth != displayWidth) {
-        [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-        displayWidth = currentWidth;
-        displayHeight = (int)self.view.bounds.size.height * scaleValue;
-        screenSizeChanged(displayWidth, displayHeight);
-    }
+    //if(currentWidth != displayWidth) {
+    // Note:  While it may be tempting to only update the frame buffer if the size has changed,
+    // doing that causes a bug whereby the app may paint with the wrong dimensions 
+    // when opening from the background on iPad with multitasking enabled.
+    // https://github.com/codenameone/CodenameOne/issues/2819
+    // This may be caused by the fact the getDisplayWidthImpl() and getDisplayHeightImpl() update
+    // the display width/height each time to match the view, without performing other resizing
+    // details, so it is possible that the size change event still needs to be sent
+    // even if the display width already matches the value we're given here.
+    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    displayWidth = currentWidth;
+    displayHeight = (int)self.view.bounds.size.height * scaleValue;
+    screenSizeChanged(displayWidth, displayHeight);
+    //}
     
 }
 
@@ -3149,67 +3166,68 @@ void cn1_addSelectedImagePath(NSString* path) {
     cn1_waitingForImagesCount = [assets count];
     __block int idx=0;
     PHImageRequestOptions *options = [PHImageRequestOptions new];
+    options.synchronous = YES;
     options.networkAccessAllowed = YES;
     for (PHAsset *asset in assets) {
-        if (asset.mediaType == PHAssetMediaTypeImage) {
-            [[PHImageManager defaultManager] requestImageForAsset:asset 
-                              targetSize:PHImageManagerMaximumSize
-                             contentMode:PHImageContentModeDefault
-                                 options:options
-                           resultHandler:^(UIImage *originalImage, NSDictionary *info) {
-                UIImage* image = originalImage;
-                               if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
-                                   return;
-                               }
+        @autoreleasepool {
+            if (asset.mediaType == PHAssetMediaTypeImage) {
+                [[PHImageManager defaultManager] requestImageForAsset:asset 
+                                  targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                 contentMode:PHImageContentModeDefault
+                                     options:options
+                               resultHandler:^(UIImage *originalImage, NSDictionary *info) {
+                    UIImage* image = originalImage;
+                    if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
+                        return;
+                    }
 
 #ifndef LOW_MEM_CAMERA
-                if (image.imageOrientation != UIImageOrientationUp) {
-                    UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-                    [image drawInRect:(CGRect){0, 0, image.size}];
-                    image = UIGraphicsGetImageFromCurrentImageContext();
-                    UIGraphicsEndImageContext();
-                }
+                    if (image.imageOrientation != UIImageOrientationUp) {
+                        UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                        [image drawInRect:(CGRect){0, 0, image.size}];
+                        image = UIGraphicsGetImageFromCurrentImageContext();
+                        UIGraphicsEndImageContext();
+                    }
 #endif
 
-                NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+                    NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
 
-                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-                NSString *documentsDirectory = [paths objectAtIndex:0];
-                NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_image_%d.jpg", idx++]];
-                [data writeToFile:path atomically:YES];
-                cn1_addSelectedImagePath(path);
-            }];
-        } else {
-            PHVideoRequestOptions *options = [PHVideoRequestOptions new];
-            options.version = PHVideoRequestOptionsVersionOriginal;
-            options.networkAccessAllowed = YES;
-
-            [[PHImageManager defaultManager] requestAVAssetForVideo:asset
-                                                            options:options
-                                                      resultHandler:
-             ^(AVAsset * _Nullable avasset,
-               AVAudioMix * _Nullable audioMix,
-               NSDictionary * _Nullable info)
-            {
-                NSError *error;
-                AVURLAsset *avurlasset = (AVURLAsset*) avasset;
-                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-                NSString *documentsDirectory = [paths objectAtIndex:0];
-                NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_video_%d.%@", idx++, avurlasset.URL.pathExtension]];
-                // Write to documents folder
-                NSURL *fileURL = [NSURL fileURLWithPath:path];
-                [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
-                if ([[NSFileManager defaultManager] copyItemAtURL:avurlasset.URL
-                                                             toURL:fileURL
-                                                             error:&error]) {
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_image_%d.jpg", idx++]];
+                    [data writeToFile:path atomically:YES];
                     cn1_addSelectedImagePath(path);
-                } else {
-                    cn1_addSelectedImagePath([NSString stringWithFormat:@"!{Error: %@}", [error localizedDescription]]);
-                }
-             }];
-        }
+                }];
+            } else {
+                PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+                options.version = PHVideoRequestOptionsVersionOriginal;
+                options.networkAccessAllowed = YES;
 
-        
+                [[PHImageManager defaultManager] requestAVAssetForVideo:asset
+                                                                options:options
+                                                          resultHandler:
+                 ^(AVAsset * _Nullable avasset,
+                   AVAudioMix * _Nullable audioMix,
+                   NSDictionary * _Nullable info)
+                {
+                    NSError *error;
+                    AVURLAsset *avurlasset = (AVURLAsset*) avasset;
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_video_%d.%@", idx++, avurlasset.URL.pathExtension]];
+                    // Write to documents folder
+                    NSURL *fileURL = [NSURL fileURLWithPath:path];
+                    [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+                    if ([[NSFileManager defaultManager] copyItemAtURL:avurlasset.URL
+                                                                 toURL:fileURL
+                                                                 error:&error]) {
+                        cn1_addSelectedImagePath(path);
+                    } else {
+                        cn1_addSelectedImagePath([NSString stringWithFormat:@"!{Error: %@}", [error localizedDescription]]);
+                    }
+                 }];
+            }
+        } 
     }
 
 #ifdef LOW_MEM_CAMERA
@@ -3219,14 +3237,15 @@ void cn1_addSelectedImagePath(NSString* path) {
 #endif
     popoverController = nil;
     popoverControllerInstance = nil;
+    galleryPopover = NO;
 }
-
 - (void)qb_imagePickerControllerDidCancel:(QBImagePickerController *)picker
 {
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
     popoverController = nil;
     popoverControllerInstance = nil;
+    galleryPopover = NO;
 }
 
 #endif
@@ -3238,6 +3257,7 @@ void cn1_addSelectedImagePath(NSString* path) {
     [picker dismissModalViewControllerAnimated:YES];
     popoverController = nil;
     popoverControllerInstance = nil;
+    galleryPopover = NO;
 }
 
 //#define LOW_MEM_CAMERA
@@ -3285,6 +3305,7 @@ void cn1_addSelectedImagePath(NSString* path) {
     }
     popoverController = nil;
     popoverControllerInstance = nil;
+    galleryPopover = NO;
 
 }
 
@@ -3462,6 +3483,12 @@ extern SKPayment *paymentInstance;
         }
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         datepickerPopover = NO;
+    }
+    if(galleryPopover) {
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+        popoverController = nil;
+        popoverControllerInstance = nil;
+        galleryPopover = NO;
     }
 }
 

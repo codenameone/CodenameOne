@@ -158,6 +158,15 @@ public class NetworkManager {
         autoDetected = false;
     }
 
+    boolean handleErrorCode(ConnectionRequest r, int code, String message) {
+        if(errorListeners != null) {
+            ActionEvent ev = new NetworkEvent(r, code, message);
+            errorListeners.fireActionEvent(ev);
+            return ev.isConsumed();
+        }
+        return false;
+    }
+    
     private boolean handleException(ConnectionRequest r, Exception o) {
         if(errorListeners != null) {
             ActionEvent ev = new NetworkEvent(r, o);
@@ -725,6 +734,7 @@ public class NetworkManager {
      * @param request network request for execution
      */
     void addToQueue(ConnectionRequest request, boolean retry) {
+        Util.getImplementation().addConnectionToQueue(request);
         if(!running) {
             start();
         }
