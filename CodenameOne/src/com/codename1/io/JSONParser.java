@@ -507,7 +507,8 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private boolean isStackHash() {
-        return parseStack.get(parseStack.size() - 1) instanceof Map;
+        return parseStack.size() > 0 && 
+            parseStack.get(parseStack.size() - 1) instanceof Map;
     }
 
     private Map getStackHash() {
