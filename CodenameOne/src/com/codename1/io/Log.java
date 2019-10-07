@@ -23,6 +23,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
@@ -576,7 +577,10 @@ public class Log {
      * @param fileURL the fileURL to set
      */
     public void setFileURL(String fileURL) {
-        this.fileURL = fileURL;
+        if(Objects.equals(this.fileURL, fileURL)) {
+            this.fileURL = fileURL;
+            output = null;
+        }
     }
 
     /**
