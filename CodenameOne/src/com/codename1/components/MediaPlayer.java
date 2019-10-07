@@ -412,7 +412,7 @@ public class MediaPlayer extends Container {
             setLayout(new BorderLayout());        
         }
         
-        if(video != null && video.getVideoComponent() != null){
+        if(video != null && video.isVideo() && video.getVideoComponent() != null){
             Component videoComponent = video.getVideoComponent();
             if (videoComponent != null) {
                 videoComponent.setUIID("Container");
@@ -586,7 +586,7 @@ public class MediaPlayer extends Container {
             buttonsBar.addComponent(fwd);           
         }
         
-        if(maximize) {
+        if(maximize && video.isVideo()) {
             Button max = new Button();
             max.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {

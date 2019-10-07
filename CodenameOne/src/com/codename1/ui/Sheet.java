@@ -22,6 +22,8 @@
  */
 package com.codename1.ui;
 
+import static com.codename1.ui.ComponentSelector.$;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -29,6 +31,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.util.EventDispatcher;
 
 /**
  * A light-weight dialog that slides up from the bottom of the screen on mobile devices. 
@@ -117,6 +120,8 @@ import com.codename1.ui.layouts.LayeredLayout;
  */
 public class Sheet extends Container {
     private final Sheet parentSheet;
+    private EventDispatcher closeListeners = new EventDispatcher();
+    private EventDispatcher backListeners = new EventDispatcher();
     private Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Label title = new Label();
     private Container commandsContainer = new Container(BoxLayout.x());
@@ -169,6 +174,7 @@ public class Sheet extends Container {
         if (uiid == null) {
             uiid = "Sheet";
         }
+        $(this).addTags("Sheet");
         setGrabsPointerEvents(true);
         this.setUIID(uiid);       
         this.title.setUIID(uiid+"Title");
@@ -279,6 +285,41 @@ public class Sheet extends Container {
             
         }
         if (cnt.getComponentCount() > 0) {
+            $(".Sheet", cnt).each(new ComponentClosure() {
+                @Override
+                public void call(Component c) {
+                    if (c instanceof Sheet) {
+                        Sheet s = (Sheet)c;
+                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) {
+                            // If the sheet is an ancestor of
+                            // ours then we don't need to fire a close event
+                            // yet.  We fire it when it is closed
+                            // without possibility of returning 
+                            // via a back chain
+                            return;
+                        }
+                        s.fireCloseEvent(false);
+                        
+                        // Hiding this sheet may eliminate the possibility of 
+                        // its parent sheets from being shown again,
+                        // so their close events should also be fired in this case.
+                        Sheet sp = s.getParentSheet();
+                        while (sp != null) {
+                            if (sp == Sheet.this) {
+                                break;
+                            }
+                            if (!sp.isAncestorSheetOf(Sheet.this)) {
+                                sp.fireCloseEvent(false);
+                            }
+                            sp = sp.getParentSheet();
+                            
+                        }
+                    }
+                    
+                    
+                }
+                
+            });
             Component existing = cnt.getComponentAt(0);
             cnt.replace(existing, this, null);
             cnt.animateLayout(duration);
@@ -308,6 +349,7 @@ public class Sheet extends Container {
      */
     public void back(int duration) {
         if (this.parentSheet != null) {
+            fireBackEvent();
             this.parentSheet.show(duration);
         } else {
             hide(duration);
@@ -325,6 +367,8 @@ public class Sheet extends Container {
                 if (parent != null && parent.getComponentForm() != null) {
                     cnt.remove();
                     parent.getComponentForm().revalidateWithAnimationSafety();
+                    fireCloseEvent(true);
+                    
                     
                 }
                 
@@ -361,6 +405,92 @@ public class Sheet extends Container {
         super.deinitialize(); 
     }
     
+    
+    /**
+     * Finds Sheet containing this component if it is currently part of a Sheet.
+     * @param cmp The component to check.
+     * @return The sheet containing the component, or null if it is not on a sheet.
+     * @since 7.0
+     */
+    public static Sheet findContainingSheet(Component cmp) {
+        Container parent = cmp.getParent();
+        while (parent != null) {
+            if (parent instanceof Sheet) {
+                return (Sheet)parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+    
+    /**
+     * Checks if the current sheet is an ancestor sheet of the given sheet.
+     * @param sheet The sheet to check
+     * @return True if the current sheet is an ancestor of sheet.
+     * @since 7.0
+     */
+    public boolean isAncestorSheetOf(Sheet sheet) {
+        sheet = sheet.getParentSheet();
+        if (sheet == this) {
+            return true;
+        } else if (sheet == null) {
+            return false;
+        } else {
+            return isAncestorSheetOf(sheet);
+        }
+    }
+    
+    /**
+     * Adds listener notified when the sheet is closed.  This event is only fired
+     * when the sheet is closed without the possibility of being reopened.  E.g. if a 
+     * child sheet is opened (causing this sheet to be hidden), the close event won't be
+     * fired until either that child sheet is hidden (without going back),
+     * or the sheet itself is hidden, or goes back.
+     * @param l 
+     * @since 7.0
+     */
+    public void addCloseListener(ActionListener l) {
+        closeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a close listener.
+     * @param l The close listener
+     */
+    public void removeCloseListener(ActionListener l) {
+        closeListeners.removeListener(l);
+    }
+    
+    private void fireCloseEvent(boolean parentsToo) {
+        closeListeners.fireActionEvent(new ActionEvent(this));
+        if (parentsToo && parentSheet != null) {
+            parentSheet.fireCloseEvent(true);
+        }
+    }
+    
+    /**
+     * Adds listener to be notified when user goes back to the parent.  This is not
+     * fired if the sheet is simply closed.  Only if the "back" button is pressed, 
+     * 
+     * @param l Listener
+     * @since 7.0
+     */
+    public void addBackListener(ActionListener l) {
+        backListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a back listener.
+     * @param l The close listener
+     */
+    public void removeBackListener(ActionListener l) {
+        backListeners.removeListener(l);
+    }
+    
+    private void fireBackEvent() {
+        backListeners.fireActionEvent(new ActionEvent(this));
+        
+    }
     
     
     

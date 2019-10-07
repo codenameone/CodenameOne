@@ -26,6 +26,8 @@ package com.codename1.impl.javase;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.charts.util.ColorUtil;
+import com.codename1.components.AudioRecorderComponent;
+import com.codename1.components.AudioRecorderComponent.RecorderState;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -112,6 +114,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
@@ -3559,7 +3562,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         return f;
     }
 
-
+    
+    private String getCurrentSkinName() {
+         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+         String skin = pref.get("skin", DEFAULT_SKIN);
+         while (skin.indexOf("/") >= 0) {
+             skin = skin.substring(skin.indexOf("/")+1);
+         }
+         while (skin.indexOf("\\") >= 0) {
+             skin = skin.substring(skin.indexOf("\\")+1);
+         }
+         return skin;
+    }
+    
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
         JMenu m;
         if (menu == null) {
@@ -7416,7 +7431,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
-        
+        if ("simulator.skin".equalsIgnoreCase(key)) {
+            return getCurrentSkinName();
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 
@@ -9582,15 +9599,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
     }
-    
+
     @Override
     public void captureAudio(com.codename1.ui.events.ActionListener response) {
         if(!checkForPermission("android.permission.RECORD_AUDIO", "This is required to record the audio")){
             return;
         }
         checkMicrophoneUsageDescription();
-        capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
+        super.captureAudio(response); 
     }
+    
+
+    
 
     @Override
     public void captureVideo(com.codename1.ui.events.ActionListener response) {
@@ -10524,7 +10544,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 }
                             }
                         }).start();
-
+                        
                    } catch (LineUnavailableException ex) {
                                     throw new RuntimeException(ex);
                     }    
@@ -10564,6 +10584,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
+                if (line == null) {
+                    return;
+                }
                 line.close();
                 
                 if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
