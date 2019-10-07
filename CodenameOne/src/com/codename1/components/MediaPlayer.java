@@ -412,7 +412,7 @@ public class MediaPlayer extends Container {
             setLayout(new BorderLayout());        
         }
         
-        if(video != null && video.isVideo() && video.getVideoComponent() != null){
+        if(video != null && video.getVideoComponent() != null){
             Component videoComponent = video.getVideoComponent();
             if (videoComponent != null) {
                 videoComponent.setUIID("Container");
