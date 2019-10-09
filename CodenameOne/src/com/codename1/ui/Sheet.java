@@ -143,6 +143,7 @@ public class Sheet extends Container {
             if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {
                 // do nothing.
             } else {
+                evt.consume();
                 hide(DEFAULT_TRANSITION_DURATION);
             }
         }
