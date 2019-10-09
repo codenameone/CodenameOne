@@ -265,6 +265,24 @@ public class MediaManager {
      * @throws IOException id failed to create a Media object
      */
     public static Media createMediaRecorder(String path, String mimeType) throws IOException {
+        return createMediaRecorder(new MediaRecorderBuilder().path(path).mimeType(mimeType));
+    }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param builder media settings
+     * @throws IllegalArgumentException if given mime-type is not supported
+     * @throws IOException id failed to create a Media object
+     * @since 7.0
+     */
+    public static Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        String mimeType = builder.getMimeType();
+        if (mimeType == null && getAvailableRecordingMimeTypes().length > 0) {
+            mimeType = getAvailableRecordingMimeTypes()[0];
+        }
+        String path = builder.getPath();
         boolean supportedMime = false;
         String [] supported  = getAvailableRecordingMimeTypes();
         int slen = supported.length;

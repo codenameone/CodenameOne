@@ -586,7 +586,7 @@ public class MediaPlayer extends Container {
             buttonsBar.addComponent(fwd);           
         }
         
-        if(maximize) {
+        if(maximize && video.isVideo()) {
             Button max = new Button();
             max.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {

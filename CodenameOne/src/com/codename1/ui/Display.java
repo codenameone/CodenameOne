@@ -4661,6 +4661,13 @@ hi.show();}</pre></noscript>
         impl.onCanInstallOnHomescreen(r);
     }
 
-    
+    /**
+     * Captures a screenshot of the screen.
+     * @return An image of the screen, or null if it failed.
+     * @since 7.0
+     */
+    public Image captureScreen() {
+        return impl.captureScreen();
+    }
 
 }

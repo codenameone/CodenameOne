@@ -1417,5 +1417,14 @@ public class CN extends  CN1Constants {
     public static void onCanInstallOnHomescreen(Runnable r) {
         Display.impl.onCanInstallOnHomescreen(r);
     }
+    
+    /**
+     * Captures a screenshot of the screen.
+     * @return An image of the screen, or null if it fails.
+     * @since 7.0
+     */
+    public static Image captureScreen() {
+        return Display.impl.captureScreen();
+    }
 
 }
