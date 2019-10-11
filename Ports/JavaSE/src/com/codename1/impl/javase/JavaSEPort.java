@@ -4286,7 +4286,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowClosing(WindowEvent e) {
-                    Display.getInstance().exitApplication();
+                    if (e.getWindow() instanceof JFrame) {
+                        Frame f = (JFrame)e.getWindow();
+                        if (f.getExtendedState() == JFrame.NORMAL) {
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                            Rectangle bounds = e.getWindow().getBounds();
+
+                            pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
+
+                            Display.getInstance().exitApplication();
+                        }
+                    }
+                    
                 }
 
                 public void windowClosed(WindowEvent e) {
@@ -4347,6 +4358,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             portrait = pref.getBoolean("Portrait", true);
+            
             if (getSkin() != null) {
                 if (scrollableSkin) {
                     canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
@@ -4370,7 +4382,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             }
+            String lastBounds = pref.get("window.bounds", null);
+            if (lastBounds != null) {
+                String[] parts = lastBounds.split(",");
+                Rectangle r = new Rectangle(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+                Rectangle bounds = new Rectangle(0, 0, 0, 0);
+                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+                GraphicsDevice lstGDs[] = ge.getScreenDevices();
+                for (GraphicsDevice gd : lstGDs) {
+                    bounds.add(gd.getDefaultConfiguration().getBounds());
+                }
+                
+                if (bounds.intersects(r)) {
+                
+                    window.setBounds(r);
+                }
+            }
 /*
+            
+            
+            
             
             if (!portrait && getSkin() != null) {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
