@@ -129,6 +129,8 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
@@ -4286,18 +4288,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowClosing(WindowEvent e) {
-                    if (e.getWindow() instanceof JFrame) {
-                        Frame f = (JFrame)e.getWindow();
-                        if (f.getExtendedState() == JFrame.NORMAL) {
-                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                            Rectangle bounds = e.getWindow().getBounds();
-
-                            pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
-
-                            Display.getInstance().exitApplication();
-                        }
-                    }
-                    
+                    Display.getInstance().exitApplication();
                 }
 
                 public void windowClosed(WindowEvent e) {
@@ -4314,6 +4305,32 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void windowDeactivated(WindowEvent e) {
                 }
+            });
+            window.addComponentListener(new ComponentAdapter() {
+                
+                private void saveBounds(ComponentEvent e) {
+                    if (e.getComponent() instanceof JFrame) {
+                        Frame f = (JFrame)e.getComponent();
+                        if (f.getExtendedState() == JFrame.NORMAL) {
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                            Rectangle bounds = f.getBounds();
+                            pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
+                        }
+                    }
+                }
+                
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    saveBounds(e);
+                }
+
+                @Override
+                public void componentMoved(ComponentEvent e) {
+                    saveBounds(e);
+                }
+                
+                
+                
             });
             window.setLocationByPlatform(true);
 
