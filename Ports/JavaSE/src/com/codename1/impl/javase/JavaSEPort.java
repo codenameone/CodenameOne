@@ -187,6 +187,8 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.event.MouseInputAdapter;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -3723,7 +3725,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         final JDialog d = new JDialog(frm, true);
                         d.setLocationRelativeTo(frm);
                         d.setTitle("Skins");
-                        d.setLayout(new BorderLayout());
+                        d.getContentPane().setLayout(new BorderLayout());
                         String userDir = System.getProperty("user.home");
                         final File skinDir = new File(userDir + "/.codenameone/");
                         if (!skinDir.exists()) {
@@ -3802,9 +3804,48 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 return super.getColumnClass(column);
                             }
                         };
+                        
+                        
+                        
                         skinsTable.setRowHeight(112);
                         skinsTable.getTableHeader().setReorderingAllowed(false);
-                        d.add(new JScrollPane(skinsTable), BorderLayout.CENTER);
+                        final JTextField filter = new JTextField();
+                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(((DefaultTableModel) skinsTable.getModel())); 
+                        
+                        filter.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                            
+                            private void updateFilter() {
+                                try {
+                                    
+                                   RowFilter rf = RowFilter.regexFilter("(?i)"+filter.getText(),2);
+                                   sorter.setRowFilter(rf);
+                                } catch (java.util.regex.PatternSyntaxException e) {
+                                    return;
+                                }
+                                
+                            }
+                            
+                            @Override
+                            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                                updateFilter();
+                            }
+
+                            @Override
+                            public void removeUpdate(DocumentEvent e) {
+                                updateFilter();
+                            }
+
+                            @Override
+                            public void changedUpdate(DocumentEvent e) {
+                                updateFilter();
+                            }
+                            
+                        });
+                        skinsTable.setRowSorter(sorter);
+                        d.getContentPane().add(filter, BorderLayout.NORTH);
+                        
+                        
+                        d.getContentPane().add(new JScrollPane(skinsTable), BorderLayout.CENTER);
                         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
                         JButton download = new JButton("Download");
                         download.addActionListener(new ActionListener() {
@@ -3879,7 +3920,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             }
                         });
                         p.add(download);
-                        d.add(p, BorderLayout.SOUTH);
+                        d.getContentPane().add(p, BorderLayout.SOUTH);
                         d.pack();
                         pleaseWait.dispose();
                         d.setVisible(true);
