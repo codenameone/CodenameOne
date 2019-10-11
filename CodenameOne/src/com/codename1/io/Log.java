@@ -578,8 +578,12 @@ public class Log {
      */
     public void setFileURL(String fileURL) {
         if(Objects.equals(this.fileURL, fileURL)) {
-            this.fileURL = fileURL;
-            output = null;
+            try {
+                this.fileURL = fileURL;
+                output = createWriter();
+            } catch(IOException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
