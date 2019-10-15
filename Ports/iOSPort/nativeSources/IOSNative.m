@@ -5829,6 +5829,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE
 
 NSLocale *currentLocale = NULL;
 NSLocale *deviceLocale = NULL;
+BOOL currentLocaleRequiresRelease = NO;
 
 NSLocale* cn1DeviceLocale() {
     if (deviceLocale == NULL) {
@@ -5841,12 +5842,22 @@ void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_ST
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
     if (currentLocale != NULL) {
-        [currentLocale release];
+        if (currentLocaleRequiresRelease) {
+            [currentLocale release];
+        }
     }
 #endif
-    currentLocale = cn1DeviceLocale();
+    if (localeStr == NULL) {
+        currentLocaleRequiresRelease = NO;
+        currentLocale = cn1DeviceLocale();
+    } else {
+        currentLocale = [[NSLocale alloc] initWithLocaleIdentifier:toNSString(threadStateData, localeStr)];
+        currentLocaleRequiresRelease = YES;
+    }
+    
     POOL_END();
 }
+
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT i) {
     POOL_BEGIN();
