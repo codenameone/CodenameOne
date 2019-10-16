@@ -3052,6 +3052,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new ComponentTreeInspector();
                 }
             });
+            
+            JMenuItem scriptingConsole = new JMenuItem("Groovy Console");
+            scriptingConsole.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    new CN1Console().open((java.awt.Component)e.getSource());
+                }
+            });
+            
+            scriptingConsole.setToolTipText("Open interactive console");
+            
             JMenuItem appArg = new JMenuItem("Send App Argument");
             appArg.addActionListener(new ActionListener() {
                 @Override
@@ -3105,6 +3115,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(pushSim);
 
             simulatorMenu.add(componentTreeInspector);
+            simulatorMenu.add(scriptingConsole);
             
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
