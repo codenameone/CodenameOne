@@ -166,7 +166,10 @@ public class AutoCompleteTextComponent extends TextComponent {
                 setLayout(new LayeredLayout());
                 Container tfContainer = BorderLayout.center(field).
                         add(BorderLayout.NORTH, getLabel()).
-                        add(BorderLayout.SOUTH, getErrorMessage());
+                        add(BorderLayout.SOUTH, 
+                            LayeredLayout.encloseIn(
+                                getErrorMessage(), 
+                                getDescriptionMessage()));
                 add(tfContainer);
 
                 Label errorMessageFiller = new Label();
@@ -258,6 +261,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return (AutoCompleteTextComponent) super.onTopMode(onTopMode);
     }
 
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public AutoCompleteTextComponent descriptionMessage(String descriptionMessage) {
+        super.descriptionMessage(descriptionMessage);
+        return this;
+    }
+    
     /**
      * Overridden for covariant return type {@inheritDoc}
      */

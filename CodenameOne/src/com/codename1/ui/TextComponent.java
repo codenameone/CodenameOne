@@ -161,7 +161,10 @@ public class TextComponent extends InputComponent {
                 setLayout(new LayeredLayout());
                 Container tfContainer = BorderLayout.center(field).
                         add(BorderLayout.NORTH, getLabel()).
-                        add(BorderLayout.SOUTH, getErrorMessage());
+                        add(BorderLayout.SOUTH, 
+                            LayeredLayout.encloseIn(
+                                getErrorMessage(), 
+                                getDescriptionMessage()));
                 add(tfContainer);
 
                 Label errorMessageFiller = new Label();
@@ -248,6 +251,15 @@ public class TextComponent extends InputComponent {
      */
     public TextComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
+        return this;
+    }
+    
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent descriptionMessage(String descriptionMessage) {
+        super.descriptionMessage(descriptionMessage);
         return this;
     }
     
