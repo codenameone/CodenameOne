@@ -102,7 +102,9 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
+import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
@@ -146,6 +148,8 @@ import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
@@ -10549,7 +10553,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
-        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+        
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }
     
     @Override
@@ -10560,41 +10565,49 @@ public class JavaSEPort extends CodenameOneImplementation {
         return createMediaRecorder(builder);
     }
 
-    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
+    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
+        System.out.println("Is redirect to Audio Buffer? "+redirectToAudioBuffer);
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
         }
-        if (mime == null) {
-            if (path.endsWith(".wav") || path.endsWith(".WAV")) {
-                mime = "audio/wav";
-            } else if (path.endsWith(".mp3") || path.endsWith(".MP3")) {
-                mime = "audio/mp3";
+
+        if (!redirectToAudioBuffer) {
+            if (mime == null) {
+                if (path.endsWith(".wav") || path.endsWith(".WAV")) {
+                    mime = "audio/wav";
+                } else if (path.endsWith(".mp3") || path.endsWith(".MP3")) {
+                    mime = "audio/mp3";
+                }
+            }
+            if (mime == null) {
+                mime = getAvailableRecordingMimeTypes()[0];
+            }
+            boolean foundMimetype = false;
+            for (String mt : getAvailableRecordingMimeTypes()) {
+                if (mt.equalsIgnoreCase(mime)) {
+                    foundMimetype = true;
+                    break;
+                }
+
+
+            }
+
+            if (!foundMimetype) {
+                throw new IOException("Mimetype "+mime+" not supported on this platform.  Use getAvailableMimetypes() to find out what is supported");
             }
         }
-        if (mime == null) {
-            mime = getAvailableRecordingMimeTypes()[0];
-        }
-        boolean foundMimetype = false;
-        for (String mt : getAvailableRecordingMimeTypes()) {
-            if (mt.equalsIgnoreCase(mime)) {
-                foundMimetype = true;
-                break;
+        final File file = redirectToAudioBuffer ? null : new File(unfile(path));
+        if (!redirectToAudioBuffer) {
+            if (!file.getParentFile().exists()) {
+                throw new IOException("Cannot write file "+path+" because the parent directory does not exist.");
             }
-            
-            
-        }
-        
-        if (!foundMimetype) {
-            throw new IOException("Mimetype "+mime+" not supported on this platform.  Use getAvailableMimetypes() to find out what is supported");
-        }
-        final File file = new File(unfile(path));
-        if (!file.getParentFile().exists()) {
-            throw new IOException("Cannot write file "+path+" because the parent directory does not exist.");
         }
         File tmpFile = file;
-        if (!"audio/wav".equalsIgnoreCase(mime) && !(tmpFile.getName().endsWith(".wav") || tmpFile.getName().endsWith(".WAV"))) {
-            tmpFile = new File(tmpFile.getParentFile(), tmpFile.getName()+".wav");
+        if (!redirectToAudioBuffer) {
+            if (!"audio/wav".equalsIgnoreCase(mime) && !(tmpFile.getName().endsWith(".wav") || tmpFile.getName().endsWith(".WAV"))) {
+                tmpFile = new File(tmpFile.getParentFile(), tmpFile.getName()+".wav");
+            }
         }
         final File fTmpFile = tmpFile;
         final String fMime = mime;
@@ -10602,10 +10615,26 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.io.File wavFile = fTmpFile;
             File outFile = file;
             AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
+
             javax.sound.sampled.TargetDataLine line;
             boolean recording;
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
+                if (redirectToAudioBuffer) {
+                    int frameSize = 2 * audioChannels;
+                    int frameRate = samplingRate;
+                    javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
+                            javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, 
+                            samplingRate, 
+                            16,
+                            audioChannels,
+                            frameSize,
+                            frameRate,
+                            true
+                    );
+                    
+                    return format;
+                }
                 float sampleRate = samplingRate;
                 int sampleSizeInBits = 8;
                 int channels = audioChannels;
@@ -10615,14 +10644,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                      channels, signed, bigEndian);
                 return format;
             }
+            
+            
             @Override
             public void play() {
                 if (line == null) {
                     try {
-                        AudioFormat format = getAudioFormat();
+                        final AudioFormat format = getAudioFormat();
                         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-
-                        // checks if system supports the data line
                         if (!AudioSystem.isLineSupported(info)) {
                             throw new RuntimeException("Audio format not supported on this platform");
                         }
@@ -10638,7 +10667,37 @@ public class JavaSEPort extends CodenameOneImplementation {
                             public void run() {
                                 try {
                                     AudioInputStream ais = new AudioInputStream(line);
-                                    AudioSystem.write(ais, fileType, wavFile);
+                                    if (redirectToAudioBuffer) {
+                                        
+                                        AudioBuffer buf = MediaManager.getAudioBuffer(path, true, 256);
+                                        int maxBufferSize = buf.getMaxSize();
+                                        float[] sampleBuffer = new float[maxBufferSize];
+                                        byte[] byteBuffer = new byte[256];
+                                        int bytesRead = -1;
+                                        while ((bytesRead = ais.read(byteBuffer)) >= 0) {
+                                            if (bytesRead > 0) {
+                                                int sampleBufferPos = 0;
+                                                
+                                                for (int i = 0; i < bytesRead; i += 2) {
+                                                    sampleBuffer[sampleBufferPos] = ((float)ByteBuffer.wrap(byteBuffer, i, 2)
+                                                            .order(ByteOrder.BIG_ENDIAN)
+                                                            .getShort())/ 0x8000;
+                                                    sampleBufferPos++;
+                                                    if (sampleBufferPos >= sampleBuffer.length) {
+                                                        buf.copyFrom(sampleBuffer, 0, sampleBuffer.length);
+                                                        sampleBufferPos = 0;
+                                                    }
+                                                
+                                                }
+                                                if (sampleBufferPos > 0) {
+                                                    buf.copyFrom(sampleBuffer, 0, sampleBufferPos);
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        AudioSystem.write(ais, fileType, wavFile);
+                                    }
+                                    
                                 } catch (IOException ioe) {
                                     throw new RuntimeException(ioe);
                                 }
@@ -10684,12 +10743,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
+                if (redirectToAudioBuffer) {
+                    MediaManager.deleteAudioBuffer(path);
+                }
                 if (line == null) {
                     return;
                 }
                 line.close();
                 
-                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                if (!redirectToAudioBuffer && isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
                     final Throwable[] t = new Throwable[1];
                     CN.invokeAndBlock(new Runnable() {
                         public void run() {

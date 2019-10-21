@@ -27,6 +27,7 @@ import android.annotation.TargetApi;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.media.AudioTimestamp;
 import android.support.v4.content.ContextCompat;
 import android.view.MotionEvent;
 import com.codename1.codescan.ScanResult;
@@ -82,6 +83,8 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.ExifInterface;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
@@ -3568,7 +3571,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
-        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }
 
     @Override
@@ -3579,15 +3582,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return createMediaRecorder(builder);
     }
     
+   
     
-    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
+    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
         if (getActivity() == null) {
             return null;
         }
         if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
             return null;
         }
-        final AndroidRecorder[] record = new AndroidRecorder[1];
+        final Media[] record = new Media[1];
         final IOException[] error = new IOException[1];
 
         final Object lock = new Object();
@@ -3596,34 +3600,190 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void run() {
                     synchronized (lock) {
-                        MediaRecorder recorder = new MediaRecorder();
-                        recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-                        if(mimeType.contains("amr")){
+                        if (redirectToAudioBuffer) {
+                            final int channelConfig =audioChannels == 1 ? android.media.AudioFormat.CHANNEL_IN_MONO
+                                            : audioChannels == 2 ? android.media.AudioFormat.CHANNEL_IN_STEREO
+                                                    : android.media.AudioFormat.CHANNEL_IN_MONO;
+                            final AudioRecord recorder = new AudioRecord(
+                                    MediaRecorder.AudioSource.MIC, 
+                                    sampleRate, 
+                                    channelConfig,
+                                    AudioFormat.ENCODING_PCM_16BIT,
+                                    AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)
+                            );
+                            final com.codename1.media.AudioBuffer audioBuffer = com.codename1.media.MediaManager.getAudioBuffer(path, true, 64);
+                            final boolean[] stop = new boolean[1];
+
+                            record[0] = new Media() {
+                                private int lastTime;
+                                private boolean isRecording;
+                                @Override
+                                public void play() {
+                                    isRecording = true;
+                                    recorder.startRecording();
+                                    new Thread(new Runnable() {
+                                        public void run() {
+                                            float[] audioData = new float[audioBuffer.getMaxSize()];
+                                            short[] buffer = new short[AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)];
+                                            int read = -1;
+                                            int index = 0;
+                                            while (isRecording) {
+                                                while ((read = recorder.read(buffer, 0, buffer.length)) > 0) {
+                                                    if (read > 0) {
+                                                        for (int i=0; i<read; i++) {
+                                                            audioData[index] = ((float)buffer[i]) / 0x8000;
+                                                            index++;
+                                                            if (index >= audioData.length) {
+                                                                audioBuffer.copyFrom(audioData, 0, index);
+                                                                index = 0;
+                                                            }
+                                                        }
+                                                        if (index > 0) {
+                                                            audioBuffer.copyFrom(audioData, 0, index);
+                                                            index = 0;
+                                                        }
+                                                        System.out.println("Time is "+getTime());
+                                                    } else {
+                                                        System.out.println("read 0");
+                                                    }
+                                                }
+                                                System.out.println("Time is "+getTime());
+                                            }
+                                        }
+
+                                    }).start();
+                                }
+
+                                @Override
+                                public void pause() {
+
+                                    recorder.stop();
+                                    isRecording = false;
+                                }
+
+                                @Override
+                                public void prepare() {
+                                    
+                                }
+
+                                @Override
+                                public void cleanup() {
+                                    pause();
+                                    com.codename1.media.MediaManager.deleteAudioBuffer(path);
+                                    
+                                }
+
+                                @Override
+                                public int getTime() {
+                                    if (isRecording) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                            AudioTimestamp ts = new AudioTimestamp();
+                                            recorder.getTimestamp(ts, AudioTimestamp.TIMEBASE_MONOTONIC);
+                                            lastTime = (int) (ts.framePosition / ((float) sampleRate / 1000f));
+                                        }
+                                    }
+                                    return lastTime;
+                                }
+
+                                @Override
+                                public void setTime(int time) {
+                                    
+                                }
+
+                                @Override
+                                public int getDuration() {
+                                    return getTime();
+                                }
+
+                                @Override
+                                public void setVolume(int vol) {
+                                    
+                                }
+
+                                @Override
+                                public int getVolume() {
+                                    return 0;
+                                }
+
+                                @Override
+                                public boolean isPlaying() {
+                                    return recorder.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING;
+                                }
+
+                                @Override
+                                public Component getVideoComponent() {
+                                    return null;
+                                }
+
+                                @Override
+                                public boolean isVideo() {
+                                    return false;
+                                }
+
+                                @Override
+                                public boolean isFullScreen() {
+                                    return false;
+                                }
+
+                                @Override
+                                public void setFullScreen(boolean fullScreen) {
+                                    
+                                }
+
+                                @Override
+                                public void setNativePlayerMode(boolean nativePlayer) {
+                                    
+                                }
+
+                                @Override
+                                public boolean isNativePlayerMode() {
+                                    return false;
+                                }
+
+                                @Override
+                                public void setVariable(String key, Object value) {
+                                    
+                                }
+
+                                @Override
+                                public Object getVariable(String key) {
+                                    return null;
+                                }
+                                
+                            };
+                            lock.notify();
+                        } else {
+                            MediaRecorder recorder = new MediaRecorder();
+                            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                        
+                            if(mimeType.contains("amr")){
                             recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
                             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-                        }else{
-                            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-                            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-                            recorder.setAudioSamplingRate(sampleRate);
-                            recorder.setAudioEncodingBitRate(bitRate);
+                            }else{
+                                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+                                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                                recorder.setAudioSamplingRate(sampleRate);
+                                recorder.setAudioEncodingBitRate(bitRate);
+                            }
+                            if (audioChannels > 0) {
+                                recorder.setAudioChannels(audioChannels);
+                            }
+                            if (maxDuration > 0) {
+                                recorder.setMaxDuration(maxDuration);
+                            }
+                            recorder.setOutputFile(removeFilePrefix(path));
+                            try {
+                                recorder.prepare();
+                                record[0] = new AndroidRecorder(recorder);
+                            } catch (IllegalStateException ex) {
+                                Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (IOException ex) {
+                                error[0] = ex;
+                            } finally {
+                                lock.notify();
+                            }
                         }
-                        if (audioChannels > 0) {
-                            recorder.setAudioChannels(audioChannels);
-                        }
-                        if (maxDuration > 0) {
-                            recorder.setMaxDuration(maxDuration);
-                        }
-                        recorder.setOutputFile(removeFilePrefix(path));
-                        try {
-                            recorder.prepare();
-                            record[0] = new AndroidRecorder(recorder);
-                        } catch (IllegalStateException ex) {
-                            Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (IOException ex) {
-                            error[0] = ex;
-                        } finally {
-                            lock.notify();
-                        }
+                        
 
 
                     }

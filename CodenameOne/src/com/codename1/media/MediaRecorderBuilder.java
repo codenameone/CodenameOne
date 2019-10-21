@@ -34,6 +34,8 @@ public class MediaRecorderBuilder {
     private int audioChannels=1,
             bitRate=64000,
             samplingRate=44100;
+    private boolean redirectToAudioBuffer;
+    
     
     private String mimeType = Display.getInstance().getAvailableRecordingMimeTypes()[0],
             path;
@@ -91,6 +93,18 @@ public class MediaRecorderBuilder {
     }
     
     /**
+     * Set this flag to {@literal true} to redirect the microphone input to an audio buffer.
+     * This is handy if you just want to capture the raw PCM data from the microphone.
+     * @param redirect True to redirect output to an audio buffer.  The {@link #path(java.lang.String) }
+     * parameter would then be used as the path to the audio buffer instead of the output file.
+     * @return Self for chaining.
+     */
+    public MediaRecorderBuilder redirectToAudioBuffer(boolean redirect) {
+        this.redirectToAudioBuffer = redirect;
+        return this;
+    }
+
+    /**
      * Builds the MediaRecorder with the given settings.
      * @return
      * @throws IOException 
@@ -146,7 +160,15 @@ public class MediaRecorderBuilder {
     public String getPath() {
         return path;
     }
-            
-            
+          
+    /**
+     * True if the media recorder should redirect output to an audio buffer instead
+     * of a file.
+     * @return 
+     */
+    public boolean isRedirectToAudioBuffer() {
+        return redirectToAudioBuffer;
+    }
+
     
 }

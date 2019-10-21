@@ -3606,6 +3606,24 @@ hi.show();}</pre></noscript>
     public void captureAudio(ActionListener response) {
         impl.captureAudio(response);
     }
+    
+    /**
+     * This method tries to invoke the device native hardware to capture audio.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The audio is saved to a file on the device.
+     * 
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * 
+     * @param recordingOptions Audio recording options.
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @since 7.0
+     */
+    public void captureAudio(MediaRecorderBuilder recordingOptions, ActionListener response) {
+        impl.captureAudio(recordingOptions, response);
+    }
 
     /**
      * This method tries to invoke the device native camera to capture video.

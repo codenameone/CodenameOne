@@ -285,6 +285,15 @@ public class AudioRecorderComponent extends Container {
         done.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent t) {
+                
+                if (builder.isRedirectToAudioBuffer()) {
+                    // We were just redirecting to the audio buffer so we don't have any previews to speak of
+                    media.cleanup();
+                    setState(RecorderState.Paused);
+                    setState(RecorderState.Accepted);
+                    return;
+                }
+                
                 final boolean[] closeHandled = new boolean[1];
                 media.pause();
                 setState(RecorderState.Paused);

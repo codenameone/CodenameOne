@@ -34,7 +34,7 @@
 #else
 #include "cn1_globals.h"
 #endif
-
+#import "CN1AudioUnit.h"
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import "NetworkConnectionImpl.h"
@@ -5244,6 +5244,69 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 #endif
     memcpy(data, d.bytes, d.length);
     POOL_END();
+}
+
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+    JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
+        __block CN1AudioUnit* recorder = nil;
+         
+        __block NSString *exStr = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            
+            AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+            
+            if (isIOS7()) {
+                CN1Log(@"Asking for record permission");
+                [audioSession requestRecordPermission:^(BOOL granted) {
+                    POOL_BEGIN();
+                    if (granted) {
+                         recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+                    } else {
+                        exStr = @"Denied access to use the microphone";
+                    }
+                    POOL_END();
+                }];
+            } else {
+                recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+            }
+            POOL_END();
+        });
+        if (exStr != nil) {
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
+            throwException(threadStateData, ex);
+            return (JAVA_LONG)0;
+        } else {
+            
+            return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+        }
+    #else
+        return (JAVA_LONG)0;
+    #endif
+    }
+    
+
+
+
+void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit start];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit stop];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit release];
+    
 }
 
 
