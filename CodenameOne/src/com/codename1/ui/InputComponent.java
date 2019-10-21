@@ -69,7 +69,13 @@ public abstract class InputComponent extends Container {
                 return true;
             }
         };
-    private final Label errorMessage = new Label("", "ErrorLabel");
+    private final Label errorMessage = new Label("", "ErrorLabel") {
+        public void setText(String s) {
+            super.setText(s);
+            descriptionMessage.setVisible(s.length() == 0);
+        } 
+    };
+    private final Label descriptionMessage = new Label("", "DescriptionLabel");
 
     static Boolean guiBuilderMode;
 
@@ -112,28 +118,39 @@ public abstract class InputComponent extends Container {
         return errorMessage;
     }
 
-    private static int max(int... vals) {
-        int out = 0;
-        for (int val : vals) {
-            out = Math.max(val, out);
-        }
-        return out;
+    /**
+     * Returns the internal description message implementation
+     * @return the label
+     */
+    Label getDescriptionMessage() {
+        return descriptionMessage;
+    }
+
+    // varags calls are significantly slower in java
+    private static int max(int a, int b, int c) {
+        return Math.max(Math.max(a, b), c);
     }
     
+    private static int max(int a, int b, int c, int d) {
+        return Math.max(Math.max(Math.max(a, b), c), d);
+    }
+
     @Override
     protected Dimension calcPreferredSize() {
         
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
-                return new Dimension(
-                        max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(), 
-                        getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + errorMessage.getOuterPreferredH() + getStyle().getVerticalPadding()
+                int w = max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW(), descriptionMessage.getOuterPreferredW());
+                int h = getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + 
+                    Math.max(errorMessage.getOuterPreferredH(), descriptionMessage.getOuterPreferredH());
+                return new Dimension(w + getStyle().getHorizontalPadding(), 
+                         h + getStyle().getVerticalPadding()
                 );
             } else {
                 return new Dimension(
-                        max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
-                        errorMessage.getOuterPreferredH() + max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
+                        Math.max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
+                        errorMessage.getOuterPreferredH() + Math.max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
                 );
             }
         }
@@ -149,7 +166,8 @@ public abstract class InputComponent extends Container {
                 setLayout(new BorderLayout());
                 add(BorderLayout.CENTER, getEditor());
                 add(BorderLayout.NORTH, lbl);
-                add(BorderLayout.SOUTH, errorMessage);
+                add(BorderLayout.SOUTH, 
+                    LayeredLayout.encloseIn(errorMessage, descriptionMessage));
             } else {
                 setLayout(new BorderLayout());
                 add(BorderLayout.CENTER, getEditor());
@@ -170,6 +188,7 @@ public abstract class InputComponent extends Container {
             removeAll();
             getEditor().remove();
             lbl.remove();
+            descriptionMessage.remove();
             errorMessage.remove();
             constructUI();
         }
@@ -260,6 +279,27 @@ public abstract class InputComponent extends Container {
                 Border b = Border.createUnderlineBorder(2, val);
                 getEditor().getAllStyles().setBorder(b);
             }
+        }
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
+     * Sets the text of the description label which currently only applies in the onTop mode. 
+     * This text occupies the same space as the error message and thus hides 
+     * when there's an error
+     * @param descriptionMessage the text
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent descriptionMessage(String descriptionMessage) {
+        if(descriptionMessage == null || descriptionMessage.length() == 0) {
+            if(this.descriptionMessage.getText().length() == 0) {
+                return this;
+            }
+            // clear the error mode
+            this.descriptionMessage.setText("");
+        } else {
+            this.descriptionMessage.setText(descriptionMessage);
         }
         refreshForGuiBuilder();
         return this;

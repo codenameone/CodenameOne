@@ -84,7 +84,8 @@ public class MediaRecorderBuilder {
     
     /**
      * Sets the output path where the audio recording should be saved.
-     * @param path The output path where the recording should be saved.
+     * @param path The output path where the recording should be saved as 
+     * a {@link com.codename1.io.FileSystemStorage} path
      * @return Self for chaining.
      */
     public MediaRecorderBuilder path(String path) {
