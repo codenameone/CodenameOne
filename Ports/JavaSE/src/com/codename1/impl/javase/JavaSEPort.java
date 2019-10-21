@@ -10621,16 +10621,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
                 if (redirectToAudioBuffer) {
-                    int frameSize = 2 * audioChannels;
-                    int frameRate = samplingRate;
                     javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
-                            javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, 
                             samplingRate, 
                             16,
                             audioChannels,
-                            frameSize,
-                            frameRate,
-                            true
+                            true,
+                            false
                     );
                     
                     return format;
@@ -10639,7 +10635,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int sampleSizeInBits = 8;
                 int channels = audioChannels;
                 boolean signed = true;
-                boolean bigEndian = true;
+                boolean bigEndian = false;
                 javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,
                                                      channels, signed, bigEndian);
                 return format;
@@ -10672,7 +10668,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                         AudioBuffer buf = MediaManager.getAudioBuffer(path, true, 256);
                                         int maxBufferSize = buf.getMaxSize();
                                         float[] sampleBuffer = new float[maxBufferSize];
-                                        byte[] byteBuffer = new byte[256];
+                                        byte[] byteBuffer = new byte[samplingRate * audioChannels];
                                         int bytesRead = -1;
                                         while ((bytesRead = ais.read(byteBuffer)) >= 0) {
                                             if (bytesRead > 0) {
@@ -10680,7 +10676,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                 
                                                 for (int i = 0; i < bytesRead; i += 2) {
                                                     sampleBuffer[sampleBufferPos] = ((float)ByteBuffer.wrap(byteBuffer, i, 2)
-                                                            .order(ByteOrder.BIG_ENDIAN)
+                                                            .order(ByteOrder.LITTLE_ENDIAN)
                                                             .getShort())/ 0x8000;
                                                     sampleBufferPos++;
                                                     if (sampleBufferPos >= sampleBuffer.length) {

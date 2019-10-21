@@ -3,6 +3,7 @@ package com.codename1.samples;
 
 import com.codename1.capture.Capture;
 import com.codename1.components.MultiButton;
+import com.codename1.io.File;
 import com.codename1.io.FileSystemStorage;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
@@ -23,6 +24,7 @@ import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.WAVWriter;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.plaf.Style;
 import java.util.Arrays;
@@ -90,7 +92,7 @@ public class AudioBufferSample {
             hi.getToolbar().addCommandToRightBar("", icon, (ev) -> {
                 try {
                     String path = "tmpBuffer.pcm";
-                    
+                    WAVWriter wavFileWriter = new WAVWriter(new File("tmpBuffer.wav"), 44100, 1, 16);
                     AudioBuffer audioBuffer = MediaManager.getAudioBuffer(path, true, 64);
                     MediaRecorderBuilder options = new MediaRecorderBuilder()
                             .audioChannels(1)
@@ -100,13 +102,34 @@ public class AudioBufferSample {
                             .path(path);
                     System.out.println("Builder isredirect? "+options.isRedirectToAudioBuffer());
                     float[] byteBuffer = new float[audioBuffer.getMaxSize()];
-                    audioBuffer.addListener(buf->{
+                    audioBuffer.addCallback(buf->{
                         buf.copyTo(byteBuffer);
-                        System.out.println(Arrays.toString(byteBuffer));
+                        try {
+                            wavFileWriter.write(byteBuffer, 0, audioBuffer.getSize());
+                        } catch (Throwable t) {
+                            Log.e(t);
+                        }
+
                     });
                                     
                             
                     String file = Capture.captureAudio(options);
+                    wavFileWriter.close();
+                    SimpleDateFormat sd = new SimpleDateFormat("yyyy-MMM-dd-kk-mm");
+                    String fileName = sd.format(new Date());
+                    String filePath = recordingsDir + fileName;
+                    Util.copy(fs.openInputStream(new File("tmpBuffer.wav").getAbsolutePath()), fs.openOutputStream(filePath));
+                    MultiButton mb = new MultiButton(fileName);
+                    mb.addActionListener((e) -> {
+                        try {
+                            Media m = MediaManager.createMedia(filePath, false);
+                            m.play();
+                        } catch (IOException err) {
+                            Log.e(err);
+                        }
+                    });
+                    hi.add(mb);
+                    hi.revalidate();
                     if (file != null) {
                         System.out.println(file);
                     }
