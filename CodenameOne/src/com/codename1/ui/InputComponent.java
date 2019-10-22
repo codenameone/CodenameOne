@@ -23,8 +23,10 @@
 
 package com.codename1.ui;
 
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import java.util.ArrayList;
@@ -78,7 +80,9 @@ public abstract class InputComponent extends Container {
     private final Label descriptionMessage = new Label("", "DescriptionLabel");
 
     static Boolean guiBuilderMode;
-
+    
+    Button action;
+    
     /**
      * Protected constructor for subclasses to override
      */
@@ -92,14 +96,17 @@ public abstract class InputComponent extends Container {
      * This method must be invoked by the constructor of the subclasses to initialize the UI
      */
     protected void initInput() {
-        setUIID("TextComponent");
-        getEditor().setLabelForComponent(lbl);
-        lbl.setFocusable(false);
-        String tuid = getUIManager().getThemeConstant("textComponentFieldUIID", null);
-        if(tuid != null) {
-            getEditor().setUIID(tuid);
+        // this can happen for base class constructors
+        if(getEditor() != null) {
+            setUIID("TextComponent");
+            getEditor().setLabelForComponent(lbl);
+            lbl.setFocusable(false);
+            String tuid = getUIManager().getThemeConstant("textComponentFieldUIID", null);
+            if(tuid != null) {
+                getEditor().setUIID(tuid);
+            }
+            refreshForGuiBuilder();
         }
-        refreshForGuiBuilder();
     }
     
     /**
@@ -157,20 +164,29 @@ public abstract class InputComponent extends Container {
         return super.calcPreferredSize();
     }
     
-    
+    void addEditorAction() {
+        if(action != null) {
+            add(BorderLayout.CENTER, LayeredLayout.encloseIn(
+                getEditor(),
+                FlowLayout.encloseRightMiddle(action)
+            ));
+        } else {
+            add(BorderLayout.CENTER, getEditor());
+        }
+    }
     
     void constructUI() {
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
                 setLayout(new BorderLayout());
-                add(BorderLayout.CENTER, getEditor());
                 add(BorderLayout.NORTH, lbl);
+                addEditorAction();
                 add(BorderLayout.SOUTH, 
                     LayeredLayout.encloseIn(errorMessage, descriptionMessage));
             } else {
                 setLayout(new BorderLayout());
-                add(BorderLayout.CENTER, getEditor());
+                addEditorAction();
                 add(BorderLayout.WEST, lbl);
                 add(BorderLayout.SOUTH, errorMessage);
             }
@@ -187,6 +203,9 @@ public abstract class InputComponent extends Container {
         if(guiBuilderMode) {
             removeAll();
             getEditor().remove();
+            if(action != null) {
+                action.remove();
+            }
             lbl.remove();
             descriptionMessage.remove();
             errorMessage.remove();
@@ -316,6 +335,46 @@ public abstract class InputComponent extends Container {
         return this;
     }
 
+    private void initAction() {
+        if(action == null) {
+            action = new Button("", "InputComponentAction");
+        }
+    }
+    
+    /**
+     * Sets the icon for the action button
+     * @param icon the icon constant from {@link com.codename1.ui.FontImage}
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent action(char icon) {
+        initAction();
+        action.setMaterialIcon(icon);
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
+     * Binds an event for the action button
+     * @param c action listener callback 
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionClick(ActionListener c) {
+        initAction();
+        action.addActionListener(c);
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
+     * Returns the button underlying the action button that is placed on 
+     * the right of the field on top of it
+     * @return a button for manual customization
+     */
+    public Button getAction() {
+        initAction();
+        return action;
+    }
+    
     /**
      * {@inheritDoc}
      */

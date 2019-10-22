@@ -24,7 +24,9 @@
 package com.codename1.ui;
 
 import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 
 /**
@@ -159,8 +161,18 @@ public class TextComponent extends InputComponent {
             if(isOnTopMode() && isFocusAnimation()) {
                 getLabel().setUIID("FloatingHint");
                 setLayout(new LayeredLayout());
-                Container tfContainer = BorderLayout.center(field).
-                        add(BorderLayout.NORTH, getLabel()).
+                Container tfContainer;
+                if(action != null) {
+                    tfContainer = BorderLayout.center(
+                        LayeredLayout.encloseIn(
+                            field,
+                            FlowLayout.encloseRightMiddle(action)
+                        )
+                    );
+                } else {
+                    tfContainer = BorderLayout.center(field);
+                }
+                tfContainer.add(BorderLayout.NORTH, getLabel()).
                         add(BorderLayout.SOUTH, 
                             LayeredLayout.encloseIn(
                                 getErrorMessage(), 
@@ -245,6 +257,24 @@ public class TextComponent extends InputComponent {
         return (TextComponent)super.onTopMode(onTopMode);
     }
 
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent action(char icon) {
+        super.action(icon);
+        return this;
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent actionClick(ActionListener c) {
+        super.actionClick(c);
+        return this;
+    }    
+    
     /**
      * Overridden for covariant return type
      * {@inheritDoc}

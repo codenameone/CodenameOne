@@ -187,11 +187,31 @@ public class TextModeLayout extends Layout {
     /**
      * Creates a new Constraint instance to add to the layout
      *
+     * @return the default constraint
+     */
+    public TableLayout.Constraint cc() {
+        return table.createConstraint().verticalAlign(Component.TOP);
+    }
+    
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
      * @param row the row for the table starting with 0
      * @param column the column for the table starting with 0
      * @return the new constraint
      */
     public TableLayout.Constraint createConstraint(int row, int column) {
+        return table.createConstraint(row, column).verticalAlign(Component.TOP);
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
+     * @param row the row for the table starting with 0
+     * @param column the column for the table starting with 0
+     * @return the default constraint
+     */
+    public TableLayout.Constraint cc(int row, int column) {
         return table.createConstraint(row, column).verticalAlign(Component.TOP);
     }
 
