@@ -25,6 +25,7 @@ package com.codename1.capture;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -92,6 +93,18 @@ public class Capture {
     public static String captureAudio() {
         CallBack c = new CallBack();
         captureAudio(c);
+        Display.getInstance().invokeAndBlock(c);
+        return c.url;
+    }
+    
+    /**
+     * Same as {@link #captureAudio(com.codename1.media.MediaRecorderBuilder) { only a blocking version that holds the EDT
+     * @return the audio file location or null if the user canceled
+     * @since 7.0
+     */
+    public static String captureAudio(MediaRecorderBuilder recordingOptions) {
+        CallBack c = new CallBack();
+        captureAudio(recordingOptions, c);
         Display.getInstance().invokeAndBlock(c);
         return c.url;
     }
@@ -177,6 +190,24 @@ public class Capture {
      */
     public static void captureAudio(ActionListener response){    
         Display.getInstance().captureAudio(response);
+    }
+    
+    /**
+     * This method tries to invoke the device native hardware to capture audio.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The audio record settings are specified in the recorderOptions parameter.
+     * 
+     * <p>use this in the actionPerformed to retrieve the file path.
+     * String path = (String) evt.getSource();</p>
+     * 
+     * 
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @since 7.0
+     */
+    public static void captureAudio(MediaRecorderBuilder recorderOptions, ActionListener response){    
+        Display.getInstance().captureAudio(recorderOptions, response);
     }
 
     /**

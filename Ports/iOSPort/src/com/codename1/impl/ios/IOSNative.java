@@ -338,6 +338,14 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
+    native void destroyAudioUnit(long peer);
+
+    native long createAudioUnit(String path, int audioChannels, float sampleRate, float[] f);
+
+    
+    native void startAudioUnit(long audioUnit);
+    native void stopAudioUnit(long audioUnit);
+    
     native long createAudioRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration);
     native void startAudioRecord(long peer);
     native void pauseAudioRecord(long peer);
@@ -696,6 +704,7 @@ public final class IOSNative {
 
     native void setConnectionId(long peer, int id);
 
+    
     
 
      

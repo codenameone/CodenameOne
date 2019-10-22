@@ -5360,19 +5360,28 @@ public abstract class CodenameOneImplementation {
         }
         return null;
     }
-
-    
+    public void captureAudio(final com.codename1.ui.events.ActionListener response) {
+        captureAudio( new MediaRecorderBuilder()
+                .path(new com.codename1.io.File("tmpaudio.wav").getAbsolutePath())
+                .mimeType("audio/wav"), response);
+        
+    }
     
     
     /**
      * Captures a audio and notifies with the raw data when available
      * @param response callback for the resulting data
      */
-    public void captureAudio(final com.codename1.ui.events.ActionListener response) {
-        
-        final MediaRecorderBuilder builder = new MediaRecorderBuilder()
-                .path(new com.codename1.io.File("tmpaudio.wav").getAbsolutePath())
-                .mimeType("audio/wav");
+    
+    public void captureAudio(final MediaRecorderBuilder recordingOptions, final com.codename1.ui.events.ActionListener response) {    
+        final MediaRecorderBuilder builder = recordingOptions == null ? new MediaRecorderBuilder() : recordingOptions;
+        if (!builder.isRedirectToAudioBuffer() && builder.getPath() == null) {
+            builder.path(new com.codename1.io.File("tmpaudio.wav").getAbsolutePath());
+        }
+        if (!builder.isRedirectToAudioBuffer() && builder.getMimeType() == null) {
+            builder.mimeType("audio/wav");
+        }
+        System.out.println("in captureAudio "+recordingOptions.isRedirectToAudioBuffer());
         final AudioRecorderComponent cmp = new AudioRecorderComponent(builder);
         final Sheet sheet = new Sheet(null, "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
