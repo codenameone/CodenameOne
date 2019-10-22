@@ -41,12 +41,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     private Container animationLayer;
     private Boolean focusAnimation;
     private static int animationSpeed = 100;
-    
-    @Override
-    protected void initInput() {
-        setUIID("TextComponent");
-    }
-    
+        
     /**
      * Allows us to invoke setters/getters and bind listeners to the text field
      * @return the text field instance
