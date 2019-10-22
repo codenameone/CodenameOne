@@ -1342,6 +1342,7 @@ public class Toolbar extends Container {
             if (!isPointerReleasedListenerAdded) {
                 parent.addPointerReleasedListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
+                        parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
                         }
