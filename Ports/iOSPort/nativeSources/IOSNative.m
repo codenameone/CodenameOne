@@ -5257,6 +5257,22 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
             POOL_BEGIN();
             
             AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+            NSError *err = nil;
+            [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
+            err = nil;
+            [audioSession setActive:YES error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
             
             if (isIOS7()) {
                 CN1Log(@"Asking for record permission");
