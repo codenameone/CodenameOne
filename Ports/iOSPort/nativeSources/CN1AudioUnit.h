@@ -20,14 +20,27 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 #import <Foundation/Foundation.h>
-#import <UIKit/UIGestureRecognizerSubclass.h>
-#import "CodenameOne_GLViewController.h"
+#import "xmlvm.h"
 
-@interface CN1TapGestureRecognizer : UIGestureRecognizer<UIGestureRecognizerDelegate> {
-    UIView* pressedView;
+#import <AudioToolbox/AudioQueue.h>
+
+@interface CN1AudioUnit : NSObject  {
+    AudioBuffer * buff;
+    AudioQueueRef queue;
+    AudioStreamBasicDescription  fmt;
+    NSThread *evtThread;
+    JAVA_ARRAY convertedSampleBuffer;
+    NSString* path;
+    int channels;
+    float sampleRate;
 }
-- (void) install:(CodenameOne_GLViewController*)ctrl;
-
+-(id)initWithPath:(NSString*)path channels:(int)channels sampleRate:(float)sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer;
+-(BOOL)start;
+-(BOOL)stop;
+-(AudioBuffer*)audioBuffer;
+-(AudioQueueRef)queue;
+-(AudioStreamBasicDescription)fmt;
+-(NSString*)path;
+-(JAVA_ARRAY)convertedSampleBuffer;
 @end

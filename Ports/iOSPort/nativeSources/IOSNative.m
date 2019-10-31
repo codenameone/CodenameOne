@@ -34,7 +34,7 @@
 #else
 #include "cn1_globals.h"
 #endif
-
+#import "CN1AudioUnit.h"
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import "NetworkConnectionImpl.h"
@@ -80,6 +80,8 @@
 #ifdef ENABLE_WKWEBVIEW
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <WebKit/WebKit.h>
+//#define CN1_USE_AVKIT
+#import <AVKit/AVKit.h>
 #define supportsWKWebKit
 #endif
 #endif
@@ -2781,6 +2783,26 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
 }
 
+void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
+    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:moviePlayer
+    queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
+        /*
+         * I'm not sure if we need to handle the callback differently in different cases
+         * but if we do, this code is a guideline on how we would do this
+        int reason = [[[notification userInfo] valueForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
+        if (reason == MPMovieFinishReasonPlaybackEnded) {
+            //movie finished playin
+        }else if (reason == MPMovieFinishReasonUserExited) {
+            //user hit the done button
+        }else if (reason == MPMovieFinishReasonPlaybackError) {
+            //error
+        }
+         * */
+        com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
+    }];
+    com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+}
+
 extern BOOL CN1_blockPaste;
 extern BOOL CN1_blockCopy;
 extern BOOL CN1_blockCut;
@@ -2808,34 +2830,94 @@ BOOL cn1UseApplicationAudioSessionForMedia(CN1_THREAD_STATE_SINGLE_ARG) {
     }
     return YES;
 }
+BOOL useAVKit() {
+    if (@available(iOS 13.0, *)) {
+        return YES;
+    }
+#ifdef CN1_USE_AVKIT
+    if (@available(iOS 8.0, *)) {
+        return YES;
+    } else {
+        return NO;
+    }
+#endif
+    
+    return NO;
+}
+JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+     __block MPMoviePlayerController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+            NSURL* u;
+            if([s hasPrefix:@"file:"]) {
+                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+            } else {
+                u = [NSURL URLWithString:s];
+            }
+            moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
+            moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+            // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+            // component is created - which is disruptive.  Better to just let it prepare to play
+            // at the time that the video is played - even if there is a delay.
+            //[moviePlayerInstance prepareToPlay];
+    #ifdef AUTO_PLAY_VIDEO
+            [moviePlayerInstance play];
+    #else
+            moviePlayerInstance.shouldAutoplay = NO;
+    #endif
+            moviePlayerInstance.controlStyle = MPMovieControlStyleEmbedded;
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+void addPlaybackToAudioSession() {
+    AVAudioSessionCategory cat = [[AVAudioSession sharedInstance] category];
+    if (cat == AVAudioSessionCategoryPlayback) {
+        return;
+    }
+    if (cat == AVAudioSessionCategoryRecord) {
+        [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord error:nil];
+        return;
+    }
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
+}
+
+JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+     __block AVPlayerViewController* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+            NSURL* u;
+            if([s hasPrefix:@"file:"]) {
+                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+            } else {
+                u = [NSURL URLWithString:s];
+            }
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+        
+            
+    #ifdef AUTO_PLAY_VIDEO
+        addPlaybackToAudioSession();
+            [moviePlayerInstance play];
+    #endif
+            moviePlayerInstance.showsPlaybackControls = YES;
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
-    __block MPMoviePlayerController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-        NSURL* u;
-        if([s hasPrefix:@"file:"]) {
-            u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-        } else {
-            u = [NSURL URLWithString:s];
-        }
-        moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
-        // component is created - which is disruptive.  Better to just let it prepare to play
-        // at the time that the video is played - even if there is a delay.
-        //[moviePlayerInstance prepareToPlay];
-#ifdef AUTO_PLAY_VIDEO
-        [moviePlayerInstance play];
-#else
-        moviePlayerInstance.shouldAutoplay = NO;
-#endif
-        moviePlayerInstance.controlStyle = MPMovieControlStyleEmbedded;
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+    if (useAVKit()) {
+        return createVideoComponentFromStringAV(str, onCompletionCallbackId);
+    } else {
+        return createVideoComponentFromStringMP(str, onCompletionCallbackId);
+    }
+    
 }
 
 
@@ -2844,157 +2926,325 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
     [[NSNotificationCenter defaultCenter] removeObserver:(void *)observerPeer];
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+
+JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN()
-        NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-        NSURL *u = nil;
-        if([s hasPrefix:@"file:"]) {
-            u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-        } else {
-            u = [NSURL URLWithString:s];
-        }
-        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
-#ifndef AUTO_PLAY_VIDEO
-        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
-#endif
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN()
+            NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+            NSURL *u = nil;
+            if([s hasPrefix:@"file:"]) {
+                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+            } else {
+                u = [NSURL URLWithString:s];
+            }
+            moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
+    #ifndef AUTO_PLAY_VIDEO
+            moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+    __block AVPlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN()
+            NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+            NSURL *u = nil;
+            if([s hasPrefix:@"file:"]) {
+                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+            } else {
+                u = [NSURL URLWithString:s];
+            }
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+    if (useAVKit()) {
+        return createNativeVideoComponentFromStringAV(str, onCompletionCallbackId);
+    } else {
+        return createNativeVideoComponentFromStringMP(str, onCompletionCallbackId);
+    }
+}
+
+JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    __block MPMoviePlayerController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+    #ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
+            JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+            int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    #else
+            void* data = ((JAVA_ARRAY)dataObject)->data;
+            int len = ((JAVA_ARRAY)dataObject)->length;
+    #endif
+            NSData* d = [NSData dataWithBytes:data length:len];
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            
+            moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
+            moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+            // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+            // component is created - which is disruptive.  Better to just let it prepare to play
+            // at the time that the video is played - even if there is a delay.
+            //[moviePlayerInstance prepareToPlay];
+    #ifdef AUTO_PLAY_VIDEO
+            [moviePlayerInstance play];
+    #else
+            moviePlayerInstance.shouldAutoplay = NO;
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    __block AVPlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+
+            void* data = ((JAVA_ARRAY)dataObject)->data;
+            int len = ((JAVA_ARRAY)dataObject)->length;
+
+            NSData* d = [NSData dataWithBytes:data length:len];
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+            
+            // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+            // component is created - which is disruptive.  Better to just let it prepare to play
+            // at the time that the video is played - even if there is a delay.
+            //[moviePlayerInstance prepareToPlay];
+    #ifdef AUTO_PLAY_VIDEO
+            addPlaybackToAudioSession();
+            [moviePlayerInstance play];
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
-    __block MPMoviePlayerController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-#ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
-        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-        int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else
-        void* data = ((JAVA_ARRAY)dataObject)->data;
-        int len = ((JAVA_ARRAY)dataObject)->length;
-#endif
-        NSData* d = [NSData dataWithBytes:data length:len];
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
-        
-        [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];
-        
-        moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
-        // component is created - which is disruptive.  Better to just let it prepare to play
-        // at the time that the video is played - even if there is a delay.
-        //[moviePlayerInstance prepareToPlay];
-#ifdef AUTO_PLAY_VIDEO
-        [moviePlayerInstance play];
-#else
-        moviePlayerInstance.shouldAutoplay = NO;
-#endif
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+    if (useAVKit()) {
+        return createVideoComponentAV(dataObject, onCompletionCallbackId);
+    } else {
+        return createVideoComponentMP(dataObject, onCompletionCallbackId);
+    }
+}
+
+
+
+JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    __block AVPlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+
+            void* data = ((JAVA_ARRAY)dataObject)->data;
+            int len = ((JAVA_ARRAY)dataObject)->length;
+
+            NSData* d = [NSData dataWithBytes:data length:len];
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            AVPlayer* player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = player;
+            
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+    __block MPMoviePlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+    #ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
+            JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+            int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    #else
+            void* data = ((JAVA_ARRAY)dataObject)->data;
+            int len = ((JAVA_ARRAY)dataObject)->length;
+    #endif
+            NSData* d = [NSData dataWithBytes:data length:len];
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            
+            moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
+    #ifndef AUTO_PLAY_VIDEO
+            moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
+    #endif
+    //#ifndef CN1_USE_ARC
+    //        [moviePlayerInstance retain];
+    //#endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
-    __block MPMoviePlayerViewController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-#ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* byteArray = dataObject;
-        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-        int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else
-        void* data = ((JAVA_ARRAY)dataObject)->data;
-        int len = ((JAVA_ARRAY)dataObject)->length;
-#endif
-        NSData* d = [NSData dataWithBytes:data length:len];
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
-        
-        [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];
-        
-        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
-#ifndef AUTO_PLAY_VIDEO
-        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
-#endif
-//#ifndef CN1_USE_ARC
-//        [moviePlayerInstance retain];
-//#endif
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+    if (useAVKit()) {
+        return createNativeVideoComponentAV(dataObject, onCompletionCallbackId);
+    } else {
+        return createNativeVideoComponentMP(dataObject, onCompletionCallbackId);
+    }
+}
+
+JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    __block MPMoviePlayerController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            
+            moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
+            moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    //#ifndef CN1_USE_ARC
+    //        [moviePlayerInstance retain];
+    //#endif
+            // prepareToPlay will cause other av sessions to be interrupted at the time that the video
+            // component is created - which is disruptive.  Better to just let it prepare to play
+            // at the time that the video is played - even if there is a delay.
+            //[moviePlayerInstance prepareToPlay];
+    #ifdef AUTO_PLAY_VIDEO
+            [moviePlayerInstance play];
+    #else
+            moviePlayerInstance.shouldAutoplay = NO;
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+
+JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    __block AVPlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+
+            
+    #ifdef AUTO_PLAY_VIDEO
+            addPlaybackToAudioSession();
+            [moviePlayerInstance play];
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-    __block MPMoviePlayerController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
-        
-        [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];
-        
-        moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
-        moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-//#ifndef CN1_USE_ARC
-//        [moviePlayerInstance retain];
-//#endif
-        // prepareToPlay will cause other av sessions to be interrupted at the time that the video
-        // component is created - which is disruptive.  Better to just let it prepare to play
-        // at the time that the video is played - even if there is a delay.
-        //[moviePlayerInstance prepareToPlay];
-#ifdef AUTO_PLAY_VIDEO
-        [moviePlayerInstance play];
-#else
-        moviePlayerInstance.shouldAutoplay = NO;
-#endif
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+    if (useAVKit()) {
+        return createVideoComponentNSDataAV(nsData, onCompletionCallbackId);
+    } else {
+        return createVideoComponentNSDataMP(nsData, onCompletionCallbackId);
+    }
+}
+
+JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    __block MPMoviePlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            
+            moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
+            registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
+    // No need to retain the instance.  Its reference count is already 1 after the alloc call.
+    //#ifndef CN1_USE_ARC
+    //        [moviePlayerInstance retain];
+    //#endif
+    #ifndef AUTO_PLAY_VIDEO
+            moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
+    #endif
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+
+JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+    __block AVPlayerViewController* moviePlayerInstance;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
+            
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentsDirectory = [paths objectAtIndex:0];
+            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            
+            [d writeToFile:path atomically:YES];
+            NSURL *u = [NSURL fileURLWithPath:path];
+            
+            moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-    __block MPMoviePlayerViewController* moviePlayerInstance;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
-        
-        [d writeToFile:path atomically:YES];
-        NSURL *u = [NSURL fileURLWithPath:path];
-        
-        moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
-        registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
-// No need to retain the instance.  Its reference count is already 1 after the alloc call.
-//#ifndef CN1_USE_ARC
-//        [moviePlayerInstance retain];
-//#endif
-#ifndef AUTO_PLAY_VIDEO
-        moviePlayerInstance.moviePlayer.shouldAutoplay = NO;
-#endif
-        POOL_END();
-    });
-    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+    if (useAVKit()) {
+        return createNativeVideoComponentNSDataMP(nsData, onCompletionCallbackId);
+    } else {
+        return createNativeVideoComponentNSDataAV(nsData, onCompletionCallbackId);
+    }
 }
 
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
@@ -3114,46 +3364,98 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     });
 }
 
-void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
+    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    MPMoviePlayerController* m = nil;;
+    if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+        m = (MPMoviePlayerController*)obj;
+    } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+        MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+        m = mv.moviePlayer;
+    }
+    return m;
+}
+
+AVPlayer* getAVPlayer(JAVA_LONG peer) {
+    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    AVPlayer* m = nil;;
+    if([obj isKindOfClass:[AVPlayer class]]) {
+        m = (AVPlayer*)obj;
+    } else if ([obj isKindOfClass:[AVPlayerViewController class]]) {
+        AVPlayerViewController *mv = (AVPlayerViewController*)obj;
+        m = mv.player;
+    }
+    return m;
+}
+
+AVPlayerViewController* getAVPlayerController(JAVA_LONG peer) {
+    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    AVPlayerViewController* m = nil;;
+    if([obj isKindOfClass:[AVPlayer class]]) {
+        
+    } else if ([obj isKindOfClass:[AVPlayerViewController class]]) {
+       m = (AVPlayerViewController*)obj;
+        
+    }
+    return m;
+}
+
+
+
+void startVideoComponentMP(JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
-        } else {
-            return;
-        }
+        [getMPPlayer(peer) play];
+        POOL_END();
+    });
+}
 
-        [m play];
+void startVideoComponentAV(JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        addPlaybackToAudioSession();
+        [getAVPlayer(peer) play];
+        POOL_END();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    if (useAVKit()) {
+        startVideoComponentAV(peer);
+    } else {
+        startVideoComponentMP(peer);
+    }
+}
+
+void stopVideoComponentMP(JAVA_LONG peer) {
+    
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+       
+        [getMPPlayer(peer) stop];
+        POOL_END();
+    });
+}
+void stopVideoComponentAV(JAVA_LONG peer) {
+    
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        [getAVPlayer(peer) seekToTime:CMTimeMake(0, 1)];
+        [getAVPlayer(peer) pause];
         POOL_END();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
-        } else {
-            return;
-        }
-        [m stop];
-        POOL_END();
-    });
+    if (useAVKit()) {
+        stopVideoComponentAV(peer);
+    } else {
+        stopVideoComponentMP(peer);
+    }
 }
 
-void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+void pauseVideoComponentMP(JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSObject* obj = (BRIDGE_CAST NSObject*)peer;
@@ -3171,47 +3473,57 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
         POOL_END();
     });
 }
+void pauseVideoComponentAV(JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        
+        [getAVPlayer(peer) pause];
+        POOL_END();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    if (useAVKit()) {
+        pauseVideoComponentAV(peer);
+    } else {
+        pauseVideoComponentMP(peer);
+    }
+}
 void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
+        if (useAVKit()) {
+            // Not sure if there is an equivalent in AVPlayer of prepareToPlay
         } else {
-            return;
+            [getMPPlayer(peer) prepareToPlay];
         }
-
-        [m prepareToPlay];
         POOL_END();
     });
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-    MPMoviePlayerController* m = nil;;
-    if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-        m = (MPMoviePlayerController*)obj;
-    } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-        MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-        m = mv.moviePlayer;
+    if (useAVKit()) {
+        AVPlayer* m = getAVPlayer(peer);
+        if (m == nil) {
+            return 0;
+        }
+        return CMTimeGetSeconds(m.currentTime) * 1000;
     } else {
-        return 0;
+        return (int)[getMPPlayer(peer) currentPlaybackTime] * 1000;
     }
-    return (int)m.currentPlaybackTime * 1000;
+    
 
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
-    NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-    if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-        MPMoviePlayerController* m = (MPMoviePlayerController*) obj;
-        m.currentPlaybackTime = time/1000;
-        return (int)m.currentPlaybackTime * 1000;
+    if (useAVKit()) {
+        [getAVPlayer(peer) seekToTime:CMTimeMakeWithSeconds(time/1000, 1000)];
+        return CMTimeGetSeconds([getAVPlayer(peer) currentTime]);
+    } else {
+        [getMPPlayer(peer) setCurrentPlaybackTime:time/1000];
+        return [getMPPlayer(peer) currentPlaybackTime];
     }
+    
     return 0;
 }
 
@@ -3219,8 +3531,13 @@ int responseGetMediaDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
-        responseGetMediaDuration = (int)m.duration * 1000;
+        if (useAVKit()) {
+            CMTime duration = getAVPlayer(peer).currentItem.asset.duration;
+            responseGetMediaDuration = CMTimeGetSeconds(duration) * 1000;
+        } else {
+            responseGetMediaDuration = (int)getMPPlayer(peer).duration * 1000;
+        }
+        
         POOL_END();
     });
     return responseGetMediaDuration;
@@ -3230,18 +3547,23 @@ void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_TH
     NSString *_artist = toNSString(CN1_THREAD_GET_STATE_PASS_ARG artist);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        if ([MPNowPlayingInfoCenter class])  {
-            NSArray *keys = [NSArray arrayWithObjects:
-                             MPMediaItemPropertyArtist,
-                             MPNowPlayingInfoPropertyPlaybackRate,
-                             nil];
-            NSArray *values = [NSArray arrayWithObjects:
-                               _artist,
-                               [NSNumber numberWithInt:1],
-                               nil];
-            NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
-            [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+        if (useAVKit()) {
+            //TODO
+        } else {
+            if ([MPNowPlayingInfoCenter class])  {
+                NSArray *keys = [NSArray arrayWithObjects:
+                                 MPMediaItemPropertyArtist,
+                                 MPNowPlayingInfoPropertyPlaybackRate,
+                                 nil];
+                NSArray *values = [NSArray arrayWithObjects:
+                                   _artist,
+                                   [NSNumber numberWithInt:1],
+                                   nil];
+                NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
+                [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
+            }
         }
+        
         POOL_END();
     });
 }
@@ -3250,6 +3572,7 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
     NSString *_title = toNSString(CN1_THREAD_GET_STATE_PASS_ARG title);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        
         if ([MPNowPlayingInfoCenter class])  {
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyTitle,
@@ -3262,6 +3585,8 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
+        
+        
         POOL_END();
     });
 }
@@ -3269,6 +3594,7 @@ void com_codename1_impl_ios_IOSNative_setMediaBgTitle___java_lang_String(CN1_THR
 void com_codename1_impl_ios_IOSNative_setMediaBgDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dur) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+
         if ([MPNowPlayingInfoCenter class])  {
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyPlaybackDuration,
@@ -3281,11 +3607,18 @@ void com_codename1_impl_ios_IOSNative_setMediaBgDuration___long(CN1_THREAD_STATE
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
+        
+        
         POOL_END();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pos) {
+    if (useAVKit()) {
+        // TODO
+    } else {
+        // TODO
+    }
     /*dispatch_async(dispatch_get_main_queue(), ^{
      POOL_BEGIN();
      if ([MPNowPlayingInfoCenter class])  {
@@ -3307,24 +3640,28 @@ void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE
 void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN value) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
+        if (useAVKit()) {
+            getAVPlayerController(peer).showsPlaybackControls = value;
         } else {
-            POOL_END();
-            return;
-        }
+            NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+            MPMoviePlayerController* m = nil;;
+            if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+                m = (MPMoviePlayerController*)obj;
+            } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+                MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+                m = mv.moviePlayer;
+            } else {
+                POOL_END();
+                return;
+            }
 
-        if (value) {
-            m.controlStyle = MPMovieControlStyleEmbedded;
-        } else {
-            m.controlStyle = MPMovieControlStyleNone;
+            if (value) {
+                m.controlStyle = MPMovieControlStyleEmbedded;
+            } else {
+                m.controlStyle = MPMovieControlStyleNone;
+            }
         }
+        
         POOL_END();
     });
 }
@@ -3332,6 +3669,7 @@ void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_bool
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+       
         if ([MPNowPlayingInfoCenter class])  {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
             UIImage* i = [glll getImage];
@@ -3347,6 +3685,8 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
             NSDictionary *mediaInfo = [NSDictionary dictionaryWithObjects:values forKeys:keys];
             [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:mediaInfo];
         }
+        
+        
         POOL_END();
     });
 }
@@ -3360,19 +3700,24 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
     responseIsVideoPlaying = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
-        } else {
-            return;
-        }
+        if (useAVKit()) {
+            responseIsVideoPlaying = getAVPlayer(peer).rate != 0 && getAVPlayer(peer).error == nil;
+        } else{
+            NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+            MPMoviePlayerController* m = nil;;
+            if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+                m = (MPMoviePlayerController*)obj;
+            } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+                MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+                m = mv.moviePlayer;
+            } else {
+                POOL_END();
+                return;
+            }
 
-        responseIsVideoPlaying = m.playbackState == MPMoviePlaybackStatePlaying;
+            responseIsVideoPlaying = m.playbackState == MPMoviePlaybackStatePlaying;
+        }
+        
         POOL_END();
     });
     return responseIsVideoPlaying;
@@ -3381,19 +3726,25 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
-        } else {
-            return;
-        }
+        if (useAVKit()) {
+            // TODO
 
-        [m setFullscreen:fullscreen];
+        } else {
+            NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+            MPMoviePlayerController* m = nil;;
+            if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+                m = (MPMoviePlayerController*)obj;
+            } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+                MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+                m = mv.moviePlayer;
+            } else {
+                POOL_END();
+                return;
+            }
+
+            [m setFullscreen:fullscreen];
+        }
+        
         POOL_END();
     });
 }
@@ -3403,37 +3754,53 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREA
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        MPMoviePlayerController* m = nil;;
-        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-            m = (MPMoviePlayerController*)obj;
-        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            m = mv.moviePlayer;
+        if (useAVKit()) {
+            // TODO
         } else {
-            return;
-        }
+            NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+            MPMoviePlayerController* m = nil;;
+            if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+                m = (MPMoviePlayerController*)obj;
+            } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+                MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+                m = mv.moviePlayer;
+            } else {
+                POOL_END();
+                return;
+            }
 
-        responseIsVideoFullScreen = [m isFullscreen];
+            responseIsVideoFullScreen = [m isFullscreen];
+        }
+        
         POOL_END();
     });
     return responseIsVideoFullScreen;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
-    return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
+    if (useAVKit()) {
+        AVPlayerViewController *m = getAVPlayerController(peer);
+        return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
+    } else {
+        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
+    }
+    
 }
 
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
-        if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
-            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:mv];
+        if (useAVKit()) {
+            [[CodenameOne_GLViewController instance] presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
+        } else {
+            NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+            if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+                MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+                [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:mv];
+            }
         }
+        
         POOL_END();
     });
 }
@@ -4880,6 +5247,85 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 }
 
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+    JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
+        __block CN1AudioUnit* recorder = nil;
+         
+        __block NSString *exStr = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            
+            AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+            NSError *err = nil;
+            [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
+            err = nil;
+            [audioSession setActive:YES error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
+            
+            if (isIOS7()) {
+                CN1Log(@"Asking for record permission");
+                [audioSession requestRecordPermission:^(BOOL granted) {
+                    POOL_BEGIN();
+                    if (granted) {
+                         recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+                    } else {
+                        exStr = @"Denied access to use the microphone";
+                    }
+                    POOL_END();
+                }];
+            } else {
+                recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+            }
+            POOL_END();
+        });
+        if (exStr != nil) {
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
+            throwException(threadStateData, ex);
+            return (JAVA_LONG)0;
+        } else {
+            
+            return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+        }
+    #else
+        return (JAVA_LONG)0;
+    #endif
+    }
+    
+
+
+
+void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit start];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit stop];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit release];
+    
+}
+
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
 #ifdef INCLUDE_MICROPHONE_USAGE
@@ -5462,6 +5908,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE
 
 NSLocale *currentLocale = NULL;
 NSLocale *deviceLocale = NULL;
+BOOL currentLocaleRequiresRelease = NO;
 
 NSLocale* cn1DeviceLocale() {
     if (deviceLocale == NULL) {
@@ -5474,12 +5921,22 @@ void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_ST
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
     if (currentLocale != NULL) {
-        [currentLocale release];
+        if (currentLocaleRequiresRelease) {
+            [currentLocale release];
+        }
     }
 #endif
-    currentLocale = cn1DeviceLocale();
+    if (localeStr == NULL) {
+        currentLocaleRequiresRelease = NO;
+        currentLocale = cn1DeviceLocale();
+    } else {
+        currentLocale = [[NSLocale alloc] initWithLocaleIdentifier:toNSString(threadStateData, localeStr)];
+        currentLocaleRequiresRelease = YES;
+    }
+    
     POOL_END();
 }
+
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT i) {
     POOL_BEGIN();

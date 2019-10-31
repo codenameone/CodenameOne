@@ -54,6 +54,17 @@ class ClassPathLoader extends ClassLoader {
         }
         return findClass(className);
     }
+
+    @Override
+    protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
+        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
+            return super.loadClass(className, resolve);
+        }
+        return findClass(className);
+        
+    }
+    
+    
     
     public Class findClass(String className) throws ClassNotFoundException {
         byte[] classByte;

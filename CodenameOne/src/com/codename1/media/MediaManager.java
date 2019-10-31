@@ -26,6 +26,8 @@ import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>
@@ -49,7 +51,54 @@ import java.io.InputStream;
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  */
 public class MediaManager {
+    
+    /**
+     * A static map of audio buffers.  These can be used to register an Audio buffer to receive
+     * raw PCM data from the microphone.
+     * @since 7.0
+     */
+    private static Map<String, AudioBuffer> audioBuffers = new HashMap<String, AudioBuffer>();
     private static RemoteControlListener remoteControlListener;
+    
+    /**
+     * Gets an audio buffer at the given path.
+     * @param path The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
+     * used as a key to map to the audio buffer so that it can be addressed.
+     * @return The AudioBuffer or null if no buffer exists at that path.
+     * @since 7.0
+     */
+    public static synchronized AudioBuffer getAudioBuffer(String path) {
+        return getAudioBuffer(path, false, 256);
+    }
+    
+    /**
+     * Gets or creates an audio buffer at the given path.
+     * @param path The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
+     * used as a key to map to the audio buffer so that it can be addressed.
+     * @param create If this flag is {@literal true} and no buffer exists at the given path,
+     * then the buffer will be created.
+     * @param size The maximum size of the buffer.
+     * @return The audio buffer or null if no buffer exists at that path and the {@literal create} flag is {@literal false}.
+     * @since 7.0
+     */
+    public static synchronized AudioBuffer getAudioBuffer(String path, boolean create, int size) {
+        if (create && !audioBuffers.containsKey(path)) {
+            audioBuffers.put(path, new AudioBuffer(size));
+        }
+        
+        return audioBuffers.get(path);
+    }
+    
+    /**
+     * Deletes the audio buffer at the given path.
+     * @param path The path to the audio buffer to delete.
+     * @since 7.0
+     */
+    public static synchronized void deleteAudioBuffer(String path) {
+       audioBuffers.remove(path);
+    }
+    
+    
     
     /**
      * Registers a listener to be notified of remote control events - e.g.
@@ -265,6 +314,27 @@ public class MediaManager {
      * @throws IOException id failed to create a Media object
      */
     public static Media createMediaRecorder(String path, String mimeType) throws IOException {
+        return createMediaRecorder(new MediaRecorderBuilder().path(path).mimeType(mimeType));
+    }
+    
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * 
+     * @param builder media settings
+     * @throws IllegalArgumentException if given mime-type is not supported
+     * @throws IOException id failed to create a Media object
+     * @since 7.0
+     */
+    public static Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+        if (builder.isRedirectToAudioBuffer()) {
+            return builder.build();
+        }
+        String mimeType = builder.getMimeType();
+        if (mimeType == null && getAvailableRecordingMimeTypes().length > 0) {
+            mimeType = getAvailableRecordingMimeTypes()[0];
+        }
+        String path = builder.getPath();
         boolean supportedMime = false;
         String [] supported  = getAvailableRecordingMimeTypes();
         int slen = supported.length;
@@ -280,6 +350,7 @@ public class MediaManager {
                     " is not supported on this platform use "
                     + "getAvailableRecordingMimeTypes()");
         }
+        
         return Display.getInstance().createMediaRecorder(path, mimeType);
     }
 }

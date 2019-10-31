@@ -4361,8 +4361,31 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerDragged(final int x, final int y) {
+        Form f = getComponentForm();
+        if (f != null) {
+            pointerDragged(x, y, f.getCurrentPointerPress());
+        } else {
+            pointerDragged(x, y, null);
+        }
+    }
+    
+    
+    /**
+     * If this Component is focused, the pointer dragged event
+     * will call this method
+     * 
+     * @param x the pointer x coordinate
+     * @param y the pointer y coordinate
+     * @param currentPointerPress Object useed to track the current pointer press.  Each time 
+     * the pointer is pressed, a new Object is generated, and is passed to pointerDragged.
+     * This is to help prevent infinite loops of pointerDragged after a pointer press has been released.
+     */
+    private void pointerDragged(final int x, final int y, final Object currentPointerPress) {
         Form p = getComponentForm();
         if(p == null){
+            return;
+        }
+        if (currentPointerPress != p.getCurrentPointerPress()) {
             return;
         }
         
@@ -4377,7 +4400,7 @@ public class Component implements Animation, StyleListener, Editable {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (dragActivated) {
-                            pointerDragged(x, y);
+                            pointerDragged(x, y, currentPointerPress);
                         }
                         dragCallbacks--;
                     }

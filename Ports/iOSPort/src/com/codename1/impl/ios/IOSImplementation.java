@@ -3023,7 +3023,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
-        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }
     
     
@@ -3037,10 +3037,117 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
 
-    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
+    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
         if (!nativeInstance.checkMicrophoneUsage()) {
             throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
         }
+        if (redirectToAudioBuffer) {
+            
+            return new Media() {
+                long peer = nativeInstance.createAudioUnit(path, audioChannels, sampleRate, new float[64]);
+                boolean isPlaying;
+                @Override
+                public void play() {
+                    isPlaying = true;
+                    nativeInstance.startAudioUnit(peer);
+                }
+
+                @Override
+                public void pause() {
+                    isPlaying = false;
+                    nativeInstance.stopAudioUnit(peer);
+                }
+
+                @Override
+                public void prepare() {
+                    
+                }
+
+                @Override
+                public void cleanup() {
+                    if (peer == 0) {
+                        return;
+                    }
+                    if (isPlaying) {
+                        pause();
+                    }
+                    
+                    nativeInstance.destroyAudioUnit(peer);
+                }
+
+                @Override
+                public int getTime() {
+                    return -1;
+                }
+
+                @Override
+                public void setTime(int time) {
+                    
+                }
+
+                @Override
+                public int getDuration() {
+                    return -1;
+                }
+
+                @Override
+                public void setVolume(int vol) {
+                    
+                }
+
+                @Override
+                public int getVolume() {
+                    return -1;
+                }
+
+                @Override
+                public boolean isPlaying() {
+                    return isPlaying;
+                }
+
+                @Override
+                public Component getVideoComponent() {
+                    return null;
+                }
+
+                @Override
+                public boolean isVideo() {
+                    return false;
+                }
+
+                @Override
+                public boolean isFullScreen() {
+                    return false;
+                }
+
+                @Override
+                public void setFullScreen(boolean fullScreen) {
+                    
+                }
+
+                @Override
+                public void setNativePlayerMode(boolean nativePlayer) {
+                    
+                }
+
+                @Override
+                public boolean isNativePlayerMode() {
+                    return false;
+                }
+
+                @Override
+                public void setVariable(String key, Object value) {
+                    
+                }
+
+                @Override
+                public Object getVariable(String key) {
+                    return null;
+                }
+                
+            };
+        }
+        
         finishedCreatingAudioRecorder = false;
         createAudioRecorderException = null;
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path, mimeType, sampleRate, bitRate, audioChannels, maxDuration) };
@@ -3176,7 +3283,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst.getPreferredMaxLength());
+        nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst != null ? cnst.getPreferredMaxLength() : 0);
         dropEvents = true;
     }
     

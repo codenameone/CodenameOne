@@ -23,8 +23,10 @@
 
 package com.codename1.ui;
 
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import java.util.ArrayList;
@@ -69,10 +71,18 @@ public abstract class InputComponent extends Container {
                 return true;
             }
         };
-    private final Label errorMessage = new Label("", "ErrorLabel");
+    private final Label errorMessage = new Label("", "ErrorLabel") {
+        public void setText(String s) {
+            super.setText(s);
+            descriptionMessage.setVisible(s.length() == 0);
+        } 
+    };
+    private final Label descriptionMessage = new Label("", "DescriptionLabel");
 
     static Boolean guiBuilderMode;
-
+    
+    Button action;
+    
     /**
      * Protected constructor for subclasses to override
      */
@@ -86,14 +96,17 @@ public abstract class InputComponent extends Container {
      * This method must be invoked by the constructor of the subclasses to initialize the UI
      */
     protected void initInput() {
-        setUIID("TextComponent");
-        getEditor().setLabelForComponent(lbl);
-        lbl.setFocusable(false);
-        String tuid = getUIManager().getThemeConstant("textComponentFieldUIID", null);
-        if(tuid != null) {
-            getEditor().setUIID(tuid);
+        // this can happen for base class constructors
+        if(getEditor() != null) {
+            setUIID("TextComponent");
+            getEditor().setLabelForComponent(lbl);
+            lbl.setFocusable(false);
+            String tuid = getUIManager().getThemeConstant("textComponentFieldUIID", null);
+            if(tuid != null) {
+                getEditor().setUIID(tuid);
+            }
+            refreshForGuiBuilder();
         }
-        refreshForGuiBuilder();
     }
     
     /**
@@ -112,47 +125,68 @@ public abstract class InputComponent extends Container {
         return errorMessage;
     }
 
-    private static int max(int... vals) {
-        int out = 0;
-        for (int val : vals) {
-            out = Math.max(val, out);
-        }
-        return out;
+    /**
+     * Returns the internal description message implementation
+     * @return the label
+     */
+    Label getDescriptionMessage() {
+        return descriptionMessage;
+    }
+
+    // varags calls are significantly slower in java
+    private static int max(int a, int b, int c) {
+        return Math.max(Math.max(a, b), c);
     }
     
+    private static int max(int a, int b, int c, int d) {
+        return Math.max(Math.max(Math.max(a, b), c), d);
+    }
+
     @Override
     protected Dimension calcPreferredSize() {
         
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
-                return new Dimension(
-                        max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(), 
-                        getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + errorMessage.getOuterPreferredH() + getStyle().getVerticalPadding()
+                int w = max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW(), descriptionMessage.getOuterPreferredW());
+                int h = getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + 
+                    Math.max(errorMessage.getOuterPreferredH(), descriptionMessage.getOuterPreferredH());
+                return new Dimension(w + getStyle().getHorizontalPadding(), 
+                         h + getStyle().getVerticalPadding()
                 );
             } else {
                 return new Dimension(
-                        max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
-                        errorMessage.getOuterPreferredH() + max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
+                        Math.max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
+                        errorMessage.getOuterPreferredH() + Math.max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
                 );
             }
         }
         return super.calcPreferredSize();
     }
     
-    
+    void addEditorAction() {
+        if(action != null) {
+            add(BorderLayout.CENTER, LayeredLayout.encloseIn(
+                getEditor(),
+                FlowLayout.encloseRightMiddle(action)
+            ));
+        } else {
+            add(BorderLayout.CENTER, getEditor());
+        }
+    }
     
     void constructUI() {
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
                 setLayout(new BorderLayout());
-                add(BorderLayout.CENTER, getEditor());
                 add(BorderLayout.NORTH, lbl);
-                add(BorderLayout.SOUTH, errorMessage);
+                addEditorAction();
+                add(BorderLayout.SOUTH, 
+                    LayeredLayout.encloseIn(errorMessage, descriptionMessage));
             } else {
                 setLayout(new BorderLayout());
-                add(BorderLayout.CENTER, getEditor());
+                addEditorAction();
                 add(BorderLayout.WEST, lbl);
                 add(BorderLayout.SOUTH, errorMessage);
             }
@@ -169,7 +203,11 @@ public abstract class InputComponent extends Container {
         if(guiBuilderMode) {
             removeAll();
             getEditor().remove();
+            if(action != null) {
+                action.remove();
+            }
             lbl.remove();
+            descriptionMessage.remove();
             errorMessage.remove();
             constructUI();
         }
@@ -266,6 +304,27 @@ public abstract class InputComponent extends Container {
     }
 
     /**
+     * Sets the text of the description label which currently only applies in the onTop mode. 
+     * This text occupies the same space as the error message and thus hides 
+     * when there's an error
+     * @param descriptionMessage the text
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent descriptionMessage(String descriptionMessage) {
+        if(descriptionMessage == null || descriptionMessage.length() == 0) {
+            if(this.descriptionMessage.getText().length() == 0) {
+                return this;
+            }
+            // clear the error mode
+            this.descriptionMessage.setText("");
+        } else {
+            this.descriptionMessage.setText(descriptionMessage);
+        }
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
      * Sets the text of the label
      * @param text the text
      * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
@@ -276,6 +335,46 @@ public abstract class InputComponent extends Container {
         return this;
     }
 
+    private void initAction() {
+        if(action == null) {
+            action = new Button("", "InputComponentAction");
+        }
+    }
+    
+    /**
+     * Sets the icon for the action button
+     * @param icon the icon constant from {@link com.codename1.ui.FontImage}
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent action(char icon) {
+        initAction();
+        action.setMaterialIcon(icon);
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
+     * Binds an event for the action button
+     * @param c action listener callback 
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionClick(ActionListener c) {
+        initAction();
+        action.addActionListener(c);
+        refreshForGuiBuilder();
+        return this;
+    }
+
+    /**
+     * Returns the button underlying the action button that is placed on 
+     * the right of the field on top of it
+     * @return a button for manual customization
+     */
+    public Button getAction() {
+        initAction();
+        return action;
+    }
+    
     /**
      * {@inheritDoc}
      */

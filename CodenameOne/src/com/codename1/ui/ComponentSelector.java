@@ -4772,6 +4772,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
     
+    /**
+     * Sets the material icon of all labels in the set.
+     * @param icon Material icon to set.  See {@link FontImage#setMaterialIcon(com.codename1.ui.Label, char) }
+     * @param size The icon size in millimeters.
+     * @return Self for chaining.
+     * @since 7.0
+     */
+    public ComponentSelector setMaterialIcon(char icon, float size) {
+        for (Component c : this) {
+            if (c instanceof Label) {
+                FontImage.setMaterialIcon((Label)c, icon, size);
+            }
+        }
+        return this;
+    }
+    
     public ComponentSelector setCursor(int cursor) {
         for (Component c : this) {
             c.setCursor(cursor);
