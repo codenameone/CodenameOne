@@ -1506,7 +1506,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Sets the Component width, this method is exposed for the purpose of 
      * external layout managers and should not be invoked directly.<br>
-     * If a user wishes to effect the component size setPreferredSize should
+     * If a user wishes to affect the component size, setPreferredSize should
      * be used.
      * 
      * @param width the width of the component
@@ -1519,7 +1519,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Sets the Component height, this method is exposed for the purpose of 
      * external layout managers and should not be invoked directly.<br>
-     * If a user wishes to effect the component size setPreferredSize should
+     * If a user wishes to affect the component size, setPreferredSize should
      * be used.
      * 
      * @param height the height of the component
@@ -1532,7 +1532,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Sets the Component size, this method is exposed for the purpose of 
      * external layout managers and should not be invoked directly.<br>
-     * If a user wishes to effect the component size setPreferredSize should
+     * If a user wishes to affect the component size, setPreferredSize should
      * be used.
      * 
      * @param d the component dimension
@@ -3036,9 +3036,22 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #getX
      * @see #getY
      * @return the component bounds
+     * @see #getBounds(com.codename1.ui.geom.Rectangle) 
      */
     protected Rectangle getBounds() {
         return bounds;
+    }
+    
+    /**
+     * Returns the bounds of this component in the provided Rectangle.
+     * @param rect An "out" parameter to store the component bounds in.  Cannot be null.
+     * @return The same Rectangle that was passed as a parameter.
+     * @since 7.0
+     * @see #getBounds()
+     */
+    public Rectangle getBounds(Rectangle rect) {
+        rect.setBounds(getBounds());
+        return rect;
     }
 
     /**
@@ -3048,9 +3061,23 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #getX
      * @see #getY
      * @return the component bounds
+     * @see #getVisibleBounds(com.codename1.ui.geom.Rectangle) 
      */
     protected Rectangle getVisibleBounds() {
         return bounds;
+    }
+    
+    /**
+     * Returns the component bounds for scrolling which might differ from the getBounds for large components 
+     * into the provided rectangle.  
+     * @param rect An "out" parameter to store the bounds in.  Cannot be null.
+     * @return The same Rectangle that was passed as a parameter.
+     * @since 7.0
+     * @see #getVisibleBounds() 
+     */
+    public Rectangle getVisibleBounds(Rectangle rect) {
+        rect.setBounds(getVisibleBounds());
+        return rect;
     }
 
     /**
