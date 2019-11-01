@@ -559,4 +559,31 @@ public class Rectangle implements Shape {
     public boolean isRectangle(){
         return true;
     }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Rectangle) {
+            Rectangle r = (Rectangle)obj;
+            return r.x == x && r.y == y && r.size.equals(size);
+        }
+        return false;
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 83 * hash + this.x;
+        hash = 83 * hash + this.y;
+        hash = 83 * hash + this.size.getWidth();
+        hash = 83 * hash + this.size.getHeight();
+        return hash;
+    }
+    
+    
 }
