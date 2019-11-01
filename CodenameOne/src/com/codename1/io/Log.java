@@ -577,7 +577,7 @@ public class Log {
      * @param fileURL the fileURL to set
      */
     public void setFileURL(String fileURL) {
-        if(Objects.equals(this.fileURL, fileURL)) {
+        if(!Objects.equals(this.fileURL, fileURL)) {
             try {
                 this.fileURL = fileURL;
                 output = createWriter();
