@@ -26,6 +26,8 @@ package com.codename1.impl.javase;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.charts.util.ColorUtil;
+import com.codename1.components.AudioRecorderComponent;
+import com.codename1.components.AudioRecorderComponent.RecorderState;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -100,7 +102,9 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
+import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
@@ -112,6 +116,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
@@ -126,6 +131,8 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
@@ -141,6 +148,8 @@ import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
@@ -182,6 +191,8 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.event.MouseInputAdapter;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -3045,6 +3056,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new ComponentTreeInspector();
                 }
             });
+            
+            JMenuItem scriptingConsole = new JMenuItem("Groovy Console");
+            scriptingConsole.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    new CN1Console().open((java.awt.Component)e.getSource());
+                }
+            });
+            
+            scriptingConsole.setToolTipText("Open interactive console");
+            
             JMenuItem appArg = new JMenuItem("Send App Argument");
             appArg.addActionListener(new ActionListener() {
                 @Override
@@ -3098,6 +3119,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(pushSim);
 
             simulatorMenu.add(componentTreeInspector);
+            simulatorMenu.add(scriptingConsole);
             
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
@@ -3559,7 +3581,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         return f;
     }
 
-
+    
+    private String getCurrentSkinName() {
+         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+         String skin = pref.get("skin", DEFAULT_SKIN);
+         while (skin.indexOf("/") >= 0) {
+             skin = skin.substring(skin.indexOf("/")+1);
+         }
+         while (skin.indexOf("\\") >= 0) {
+             skin = skin.substring(skin.indexOf("\\")+1);
+         }
+         return skin;
+    }
+    
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
         JMenu m;
         if (menu == null) {
@@ -3706,7 +3740,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         final JDialog d = new JDialog(frm, true);
                         d.setLocationRelativeTo(frm);
                         d.setTitle("Skins");
-                        d.setLayout(new BorderLayout());
+                        d.getContentPane().setLayout(new BorderLayout());
                         String userDir = System.getProperty("user.home");
                         final File skinDir = new File(userDir + "/.codenameone/");
                         if (!skinDir.exists()) {
@@ -3785,9 +3819,48 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 return super.getColumnClass(column);
                             }
                         };
+                        
+                        
+                        
                         skinsTable.setRowHeight(112);
                         skinsTable.getTableHeader().setReorderingAllowed(false);
-                        d.add(new JScrollPane(skinsTable), BorderLayout.CENTER);
+                        final JTextField filter = new JTextField();
+                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(((DefaultTableModel) skinsTable.getModel())); 
+                        
+                        filter.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                            
+                            private void updateFilter() {
+                                try {
+                                    
+                                   RowFilter rf = RowFilter.regexFilter("(?i)"+filter.getText(),2);
+                                   sorter.setRowFilter(rf);
+                                } catch (java.util.regex.PatternSyntaxException e) {
+                                    return;
+                                }
+                                
+                            }
+                            
+                            @Override
+                            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                                updateFilter();
+                            }
+
+                            @Override
+                            public void removeUpdate(DocumentEvent e) {
+                                updateFilter();
+                            }
+
+                            @Override
+                            public void changedUpdate(DocumentEvent e) {
+                                updateFilter();
+                            }
+                            
+                        });
+                        skinsTable.setRowSorter(sorter);
+                        d.getContentPane().add(filter, BorderLayout.NORTH);
+                        
+                        
+                        d.getContentPane().add(new JScrollPane(skinsTable), BorderLayout.CENTER);
                         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
                         JButton download = new JButton("Download");
                         download.addActionListener(new ActionListener() {
@@ -3862,7 +3935,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             }
                         });
                         p.add(download);
-                        d.add(p, BorderLayout.SOUTH);
+                        d.getContentPane().add(p, BorderLayout.SOUTH);
                         d.pack();
                         pleaseWait.dispose();
                         d.setVisible(true);
@@ -4289,6 +4362,32 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void windowDeactivated(WindowEvent e) {
                 }
             });
+            window.addComponentListener(new ComponentAdapter() {
+                
+                private void saveBounds(ComponentEvent e) {
+                    if (e.getComponent() instanceof JFrame) {
+                        Frame f = (JFrame)e.getComponent();
+                        if (f.getExtendedState() == JFrame.NORMAL) {
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                            Rectangle bounds = f.getBounds();
+                            pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
+                        }
+                    }
+                }
+                
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    saveBounds(e);
+                }
+
+                @Override
+                public void componentMoved(ComponentEvent e) {
+                    saveBounds(e);
+                }
+                
+                
+                
+            });
             window.setLocationByPlatform(true);
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
@@ -4332,6 +4431,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             portrait = pref.getBoolean("Portrait", true);
+            
             if (getSkin() != null) {
                 if (scrollableSkin) {
                     canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
@@ -4355,7 +4455,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             }
+            String lastBounds = pref.get("window.bounds", null);
+            if (lastBounds != null) {
+                String[] parts = lastBounds.split(",");
+                Rectangle r = new Rectangle(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+                Rectangle bounds = new Rectangle(0, 0, 0, 0);
+                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+                GraphicsDevice lstGDs[] = ge.getScreenDevices();
+                for (GraphicsDevice gd : lstGDs) {
+                    bounds.add(gd.getDefaultConfiguration().getBounds());
+                }
+                
+                if (bounds.intersects(r)) {
+                
+                    window.setBounds(r);
+                }
+            }
 /*
+            
+            
+            
             
             if (!portrait && getSkin() != null) {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
@@ -5989,15 +6108,63 @@ public class JavaSEPort extends CodenameOneImplementation {
         return 255;
     }
 
-    /**
-     * A cache of fallback fonts
-     * @see #requiresFallbackFont(java.awt.Font, java.lang.String) 
-     * @see #fallback(java.awt.Font, java.lang.String) 
-     * @see #getFallbackFont(java.awt.Font) 
-     * 
-     * 
-     */
+    
+    
     private Map<Integer,java.awt.Font> fallbackFonts = new HashMap<>();
+    
+    
+    /*
+     The following comprise a simple LRU cache to keep track of the value of
+     fonts' canDisplayUpTo(String) method, since it may be called a lot.
+    */
+    
+    // Cache to keep track of Font canDisplayUpTo(String) mechod.
+    // key = <fontname>:<string>
+    // Value integer return value of canDisplayUpTo(String) for the font.
+    private Map<String,Integer> canDisplayUpToCache = new HashMap<>();
+    
+    // Linked list Linked list that is kept in sync with canDisplayUpToCache
+    // so we know the order in which the strings were added.
+    // Each value of the form <fontname>:<string>
+    private LinkedList<String> canDisplayUpToCacheList = new LinkedList<>();
+    
+    // The maximum size of the cache in chars
+    private static final int canDisplayUpToCacheMaxSize = 1024 * 256;
+    
+    // Half the max size of the cache in chars.  When cache fills up, it will
+    // purge until it has at least this amount available.
+    private static final int canDisplayUpToCacheHalfMaxSize =canDisplayUpToCacheMaxSize/2;
+    
+    // Variable to keep track of available chars in the cache.  Each time a string
+    // is added, this is decreased, and when a string is removed, it is increased.
+    private int canDisplayUpToCacheAvailable = canDisplayUpToCacheMaxSize;
+    
+    
+    /*
+     Wraps Font.canDisplayUpTo(String), but uses an LRU cache to keep
+     track of the values
+    */
+    private int canDisplayUpTo(java.awt.Font fnt, String str) {
+        String key = fnt.getName() + ":" + str;
+        if (canDisplayUpToCache.containsKey(key)) {
+            return canDisplayUpToCache.get(key);
+        }
+        int len = key.length();
+        if (canDisplayUpToCacheAvailable - len < 0) {
+            while (canDisplayUpToCacheAvailable < canDisplayUpToCacheHalfMaxSize) {
+                String toRemove = canDisplayUpToCacheList.remove(0);
+                canDisplayUpToCacheAvailable += toRemove.length();
+                canDisplayUpToCache.remove(toRemove);
+            }
+        }
+        
+        canDisplayUpToCacheAvailable -= len;
+        canDisplayUpToCacheList.add(key);
+        int canDisplayUpTo = fnt.canDisplayUpTo(str);
+        canDisplayUpToCache.put(key, canDisplayUpTo);
+        return canDisplayUpTo;
+        
+    }
     
     /**
      * Checks to see if the given font is Roboto and the string contains the password 
@@ -6059,7 +6226,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             // https://github.com/google/roboto/issues/291
             nativeGraphics.setFont(fnt);
         }
-        if (isEmojiFontLoaded() && fnt.canDisplayUpTo(str) != -1) {
+        if (canDisplayUpTo(fnt, str) != -1) {
             // This might have emojis
             // render as attributed string
             AttributedString astr = createAttributedString(fnt, str);
@@ -6190,7 +6357,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
-        if (isEmojiFontLoaded() && hasUnsupportedChars(font, str)) {
+        if (hasUnsupportedChars(font, str)) {
             TextLayout textLayout = new TextLayout( 
                     createAttributedString(font, str).getIterator(), 
                     canvas.getFRC()
@@ -6242,13 +6409,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         return emojiFontCache.get(key);
     }
     
+    
+    private Map<String,AttributedString> attributedStringCache = new HashMap<>();
+    private LinkedList<String> attributedStringCacheList = new LinkedList<>();
+    private static final int attributedStringCacheMaxSize = 1024 * 256;
+    private static final int attributedStringCacheHalfMaxSize = attributedStringCacheMaxSize/2;
+    private int attributedStringCacheAvailable = attributedStringCacheMaxSize;
+    
+    
     private AttributedString createAttributedString(java.awt.Font font, String str) {
-        java.awt.Font emojiFont = deriveEmojiFont(font.getSize2D());
-        AttributedString astr = new AttributedString(str);
-        astr.addAttribute(TextAttribute.FONT, font);
-        if (emojiFont == null) {
-            return astr;
+        String key = font.getName() + ":" + font.getSize()+":"+ str;
+        if (attributedStringCache.containsKey(key)) {
+            return attributedStringCache.get(key);
         }
+        int keyLen = key.length();
+        if (attributedStringCacheAvailable - keyLen < 0) {
+            while (attributedStringCacheAvailable < attributedStringCacheHalfMaxSize) {
+                String toRemove = attributedStringCacheList.remove(0);
+                attributedStringCacheAvailable += toRemove.length();
+                attributedStringCache.remove(toRemove);
+            }
+        }
+        java.awt.Font emojiFont = isEmojiFontLoaded() ? deriveEmojiFont(font.getSize2D()) : null;
+        AttributedString astr = new AttributedString(str);
+        attributedStringCacheList.add(key);
+        attributedStringCache.put(key, astr);
+        attributedStringCacheAvailable -= keyLen;
+        
+        java.awt.Font fallbackFont = getFallbackFont(font);
+        astr.addAttribute(TextAttribute.FONT, font);
         int pos = font.canDisplayUpTo(str);
         if (pos == -1) {
             return astr;
@@ -6258,7 +6447,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         while (pos < len) {
             // find next char that the font can render
             int spanEnd = len;
-            for (int j=pos+1; j<len; j++) {
+            for (int j=pos; j<len; j++) {
                 char c = chars[j];
                 
                 if (j < len-1 && Character.isSurrogatePair(c, chars[j+1])) {
@@ -6267,6 +6456,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         spanEnd = j;
                         break;
                     }
+                    j++;
                 } else {
                     if (font.canDisplay(c)) {
                         spanEnd = j;
@@ -6274,7 +6464,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             }
-            astr.addAttribute(TextAttribute.FONT, emojiFont, pos, spanEnd);
+            
+            
+            String spanStr = new String(chars, pos, spanEnd - pos);
+            if (emojiFont == null || canDisplayUpTo(fallbackFont, spanStr) == -1) {
+                astr.addAttribute(TextAttribute.FONT, fallbackFont, pos, spanEnd);
+            } else {
+            
+                astr.addAttribute(TextAttribute.FONT, emojiFont, pos, spanEnd);
+            }
+            
             if (spanEnd < len) {
                 pos = font.canDisplayUpTo(chars, spanEnd, len);
                 if (pos == -1) {
@@ -6290,7 +6489,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private boolean hasUnsupportedChars(java.awt.Font font, String str) {
-        return font.canDisplayUpTo(str) != -1;
+        return canDisplayUpTo(font, str) != -1;
     }
     
     /**
@@ -6320,6 +6519,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         String strch = ""+ch;
         java.awt.Font fnt = fallback(font(nativeFont), strch);
+        if (!fnt.canDisplay(ch)) {
+            fnt = getFallbackFont(fnt);
+        }
         
         if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
             fnt = deriveEmojiFont(fnt.getSize2D());
@@ -7416,7 +7618,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
-        
+        if ("simulator.skin".equalsIgnoreCase(key)) {
+            return getCurrentSkinName();
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 
@@ -9582,15 +9786,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
     }
-    
+
     @Override
     public void captureAudio(com.codename1.ui.events.ActionListener response) {
         if(!checkForPermission("android.permission.RECORD_AUDIO", "This is required to record the audio")){
             return;
         }
         checkMicrophoneUsageDescription();
-        capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
+        super.captureAudio(response); 
     }
+    
+
+    
 
     @Override
     public void captureVideo(com.codename1.ui.events.ActionListener response) {
@@ -10429,7 +10636,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
-        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0);
+        
+        return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }
     
     @Override
@@ -10440,41 +10648,49 @@ public class JavaSEPort extends CodenameOneImplementation {
         return createMediaRecorder(builder);
     }
 
-    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration) throws IOException {
+    private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
+        System.out.println("Is redirect to Audio Buffer? "+redirectToAudioBuffer);
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
         }
-        if (mime == null) {
-            if (path.endsWith(".wav") || path.endsWith(".WAV")) {
-                mime = "audio/wav";
-            } else if (path.endsWith(".mp3") || path.endsWith(".MP3")) {
-                mime = "audio/mp3";
+
+        if (!redirectToAudioBuffer) {
+            if (mime == null) {
+                if (path.endsWith(".wav") || path.endsWith(".WAV")) {
+                    mime = "audio/wav";
+                } else if (path.endsWith(".mp3") || path.endsWith(".MP3")) {
+                    mime = "audio/mp3";
+                }
+            }
+            if (mime == null) {
+                mime = getAvailableRecordingMimeTypes()[0];
+            }
+            boolean foundMimetype = false;
+            for (String mt : getAvailableRecordingMimeTypes()) {
+                if (mt.equalsIgnoreCase(mime)) {
+                    foundMimetype = true;
+                    break;
+                }
+
+
+            }
+
+            if (!foundMimetype) {
+                throw new IOException("Mimetype "+mime+" not supported on this platform.  Use getAvailableMimetypes() to find out what is supported");
             }
         }
-        if (mime == null) {
-            mime = getAvailableRecordingMimeTypes()[0];
-        }
-        boolean foundMimetype = false;
-        for (String mt : getAvailableRecordingMimeTypes()) {
-            if (mt.equalsIgnoreCase(mime)) {
-                foundMimetype = true;
-                break;
+        final File file = redirectToAudioBuffer ? null : new File(unfile(path));
+        if (!redirectToAudioBuffer) {
+            if (!file.getParentFile().exists()) {
+                throw new IOException("Cannot write file "+path+" because the parent directory does not exist.");
             }
-            
-            
-        }
-        
-        if (!foundMimetype) {
-            throw new IOException("Mimetype "+mime+" not supported on this platform.  Use getAvailableMimetypes() to find out what is supported");
-        }
-        final File file = new File(unfile(path));
-        if (!file.getParentFile().exists()) {
-            throw new IOException("Cannot write file "+path+" because the parent directory does not exist.");
         }
         File tmpFile = file;
-        if (!"audio/wav".equalsIgnoreCase(mime) && !(tmpFile.getName().endsWith(".wav") || tmpFile.getName().endsWith(".WAV"))) {
-            tmpFile = new File(tmpFile.getParentFile(), tmpFile.getName()+".wav");
+        if (!redirectToAudioBuffer) {
+            if (!"audio/wav".equalsIgnoreCase(mime) && !(tmpFile.getName().endsWith(".wav") || tmpFile.getName().endsWith(".WAV"))) {
+                tmpFile = new File(tmpFile.getParentFile(), tmpFile.getName()+".wav");
+            }
         }
         final File fTmpFile = tmpFile;
         final String fMime = mime;
@@ -10482,27 +10698,39 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.io.File wavFile = fTmpFile;
             File outFile = file;
             AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
+
             javax.sound.sampled.TargetDataLine line;
             boolean recording;
             
             javax.sound.sampled.AudioFormat getAudioFormat() {
+                if (redirectToAudioBuffer) {
+                    javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
+                            samplingRate, 
+                            16,
+                            audioChannels,
+                            true,
+                            false
+                    );
+                    
+                    return format;
+                }
                 float sampleRate = samplingRate;
                 int sampleSizeInBits = 8;
                 int channels = audioChannels;
                 boolean signed = true;
-                boolean bigEndian = true;
+                boolean bigEndian = false;
                 javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(sampleRate, sampleSizeInBits,
                                                      channels, signed, bigEndian);
                 return format;
             }
+            
+            
             @Override
             public void play() {
                 if (line == null) {
                     try {
-                        AudioFormat format = getAudioFormat();
+                        final AudioFormat format = getAudioFormat();
                         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-
-                        // checks if system supports the data line
                         if (!AudioSystem.isLineSupported(info)) {
                             throw new RuntimeException("Audio format not supported on this platform");
                         }
@@ -10518,13 +10746,43 @@ public class JavaSEPort extends CodenameOneImplementation {
                             public void run() {
                                 try {
                                     AudioInputStream ais = new AudioInputStream(line);
-                                    AudioSystem.write(ais, fileType, wavFile);
+                                    if (redirectToAudioBuffer) {
+                                        
+                                        AudioBuffer buf = MediaManager.getAudioBuffer(path, true, 256);
+                                        int maxBufferSize = buf.getMaxSize();
+                                        float[] sampleBuffer = new float[maxBufferSize];
+                                        byte[] byteBuffer = new byte[samplingRate * audioChannels];
+                                        int bytesRead = -1;
+                                        while ((bytesRead = ais.read(byteBuffer)) >= 0) {
+                                            if (bytesRead > 0) {
+                                                int sampleBufferPos = 0;
+                                                
+                                                for (int i = 0; i < bytesRead; i += 2) {
+                                                    sampleBuffer[sampleBufferPos] = ((float)ByteBuffer.wrap(byteBuffer, i, 2)
+                                                            .order(ByteOrder.LITTLE_ENDIAN)
+                                                            .getShort())/ 0x8000;
+                                                    sampleBufferPos++;
+                                                    if (sampleBufferPos >= sampleBuffer.length) {
+                                                        buf.copyFrom(sampleBuffer, 0, sampleBuffer.length);
+                                                        sampleBufferPos = 0;
+                                                    }
+                                                
+                                                }
+                                                if (sampleBufferPos > 0) {
+                                                    buf.copyFrom(sampleBuffer, 0, sampleBufferPos);
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        AudioSystem.write(ais, fileType, wavFile);
+                                    }
+                                    
                                 } catch (IOException ioe) {
                                     throw new RuntimeException(ioe);
                                 }
                             }
                         }).start();
-
+                        
                    } catch (LineUnavailableException ex) {
                                     throw new RuntimeException(ex);
                     }    
@@ -10564,9 +10822,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pause();
                 }
                 recording = false;
+                if (redirectToAudioBuffer) {
+                    MediaManager.deleteAudioBuffer(path);
+                }
+                if (line == null) {
+                    return;
+                }
                 line.close();
                 
-                if (isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
+                if (!redirectToAudioBuffer && isMP3EncodingSupported() && "audio/mp3".equalsIgnoreCase(fMime)) {
                     final Throwable[] t = new Throwable[1];
                     CN.invokeAndBlock(new Runnable() {
                         public void run() {

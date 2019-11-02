@@ -338,7 +338,7 @@ public class SwipeableContainer extends Container {
                 return;
             }
             Component cmp = f.getComponentAt(x, y);
-            if (!contains(cmp)) {
+            if (!waitForRelease && !contains(cmp)) {
                 return;
             }
             if (!waitForRelease && !topWrapper.contains(x, y)) {

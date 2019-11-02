@@ -34,7 +34,7 @@
 #else
 #include "cn1_globals.h"
 #endif
-
+#import "CN1AudioUnit.h"
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import "NetworkConnectionImpl.h"
@@ -5247,6 +5247,85 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 }
 
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+    JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
+#ifdef INCLUDE_MICROPHONE_USAGE
+        __block CN1AudioUnit* recorder = nil;
+         
+        __block NSString *exStr = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            
+            AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+            NSError *err = nil;
+            [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
+            err = nil;
+            [audioSession setActive:YES error:&err];
+            if(err){
+                CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+                exStr = [[err userInfo] description];
+                POOL_END();
+                return;
+            }
+            
+            if (isIOS7()) {
+                CN1Log(@"Asking for record permission");
+                [audioSession requestRecordPermission:^(BOOL granted) {
+                    POOL_BEGIN();
+                    if (granted) {
+                         recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+                    } else {
+                        exStr = @"Denied access to use the microphone";
+                    }
+                    POOL_END();
+                }];
+            } else {
+                recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path) channels:audioChannels sampleRate:sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+            }
+            POOL_END();
+        });
+        if (exStr != nil) {
+            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
+            throwException(threadStateData, ex);
+            return (JAVA_LONG)0;
+        } else {
+            
+            return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+        }
+    #else
+        return (JAVA_LONG)0;
+    #endif
+    }
+    
+
+
+
+void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit start];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit stop];
+    
+}
+
+void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
+    [audioUnit release];
+    
+}
+
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
 #ifdef INCLUDE_MICROPHONE_USAGE
@@ -5829,6 +5908,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE
 
 NSLocale *currentLocale = NULL;
 NSLocale *deviceLocale = NULL;
+BOOL currentLocaleRequiresRelease = NO;
 
 NSLocale* cn1DeviceLocale() {
     if (deviceLocale == NULL) {
@@ -5841,12 +5921,22 @@ void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_ST
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
     if (currentLocale != NULL) {
-        [currentLocale release];
+        if (currentLocaleRequiresRelease) {
+            [currentLocale release];
+        }
     }
 #endif
-    currentLocale = cn1DeviceLocale();
+    if (localeStr == NULL) {
+        currentLocaleRequiresRelease = NO;
+        currentLocale = cn1DeviceLocale();
+    } else {
+        currentLocale = [[NSLocale alloc] initWithLocaleIdentifier:toNSString(threadStateData, localeStr)];
+        currentLocaleRequiresRelease = YES;
+    }
+    
     POOL_END();
 }
+
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT i) {
     POOL_BEGIN();

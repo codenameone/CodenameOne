@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Component;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -115,6 +116,7 @@ public class ImageViewer extends Component {
     public ImageViewer() {
         setFocusable(true);
         setUIID("ImageViewer");
+        $(this).selectAllStyles().setBgTransparency(0x0);
     }
 
     /**

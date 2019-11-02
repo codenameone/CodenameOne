@@ -25,8 +25,6 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.plaf.UIManager;
 
 /**
  * TextComponent extended to automatically add mask/unmask password button near
@@ -36,43 +34,29 @@ import com.codename1.ui.plaf.UIManager;
  * @author Francesco Galgani
  */
 public class TextComponentPassword extends TextComponent {
-
-    private Image unmask = FontImage.createMaterial(FontImage.MATERIAL_VISIBILITY, UIManager.getInstance().getComponentStyle("Label"));
-    private Image mask = FontImage.createMaterial(FontImage.MATERIAL_VISIBILITY_OFF, UIManager.getInstance().getComponentStyle("Label"));
-    private Button showPassword = new Button(unmask, "Label");
     private final TextField field = super.getField();
 
     public TextComponentPassword() {
         super();
-        showPassword.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (field.getConstraint() == TextArea.PASSWORD) {
-                    field.setConstraint(TextField.NON_PREDICTIVE);
-                    showPassword.setIcon(mask);
-                } else {
-                    field.setConstraint(TextField.PASSWORD);
-                    showPassword.setIcon(unmask);
+        field.setConstraint(TextArea.PASSWORD);
+        action(FontImage.MATERIAL_VISIBILITY_OFF).
+            actionClick(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (field.getConstraint() == TextArea.PASSWORD) {
+                        field.setConstraint(TextField.NON_PREDICTIVE);
+                        action(FontImage.MATERIAL_VISIBILITY_OFF);
+                    } else {
+                        field.setConstraint(TextField.PASSWORD);
+                        action(FontImage.MATERIAL_VISIBILITY);
+                    }
+                    if (field.isEditing()) {
+                        field.stopEditing();
+                        field.startEditingAsync();
+                    } else {
+                        field.getParent().revalidate();
+                    }
                 }
-                if (field.isEditing()) {
-                    field.stopEditing();
-                    field.startEditingAsync();
-                } else {
-                    field.getParent().revalidate();
-                }
-            }
-        });
-    }
-
-    @Override
-    void constructUI() {
-        super.constructUI();
-        if (field.getConstraint() == TextArea.PASSWORD) {
-            Container tfContainer = field.getParent();
-            // to solve a "java.lang.IllegalArgumentException - 
-            // Component is already contained in Container" after a Form.showBack
-            showPassword.remove(); 
-            tfContainer.add(BorderLayout.EAST, showPassword);
-        }
+            });
     }
 }

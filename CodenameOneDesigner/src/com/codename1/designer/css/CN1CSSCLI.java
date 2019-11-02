@@ -176,43 +176,68 @@ public class CN1CSSCLI extends Application {
                         pulseThread.start();
                     }
                     
-                    final Path path = inputFile.getParentFile().toPath();
+                    boolean usePollingFileWatcher = true;
                     
-                    try (final WatchService watchService = FileSystems.getDefault().newWatchService()) {
-                        System.out.println("Watching file "+inputFile+" for changes...");
-                        
-                        final WatchKey watchKey = path.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+                    if (usePollingFileWatcher) {
+                        PollingFileWatcher watcher = new PollingFileWatcher(inputFile, 1000);
                         while (true) {
-                            final WatchKey wk = watchService.take();
-                            for (WatchEvent<?> event : wk.pollEvents()) {
-                                //we only register "ENTRY_MODIFY" so the context is always a Path.
-                                final Path changed = (Path) event.context();
-                                //System.out.println("Change detected at path "+changed);
-                                File changedFile = new File(inputFile.getParentFile(), changed.toString());
-                                if (inputFile.equals(changedFile)) {
-                                    try {
-                                        System.out.println("Changed detected in "+inputFile+".  Recompiling");
-                                        compile(inputFile, outputFile);
-                                        System.out.println("CSS file successfully compiled.  "+outputFile);
-                                        System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
-                                    } catch (Throwable t) {
-                                        System.err.println("Compile of "+inputFile+" failed");
-                                        t.printStackTrace();
-                                    }
+                            try {
+                                watcher.poll();
+                                try {
+                                    System.out.println("Changed detected in "+inputFile+".  Recompiling");
+                                    compile(inputFile, outputFile);
+                                    System.out.println("CSS file successfully compiled.  "+outputFile);
+                                    System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
+                                } catch (Throwable t) {
+                                    System.err.println("Compile of "+inputFile+" failed");
+                                    t.printStackTrace();
                                 }
-
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
                             }
-                            // reset the key
-                            boolean valid = wk.reset();
-                            if (!valid) {
-                                System.out.println("Key has been unregisterede");
-                            }
+                            
                         }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    } catch (InterruptedException ex) {
-                        Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
+                    } else {
+                        final Path path = inputFile.getParentFile().toPath();
+                    
+                        try (final WatchService watchService = FileSystems.getDefault().newWatchService()) {
+                            System.out.println("Watching file "+inputFile+" for changes...");
+
+                            final WatchKey watchKey = path.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+                            while (true) {
+                                final WatchKey wk = watchService.take();
+                                for (WatchEvent<?> event : wk.pollEvents()) {
+                                    //we only register "ENTRY_MODIFY" so the context is always a Path.
+                                    final Path changed = (Path) event.context();
+                                    //System.out.println("Change detected at path "+changed);
+                                    File changedFile = new File(inputFile.getParentFile(), changed.toString());
+                                    if (inputFile.equals(changedFile)) {
+                                        try {
+                                            System.out.println("Changed detected in "+inputFile+".  Recompiling");
+                                            compile(inputFile, outputFile);
+                                            System.out.println("CSS file successfully compiled.  "+outputFile);
+                                            System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
+                                        } catch (Throwable t) {
+                                            System.err.println("Compile of "+inputFile+" failed");
+                                            t.printStackTrace();
+                                        }
+                                    }
+
+                                }
+                                // reset the key
+                                boolean valid = wk.reset();
+                                if (!valid) {
+                                    System.out.println("Key has been unregisterede");
+                                }
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                     }
+                    
+                    
                 }
                 
             });

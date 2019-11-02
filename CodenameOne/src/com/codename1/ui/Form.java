@@ -3082,10 +3082,25 @@ public class Form extends Container {
         }
         
     }
+    
+    private Object currentPointerPress;
+    
+    /**
+     * Gets the handle for the current pointer press event.  A new object
+     * is generated for each pointer press.
+     * @return 
+     * @since 7.0
+     */
+    Object getCurrentPointerPress() {
+        return currentPointerPress;
+    }
+    
+    
     /**
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
+        currentPointerPress = new Object();
         // See https://github.com/codenameone/CodenameOne/issues/2352
         if (resumeDragAfterScrolling(x, y)) {
             return;
@@ -3529,192 +3544,196 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
-        Component origPressedCmp = pressedCmp;
-        boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
-        rippleMotion = null;
-        setPressedCmp(null);
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
-        Container actual = getActualPane(formLayeredPane, x, y);
-        if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
-            // special case allowing drag within a button
-            Component atXY = actual.getComponentAt(x, y);
-            
-            Component pendingC = componentsAwatingRelease.get(0);
-            if(atXY == pendingC) {
-            	componentsAwatingRelease = null;
-                if (dragged == pendingC) {
-                    if (pendingC.isDragAndDropInitialized()) {
-                    	pendingC.dragFinishedImpl(x, y);
+        try {
+            Component origPressedCmp = pressedCmp;
+            boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
+            rippleMotion = null;
+            setPressedCmp(null);
+            boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+            Container actual = getActualPane(formLayeredPane, x, y);
+            if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
+                // special case allowing drag within a button
+                Component atXY = actual.getComponentAt(x, y);
+
+                Component pendingC = componentsAwatingRelease.get(0);
+                if(atXY == pendingC) {
+                    componentsAwatingRelease = null;
+                    if (dragged == pendingC) {
+                        if (pendingC.isDragAndDropInitialized()) {
+                            pendingC.dragFinishedImpl(x, y);
+                        } else {
+                            pendingC.pointerReleased(x, y);
+                        }
+                        dragged = null;
                     } else {
-                    	pendingC.pointerReleased(x, y);
+                            pendingC.pointerReleased(x, y);
+                        if (dragged != null) {
+                            if (dragged.isDragAndDropInitialized()) {
+                                dragged.dragFinishedImpl(x, y);
+                                dragged = null;
+                            } else {
+                                dragged.pointerReleased(x, y);
+                                dragged = null;
+                            }
+                        }
                     }
-                    dragged = null;
-                } else {
-                	pendingC.pointerReleased(x, y);
+                    return;
+                }
+
+                if(pendingC instanceof ReleasableComponent) {
+                    ReleasableComponent rc = (ReleasableComponent) pendingC;
+                    int relRadius = rc.getReleaseRadius();
+                    if(relRadius > 0 || pendingC.contains(x, y)) {
+                        Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
+                        if(r.contains(x, y)) {
+                            componentsAwatingRelease = null;
+                            pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
+                            return;
+                        }
+                    }
+                }
+            }
+            if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+                ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+                pointerReleasedListeners.fireActionEvent(ev);
+                if(ev.isConsumed()) {
                     if (dragged != null) {
                         if (dragged.isDragAndDropInitialized()) {
                             dragged.dragFinishedImpl(x, y);
-                            dragged = null;
-                        } else {
-                            dragged.pointerReleased(x, y);
-                            dragged = null;
+
                         }
+                        dragged = null;
                     }
-                }
-                return;
-            }
-            
-            if(pendingC instanceof ReleasableComponent) {
-            	ReleasableComponent rc = (ReleasableComponent) pendingC;
-                int relRadius = rc.getReleaseRadius();
-                if(relRadius > 0 || pendingC.contains(x, y)) {
-                    Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
-                    if(r.contains(x, y)) {
-                    	componentsAwatingRelease = null;
-                        pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
-                        return;
-                    }
+                    return;
                 }
             }
-        }
-        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-            pointerReleasedListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
+            if(dragStopFlag) {
                 if (dragged != null) {
                     if (dragged.isDragAndDropInitialized()) {
                         dragged.dragFinishedImpl(x, y);
-                        
+
                     }
                     dragged = null;
                 }
-                return;
-            }
-        }
-        if(dragStopFlag) {
-            if (dragged != null) {
-                if (dragged.isDragAndDropInitialized()) {
-                    dragged.dragFinishedImpl(x, y);
-                    
-                }
-                dragged = null;
-            }
-            dragStopFlag = false;
-            
-            return;
-        }
-        
-        if (dragged == null) {
-            //if the pointer was released on the menu invoke the appropriate
-            //soft button.
-            if (origPressedCmp != null && inOrigPressedCmpBounds) {
-                // This is a special case that occurs when the pointer press
-                // causes a drastic change in the layout (e.g. hiding the keyboard)
-                // This causes buttons to fail to fire their action events because
-                // the button is no longer under the pointer release event.
-                // We solve this by tracking the original location of the pressed component.
-                if (origPressedCmp.isEnabled()) {
-                    origPressedCmp.pointerReleased(x, y);
-                }
-                return;
-            }
-            if (menuBar.contains(x, y)) {
-                Component cmp = menuBar.getComponentAt(x, y);
-                if (cmp != null && cmp.isEnabled()) {
-                    cmp.pointerReleased(x, y);
-                }
+                dragStopFlag = false;
+
                 return;
             }
 
-            if(stickyDrag != null) {
-                stickyDrag.pointerReleased(x, y);
-                repaint();
-            } else {
-                //Container actual = getActualPane();
-                if (y >= actual.getY() && x >= actual.getX()) {
-                    Component cmp = actual.getComponentAt(x, y);
-                    while (cmp != null && cmp.isIgnorePointerEvents()) {
-                        cmp = cmp.getParent();
+            if (dragged == null) {
+                //if the pointer was released on the menu invoke the appropriate
+                //soft button.
+                if (origPressedCmp != null && inOrigPressedCmpBounds) {
+                    // This is a special case that occurs when the pointer press
+                    // causes a drastic change in the layout (e.g. hiding the keyboard)
+                    // This causes buttons to fail to fire their action events because
+                    // the button is no longer under the pointer release event.
+                    // We solve this by tracking the original location of the pressed component.
+                    if (origPressedCmp.isEnabled()) {
+                        origPressedCmp.pointerReleased(x, y);
                     }
+                    return;
+                }
+                if (menuBar.contains(x, y)) {
+                    Component cmp = menuBar.getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled()) {
-                        if (cmp.hasLead) {
-                            Container leadParent;
-                            if (cmp instanceof Container) {
-                                leadParent = ((Container) cmp).getLeadParent();
-                            } else {
-                                leadParent = cmp.getParent().getLeadParent();
-                            }
-                            leadParent.repaint();
-                            if (!isScrollWheeling) {
-                                setFocused(leadParent);
-                            }
-                            cmp.getLeadComponent().pointerReleased(x, y);
-                        } else {
-                            if (cmp.isEnabled()) {
-                                if (!isScrollWheeling && cmp.isFocusable()) {
-                                    setFocused(cmp);
-                                }
-                                cmp.pointerReleased(x, y);
-                            }
-                        }
+                        cmp.pointerReleased(x, y);
                     }
+                    return;
+                }
+
+                if(stickyDrag != null) {
+                    stickyDrag.pointerReleased(x, y);
+                    repaint();
                 } else {
-                    if(y < actual.getY()) {
-                        Component cmp = getTitleArea().getComponentAt(x, y);
+                    //Container actual = getActualPane();
+                    if (y >= actual.getY() && x >= actual.getX()) {
+                        Component cmp = actual.getComponentAt(x, y);
                         while (cmp != null && cmp.isIgnorePointerEvents()) {
                             cmp = cmp.getParent();
                         }
                         if (cmp != null && cmp.isEnabled()) {
-                            cmp.pointerReleased(x, y);
+                            if (cmp.hasLead) {
+                                Container leadParent;
+                                if (cmp instanceof Container) {
+                                    leadParent = ((Container) cmp).getLeadParent();
+                                } else {
+                                    leadParent = cmp.getParent().getLeadParent();
+                                }
+                                leadParent.repaint();
+                                if (!isScrollWheeling) {
+                                    setFocused(leadParent);
+                                }
+                                cmp.getLeadComponent().pointerReleased(x, y);
+                            } else {
+                                if (cmp.isEnabled()) {
+                                    if (!isScrollWheeling && cmp.isFocusable()) {
+                                        setFocused(cmp);
+                                    }
+                                    cmp.pointerReleased(x, y);
+                                }
+                            }
                         }
                     } else {
-                        Component cmp = ((BorderLayout)super.getLayout()).getWest();
-                        if(cmp != null) {
-                            cmp = ((Container)cmp).getComponentAt(x, y);
+                        if(y < actual.getY()) {
+                            Component cmp = getTitleArea().getComponentAt(x, y);
                             while (cmp != null && cmp.isIgnorePointerEvents()) {
                                 cmp = cmp.getParent();
                             }
-                            if (cmp != null && cmp.isEnabled()) {                                
-                                if(cmp.hasLead) {
-                                    Container leadParent;
-                                    if (cmp instanceof Container) {
-                                        leadParent = ((Container) cmp).getLeadParent();
+                            if (cmp != null && cmp.isEnabled()) {
+                                cmp.pointerReleased(x, y);
+                            }
+                        } else {
+                            Component cmp = ((BorderLayout)super.getLayout()).getWest();
+                            if(cmp != null) {
+                                cmp = ((Container)cmp).getComponentAt(x, y);
+                                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                                    cmp = cmp.getParent();
+                                }
+                                if (cmp != null && cmp.isEnabled()) {                                
+                                    if(cmp.hasLead) {
+                                        Container leadParent;
+                                        if (cmp instanceof Container) {
+                                            leadParent = ((Container) cmp).getLeadParent();
+                                        } else {
+                                            leadParent = cmp.getParent().getLeadParent();
+                                        }
+                                        leadParent.repaint();
+                                        if (!isScrollWheeling) {
+                                            setFocused(leadParent);
+                                        }
+                                        cmp = cmp.getLeadComponent();
+                                        cmp.pointerReleased(x, y);
                                     } else {
-                                        leadParent = cmp.getParent().getLeadParent();
+                                        cmp.pointerReleased(x, y);
                                     }
-                                    leadParent.repaint();
-                                    if (!isScrollWheeling) {
-                                        setFocused(leadParent);
-                                    }
-                                    cmp = cmp.getLeadComponent();
-                                    cmp.pointerReleased(x, y);
-                                } else {
-                                    cmp.pointerReleased(x, y);
                                 }
                             }
                         }
                     }
                 }
-            }
-        } else {
-            if (dragged.isDragAndDropInitialized()) {
-                dragged.dragFinishedImpl(x, y);
-                dragged = null;
             } else {
-                dragged.pointerReleased(x, y);
-                dragged = null;
+                if (dragged.isDragAndDropInitialized()) {
+                    dragged.dragFinishedImpl(x, y);
+                    dragged = null;
+                } else {
+                    dragged.pointerReleased(x, y);
+                    dragged = null;
+                }
             }
-        }
-        stickyDrag = null;
-        if (componentsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-            for (int iter = 0; iter < componentsAwatingRelease.size(); iter++) {
-            	Component c = componentsAwatingRelease.get(iter);
-            	if (c instanceof ReleasableComponent) {
-            		ReleasableComponent rc = (ReleasableComponent) c;
-            		rc.setReleased();
-            	}
+            stickyDrag = null;
+            if (componentsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
+                for (int iter = 0; iter < componentsAwatingRelease.size(); iter++) {
+                    Component c = componentsAwatingRelease.get(iter);
+                    if (c instanceof ReleasableComponent) {
+                            ReleasableComponent rc = (ReleasableComponent) c;
+                            rc.setReleased();
+                    }
+                }
+                componentsAwatingRelease = null;
             }
-            componentsAwatingRelease = null;
+        } finally {
+            currentPointerPress = null;
         }
     }
 

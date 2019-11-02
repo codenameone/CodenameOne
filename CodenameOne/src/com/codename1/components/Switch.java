@@ -147,8 +147,8 @@ public class Switch extends Component {
     private Image trackOffImage;
     private Image trackDisabledImage;
     private boolean dragged;
-    private int pressX;
-    private int deltaX; //pressX - currentdragX
+    private int pressX, pressY;
+    private int deltaX, deltaY; //pressX - currentdragX
     private final EventDispatcher dispatcher = new EventDispatcher();
     private final EventDispatcher changeDispatcher = new EventDispatcher();
     private boolean animationLock;
@@ -627,89 +627,108 @@ public class Switch extends Component {
      */
     protected void initComponent() {
         super.initComponent();
+        addPointerPressedListener(pointerPressed);
+        addPointerDraggedListener(pointerDragged);
+        addPointerReleasedListener(pointerReleased);
     }
 
     /**
      * {@inheritDoc}
      */
     protected void deinitialize() {
+        removePointerPressedListener(pointerPressed);
+        removePointerDraggedListener(pointerDragged);
+        removePointerReleasedListener(pointerReleased);
         super.deinitialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerPressed(int x, int y) {
-        super.pointerPressed(x, y);
-        pressX = x;
-    }
+    private final ActionListener pointerPressed = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
+            dragged = false;
+            deltaX = 0;
+            deltaY = 0;
+            pressX = evt.getX();
+            pressY = evt.getY();
+        }
+    };
+    
+    private final ActionListener pointerDragged = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
 
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerDragged(int x, int y) {
-        dragged = true;
-        deltaX = pressX - x;
-    }
+            dragged = true;
+            deltaX = pressX - evt.getX();
+            deltaY = pressY - evt.getY();
+            if (Math.abs(deltaY) >= Math.abs(deltaX*0.5)) {
+                dragged = false;
+                deltaX = 0;
+                deltaY = 0;
+            } else {
+                evt.consume();
+            }
+        }
+    };
+    
+    private final ActionListener pointerReleased = new ActionListener() {
+    
+        public void actionPerformed(ActionEvent evt) {
+            if (animationLock) {
+                return;
+            }
+            animationLock = true;
+            
+            if (dragged) {
+                if (deltaX > 0) { //dragged from RtL
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    if (deltaX > trackLength / 2) {
+                        animateTo(isRTL(), deltaX, trackLength, trackLength);
+                    } else { //Not moved enaugh, go back to the state where we come from (i.e. ON for LtR switch and OFF for RtL ones)
+                        animateTo(!isRTL(), deltaX, 0, trackLength);
+                    }
+                } else { //dragged from LtR
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    if (deltaX * -1 > trackLength / 2) {
+                        animateTo(!isRTL(), deltaX, -trackLength, trackLength);
+                    } else {
+                        animateTo(isRTL(), deltaX, 0, trackLength);
+                    }
+                }  
+            } else {
+                if (value) {
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    animateTo(false, 0, trackLength, trackLength);
+                } else {
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    animateTo(true, 0, -trackLength, trackLength);
+                }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerReleased(int x, int y) {
-        if (animationLock) {
+            }
+            animationLock = false;
             return;
         }
-        animationLock = true;
-
-        if (dragged) {
-            if (deltaX > 0) { //dragged from RtL
-                int trackLength = 0;
-                if (isRTL()) {
-                    trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                } else {
-                    trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                }
-                if (deltaX > trackLength / 2) {
-                    animateTo(isRTL(), deltaX, trackLength, trackLength);
-                } else { //Not moved enaugh, go back to the state where we come from (i.e. ON for LtR switch and OFF for RtL ones)
-                    animateTo(!isRTL(), deltaX, 0, trackLength);
-                }
-            } else { //dragged from LtR
-                int trackLength = 0;
-                if (isRTL()) {
-                    trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                } else {
-                    trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                }
-                if (deltaX * -1 > trackLength / 2) {
-                    animateTo(!isRTL(), deltaX, -trackLength, trackLength);
-                } else {
-                    animateTo(isRTL(), deltaX, 0, trackLength);
-                }
-            }
-        } else {
-            if (value) {
-                int trackLength = 0;
-                if (isRTL()) {
-                    trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                } else {
-                    trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                }
-                animateTo(false, 0, trackLength, trackLength);
-            } else {
-                int trackLength = 0;
-                if (isRTL()) {
-                    trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                } else {
-                    trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                }
-                animateTo(true, 0, -trackLength, trackLength);
-            }
-
-        }
-        animationLock = false;
-        return;
-    }
+    };
+    
+    
+   
 
     private void animateTo(final boolean value, final int deltaStart, final int deltaEnd, final int maxMoveDist) {
         int anim_duration = (int) Math.abs((deltaEnd - deltaStart) / (double) maxMoveDist * 100.0);
@@ -723,6 +742,8 @@ public class Switch extends Component {
                     dragged = true;
                     if (current.isFinished()) {
                         dragged = false;
+                        deltaX = 0;
+                        deltaY = 0;
                         Form f = getComponentForm();
                         if (f != null) {
                             f.deregisterAnimated(this);
@@ -736,11 +757,15 @@ public class Switch extends Component {
                 public void paint(Graphics g) {
                 }
             });
+            dragged = true;
         } else {
-            deltaX = deltaEnd;
+            //deltaX = deltaEnd;
+            deltaX = 0;
+            deltaY = 0;
+            dragged = false;
             setValue(value, true);
         }
-        dragged = true;
+        
     }
 
     /**
@@ -839,6 +864,7 @@ public class Switch extends Component {
      * @param state the non-null state
      */
     public void setComponentState(Object state) {
+        System.out.println("Setting component state "+state);
         value = ((Boolean) state).booleanValue();
     }
 

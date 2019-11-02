@@ -41,12 +41,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     private Container animationLayer;
     private Boolean focusAnimation;
     private static int animationSpeed = 100;
-    
-    @Override
-    protected void initInput() {
-        setUIID("TextComponent");
-    }
-    
+        
     /**
      * Allows us to invoke setters/getters and bind listeners to the text field
      * @return the text field instance
@@ -166,7 +161,10 @@ public class AutoCompleteTextComponent extends TextComponent {
                 setLayout(new LayeredLayout());
                 Container tfContainer = BorderLayout.center(field).
                         add(BorderLayout.NORTH, getLabel()).
-                        add(BorderLayout.SOUTH, getErrorMessage());
+                        add(BorderLayout.SOUTH, 
+                            LayeredLayout.encloseIn(
+                                getErrorMessage(), 
+                                getDescriptionMessage()));
                 add(tfContainer);
 
                 Label errorMessageFiller = new Label();
@@ -258,6 +256,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return (AutoCompleteTextComponent) super.onTopMode(onTopMode);
     }
 
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public AutoCompleteTextComponent descriptionMessage(String descriptionMessage) {
+        super.descriptionMessage(descriptionMessage);
+        return this;
+    }
+    
     /**
      * Overridden for covariant return type {@inheritDoc}
      */

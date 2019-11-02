@@ -1332,14 +1332,19 @@ public class Container extends Component implements Iterable<Component>{
             revalidate();
             return;
         }
-        mgr.flushAnimation(new Runnable() {
-            @Override
-            public void run() {
-                revalidatePending = false;
-                revalidate();
-            }
-            
-        });
+        if (mgr.isAnimating()) {
+            mgr.flushAnimation(new Runnable() {
+                @Override
+                public void run() {
+                    revalidatePending = false;
+                    revalidate();
+                }
+
+            });
+        } else {
+            revalidatePending = false;
+            revalidate();
+        }
     }
    
     /**

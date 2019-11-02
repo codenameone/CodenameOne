@@ -1116,6 +1116,18 @@ public class UIManager {
             themeProps.put("ErrorLabel.sel#fgColor", "ff1744");
             themeProps.put("ErrorLabel.press#fgColor", "ff1744");
         }        
+        if(installedTheme == null || !installedTheme.containsKey("InputComponentAction.derive")) {
+            themeProps.put("InputComponentAction.derive", "FloatingHint");
+            themeProps.put("InputComponentAction.font", Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 3f));
+        }                
+        if(installedTheme == null || !installedTheme.containsKey("DescriptionLabel.derive")) {
+            themeProps.put("DescriptionLabel.derive", "FloatingHint");
+            themeProps.put("DescriptionLabel.sel#derive", "FloatingHint");
+            themeProps.put("DescriptionLabel.press#derive", "FloatingHint");
+            themeProps.put("DescriptionLabel.fgColor", "666666");
+            themeProps.put("DescriptionLabel.sel#fgColor", "666666");
+            themeProps.put("DescriptionLabel.press#fgColor", "666666");
+        }        
         if(installedTheme == null || !installedTheme.containsKey("TextComponent.derive")) {
             themeProps.put("TextComponent.derive", "Container");
         }

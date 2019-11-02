@@ -55,6 +55,7 @@ public class Simulator {
         if (skin == null) {
             System.setProperty("dskin", DEFAULT_SKIN);
         }
+        
         for (int i = 0; i < argv.length; i++) {
             String argv1 = argv[i];
             if(argv1.equals("resetSkins")){
@@ -63,6 +64,11 @@ public class Simulator {
                 System.setProperty("dskin", DEFAULT_SKIN);            
             }
         }
+        
+        if (System.getenv("CN1_SIMULATOR_SKIN") != null) {
+            System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
+        }
+        
         StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
         if(argv.length > 0) {
             System.setProperty("MainClass", argv[0]);
