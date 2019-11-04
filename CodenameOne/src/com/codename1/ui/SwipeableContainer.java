@@ -28,7 +28,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.EventDispatcher;
-import java.util.ArrayList;
 
 /**
  * <p>{@code SwipeableContainer} allows us to side swipe a component and expose underlying configuration
@@ -58,7 +57,7 @@ public class SwipeableContainer extends Container {
     private int topX = -1;
     private boolean waitForRelease;
 
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
     /**
      * Simple Constructor
      * 
@@ -276,13 +275,9 @@ public class SwipeableContainer extends Container {
 
     @Override
     void doLayout() {
-        if(openedToLeft || openedToRight) {
-            int x = topWrapper.getX();
-            super.doLayout();
-            topWrapper.setX(x);
-        } else {
-            super.doLayout();
-        }
+        int x = topWrapper.getX();
+        super.doLayout();
+        topWrapper.setX(x);
     }
 
     
@@ -337,7 +332,7 @@ public class SwipeableContainer extends Container {
             if (f == null) {
                 return;
             }
-            Component cmp = f.getComponentAt(x, y);
+            Component cmp = f.getComponentAt(x, y); 
             if (!waitForRelease && !contains(cmp)) {
                 return;
             }
@@ -362,6 +357,9 @@ public class SwipeableContainer extends Container {
 
             switch (type) {
                 case PRESS: {
+                    if (!topWrapper.contains(x, y)) {
+                        return;
+                    }
                     topX = topWrapper.getX();
                     initialX = x;
                     initialY = y;
@@ -369,6 +367,9 @@ public class SwipeableContainer extends Container {
                     break;
                 }
                 case DRAG: {
+                    if (!waitForRelease) {
+                        return;
+                    }
                     if (Math.abs(y - initialY) > Math.abs(x - initialX)) {
                         return;
                     }
