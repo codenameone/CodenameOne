@@ -194,8 +194,8 @@ public final class Math{
      * <li>{@code round(-0.0) = (long) +0.0}</li>
      * <li>{@code round((anything > Long.MAX_VALUE) = Long.MAX_VALUE}</li>
      * <li>{@code round((anything < Long.MIN_VALUE) = Long.MIN_VALUE}</li>
-     * <li>{@code round(+infintiy) = Long.MAX_VALUE}</li>
-     * <li>{@code round(-infintiy) = Long.MIN_VALUE}</li>
+     * <li>{@code round(+infinity) = Long.MAX_VALUE}</li>
+     * <li>{@code round(-infinity) = Long.MIN_VALUE}</li>
      * <li>{@code round(NaN) = (long) +0.0}</li>
      * </ul>
      * 
@@ -221,8 +221,8 @@ public final class Math{
      * <li>{@code round(-0.0) = (int) +0.0}</li>
      * <li>{@code round((anything > Integer.MAX_VALUE) = Integer.MAX_VALUE}</li>
      * <li>{@code round((anything < Integer.MIN_VALUE) = Integer.MIN_VALUE}</li>
-     * <li>{@code round(+infintiy) = Integer.MAX_VALUE}</li>
-     * <li>{@code round(-infintiy) = Integer.MIN_VALUE}</li>
+     * <li>{@code round(+infinity) = Integer.MAX_VALUE}</li>
+     * <li>{@code round(-infinity) = Integer.MIN_VALUE}</li>
      * <li>{@code round(NaN) = (int) +0.0}</li>
      * </ul>
      * 
