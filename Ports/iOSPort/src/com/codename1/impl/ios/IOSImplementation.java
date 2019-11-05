@@ -2545,6 +2545,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         private LocationListener backgroundLocationListenerInstance;
         private Map<String,String> geofenceListeners;
         private Map<String,Long> geofenceExpirations;
+
+        @Override
+        public boolean isGPSDetectionSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isGPSEnabled() {
+            return nativeInstance.isGPSEnabled();
+        }
+        
+        
+        
         
         protected void finalize() throws Throwable {
             //super.finalize();

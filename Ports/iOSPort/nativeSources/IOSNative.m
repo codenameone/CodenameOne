@@ -3807,6 +3807,16 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGPSEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_LOCATION_USAGE
+    return [CLLocationManager locationServicesEnabled] && 
+   [CLLocationManager authorizationStatus] != kCLAuthorizationStatusDenied;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_LOCATION_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
