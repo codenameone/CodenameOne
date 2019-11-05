@@ -2363,9 +2363,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
             
-    #ifndef CN1_USE_ARC
-            [com_codename1_impl_ios_IOSNative_createWKBrowserComponent retain];
-    #endif
         });
         id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
         com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
