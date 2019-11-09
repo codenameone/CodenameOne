@@ -1,5 +1,6 @@
 package com.codename1.samples;
 
+import com.codename1.components.SpanButton;
 import com.codename1.components.SpanLabel;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
@@ -54,13 +55,13 @@ public class SwipableContainerTest2766 {
         Form hi = new Form("Welcome", new BorderLayout());
         Container list = new Container(BoxLayout.y());
         for (int i = 0; i < 20; i++) {
-            SwipeableContainer swip = new SwipeableContainer(null, new Label("SWIPE"), new SpanLabel("ListElement " + i + " + a lot of fill text to make the element span over several lines so the dragging of the underlying Swipeable is normally noticeable"));
+            SwipeableContainer swip = new SwipeableContainer(null, new Label("SWIPE"), new Label("ListElement " + i + " + a lot of fill text to make the element span over several lines so the dragging of the underlying Swipeable is normally noticeable"));
             list.add(swip);
         }
         list.setScrollableY(true);
         Container cont = hi.getContentPane();
         cont.add(BorderLayout.CENTER, list);
-        SwipeableContainer swip = new SwipeableContainer(null, new Label("SOUTHSWIPE"), new Label("SOUTH CONTAINER"));
+        SwipeableContainer swip = new SwipeableContainer(null, new SpanLabel("SOUTHSWIPE"), new SpanLabel("SOUTH CONTAINER"));
         cont.add(BorderLayout.SOUTH, swip);
         hi.show();
     }

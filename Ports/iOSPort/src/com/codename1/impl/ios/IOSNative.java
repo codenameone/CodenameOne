@@ -316,6 +316,7 @@ public final class IOSNative {
     native String getDeviceName();
     
     // location manager
+    native boolean isGPSEnabled();
     native long createCLLocation();
     native boolean isGoodLocation(long clLocation);
     native long getCurrentLocationObject(long clLocation);
@@ -703,6 +704,8 @@ public final class IOSNative {
     native boolean isMultiGallerySelectSupported();
 
     native void setConnectionId(long peer, int id);
+
+    
 
     
     

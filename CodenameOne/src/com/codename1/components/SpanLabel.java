@@ -26,6 +26,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -71,6 +72,7 @@ public class SpanLabel extends Container {
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setActAsLabel(true);
         text.setColumns(text.getText().length() + 1);
+        text.setGrowByContent(true);
         text.setUIID("Label");
         text.setEditable(false);
         text.setFocusable(false);
@@ -411,13 +413,23 @@ public class SpanLabel extends Container {
         return text.isTextSelectionEnabled();
     }
 
+    
     @Override
-    public void layoutContainer() {
-        // We may need to layout the container twice due to the preferred size calculation
-        // of the TextArea depending on its width at the time of the calculation.
-        // https://github.com/codenameone/CodenameOne/issues/2897
-        super.layoutContainer();
+    protected Dimension calcPreferredSize() {
+        int w = getWidth();
+        int h = getHeight();
+        Dimension dim = super.calcPreferredSize();
+        setWidth(dim.getWidth());
+        setHeight(dim.getHeight());
         setShouldCalcPreferredSize(true);
-        super.layoutContainer();
+        
+        dim = super.calcPreferredSize();
+        setWidth(w);
+        setHeight(h);
+        return dim;
     }
+    
+    
+    
+    
 }
