@@ -22,21 +22,30 @@
  */
 package com.codename1.location;
 
+import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.ui.Display;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.FusedLocationProviderApi;
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.LocationAvailability;
+import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,7 +60,41 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         com.google.android.gms.location.LocationListener,
         LifecycleListener {
 
-    
+
+    static class ParcelableUtil {
+        public static byte[] marshall(Parcelable parceable) {
+            Parcel parcel = Parcel.obtain();
+            parceable.writeToParcel(parcel, 0);
+            byte[] bytes = parcel.marshall();
+            parcel.recycle();
+            return bytes;
+        }
+
+        public static Parcel unmarshall(byte[] bytes) {
+            Parcel parcel = Parcel.obtain();
+            parcel.unmarshall(bytes, 0, bytes.length);
+            parcel.setDataPosition(0); // This is extremely important!
+            return parcel;
+        }
+
+        public static <T> T unmarshall(byte[] bytes, Parcelable.Creator<T> creator) {
+            Parcel parcel = unmarshall(bytes);
+            T result = creator.createFromParcel(parcel);
+            parcel.recycle();
+            return result;
+        }
+    }
+
+    private final LocationCallback callback = new LocationCallback() {
+        public void onLocationResult(LocationResult var1) {
+            AndroidLocationPlayServiceManager.this.onLocationChanged(var1.getLastLocation());
+        }
+
+        public void onLocationAvailability(LocationAvailability var1) {
+
+        }
+    };
+
     public static AndroidLocationPlayServiceManager inMemoryBackgroundLocationListener;
     
     private GoogleApiClient mGoogleApiClient;
@@ -84,7 +127,8 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             } catch (Exception ex) {
             }
         }
-        android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
+        //android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
+        android.location.Location location = LocationServices.getFusedLocationProviderClient(AndroidNativeUtil.getContext()).getLastLocation().getResult();
         if (location != null) {
             return AndroidLocationManager.convert(location);
         }
@@ -144,9 +188,11 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                             inMemoryBackgroundLocationListener = AndroidLocationPlayServiceManager.this;
                             
 
-                            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, pendingIntent);
+                            //LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, pendingIntent);
+                            requestLocationUpdates(context, r, pendingIntent);
                         } else {
-                            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, AndroidLocationPlayServiceManager.this);
+                            //LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, AndroidLocationPlayServiceManager.this);
+                            requestLocationUpdates(AndroidNativeUtil.getContext(), r, AndroidLocationPlayServiceManager.this);
                         }
                     }
                 });
@@ -154,6 +200,79 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         });
         t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
         t.start();
+    }
+
+    private void requestLocationUpdates(Context context, LocationRequest req, PendingIntent pendingIntent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocationServices.getFusedLocationProviderClient(context).requestLocationUpdates(req, pendingIntent);
+        } else {
+            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, pendingIntent);
+        }
+    }
+
+
+    private PendingIntent createBackgroundPendingIntent() {
+        return createBackgroundPendingIntent(false);
+    }
+
+    private PendingIntent createBackgroundPendingIntent(boolean forceService) {
+        Context context = AndroidNativeUtil.getContext().getApplicationContext();
+        final Class bgListenerClass = getBackgroundLocationListener();
+        if (bgListenerClass == null) {
+            return null;
+        }
+        if (!forceService && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(context, BackgroundLocationBroadcastReceiver.class);
+            intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
+            intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_UPDATES);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            return pendingIntent;
+        } else {
+
+
+            Intent intent = new Intent(context, BackgroundLocationHandler.class);
+            intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
+            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+            return pendingIntent;
+        }
+    }
+
+    static android.location.Location extractLocationFromIntent(Intent intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocationResult locationResult = LocationResult.extractResult(intent);
+            if (locationResult == null) {
+                return null;
+            }
+            return locationResult.getLastLocation();
+        } else {
+            return intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
+        }
+    }
+
+    private void requestLocationUpdates(Context context, LocationRequest req, AndroidLocationPlayServiceManager mgr) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocationServices.getFusedLocationProviderClient(context).requestLocationUpdates(req, mgr.callback, Looper.getMainLooper());
+        } else {
+            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, mgr);
+        }
+    }
+
+    private void removeLocationUpdates(Context context, AndroidLocationPlayServiceManager mgr) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocationServices.getFusedLocationProviderClient(context).removeLocationUpdates(mgr.callback);
+        } else {
+            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), mgr);
+        }
+    }
+
+    private void removeLocationUpdates(Context context, PendingIntent pendingIntent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocationServices.getFusedLocationProviderClient(context).removeLocationUpdates(pendingIntent);
+        } else {
+            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
+        }
     }
 
     @Override
@@ -184,10 +303,12 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                                     intent,
                                     PendingIntent.FLAG_UPDATE_CURRENT);
 
-                            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
+                            //LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
+                            removeLocationUpdates(context, pendingIntent);
                             inMemoryBackgroundLocationListener = null;
                         } else {
-                            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), AndroidLocationPlayServiceManager.this);
+                            //LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), AndroidLocationPlayServiceManager.this);
+                            removeLocationUpdates(AndroidNativeUtil.getContext(), AndroidLocationPlayServiceManager.this);
                         }
                     }
                 });
@@ -197,8 +318,16 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         t.start();
     }
 
+
+
     @Override
     protected void bindBackgroundListener() {
+        /*
+        if(!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, "This is required to get the location")){
+            System.out.println("Request for background location access is denied");
+        }
+        */
+
         final Class bgListenerClass = getBackgroundLocationListener();
         if (bgListenerClass == null) {
             return;
@@ -222,19 +351,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         //don't be too aggressive for location updates in the background
                         LocationRequest req = LocationRequest.create();
                         setupBackgroundLocationRequest(req);
-
                         Context context = AndroidNativeUtil.getContext().getApplicationContext();
-
-                        Intent intent = new Intent(context, BackgroundLocationHandler.class);
-                        //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
-                        //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
-                        //an ugly workaround to the putExtra bug 
-                        intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
-                        PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT);
-
-                        LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, pendingIntent);
+                        PendingIntent pendingIntent = createBackgroundPendingIntent();
+                        requestLocationUpdates(context, req, pendingIntent);
                     }
                 });
             }
@@ -245,28 +364,28 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     private void setupBackgroundLocationRequest(LocationRequest req) {
         Display d = Display.getInstance();
-         String priorityStr = d.getProperty("android.backgroundLocation.priority", "PRIORITY_BALANCED_POWER_ACCURACY");
-         String fastestIntervalStr = d.getProperty("android.backgroundLocation.fastestInterval", "5000");
-         String intervalStr = d.getProperty("android.backgroundLocation.interval", "10000");
-         String smallestDisplacementStr = d.getProperty("android.backgroundLocation.smallestDisplacement", "50");
-         
-         int priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
-         if ("PRIORITY_HIGH_ACCURACY".equals(priorityStr)) {
-             priority = LocationRequest.PRIORITY_HIGH_ACCURACY;
-         } else if ("PRIORITY_LOW_POWER".equals(priorityStr)) {
-             priority = LocationRequest.PRIORITY_LOW_POWER;
-         } else if ("PRIORITY_NO_POWER".equals(priorityStr)) {
-             priority = LocationRequest.PRIORITY_NO_POWER;
-         }
-         
-         long interval = Long.parseLong(intervalStr);
-         long fastestInterval = Long.parseLong(fastestIntervalStr);
-         int smallestDisplacement = Integer.parseInt(smallestDisplacementStr);
-         
-         req.setPriority(priority)
-                 .setFastestInterval(fastestInterval)
-                 .setInterval(interval)
-                 .setSmallestDisplacement(smallestDisplacement);
+        String priorityStr = d.getProperty("android.backgroundLocation.priority", "PRIORITY_BALANCED_POWER_ACCURACY");
+        String fastestIntervalStr = d.getProperty("android.backgroundLocation.fastestInterval", "5000");
+        String intervalStr = d.getProperty("android.backgroundLocation.interval", "10000");
+        String smallestDisplacementStr = d.getProperty("android.backgroundLocation.smallestDisplacement", "50");
+
+        int priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
+        if ("PRIORITY_HIGH_ACCURACY".equals(priorityStr)) {
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY;
+        } else if ("PRIORITY_LOW_POWER".equals(priorityStr)) {
+            priority = LocationRequest.PRIORITY_LOW_POWER;
+        } else if ("PRIORITY_NO_POWER".equals(priorityStr)) {
+            priority = LocationRequest.PRIORITY_NO_POWER;
+        }
+
+        long interval = Long.parseLong(intervalStr);
+        long fastestInterval = Long.parseLong(fastestIntervalStr);
+        int smallestDisplacement = Integer.parseInt(smallestDisplacementStr);
+
+        req.setPriority(priority)
+                .setFastestInterval(fastestInterval)
+                .setInterval(interval)
+                .setSmallestDisplacement(smallestDisplacement);
     }
     
     @Override
@@ -291,13 +410,8 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                     public void run() {
                         Context context = AndroidNativeUtil.getContext().getApplicationContext();
-                        Intent intent = new Intent(context, BackgroundLocationHandler.class);
-                        intent.putExtra("backgroundClass", bgListenerClass.getName());
-                        PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT);
-
-                        LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
+                        PendingIntent pendingIntent = createBackgroundPendingIntent();
+                        removeLocationUpdates(context, pendingIntent);
                     }
                 });
             }
