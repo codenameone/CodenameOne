@@ -44,58 +44,44 @@ public class StringUtil {
     }
 
     /**
-     * This method replaces all occurrences of the pattern with the 
+     * This method replaces all occurrences of the target with the
      * replacement String
      * 
      * @param source the String source
-     * @param pattern String to replace in the source
+     * @param target String to replace in the source
      * @param replace replacement String
      * @return string with replaced elements
      */
-    public static String replaceAll(String source, String pattern, String replace) {
-        StringBuilder sb = new StringBuilder();
-        int idx = 0;
-        String workingSource = source;
-        idx = workingSource.indexOf(pattern);
-        if(idx == -1){
+    public static String replaceAll(String source, String target, String replacement) {
+        int index = source.indexOf(target);
+        if (index == -1)
             return source;
+        final StringBuilder result = new StringBuilder(source.length() + replacement.length());
+        result.append(source, 0, index);
+        while (true) {
+            result.append(replacement);
+            final int start = index + target.length();
+            index = source.indexOf(target, start);
+            if (index < 0)
+                return result.append(source, start, source.length()).toString();
+            result.append(source, start, index);
         }
-        
-        while (idx != -1) {
-            sb.append(workingSource.substring(0, idx));
-            sb.append(replace);
-            workingSource = workingSource.substring(idx + pattern.length());
-            idx = workingSource.indexOf(pattern);            
-        }
-        sb.append(workingSource);
-
-        return sb.toString();
     }
 
     /**
-     * This method replaces the first occurrence of the pattern with the 
+     * This method replaces the first occurrence of the target with the
      * replacement String
      * 
      * @param source the String source
-     * @param pattern String to replace in the source
+     * @param target String to replace in the source
      * @param replace replacement String
      * @return string with replaced elements
      */
-    public static String replaceFirst(String source, String pattern, String replace) {
-        StringBuilder sb = new StringBuilder();
-        int idx = 0;
-        String workingSource = source;
-        idx = workingSource.indexOf(pattern);
-        if(idx == -1){
+    public static String replaceFirst(String source, String target, String replacement) {
+        final int index = source.indexOf(target);
+        if (index == -1)
             return source;
-        }
-        
-        sb.append(workingSource.substring(0, idx));
-        sb.append(replace);
-        workingSource = workingSource.substring(idx + pattern.length());
-        sb.append(workingSource);
-
-        return sb.toString();
+        return source.substring(0, index) + replacement + source.substring(index + target.length());
     }
     
     /**
