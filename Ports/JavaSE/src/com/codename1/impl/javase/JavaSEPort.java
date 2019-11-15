@@ -10003,8 +10003,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 player.setOnPlaying(new Runnable() {
                     public void run() {
                         playing = true;
-                    }
-                });
+                                    }
+                            });
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
@@ -10086,8 +10086,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     @Override
                     protected void onShow() {
                         player.play();
-                        playing = true;
-                    }
+                            playing = true;
+                        }
                     
                 };
                 com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
@@ -10108,8 +10108,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
             player.play();
-            playing = true;
-        }
+                playing = true;
+            }
 
         public void pause() {
             if(playing) {
@@ -10763,13 +10763,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                             .getShort())/ 0x8000;
                                                     sampleBufferPos++;
                                                     if (sampleBufferPos >= sampleBuffer.length) {
-                                                        buf.copyFrom(sampleBuffer, 0, sampleBuffer.length);
+                                                        buf.copyFrom(samplingRate, audioChannels, sampleBuffer, 0, sampleBuffer.length);
                                                         sampleBufferPos = 0;
                                                     }
                                                 
                                                 }
                                                 if (sampleBufferPos > 0) {
-                                                    buf.copyFrom(sampleBuffer, 0, sampleBufferPos);
+                                                    buf.copyFrom(samplingRate, audioChannels, sampleBuffer, 0, sampleBufferPos);
                                                 }
                                             }
                                         }

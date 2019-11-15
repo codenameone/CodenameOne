@@ -57,13 +57,13 @@ static void HandleInputBuffer (
       sampleData[index] = (JAVA_ARRAY_FLOAT)inputFrames[i] / 32768;
       index++;
       if (index >= len) {
-          com_codename1_media_AudioBuffer_copyFrom___float_1ARRAY_int_int(CN1_THREAD_GET_STATE_PASS_ARG audioBuffer, (JAVA_OBJECT)convertedSampleBuffer, 0, index);
+          com_codename1_media_AudioBuffer_copyFrom___int_int_float_1ARRAY_int_int(CN1_THREAD_GET_STATE_PASS_ARG audioBuffer, (JAVA_INT)[audioUnit sampleRate], [audioUnit channels], (JAVA_OBJECT)convertedSampleBuffer, 0, index);
           index = 0;
       }
     }
 
     if (index > 0) {
-      com_codename1_media_AudioBuffer_copyFrom___float_1ARRAY_int_int(CN1_THREAD_GET_STATE_PASS_ARG audioBuffer, (JAVA_OBJECT)convertedSampleBuffer, 0, index);
+      com_codename1_media_AudioBuffer_copyFrom___int_int_float_1ARRAY_int_int(CN1_THREAD_GET_STATE_PASS_ARG audioBuffer, (JAVA_INT)[audioUnit sampleRate], [audioUnit channels], (JAVA_OBJECT)convertedSampleBuffer, 0, index);
       index = 0;
     }
     
@@ -172,6 +172,12 @@ static void HandleInputBuffer (
     AudioQueueStop(queue, YES);
     AudioQueueDispose(queue, YES);
     return YES;
+}
+-(float)sampleRate {
+    return sampleRate;
+}
+-(int)channels {
+    return channels;
 }
 
 -(void)dealloc {

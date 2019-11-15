@@ -57,6 +57,7 @@ public class AudioBuffer {
      * The buffer contents.
      */
     private float[] buffer;
+    private float[] tmpDownSampleBuffer;
     
     /**
      * Internal flag used to indicate that we are currently firing callbacks.  This is used 
@@ -79,12 +80,16 @@ public class AudioBuffer {
      */
     private int size;
     
+    private int sampleRate;
+    private int numChannels;
+    
     /**
      * Creates a new AudioBuffer with the given maximum size.
      * @param maxSize The maximum size of the buffer.
      */
     public AudioBuffer(int maxSize) {
         buffer = new float[maxSize];
+        tmpDownSampleBuffer = new float[maxSize];
     }
 
     /**
@@ -93,7 +98,7 @@ public class AudioBuffer {
      * @param source The source buffer to copy from.
      */
     public synchronized void copyFrom(AudioBuffer source) {
-        copyFrom(source.buffer, 0, source.size);
+        copyFrom(source.getSampleRate(), source.getNumChannels(), source.buffer, 0, source.size);
     }
     
     /**
@@ -101,8 +106,8 @@ public class AudioBuffer {
      * method.
      * @param source 
      */
-    public synchronized void copyFrom(float[] source) {
-        copyFrom(source, 0, source.length);
+    public synchronized void copyFrom(int sampleRate, int numChannels, float[] source) {
+        copyFrom(sampleRate, numChannels, source, 0, source.length);
     }
     
     /**
@@ -112,10 +117,12 @@ public class AudioBuffer {
      * @param offset The offset in the source array to begin copying from.
      * @param len The length of the range to copy.
      */
-    public synchronized void copyFrom(float[] source, int offset, int len) {
+    public synchronized void copyFrom(int sampleRate, int numChannels, float[] source, int offset, int len) {
         if (len > buffer.length) {
             throw new IllegalArgumentException("Buffer size is "+buffer.length+" but attempt to copy "+len+" samples into it");
         }
+        this.sampleRate = sampleRate;
+        this.numChannels = numChannels;
         System.arraycopy(source, offset, buffer, 0, len);
         size = len;
         fireFrameReceived();
@@ -218,7 +225,81 @@ public class AudioBuffer {
             callbacks.remove(l);
         }
     }
+
+    /**
+     * @return the sampleRate
+     */
+    public int getSampleRate() {
+        return sampleRate;
+    }
+
+    /**
+     * @return the numChannels
+     */
+    public int getNumChannels() {
+        return numChannels;
+    }
+
     
     
+    /**
+     * Downsamples the buffer to the given rate.  This will change the result of 
+     * {@link #getSize() } and {@link #getSampleRate() }.
+     * 
+     * Note:  This should only be called inside the AudioBuffer callback since it is 
+     * modifying the contents of the buffer.
+     * @param targetSampleRate The new target rate.
+     */
+    public void downSample(int targetSampleRate) {
+        
+        if (targetSampleRate == sampleRate) {
+            return;
+        }
+        if (targetSampleRate > sampleRate) {
+            throw new IllegalArgumentException("downsample() expects a target rate that it same or lower than current sample rate.  Current rate="+sampleRate+" target rate requested="+targetSampleRate);
+        }
+        float ratio = targetSampleRate / (float)sampleRate;
+        
+        float stepSize = 1/ratio;
+        int len = size;
+        int j = 0;
+        for (int channel=0; channel < numChannels; channel++) {
+            if (numChannels == 1) {
+                System.arraycopy(buffer, 0, tmpDownSampleBuffer, 0, len);
+            } else {
+                int k=0;
+                for (int i=0; i<size; i+=numChannels) {
+                    tmpDownSampleBuffer[k++] = buffer[i + channel];
+                }
+            }
+            len = size / numChannels;
+            for (float i=0; i<len; i+=stepSize ) {
+            
+                int i0 = (int)Math.floor(i);
+                int i1 = (int)Math.ceil(i);
+                if (i1 == i0 || i1 > len-1) {
+                    if (i0 > len-1) {
+                        break;
+                    }
+                    buffer[j + channel] = tmpDownSampleBuffer[i0];
+                    j += numChannels;
+                } else {
+                    float v0 = tmpDownSampleBuffer[i0];
+                    float v1 = tmpDownSampleBuffer[i1];
+                    float t = Math.round(i) - i0;
+                    float v = v0 + t * (v1-v0);
+                    buffer[j + channel] = v;
+                    j += numChannels;
+                    
+                }
+                
+            }
+        }
+        
+        size = j;
+        sampleRate = targetSampleRate;
+        
+        
+    }
     
 }
