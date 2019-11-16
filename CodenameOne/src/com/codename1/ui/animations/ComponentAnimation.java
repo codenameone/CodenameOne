@@ -182,6 +182,34 @@ public abstract class ComponentAnimation {
         }
 
         @Override
+        public void setStep(int step) {
+            if(sequence == -1) {
+                anims[0].setStep(step);
+                return;
+            }
+            for(int iter = 0 ; iter < sequence ; iter++) {
+                int m = anims[iter].getMaxSteps();
+                if(m > step) {
+                    anims[iter].setStep(step);
+                } else {
+                    step -= m;
+                }
+            } 
+        }
+
+        @Override
+        public int getStep() {
+            if(sequence == -1) {
+                return anims[0].getStep();
+            }
+            int count = 0;
+            for(int iter = 0 ; iter < sequence ; iter++) {
+                count += anims[iter].getMaxSteps();
+            } 
+            return count + anims[sequence].getStep();
+        }
+
+        @Override
         public boolean isInProgress() {
             if(sequence > -1 && sequence < anims.length) {
                 if(anims[sequence].isInProgress()) {
