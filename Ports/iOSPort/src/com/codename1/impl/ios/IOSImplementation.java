@@ -83,6 +83,7 @@ import com.codename1.io.Preferences;
 import com.codename1.location.Geofence;
 import com.codename1.location.GeofenceListener;
 import com.codename1.location.LocationRequest;
+import com.codename1.media.AudioBuffer;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
@@ -3055,7 +3056,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
         }
         if (redirectToAudioBuffer) {
-            
+            AudioBuffer buf = MediaManager.getAudioBuffer(path, true, 4096);
             return new Media() {
                 long peer = nativeInstance.createAudioUnit(path, audioChannels, sampleRate, new float[64]);
                 boolean isPlaying;

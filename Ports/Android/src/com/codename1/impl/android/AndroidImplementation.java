@@ -3634,12 +3634,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                                             audioData[index] = ((float)buffer[i]) / 0x8000;
                                                             index++;
                                                             if (index >= audioData.length) {
-                                                                audioBuffer.copyFrom(audioData, 0, index);
+                                                                audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
                                                                 index = 0;
                                                             }
                                                         }
                                                         if (index > 0) {
-                                                            audioBuffer.copyFrom(audioData, 0, index);
+                                                            audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
                                                             index = 0;
                                                         }
                                                         System.out.println("Time is "+getTime());
