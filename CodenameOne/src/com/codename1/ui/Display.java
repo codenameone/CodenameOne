@@ -159,6 +159,7 @@ public final class Display extends CN1Constants {
     private static final int POINTER_PRESSED_MULTI = 21;
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
+    private boolean disableInvokeAndBlock;
     
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
@@ -1317,6 +1318,30 @@ public final class Display extends CN1Constants {
         }
     }
 
+    
+    /**
+     * Invokes a Runnable with blocking disabled.  If any attempt is made to block
+     * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
+     * it will result in a {@link BlockingDisallowedException} being thrown.
+     * @param r Runnable to be run immediately.
+     * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
+     * anywhere in the Runnable.
+     * 
+     * @since 7.0
+     */
+    public void invokeWithoutBlocking(Runnable r) {
+        if (disableInvokeAndBlock || !isEdt()) {
+            r.run();
+        } else {
+            disableInvokeAndBlock = true;
+            try {
+                r.run();
+            } finally {
+                disableInvokeAndBlock = false;
+            }
+        }
+    }
+    
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
      * EDT it will still be blocked in a way that doesn't break event dispatch .
@@ -1327,11 +1352,17 @@ public final class Display extends CN1Constants {
      * @param r runnable (NOT A THREAD!) that will be invoked synchronously by this method
      * @param dropEvents indicates if the display should drop all events
      * while this runnable is running
+     * 
+     * @throws BlockingDisallowedException if this method is called while blocking is disabled (i.e. we are running
+     * inside a call to {@link #invokeWithoutBlocking(java.lang.Runnable) } on the EDT).
      */
     public void invokeAndBlock(Runnable r, boolean dropEvents){
         this.dropEvents = dropEvents;
         try {
             if(isEdt()) {
+                if (disableInvokeAndBlock) {
+                    throw new BlockingDisallowedException();
+                }
                 // this class allows a runtime exception to propogate correctly out of the
                 // internal thread
                 RunnableWrapper w = new RunnableWrapper(r, 1);
@@ -1372,7 +1403,9 @@ public final class Display extends CN1Constants {
                 r.run();
             }
         } catch(RuntimeException re) {
-            Log.e(re);
+            if (!(re instanceof BlockingDisallowedException)) {
+                Log.e(re);
+            }
             throw re;
         } finally {
             this.dropEvents = false;
