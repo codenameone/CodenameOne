@@ -182,34 +182,6 @@ public abstract class ComponentAnimation {
         }
 
         @Override
-        public void setStep(int step) {
-            if(sequence == -1) {
-                anims[0].setStep(step);
-                return;
-            }
-            for(int iter = 0 ; iter < sequence ; iter++) {
-                int m = anims[iter].getMaxSteps();
-                if(m > step) {
-                    anims[iter].setStep(step);
-                } else {
-                    step -= m;
-                }
-            } 
-        }
-
-        @Override
-        public int getStep() {
-            if(sequence == -1) {
-                return anims[0].getStep();
-            }
-            int count = 0;
-            for(int iter = 0 ; iter < sequence ; iter++) {
-                count += anims[iter].getMaxSteps();
-            } 
-            return count + anims[sequence].getStep();
-        }
-
-        @Override
         public boolean isInProgress() {
             if(sequence > -1 && sequence < anims.length) {
                 if(anims[sequence].isInProgress()) {
@@ -248,5 +220,53 @@ public abstract class ComponentAnimation {
                 a.flush();
             }
         }
+
+        @Override
+        public int getMaxSteps() {
+            if (sequence > -1) {
+                int out = 0;
+                for (ComponentAnimation a : anims) {
+                    out += a.getMaxSteps();
+                }
+                return out;
+            } else {
+                int out = 0;
+                for (ComponentAnimation a : anims) {
+                    out = Math.max(a.getMaxSteps(), out);
+                }
+                return out;
+            }
+            
+        }
+
+        @Override
+        public void setStep(int step) {
+            super.setStep(step);
+            if (sequence > -1) {
+                int animIdx = 0;
+                int len = anims.length;
+                while (animIdx < anims.length && anims[animIdx].getMaxSteps() <= step) {
+                    ComponentAnimation anim = anims[animIdx];
+                    anim.setStep(anim.getMaxSteps());
+                    step -= anim.getMaxSteps();
+                    animIdx++;
+                }
+                while (animIdx < len) {
+                    anims[animIdx].setStep(0);
+                    animIdx++;
+                }
+                
+            } else {
+                for (ComponentAnimation anim : anims) {
+                    anim.setStep(Math.min(anim.getMaxSteps(), step));
+                }
+            }
+        }
+        
+        
+        
+        
+        
+        
     }
 }
