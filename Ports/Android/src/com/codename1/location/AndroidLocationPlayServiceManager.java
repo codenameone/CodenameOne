@@ -37,6 +37,7 @@ import android.os.Parcelable;
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
+import com.codename1.impl.android.PlayServices;
 import com.codename1.ui.Display;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -85,7 +86,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         }
     }
 
-    private final LocationCallback callback = new LocationCallback() {
+    public final LocationCallback callback = new LocationCallback() {
         public void onLocationResult(LocationResult var1) {
             AndroidLocationPlayServiceManager.this.onLocationChanged(var1.getLastLocation());
         }
@@ -128,7 +129,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             }
         }
         //android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
-        android.location.Location location = LocationServices.getFusedLocationProviderClient(AndroidNativeUtil.getContext()).getLastLocation().getResult();
+        android.location.Location location = PlayServices.getInstance().getLastKnownLocation(getmGoogleApiClient());
         if (location != null) {
             return AndroidLocationManager.convert(location);
         }
@@ -203,11 +204,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     }
 
     private void requestLocationUpdates(Context context, LocationRequest req, PendingIntent pendingIntent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LocationServices.getFusedLocationProviderClient(context).requestLocationUpdates(req, pendingIntent);
-        } else {
-            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, pendingIntent);
-        }
+        PlayServices.getInstance().requestLocationUpdates(getmGoogleApiClient(), context, req, pendingIntent);
     }
 
 
@@ -252,27 +249,15 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     }
 
     private void requestLocationUpdates(Context context, LocationRequest req, AndroidLocationPlayServiceManager mgr) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LocationServices.getFusedLocationProviderClient(context).requestLocationUpdates(req, mgr.callback, Looper.getMainLooper());
-        } else {
-            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, mgr);
-        }
+        PlayServices.getInstance().requestLocationUpdates(getmGoogleApiClient(), context, req, mgr);
     }
 
     private void removeLocationUpdates(Context context, AndroidLocationPlayServiceManager mgr) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LocationServices.getFusedLocationProviderClient(context).removeLocationUpdates(mgr.callback);
-        } else {
-            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), mgr);
-        }
+        PlayServices.getInstance().removeLocationUpdates(getmGoogleApiClient(), context, mgr);
     }
 
     private void removeLocationUpdates(Context context, PendingIntent pendingIntent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LocationServices.getFusedLocationProviderClient(context).removeLocationUpdates(pendingIntent);
-        } else {
-            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
-        }
+        PlayServices.getInstance().removeLocationUpdates(getmGoogleApiClient(), context, pendingIntent);
     }
 
     @Override
