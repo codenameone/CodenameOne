@@ -62,6 +62,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Timer;
 
@@ -1268,6 +1269,7 @@ public final class Display extends CN1Constants {
         c.fireActionEvent();
     }
     
+    private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
     /**
      * Used by the EDT to process all the calls submitted via call serially
      */
@@ -1276,14 +1278,15 @@ public final class Display extends CN1Constants {
         processingSerialCalls = true;
         int size = pendingSerialCalls.size();
         if(size > 0) {
-            Runnable[] array = null;
+            //Runnable[] array = null;
             synchronized(lock) {
                 size = pendingSerialCalls.size();
-                array = new Runnable[size];
+                //array = new Runnable[size];
 
                 // copy all elements to an array and remove them otherwise invokeAndBlock from
                 // within a callSerially() can cause an infinite loop...
-                pendingSerialCalls.toArray(array);
+                //pendingSerialCalls.toArray(array);
+                runningSerialCallsQueue.addAll(pendingSerialCalls);
 
                 if(size == pendingSerialCalls.size()) {
                     // this is faster
@@ -1295,9 +1298,8 @@ public final class Display extends CN1Constants {
                     }
                 }
             }
-
-            for(int iter = 0 ; iter < size ; iter++) {
-                array[iter].run();
+            while (!runningSerialCallsQueue.isEmpty()) {
+                runningSerialCallsQueue.remove(0).run();
             }
 
             // after finishing an event cycle there might be serial calls waiting
@@ -1382,6 +1384,11 @@ public final class Display extends CN1Constants {
                         ex.printStackTrace();
                     }
                 }
+                
+                while (!runningSerialCallsQueue.isEmpty()) {
+                    pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
+                }
+
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {
                      edtLoopImpl();
