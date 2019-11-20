@@ -39,6 +39,7 @@ import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ComponentStateChangeEvent;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
@@ -449,6 +450,7 @@ public class Component implements Animation, StyleListener, Editable {
     EventDispatcher pointerDraggedListeners;
     EventDispatcher dragFinishedListeners;
     EventDispatcher longPressListeners;
+    private EventDispatcher stateChangeListeners;
     boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
@@ -4934,6 +4936,32 @@ public class Component implements Animation, StyleListener, Editable {
         }
         dragFinishedListeners.addListener(l);
     }
+    
+    /**
+     * Adds a listener to be notified when the state of this component is changed
+     * to and from initialized.
+     * @param l Listener to be subscribed.
+     * @since 7.0
+     */
+    public void addStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
+        if (stateChangeListeners == null) {
+            stateChangeListeners = new EventDispatcher();
+        }
+        stateChangeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a listener from being notified when the state of this component is
+     * changed to and from initialized.
+     * @param l Listener to be unsubscribed.
+     * @since 7.0
+     */
+    public void removeStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
+        if (stateChangeListeners != null) {
+            stateChangeListeners.removeListener(l);
+        }
+    }
+    
     /**
      * Adds a listener to the pointer event
      *
@@ -5990,6 +6018,9 @@ public class Component implements Animation, StyleListener, Editable {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
             initComponent();
+            if (stateChangeListeners != null) {
+                stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, true));
+            }
             showNativeOverlay();
             if(refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
                 final Form p = getComponentForm();
@@ -6038,7 +6069,10 @@ public class Component implements Animation, StyleListener, Editable {
             Painter p = stl.getBgPainter();
             if(p instanceof BGPainter) {
                 ((BGPainter)p).radialCache = null;
-            }           
+            }
+            if (stateChangeListeners != null) {
+                stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
+            }
             deinitialize();
             if(refreshTaskDragListener != null) {
                 Form f = getComponentForm();
