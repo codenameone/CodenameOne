@@ -214,7 +214,7 @@ public abstract class ComponentAnimation {
                 return;
             }
             for(ComponentAnimation a : anims) {
-                a.updateState();
+                a.updateAnimationState();
             }
         }
         
