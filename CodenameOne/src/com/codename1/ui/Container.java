@@ -1000,9 +1000,9 @@ public class Container extends Component implements Iterable<Component>{
                 getAnimationManager().addAnimationAndBlock(anim);
             } else {
                 if(onFinish != null) {
-                    getAnimationManager().addAnimation(anim, onFinish);
+                    getAnimationManager().addUIMutation(this, anim, onFinish);
                 } else {
-                    getAnimationManager().addAnimation(anim);
+                    getAnimationManager().addUIMutation(this, anim);
                 }
             }
         }
@@ -3059,9 +3059,9 @@ public class Container extends Component implements Iterable<Component>{
                 getAnimationManager().addAnimationAndBlock(a);
             } else {
                 if(callback != null) {
-                    getAnimationManager().addAnimation(a, callback);
+                    getAnimationManager().addUIMutation(this, a, callback);
                 } else {
-                    getAnimationManager().addAnimation(a);
+                    getAnimationManager().addUIMutation(this, a);
                 }
             }
         }
@@ -3121,7 +3121,7 @@ public class Container extends Component implements Iterable<Component>{
             if(wait) {
                 getAnimationManager().addAnimationAndBlock(a);
             } else {
-                getAnimationManager().addAnimation(a);
+                getAnimationManager().addUIMutation(this, a);
             }
         } else {
             a.dontRevalidate = true;

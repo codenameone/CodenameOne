@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.io.Util;
 import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.animations.ComponentAnimation.UIMutation;
 import com.codename1.ui.events.ScrollListener;
 import java.util.ArrayList;
 
@@ -39,6 +40,7 @@ public final class AnimationManager {
     private final Form parentForm;
     private ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
     private ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
+    private ArrayList<UIMutation> uiMutations = new ArrayList<UIMutation>();
     
     AnimationManager(Form parentForm) {
         this.parentForm = parentForm;
@@ -61,6 +63,7 @@ public final class AnimationManager {
     }
     
     void updateAnimations() {
+        uiMutations.clear();
         if(anims.size() > 0) {
             ComponentAnimation c = anims.get(0);
             if(c.isInProgress()) {
@@ -82,6 +85,27 @@ public final class AnimationManager {
             anims.get(0).flush();
             anims.remove(0);
         }
+    }
+    
+    /**
+     * Adds a UIMutation to the animation manager.  If there are any current compatible
+     * UIMutations in the animation queue, then this mutation will be added to that mutation.
+     * Otherwise it will appended to the end of the queue to be run sequentially.
+     * @param container The container that is being mutated.
+     * @param an The animation
+     * @see UIMutation
+     * @since 7.0
+     */
+    public void addUIMutation(Container container, ComponentAnimation an) {
+        for (UIMutation existing : uiMutations) {
+            if (existing.add(container, an)) {
+                return;
+            }
+        }
+        UIMutation mut = new UIMutation(container, an);
+        uiMutations.add(mut);
+        addAnimation(mut);
+        
     }
     
     /**
@@ -121,6 +145,21 @@ public final class AnimationManager {
         an.setOnCompletion(callback);
         addAnimation(an);
         Display.getInstance().notifyDisplay();
+    }
+    
+    /**
+     * Adds a UIMutation to the animation manager.  If there are any current compatible
+     * UIMutations in the animation queue, then this mutation will be added to that mutation.
+     * Otherwise it will appended to the end of the queue to be run sequentially.
+     * @param container The container that is being mutated.
+     * @param an The animation
+     * @param callback A callback to be run on completion.
+     * @see UIMutation
+     * @since 7.0
+     */
+    public void addUIMutation(Container container, ComponentAnimation an, Runnable callback) {
+        an.setOnCompletion(callback);
+        addUIMutation(container, an);
     }
     
     /**
@@ -181,4 +220,5 @@ public final class AnimationManager {
             r.run();
         }
     }
+    
 }
