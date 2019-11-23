@@ -42,7 +42,19 @@ public class PlayServices_12_0_0 extends PlayServices {
 
     @Override
     public Location getLastKnownLocation(GoogleApiClient apiClient) {
-        return LocationServices.getFusedLocationProviderClient(AndroidNativeUtil.getContext()).getLastLocation().getResult();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                return LocationServices.getFusedLocationProviderClient(AndroidNativeUtil.getContext()).getLastLocation().getResult();
+            } catch (Throwable ex) {
+                try {
+                    return LocationServices.FusedLocationApi.getLastLocation(apiClient);
+                } catch (Throwable t) {
+                    return null;
+                }
+            }
+        } else {
+            return LocationServices.FusedLocationApi.getLastLocation(apiClient);
+        }
     }
 
     @Override
