@@ -2425,7 +2425,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @since 7.0
      */
     public static AsyncResource<Map<String, Object>> fetchJSONAsync(String url) {
-        final AsyncResource<Map<String, Object>> out = new AsyncResource<>();
+        final AsyncResource<Map<String, Object>> out = new AsyncResource<Map<String, Object>>();
         final ConnectionRequest cr = new ConnectionRequest();
         cr.setFailSilently(true);
         cr.setPost(false);
