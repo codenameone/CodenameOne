@@ -511,6 +511,7 @@ public class RoundBorder extends Border {
         g.setColor(color);
         g.setAlpha(opacity);
         if(!rectangle || width <= height) {
+            
             int x = 0; 
             int y = 0;
             int size = width;
@@ -530,13 +531,13 @@ public class RoundBorder extends Border {
             if(stroke && this.stroke != null) {
                 int sw = (int)Math.ceil((stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0);
                 GeneralPath arc = new GeneralPath();
-                arc.arc(x+sw/2, y+sw/2, size-2*sw, size-2*sw, 0, 2*Math.PI);
+                arc.arc(x+sw/2, y+sw/2, size-sw, size-sw, 0, 2*Math.PI);
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);
                 if(strokeAngle != 360) {
                     arc = new GeneralPath();
-                    arc.arc(x+sw/2, y+sw/2, size-2*sw, size-2*sw, Math.PI / 2, -Math.toRadians(strokeAngle));
+                    arc.arc(x+sw/2, y+sw/2, size-sw, size-sw, Math.PI / 2, -Math.toRadians(strokeAngle));
                 }
                 g.drawShape(arc, this.stroke);
             } else {
