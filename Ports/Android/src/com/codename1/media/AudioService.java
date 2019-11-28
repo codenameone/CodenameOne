@@ -37,6 +37,7 @@ import android.support.v4.media.session.MediaButtonReceiver;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import android.widget.Toast;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Component;
 import java.io.File;
 import java.io.FileInputStream;
@@ -111,7 +112,7 @@ public class AudioService extends Service  {
 
 
 
-    class BackgroundMedia implements Media, MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedListener,
+    class BackgroundMedia extends AbstractMedia implements MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedListener,
             MediaPlayer.OnErrorListener, MediaPlayer.OnSeekCompleteListener, MediaPlayer.OnInfoListener, MediaPlayer.OnBufferingUpdateListener {
 
         private MediaPlayer mediaPlayer = new MediaPlayer();
@@ -194,20 +195,25 @@ public class AudioService extends Service  {
 
         @Override
         public boolean onError(MediaPlayer mp, int what, int extra) {
-            switch (what) {
-                case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
-                    Toast.makeText(AudioService.this,
-                            "MEDIA ERROR NOT VALID FOR PROGRESSIVE PLAYBACK " + extra,
-                            Toast.LENGTH_SHORT).show();
-                    break;
-                case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
-                    Toast.makeText(AudioService.this, "MEDIA ERROR SERVER DIED " + extra,
-                            Toast.LENGTH_SHORT).show();
-                    break;
-                case MediaPlayer.MEDIA_ERROR_UNKNOWN:
-                    Toast.makeText(AudioService.this, "MEDIA ERROR UNKNOWN " + extra,
-                            Toast.LENGTH_SHORT).show();
-                    break;
+            MediaErrorEvent evt = fireMediaError(AndroidImplementation.createMediaException(extra));
+            fireMediaStateChange(State.Playing);
+            fireMediaStateChange(State.Paused);
+            if (!evt.isConsumed()) {
+                switch (what) {
+                    case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
+                        Toast.makeText(AudioService.this,
+                                "MEDIA ERROR NOT VALID FOR PROGRESSIVE PLAYBACK " + extra,
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                        Toast.makeText(AudioService.this, "MEDIA ERROR SERVER DIED " + extra,
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                        Toast.makeText(AudioService.this, "MEDIA ERROR UNKNOWN " + extra,
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                }
             }
             return false;
         }
@@ -243,7 +249,7 @@ public class AudioService extends Service  {
             }
         }
 
-        public void play() {
+        protected void playImpl() {
             if (released) return;
             for (BackgroundMedia bm : backgroundMedia.values()) {
                 try {
@@ -255,15 +261,17 @@ public class AudioService extends Service  {
             if (!mediaPlayer.isPlaying()) {
                 showPlayingNotification();
                 mediaPlayer.start();
+                fireMediaStateChange(State.Playing);
             }
         }
 
         @Override
-        public void pause() {
+        protected void pauseImpl() {
             if (released) return;
             if (mediaPlayer.isPlaying()) {
                 showPauseNotification();
                 mediaPlayer.pause();
+                fireMediaStateChange(State.Paused);
             }
         }
 

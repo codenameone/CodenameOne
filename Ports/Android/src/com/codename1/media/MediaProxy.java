@@ -24,29 +24,95 @@ package com.codename1.media;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.SuccessCallback;
 
 /**
  *
  * @author Chen
  */
-public class MediaProxy implements Media{
+public class MediaProxy extends AbstractMedia {
 
     private Media media;
+    private AsyncMedia asyncMedia;
+    
+    private ActionListener<MediaStateChangeEvent> stateChangeListener = new ActionListener<MediaStateChangeEvent> () {
+        
+        @Override
+        public void actionPerformed(MediaStateChangeEvent evt) {
+            fireMediaStateChange(evt.getNewState());
+        }
+        
+    };
+    
+    private ActionListener<MediaErrorEvent> errorListener = new ActionListener<MediaErrorEvent>() {
+        @Override
+        public void actionPerformed(MediaErrorEvent evt) {
+            fireMediaError(evt.getMediaException());
+        }
+        
+    };
     
     public MediaProxy(Media m) {
         this.media = m;
+        this.asyncMedia = MediaManager.getAsyncMedia(m);
+        asyncMedia.addMediaStateChangeListener(stateChangeListener);
+        asyncMedia.addMediaErrorListener(errorListener);
     }
     
     
     @Override
-    public void play() {
+    protected void playImpl() {
         media.play();
     }
 
     @Override
-    public void pause() {
+    public PlayRequest playAsync() {
+        final PlayRequest out = new PlayRequest();
+        PlayRequest req = asyncMedia.playAsync();
+        req.ready(new SuccessCallback<AsyncMedia>() {
+            @Override
+            public void onSucess(AsyncMedia value) {
+                out.complete(MediaProxy.this);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                out.error(value);
+            }
+        });
+        
+        return out;
+        
+    }
+    
+    
+
+    @Override
+    protected void pauseImpl() {
         media.pause();
     }
+
+    @Override
+    public PauseRequest pauseAsync() {
+        final PauseRequest out = new PauseRequest();
+        PauseRequest req = asyncMedia.pauseAsync();
+        req.ready(new SuccessCallback<AsyncMedia>() {
+            @Override
+            public void onSucess(AsyncMedia value) {
+                out.complete(MediaProxy.this);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                out.error(value);
+            }
+        });
+        
+        return out;
+    }
+    
+    
 
     @Override
     public void prepare() {
@@ -56,6 +122,7 @@ public class MediaProxy implements Media{
     @Override
     public void cleanup() {
         media.cleanup();
+        asyncMedia.removeMediaStateChangeListener(stateChangeListener);
     }
 
     @Override

@@ -83,6 +83,7 @@ import com.codename1.io.Preferences;
 import com.codename1.location.Geofence;
 import com.codename1.location.GeofenceListener;
 import com.codename1.location.LocationRequest;
+import com.codename1.media.AbstractMedia;
 import com.codename1.media.AudioBuffer;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
@@ -93,6 +94,7 @@ import com.codename1.push.PushAction;
 import com.codename1.push.PushActionCategory;
 import com.codename1.push.PushContent;
 import com.codename1.ui.Accessor;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Graphics;
@@ -3057,19 +3059,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if (redirectToAudioBuffer) {
             AudioBuffer buf = MediaManager.getAudioBuffer(path, true, 4096);
-            return new Media() {
+            return new AbstractMedia() {
                 long peer = nativeInstance.createAudioUnit(path, audioChannels, sampleRate, new float[64]);
                 boolean isPlaying;
                 @Override
-                public void play() {
+                protected void playImpl() {
                     isPlaying = true;
                     nativeInstance.startAudioUnit(peer);
+                    fireMediaStateChange(State.Playing);
                 }
 
                 @Override
-                public void pause() {
+                protected void pauseImpl() {
                     isPlaying = false;
                     nativeInstance.stopAudioUnit(peer);
+                    fireMediaStateChange(State.Paused);
                 }
 
                 @Override
@@ -3083,7 +3087,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         return;
                     }
                     if (isPlaying) {
-                        pause();
+                        pauseImpl();
                     }
                     
                     nativeInstance.destroyAudioUnit(peer);
@@ -3177,21 +3181,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (createAudioRecorderException != null) {
             throw createAudioRecorderException;
         }
-        return new Media() {
+        return new AbstractMedia() {
             private boolean playing;
             @Override
-            public void play() {
+            protected void playImpl() {
                 if(peer[0] != 0) {
                     nativeInstance.startAudioRecord(peer[0]);
                     playing = true;
+                    fireMediaStateChange(State.Playing);
                 }
             }
 
             @Override
-            public void pause() {
+            protected void pauseImpl() {
                 if(peer[0] != 0) {
                     nativeInstance.pauseAudioRecord(peer[0]);
                     playing = false;
+                    fireMediaStateChange(State.Paused);
                 }
             }
             
@@ -3205,6 +3211,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void cleanup() {
                 if(playing) {
                     nativeInstance.pauseAudioRecord(peer[0]);
+                    fireMediaStateChange(State.Paused);
                 }
                 nativeInstance.cleanupAudioRecord(peer[0]);
                 peer[0] = 0;
@@ -3461,7 +3468,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     // https://github.com/codenameone/CodenameOne/issues/2380
     private List<IOSMedia> activeMedia;
     
-    class IOSMedia implements Media {
+    class IOSMedia extends AbstractMedia {
         private String uri;
         private boolean isVideo;
         //private Runnable onCompletion;
@@ -3489,7 +3496,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     unmarkActive();
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
+                    
                 }
                 
             };
@@ -3510,7 +3519,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     unmarkActive();
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
+                    
                 }
                 
             };
@@ -3520,8 +3531,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                 try {
                     moviePlayerPeer = nativeInstance.createAudio(Util.readInputStream(stream), onCompletion);
                     nativeInstance.retainPeer(moviePlayerPeer);
-                } catch (IOException ex) {
+                } catch (final IOException ex) {
                     ex.printStackTrace();
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            fireMediaError(new MediaException(MediaErrorType.Network, ex));
+                        }
+                    });
                 }
             }
             
@@ -3577,7 +3593,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         @Override
-        public void play() {
+        protected void playImpl() {
             if(isVideo) {
                 if(component == null && nativePlayer) {
                     // Mass source of confusion.  If getVideoComponent() has been called, then
@@ -3596,7 +3612,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 moviePlayerPeer = nativeInstance.createNativeVideoComponent(data, onCompletionCallbackId);
                             }
                         } catch (IOException ex) {
-                            ex.printStackTrace();
+                            fireMediaError(new MediaException(MediaErrorType.Decode, ex));
                         }
                     }
                     nativeInstance.showNativePlayerController(moviePlayerPeer);
@@ -3609,6 +3625,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.playAudio(moviePlayerPeer);                
             }
             markActive();
+            fireMediaStateChange(State.Playing);
         }
 
         private void unmarkActive() {
@@ -3618,7 +3635,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         @Override
-        public void pause() {
+        protected void pauseImpl() {
             if(moviePlayerPeer != 0) {
                 if(isVideo) {
                     nativeInstance.pauseVideoComponent(moviePlayerPeer);
@@ -3627,6 +3644,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             unmarkActive();
+            fireMediaStateChange(State.Paused);
         }
 
         public void prepare() {
@@ -3735,6 +3753,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                     } catch (IOException ex) {
                         ex.printStackTrace();
+                        fireMediaError(new MediaException(MediaErrorType.Decode, ex));
                         return new Label("Error loading video " + ex);
                     }
                 }

@@ -129,6 +129,10 @@ import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.*;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.media.AbstractMedia;
+import com.codename1.media.AsyncMedia;
+import com.codename1.media.AsyncMedia.MediaErrorType;
+import com.codename1.media.AsyncMedia.MediaException;
 import com.codename1.media.Audio;
 import com.codename1.media.AudioService;
 import com.codename1.media.BackgroundAudioService;
@@ -184,6 +188,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -3368,11 +3373,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         Media ret = new MediaProxy(background.getMedia(mediaId)) {
 
-            @Override
-            public void play() {
-                super.play();
-            }
-
+            
             @Override
             public void cleanup() {
                 super.cleanup();
@@ -3616,54 +3617,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     AudioFormat.ENCODING_PCM_16BIT,
                                     AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)
                             );
+                            
                             final com.codename1.media.AudioBuffer audioBuffer = com.codename1.media.MediaManager.getAudioBuffer(path, true, 64);
                             final boolean[] stop = new boolean[1];
 
-                            record[0] = new Media() {
+                            record[0] = new AbstractMedia() {
                                 private int lastTime;
                                 private boolean isRecording;
                                 @Override
-                                public void play() {
+                                protected void playImpl() {
+                                    if (isRecording) {
+                                        return;
+                                    }
                                     isRecording = true;
                                     recorder.startRecording();
+                                    fireMediaStateChange(State.Playing);
                                     new Thread(new Runnable() {
                                         public void run() {
                                             float[] audioData = new float[audioBuffer.getMaxSize()];
-                                            short[] buffer = new short[AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)];
+                                            short[] buffer = new short[AudioRecord.getMinBufferSize(recorder.getSampleRate(), recorder.getChannelCount(), AudioFormat.ENCODING_PCM_16BIT)];
                                             int read = -1;
                                             int index = 0;
-                                            while (isRecording) {
-                                                while ((read = recorder.read(buffer, 0, buffer.length)) > 0) {
-                                                    if (read > 0) {
-                                                        for (int i=0; i<read; i++) {
-                                                            audioData[index] = ((float)buffer[i]) / 0x8000;
-                                                            index++;
-                                                            if (index >= audioData.length) {
-                                                                audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
-                                                                index = 0;
-                                                            }
-                                                        }
-                                                        if (index > 0) {
+                                            
+                                            while (isRecording && (read = recorder.read(buffer, 0, buffer.length)) >= 0) {
+                                                if (read > 0) {
+                                                    for (int i=0; i<read; i++) {
+                                                        audioData[index] = ((float)buffer[i]) / 0x8000;
+                                                        index++;
+                                                        if (index >= audioData.length) {
                                                             audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
                                                             index = 0;
                                                         }
-                                                        System.out.println("Time is "+getTime());
-                                                    } else {
-                                                        System.out.println("read 0");
+                                                    }
+                                                    if (index > 0) {
+                                                        audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
+                                                        index = 0;
                                                     }
                                                 }
-                                                System.out.println("Time is "+getTime());
                                             }
+
                                         }
 
                                     }).start();
                                 }
 
                                 @Override
-                                public void pause() {
-
-                                    recorder.stop();
+                                protected void pauseImpl() {
+                                    if (!isRecording) {
+                                        return;
+                                    }
                                     isRecording = false;
+                                    recorder.stop();
+
+
+                                    fireMediaStateChange(State.Paused);
                                 }
 
                                 @Override
@@ -3673,7 +3680,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 @Override
                                 public void cleanup() {
-                                    pause();
+                                    pauseImpl();
+                                    recorder.release();
                                     com.codename1.media.MediaManager.deleteAudioBuffer(path);
                                     
                                 }
@@ -7051,11 +7059,50 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return response[0];
     }
 
+    public static MediaException createMediaException(int extra) {
+        MediaErrorType type;
+        String message;
+        switch (extra) {
+
+            case MediaPlayer.MEDIA_ERROR_IO:
+                type = MediaErrorType.Network;
+                message = "IO error";
+                break;
+            case MediaPlayer.MEDIA_ERROR_MALFORMED:
+                type = MediaErrorType.Decode;
+                message = "Media was malformed";
+                break;
+            case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
+                type = MediaErrorType.SrcNotSupported;
+                message = "Not valie for progressive playback";
+                break;
+            case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                type = MediaErrorType.Network;
+                message = "Server died";
+                break;
+            case MediaPlayer.MEDIA_ERROR_TIMED_OUT:
+                type = MediaErrorType.Network;
+                message = "Timed out";
+                break;
+
+            case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                type = MediaErrorType.Network;
+                message = "Unknown error";
+                break;
+            case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
+                type = MediaErrorType.SrcNotSupported;
+                message = "Unsupported media";
+                break;
+            default:
+                type = MediaErrorType.Network;
+                message = "Unknown error";
+        }
+        return new MediaException(type, message);
+    }
 
 
-
-    public class Video extends AndroidImplementation.AndroidPeer implements Media {
-
+    public class Video extends AndroidImplementation.AndroidPeer implements AsyncMedia {
+        
         private VideoView nativeVideo;
         private Activity activity;
         private boolean fullScreen = false;
@@ -7064,6 +7111,170 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean nativePlayer;
         private Form curentForm;
         private List<Runnable> completionHandlers;
+        private final EventDispatcher errorListeners = new EventDispatcher();
+        
+        private final EventDispatcher stateChangeListeners = new EventDispatcher();
+        private PlayRequest pendingPlayRequest;
+        private PauseRequest pendingPauseRequest;
+
+        @Override
+        public State getState() {
+            if (isPlaying()) {
+                return State.Playing;
+            } else {
+                return State.Paused;
+            }
+        }
+        
+        protected void fireMediaStateChange(State newState) {
+            if (stateChangeListeners.hasListeners() && newState != getState()) {
+                stateChangeListeners.fireActionEvent(new MediaStateChangeEvent(this, getState(), newState));
+            }
+        }
+        
+        @Override
+        public void addMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l) {
+            
+            stateChangeListeners.addListener(l);
+        }
+        
+        @Override
+        public void removeMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l) {
+            
+            stateChangeListeners.removeListener(l);
+        }
+        
+        @Override
+        public void addMediaErrorListener(ActionListener<MediaErrorEvent> l) {
+            errorListeners.addListener(l);
+        }
+        
+        @Override
+        public void removeMediaErrorListener(ActionListener<MediaErrorEvent> l) {
+            errorListeners.removeListener(l);
+        }
+        
+        @Override
+        public PlayRequest playAsync() {
+            final PlayRequest out = new PlayRequest();
+            out.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (out == pendingPlayRequest) {
+                        pendingPlayRequest = null;
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (out == pendingPlayRequest) {
+                        pendingPlayRequest = null;
+                    }
+                }
+            });
+            ;
+            if (pendingPlayRequest != null) {
+                pendingPlayRequest.ready(new SuccessCallback<AsyncMedia>() {
+                    @Override
+                    public void onSucess(AsyncMedia value) {
+                        if (!out.isDone()) {
+                            out.complete(value);
+                        }
+                    }
+                }).except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable value) {
+                        if (!out.isDone()) {
+                            out.error(value);
+                        }
+                    }
+                });
+                return out;
+            } else {
+                pendingPlayRequest = out;
+            }
+            
+            ActionListener<MediaStateChangeEvent> onStateChange = new ActionListener<MediaStateChangeEvent>() {
+                @Override
+                public void actionPerformed(MediaStateChangeEvent evt) {
+                    stateChangeListeners.removeListener(this);
+                    if (!out.isDone()) {
+                        if (evt.getNewState() == State.Playing) {
+                            out.complete(Video.this);
+                        }
+                    }
+                    
+                }
+                
+            };
+            
+            stateChangeListeners.addListener(onStateChange);
+            play();
+            
+            return out;
+            
+        }
+        
+        @Override
+        public PauseRequest pauseAsync() {
+            final PauseRequest out = new PauseRequest();
+            out.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (out == pendingPauseRequest) {
+                        pendingPauseRequest = null;
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (out == pendingPauseRequest) {
+                        pendingPauseRequest = null;
+                    }
+                }
+            });
+            ;
+            if (pendingPauseRequest != null) {
+                pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
+                    @Override
+                    public void onSucess(AsyncMedia value) {
+                        if (!out.isDone()) {
+                            out.complete(value);
+                        }
+                    }
+                }).except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable value) {
+                        if (!out.isDone()) {
+                            out.error(value);
+                        }
+                    }
+                });
+                return out;
+            } else {
+                pendingPauseRequest = out;
+            }
+            
+            ActionListener<MediaStateChangeEvent> onStateChange = new ActionListener<MediaStateChangeEvent>() {
+                @Override
+                public void actionPerformed(MediaStateChangeEvent evt) {
+                    stateChangeListeners.removeListener(this);
+                    if (!out.isDone()) {
+                        if (evt.getNewState() == State.Paused) {
+                            out.complete(Video.this);
+                        }
+                    }
+                    
+                }
+                
+            };
+            
+            stateChangeListeners.addListener(onStateChange);
+            play();
+            
+            return out;
+        }
+        
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
             super(new RelativeLayout(activity));
@@ -7086,6 +7297,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer arg0) {
+                    fireMediaStateChange(State.Paused);
+                    
                     fireCompletionHandlers();
                 }
             });
@@ -7096,13 +7309,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
+                    errorListeners.fireActionEvent(new MediaErrorEvent(Video.this, createMediaException(extra)));
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
+                    
                     return false;
                 }
             });
 
         }
-
+        
+        
         
         private void fireCompletionHandlers() {
             if (completionHandlers != null && !completionHandlers.isEmpty()) {
@@ -7183,12 +7400,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 f.show();
             }
             nativeVideo.start();
+            fireMediaStateChange(State.Playing);
         }
 
         @Override
         public void pause() {
             if(nativeVideo != null && nativeVideo.canPause()){
                 nativeVideo.pause();
+                fireMediaStateChange(State.Paused);
             }
         }
 
@@ -7196,6 +7415,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void cleanup() {
             if(nativeVideo != null) {
                 nativeVideo.stopPlayback();
+                fireMediaStateChange(State.Paused);
             }
             nativeVideo = null;
             if (nativePlayer && curentForm != null) {
@@ -7380,6 +7600,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return null;
         }
 
+        @Override
+        public void addMediaCompletionHandler(Runnable onComplete) {
+            addCompletionHandler(onComplete);
+        }
+
+        
+        
         private void addCompletionHandler(Runnable onCompletion) {
             synchronized(this) {
                 if (completionHandlers == null) {
@@ -7396,6 +7623,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
+
+      
     }
 
 
