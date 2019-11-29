@@ -4646,6 +4646,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             return ((JTextComponent) c).getCaretPosition();
         }
     }
+
+    @Override
+    public boolean nativeEditorPaintsHint() {
+        return false;
+    }
+    
+    
     
     public void editStringLegacy(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
         checkEDT();
@@ -4867,6 +4874,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
                     public void repaint(long tm, int x, int y, int width, int height) {
+                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        Rectangle bounds;
+                        if (getSkin() != null) {
+                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                        } else {
+                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        }
+                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
+                            textCmp.setBounds(bounds);
+                        }
+
+                        
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 cmp.repaint();
@@ -4877,11 +4903,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 t = new JTextField() {
                     public void repaint(long tm, int x, int y, int width, int height) {
+                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        Rectangle bounds;
+                        if (getSkin() != null) {
+                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                        } else {
+                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        }
+                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
+                            textCmp.setBounds(bounds);
+                        }
+
+                        
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 cmp.repaint();
                             }
                         });
+                        
                     }
                 };
                 
@@ -5009,10 +5055,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
+            System.out.println("Set bounds to "+textCmp.getBounds());
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+            System.out.println("Set bounds to "+textCmp.getBounds());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {

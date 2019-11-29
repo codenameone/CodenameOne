@@ -376,6 +376,10 @@ public abstract class CodenameOneImplementation {
      */
     public abstract void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode);
 
+    public boolean nativeEditorPaintsHint() {
+        return true;
+    }
+    
     /**
      * Returns true if we are currently editing a component
      * @return whether a component is being edited
