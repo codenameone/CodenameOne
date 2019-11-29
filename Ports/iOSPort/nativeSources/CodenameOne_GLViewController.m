@@ -321,14 +321,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.tintColor = UIColorFromRGB(color, 255);
             if(hintString != nil) {
                 utf.placeholder = hintString;
-                
-                // On IOS13, we cange set the placeholder lable color
-                // via KVC, because it gives a prohibited error.
-                // Instead we use runtime as described at https://stackoverflow.com/a/56776561
-                Ivar ivar =  class_getInstanceVariable([UITextField class], "_placeholderLabel");
-                UILabel *placeholderLabel = object_getIvar(utf, ivar);
-
-                placeholderLabel.textColor = UIColorFromRGB(hintColor, 255);
+                utf.attributedPlaceholder = [[NSAttributedString alloc] initWithString:hintString attributes:[NSDictionary dictionaryWithObject:UIColorFromRGB(hintColor, 255) forKey:NSForegroundColorAttributeName]];
             }
             
             // INITIAL_CAPS_WORD
