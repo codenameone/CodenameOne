@@ -1241,6 +1241,9 @@ public class TextArea extends Component {
     public void paint(Graphics g) {
 
         if(Display.getInstance().isNativeEditorVisible(this)) {
+            if (!Display.impl.nativeEditorPaintsHint()) {
+                paintHint(g);
+            }
             return;
         }
         
@@ -1249,7 +1252,7 @@ public class TextArea extends Component {
     }
 
     void paintHint(Graphics g) {
-        if(Display.getInstance().isNativeEditorVisible(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
             return;
         }
         super.paintHint(g);
