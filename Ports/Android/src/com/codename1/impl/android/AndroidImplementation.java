@@ -4615,6 +4615,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return false;
                             }
                         });
+                        
+                        if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false")) ) {
+                            wv.setWebContentsDebuggingEnabled(true); 
+                        }
                         wv.getSettings().setDomStorageEnabled(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);

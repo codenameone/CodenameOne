@@ -73,7 +73,11 @@ import java.util.Vector;
  * <script src="https://gist.github.com/codenameone/20b6a17463152f90ebbb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-browsercomponent.png" alt="Simple usage of BrowserComponent" />
  * 
+ * <h3>Debugging on Android</h3>
  * 
+ * <p>You can use <a href="https://developers.google.com/web/tools/chrome-devtools/remote-debugging/webviews">Chrome's remote debugging features</a> to debug the contents of a BrowserComponent.  On Android 4.4 (KitKat)
+ * and higher, you will need to define the "android.webContentsDebuggingEnabled" display property in order for this to work.  You can define this inside your app's init() method:</p>
+ * <code><pre>Display.getInstance().setProperty("android.webContentsDebuggingEnabled", "true");</pre></code>
  * @author Shai Almog
  */
 public class BrowserComponent extends Container {
@@ -474,6 +478,7 @@ public class BrowserComponent extends Container {
         
         s = getUnselectedStyle();
         s.setPadding(0, 0, 0, 0);
+        
         addWebEventListener(onStart, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
@@ -481,6 +486,7 @@ public class BrowserComponent extends Container {
             }
             
         });
+        
     }
     
     private final Object readyLock = new Object();

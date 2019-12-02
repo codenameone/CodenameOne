@@ -48,7 +48,8 @@ public class BrowserComponentPostMessageSample {
             }
             Log.sendLogAsync();
             Dialog.show("Connection Error", "There was a networking error in the connection to " + err.getConnectionRequest().getUrl(), "OK", null);
-        });        
+        });
+        Display.getInstance().setProperty("android.webContentsDebuggingEnabled", "true");
     }
     
     public void start() {
