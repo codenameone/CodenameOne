@@ -404,7 +404,13 @@ public class RequestBuilder {
         CN.addToQueueAndWait(request);
         Response res = null;
         try {
-            res = new Response(request.getResponseCode(), new String(request.getResponseData(), "UTF-8"), request.getResponseErrorMessage());
+            byte[] respData = request.getResponseData();
+            String resp = null;
+            if(respData != null) {
+                resp = new String(respData, "UTF-8");
+            }
+            res = new Response(request.getResponseCode(), resp, 
+                request.getResponseErrorMessage());
         } catch (UnsupportedEncodingException ex) {
             ex.printStackTrace();
         }
