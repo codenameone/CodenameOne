@@ -10,6 +10,7 @@ package com.codename1.designer.css;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import com.codename1.designer.css.CSSTheme.WebViewProvider;
+import com.codename1.io.Util;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -35,8 +36,11 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -90,16 +94,140 @@ public class CN1CSSCLI extends Application {
         startImpl(stage);
     }
     
+    public static boolean mergeMode;
     public static boolean watchmode;
     private static Thread watchThread;
-    public static void main(String[] args) throws Exception {
-        
-        String inputPath = "test.css";
-        
+    
+    private static String getInputFile(String[] args) {
         if (args.length > 0) {
-            inputPath = args[0];
+            return args[0];
+        } else {
+            return "test.css";
         }
+    }
+    
+    private static Properties loadProjectProperties(File projectDir) throws IOException {
+        
+        Properties out = new Properties();
+        try (FileInputStream fis = new FileInputStream(new File(projectDir, "codenameone_settings.properties"))) {
+            out.load(fis);
+        };
+        return out;
+    }
+    
+    private static boolean isMergeMode(String[] args) {
+        String inputFile = getInputFile(args);
+        File f = new File(inputFile);
+        if (!"theme.css".equals(f.getName())) {
+            return false;
+        }
+        try {
+            File projectDir = getProjectDir(f);
+            Properties props = loadProjectProperties(projectDir);
+            return "true".equals(props.getProperty("codename1.cssTheme"));
             
+        } catch (IOException ex) {
+            
+            return false;
+        }
+        
+    }
+    
+    private static String prefixUrls(String contents, String prefix) {
+        
+        contents = contents.replaceAll("url\\(\"(.*?)\"\\)", "url($1)");
+        contents = contents.replaceAll("url\\('(.*?)'\\)", "url($1)");
+        contents = contents.replaceAll("url\\((.*?://.*?)\\)", "url(\"$1\")");
+        contents = contents.replaceAll("url\\((/.*?)\\)", "url(\"$1\")");
+        //contents = contents.replaceAll("url\\(((?!(.*://)).*?)?\\)", "url("+prefix+"$1)");
+        contents = contents.replaceAll("url\\(([^\\\"\'].*?)\\)", "url(\""+prefix+"$1\")");
+        return contents;
+    }
+    
+    private static void updateMergeFile(File inputFile, File mergedFile) throws IOException {
+        System.out.println("Updating merge file "+mergedFile);
+        List<File> libCSSFiles = findLibCSSFiles(inputFile);
+        boolean changed = false;
+        if (!mergedFile.exists() || mergedFile.lastModified() < inputFile.lastModified()) {
+            changed = true;
+        }
+        if (!changed) {
+            for (File f : libCSSFiles) {
+                if (mergedFile.lastModified() < f.lastModified()) {
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        StringBuilder buf = new StringBuilder();
+        for (File f : libCSSFiles) {
+            String contents;
+            System.out.println("Merging "+f);
+            try (FileInputStream fis = new FileInputStream(f)) {
+                byte[] buffer = new byte[(int)f.length()];
+                fis.read(buffer);
+                contents = new String(buffer, "UTF-8");
+            }
+            contents = prefixUrls(contents, "../lib/impl/css/"+f.getParentFile().getName()+"/");
+            buf.append("\n/* "+f.getAbsolutePath()+" */\n").append(contents).append("\n/* end "+f.getAbsolutePath()+"*/\n");
+        }
+        
+        try (FileInputStream fis = new FileInputStream(inputFile)) {
+            buf.append("\n/* ").append(inputFile.getAbsolutePath()).append(" */\n");
+            byte[] buffer = new byte[(int)inputFile.length()];
+            fis.read(buffer);
+            String fileContents = new String(buffer, "UTF-8");
+            buf.append(fileContents);
+            buf.append("\n/* End ").append(inputFile.getAbsolutePath()).append(" */\n");
+        }
+        
+        try (FileOutputStream fos = new FileOutputStream(mergedFile)) {
+            fos.write(buf.toString().getBytes("UTF-8"));
+        }
+        
+        
+        
+    }
+    
+    private static File getProjectDir(File inputFile) throws IOException {
+        return inputFile.getCanonicalFile().getParentFile().getParentFile();
+        
+    }
+    
+    private static File getLibCSSDirectory(File inputFile) throws IOException {
+        
+        return new File(getProjectDir(inputFile), 
+                "lib" + File.separator + "impl" +File.separator + "css"
+        );
+    }
+    
+    private static List<File> findLibCSSFiles(File inputFile) throws IOException {
+        ArrayList<File> out = new ArrayList<>();
+        File cssDir = getLibCSSDirectory(inputFile);
+        for (File child : cssDir.listFiles()) {
+            if (child.isDirectory()) {
+                File themeCss = new File(child, "theme.css");
+                if (themeCss.exists()) {
+                    out.add(themeCss);
+                }
+            }
+        }
+        return out;
+       
+    }
+    
+    public static void main(String[] args) throws Exception {
+        mergeMode = isMergeMode(args);
+        String inputPath = getInputFile(args);
+        
+        String mergedFile = mergeMode ? inputPath + ".merged" : inputPath;
+        if (mergeMode) {
+            updateMergeFile(new File(inputPath), new File(mergedFile));
+        }
+        
         String outputPath = inputPath+".res";
         
         if (args.length > 1) {
@@ -185,7 +313,13 @@ public class CN1CSSCLI extends Application {
                                 watcher.poll();
                                 try {
                                     System.out.println("Changed detected in "+inputFile+".  Recompiling");
-                                    compile(inputFile, outputFile);
+                                    if (mergeMode) {
+                                        updateMergeFile(new File(inputPath), new File(mergedFile));
+                                        compile(new File(mergedFile), outputFile);
+                                    } else {
+                                        compile(inputFile, outputFile);
+                                    }
+                                    
                                     System.out.println("CSS file successfully compiled.  "+outputFile);
                                     System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
                                 } catch (Throwable t) {
@@ -214,7 +348,12 @@ public class CN1CSSCLI extends Application {
                                     if (inputFile.equals(changedFile)) {
                                         try {
                                             System.out.println("Changed detected in "+inputFile+".  Recompiling");
-                                            compile(inputFile, outputFile);
+                                            if (mergeMode) {
+                                                updateMergeFile(new File(inputPath), new File(mergedFile));
+                                                compile(new File(mergedFile), outputFile);
+                                            } else {
+                                                compile(inputFile, outputFile);
+                                            }
                                             System.out.println("CSS file successfully compiled.  "+outputFile);
                                             System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
                                         } catch (Throwable t) {
@@ -244,7 +383,11 @@ public class CN1CSSCLI extends Application {
             
         }
         try {
-            compile(inputFile, outputFile);
+            if (mergeMode) {
+                compile(new File(mergedFile), outputFile);
+            } else {
+                compile(inputFile, outputFile);
+            }
             System.out.println("CSS file successfully compiled.  "+outputFile);
         } catch (Throwable t) {
             t.printStackTrace();
