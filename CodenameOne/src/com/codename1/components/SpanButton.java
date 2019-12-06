@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>
@@ -434,17 +435,25 @@ public class SpanButton extends Container {
 
     @Override
     protected Dimension calcPreferredSize() {
+        
         int w = getWidth();
         int h = getHeight();
-        Dimension dim = super.calcPreferredSize();
-        setWidth(dim.getWidth());
-        setHeight(dim.getHeight());
-        setShouldCalcPreferredSize(true);
-        
-        dim = super.calcPreferredSize();
+        Dimension d = getLayout().getPreferredSize(this);
+        setWidth(d.getWidth());
+        setHeight(d.getHeight());
+        d = getLayout().getPreferredSize(this);
+        Style style = getStyle();
+        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
+            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
+        }
+        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
         setWidth(w);
         setHeight(h);
-        return dim;
+        return d;
     }
     
     
