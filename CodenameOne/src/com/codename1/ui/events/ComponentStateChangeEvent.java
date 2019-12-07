@@ -20,29 +20,37 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import <Foundation/Foundation.h>
-#import "xmlvm.h"
+package com.codename1.ui.events;
 
-#import <AudioToolbox/AudioQueue.h>
+import com.codename1.ui.Component;
 
-@interface CN1AudioUnit : NSObject  {
-    AudioBuffer * buff;
-    AudioQueueRef queue;
-    AudioStreamBasicDescription  fmt;
-    NSThread *evtThread;
-    JAVA_ARRAY convertedSampleBuffer;
-    NSString* path;
-    int channels;
-    float sampleRate;
+/**
+ * An event that is fired when the state of a component is changed to and from initialized.
+ * @see Component#addStateChangeListener(com.codename1.ui.events.ActionListener) 
+ * @see Component#removeStateChangeListener(com.codename1.ui.events.ActionListener) 
+ * @author shannah
+ */
+public class ComponentStateChangeEvent extends ActionEvent {
+    private boolean initialized;
+    
+    /**
+     * Creates a ComponentStateChangeEvent.
+     * @param source The component whose state has changed.
+     * @param initialized True if the component state changed to initialized.  False otherwise.
+     */
+    public ComponentStateChangeEvent(Component source, boolean initialized) {
+        super(source);
+        this.initialized = initialized;
+    }
+    
+    /**
+     * Indicates if the component state is initialized.
+     * @return True if the component state changed to initialized.
+     */
+    public boolean isInitialized() {
+        return initialized;
+    }
+    
+    
+    
 }
--(id)initWithPath:(NSString*)path channels:(int)channels sampleRate:(float)sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer;
--(BOOL)start;
--(BOOL)stop;
--(AudioBuffer*)audioBuffer;
--(AudioQueueRef)queue;
--(AudioStreamBasicDescription)fmt;
--(NSString*)path;
--(JAVA_ARRAY)convertedSampleBuffer;
--(float)sampleRate;
--(int)channels;
-@end

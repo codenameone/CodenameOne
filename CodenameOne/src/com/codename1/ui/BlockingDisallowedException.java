@@ -20,29 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import <Foundation/Foundation.h>
-#import "xmlvm.h"
+package com.codename1.ui;
 
-#import <AudioToolbox/AudioQueue.h>
-
-@interface CN1AudioUnit : NSObject  {
-    AudioBuffer * buff;
-    AudioQueueRef queue;
-    AudioStreamBasicDescription  fmt;
-    NSThread *evtThread;
-    JAVA_ARRAY convertedSampleBuffer;
-    NSString* path;
-    int channels;
-    float sampleRate;
+/**
+ * Exception that is thrown if attempting to run invokeAndBlock while blocking is disabled.  This exception is thrown
+ * by {@link Display#invokeAndBlock(java.lang.Runnable) } if blocking is currently disabled.  Blocking is
+ * disabled on any code run inside the {@link Display#invokeWithoutBlocking(java.lang.Runnable) } method, which will propagate
+ * this exception if {@link Display#invokeAndBlock(java.lang.Runnable) } throws this exception.
+ * 
+ * @author shannah
+ * @since 7.0
+ * @see Display#invokeWithoutBlocking(java.lang.Runnable) 
+ * @see Display#invokeAndBlock(java.lang.Runnable) 
+ * @see Display#invokeAndBlock(java.lang.Runnable, boolean) 
+ */
+public class BlockingDisallowedException extends IllegalStateException {
+    public BlockingDisallowedException() {
+        super("Attempt to run invokeAndBlock while blocking is disabled.");
+    }
 }
--(id)initWithPath:(NSString*)path channels:(int)channels sampleRate:(float)sampleRate sampleBuffer:(JAVA_ARRAY)sampleBuffer;
--(BOOL)start;
--(BOOL)stop;
--(AudioBuffer*)audioBuffer;
--(AudioQueueRef)queue;
--(AudioStreamBasicDescription)fmt;
--(NSString*)path;
--(JAVA_ARRAY)convertedSampleBuffer;
--(float)sampleRate;
--(int)channels;
-@end

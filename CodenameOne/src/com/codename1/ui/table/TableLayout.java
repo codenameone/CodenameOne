@@ -624,7 +624,16 @@ public class TableLayout extends Layout {
 
                             // for RTL we need to move the component to the side so spanning will work
                             if(rtl) {
-                                conX = left + leftMargin + columnPositions[c + con.spanHorizontal - 1];
+                                int spanEndPos = c + con.spanHorizontal - 1;
+                                
+                                if (spanEndPos < 0) {
+                                    spanEndPos = 0;
+                                } else if (spanEndPos > clen - 1) {
+                                    spanEndPos = clen-1;
+                                    
+                                } 
+                                conX = left + leftMargin + columnPositions[spanEndPos];
+                                
                             }
                             conW = w - leftMargin - componentStyle.getMarginLeft(parent.isRTL());
                         } else {

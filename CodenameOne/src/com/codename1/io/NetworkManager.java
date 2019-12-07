@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -623,6 +624,53 @@ public class NetworkManager {
         userHeaders.put(key, value);
     }
 
+    /**
+     * Identical to add to queue but returns an AsyncResource object that will resolve to
+     * the ConnectionRequest.
+     * 
+     * @param request the request object to add.
+     * @return AsyncResource resolving to the connection request on complete.
+     * @since 7.0
+     */
+    public AsyncResource<ConnectionRequest> addToQueueAsync(final ConnectionRequest request) {
+        final AsyncResource<ConnectionRequest> out = new AsyncResource<ConnectionRequest>();
+        class WaitingClass implements ActionListener<NetworkEvent> {
+            
+
+            public void actionPerformed(NetworkEvent e) {
+                if(e.getError() != null) {
+                    
+                    removeProgressListener(this);
+                    removeErrorListener(this);
+                    if (!out.isDone()) {
+                        out.error(e.getError());
+                    }
+                    return;
+                }
+                if(e.getConnectionRequest() == request) {
+                    if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                        if(request.retrying) {
+                            request.retrying = false;
+                            return;
+                        }
+                        
+                        removeProgressListener(this);
+                        removeErrorListener(this);
+                        if (!out.isDone()) {
+                            out.complete(request);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+        WaitingClass w = new WaitingClass();
+        addProgressListener(w);
+        addErrorListener(w);
+        addToQueue(request);
+        return out;
+    }
+    
     /**
      * Identical to add to queue but waits until the request is processed in the queue,
      * this is useful for completely synchronous operations. 

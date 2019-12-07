@@ -102,6 +102,7 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
+import com.codename1.media.AbstractMedia;
 import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
@@ -4645,6 +4646,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             return ((JTextComponent) c).getCaretPosition();
         }
     }
+
+    @Override
+    public boolean nativeEditorPaintsHint() {
+        return false;
+    }
+    
+    
     
     public void editStringLegacy(final Component cmp, int maxSize, int constraint, String text, int keyCode) {
         checkEDT();
@@ -4866,6 +4874,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
                     public void repaint(long tm, int x, int y, int width, int height) {
+                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        Rectangle bounds;
+                        if (getSkin() != null) {
+                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                        } else {
+                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        }
+                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
+                            textCmp.setBounds(bounds);
+                        }
+
+                        
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 cmp.repaint();
@@ -4876,11 +4903,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 t = new JTextField() {
                     public void repaint(long tm, int x, int y, int width, int height) {
+                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        Rectangle bounds;
+                        if (getSkin() != null) {
+                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                        } else {
+                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        }
+                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
+                            textCmp.setBounds(bounds);
+                        }
+
+                        
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 cmp.repaint();
                             }
                         });
+                        
                     }
                 };
                 
@@ -5008,10 +5055,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
+            System.out.println("Set bounds to "+textCmp.getBounds());
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+            System.out.println("Set bounds to "+textCmp.getBounds());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
@@ -9837,7 +9886,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
     
-    class CodenameOneMediaPlayer implements Media {
+    class CodenameOneMediaPlayer extends AbstractMedia {
 
         private Runnable onCompletion;
         private List<Runnable> completionHandlers;
@@ -9858,7 +9907,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    if (callback != null && !callback.isDone()) {
+                        callback.complete(CodenameOneMediaPlayer.this);
+                    }
                     playing = false;
+                    
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
                 }
                 
@@ -9893,19 +9947,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
                 player.setOnReady(new Runnable() {
                     public void run() {
-                        if (callback != null) {
+                        if (callback != null && !callback.isDone()) {
                             callback.complete(CodenameOneMediaPlayer.this);
                         }
                     }
                 });
+
                 player.setOnPaused(new Runnable() {
                     public void run() {
                         playing = false;
+                        fireMediaStateChange(State.Paused);
                     }
                 });
                 player.setOnPlaying(new Runnable() {
                     public void run() {
                         playing = true;
+                        fireMediaStateChange(State.Playing);
                     }
                 });
                 
@@ -9915,16 +9972,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 player.setOnError(new Runnable() {
                     public void run() {
-                        if (callback != null) {
+                        if (callback != null && !callback.isDone()) {
                             callback.error(player.errorProperty().get());
+                            return;
                         } else {
                             Log.e(player.errorProperty().get());
                         }
+                        fireMediaError(createMediaException(player.errorProperty().get()));
+                        if (!playing) {
+                            fireMediaStateChange(State.Playing);
+                            fireMediaStateChange(State.Paused);
+                        }
+                        
                     }
                 });
 
             } catch (Exception ex) {
-                if (callback != null) {
+                if (callback != null && !callback.isDone()) {
                     callback.error(ex);
                 } else {
                     ex.printStackTrace();
@@ -9933,6 +9997,40 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        private com.codename1.media.AsyncMedia.MediaException createMediaException(javafx.scene.media.MediaException ex) {
+            MediaErrorType type;
+            switch (ex.getType()) {
+                case MEDIA_CORRUPTED:
+                    type = MediaErrorType.Decode;
+                    break;
+                case MEDIA_INACCESSIBLE:
+                case MEDIA_UNAVAILABLE:
+                    type = MediaErrorType.Network;
+                    break;
+                case MEDIA_UNSUPPORTED:
+                    type = MediaErrorType.SrcNotSupported;
+                    break;
+                case MEDIA_UNSPECIFIED:
+                    type = MediaErrorType.Unknown;
+                    break;
+                case OPERATION_UNSUPPORTED:
+                    type = MediaErrorType.SrcNotSupported;
+                    break;
+                case PLAYBACK_ERROR:
+                    type = MediaErrorType.Decode;
+                    break;
+                case PLAYBACK_HALTED:
+                    type = MediaErrorType.Aborted;
+                    break;
+                //case UNKNOWN:
+                default:
+                    type = MediaErrorType.Unknown;
+                    break;
+                    
+            }
+            return new com.codename1.media.AsyncMedia.MediaException(type, ex);
+        }
+        
         public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             String suffix = "";
             if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
@@ -10003,8 +10101,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 player.setOnPlaying(new Runnable() {
                     public void run() {
                         playing = true;
-                    }
-                });
+                                    }
+                            });
                 player.setOnEndOfMedia(this.onCompletion);
                 if (isVideo) {
                     videoPanel = fx;
@@ -10077,7 +10175,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void prepare() {
         }
         
-        public void play() {
+        @Override
+        protected void playImpl() {
+            
             if (isVideo && nativePlayerMode) {
                 // To simulate native player mode, we will show a form with the player.
                 final Form currForm = Display.getInstance().getCurrent();
@@ -10086,8 +10186,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     @Override
                     protected void onShow() {
                         player.play();
-                        playing = true;
-                    }
+                            playing = true;
+                        }
                     
                 };
                 com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
@@ -10111,7 +10211,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             playing = true;
         }
 
-        public void pause() {
+        @Override
+        protected void pauseImpl() {
             if(playing) {
                 player.pause();
             }
@@ -10649,7 +10750,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private  Media createMediaRecorder(final String path, String mime, final int samplingRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
-        System.out.println("Is redirect to Audio Buffer? "+redirectToAudioBuffer);
         checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
@@ -10694,7 +10794,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         final File fTmpFile = tmpFile;
         final String fMime = mime;
-        return new Media() {
+        return new AbstractMedia() {
             java.io.File wavFile = fTmpFile;
             File outFile = file;
             AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
@@ -10726,12 +10826,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             
             @Override
-            public void play() {
+            protected void playImpl() {
                 if (line == null) {
                     try {
                         final AudioFormat format = getAudioFormat();
                         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
                         if (!AudioSystem.isLineSupported(info)) {
+                            fireMediaStateChange(State.Playing);
+                            fireMediaStateChange(State.Paused);
+                            
                             throw new RuntimeException("Audio format not supported on this platform");
                         }
                         line = (TargetDataLine) AudioSystem.getLine(info);
@@ -10741,6 +10844,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
                         recording = true;
+                        fireMediaStateChange(State.Playing);
                         // start recording
                         new Thread(new Runnable() {
                             public void run() {
@@ -10763,13 +10867,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                             .getShort())/ 0x8000;
                                                     sampleBufferPos++;
                                                     if (sampleBufferPos >= sampleBuffer.length) {
-                                                        buf.copyFrom(sampleBuffer, 0, sampleBuffer.length);
+                                                        buf.copyFrom(samplingRate, audioChannels, sampleBuffer, 0, sampleBuffer.length);
                                                         sampleBufferPos = 0;
                                                     }
                                                 
                                                 }
                                                 if (sampleBufferPos > 0) {
-                                                    buf.copyFrom(sampleBuffer, 0, sampleBufferPos);
+                                                    buf.copyFrom(samplingRate, audioChannels, sampleBuffer, 0, sampleBufferPos);
                                                 }
                                             }
                                         }
@@ -10778,18 +10882,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     }
                                     
                                 } catch (IOException ioe) {
-                                    throw new RuntimeException(ioe);
+                                    fireMediaError(new MediaException(MediaErrorType.Unknown, ioe));
                                 }
                             }
                         }).start();
                         
                    } catch (LineUnavailableException ex) {
-                                    throw new RuntimeException(ex);
+                        fireMediaError(new MediaException(MediaErrorType.LineUnavailable, ex));
                     }    
                 } else {
                     if (!line.isActive()) {
                         line.start();
                         recording = true;
+                        fireMediaStateChange(State.Playing);
                     }
                 }
 
@@ -10797,7 +10902,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             @Override
-            public void pause() {
+            protected void pauseImpl() {
                 if (line == null) {
                     return;
                 }
@@ -10805,6 +10910,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return;
                 }
                 recording = false;
+                fireMediaStateChange(State.Paused);
                 line.stop();
                 
                 
@@ -10841,12 +10947,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                             } catch (Throwable ex) {
                                 com.codename1.io.Log.e(ex);
                                 t[0] = ex;
+                                fireMediaError(new MediaException(MediaErrorType.Encode, ex));
                             }
                         }
                     });
-                    if (t[0] != null) {
-                        throw new RuntimeException(t[0]);
-                    }
+                    //if (t[0] != null) {
+                    //    throw new RuntimeException(t[0]);
+                    //}
                     
                 }
                 line = null;

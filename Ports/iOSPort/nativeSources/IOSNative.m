@@ -5315,10 +5315,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
 
 
 void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        NSError *err = nil;
+        [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+        POOL_END();
+    });
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit start];
     
 }
+
 
 void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);

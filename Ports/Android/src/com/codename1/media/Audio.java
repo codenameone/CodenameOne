@@ -45,7 +45,7 @@ import java.util.Vector;
  *
  * @author Chen
  */
-public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener, AudioManager.OnAudioFocusChangeListener {
+public class Audio extends AbstractMedia implements Runnable, MediaPlayer.OnInfoListener, AudioManager.OnAudioFocusChangeListener {
     private static final int MEDIA_INFO_BUFFERING_START = 701;
     private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;
@@ -69,6 +69,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         if (onComplete != null) {
             addCompletionHandler(onComplete);
         }
+        
         bindPlayerCleanupOnComplete();
 
         AudioManager audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
@@ -130,6 +131,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 
             public void onCompletion(MediaPlayer arg0) {
+                fireMediaStateChange(State.Paused);
                 if(disposeOnComplete){
                     run();
                 }
@@ -140,8 +142,12 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
 
             public boolean onError(MediaPlayer arg0, int arg1, int arg2) {
+                fireMediaError(AndroidImplementation.createMediaException(arg2));
+                fireMediaStateChange(State.Playing);
+                fireMediaStateChange(State.Paused);
                 run();
                 fireCompletionHandlers();
+                
                 return true;
             }
         });
@@ -153,6 +159,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
             if (player != null) {
                 if (player.isPlaying()) {
                     player.stop();
+                    fireMediaStateChange(State.Paused);
                 }
                 cleanVars();
             }
@@ -179,10 +186,11 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
     }
     
     @Override
-    public void play() {
+    protected void playImpl() {
         try {
             if (player != null) {
                 player.start();
+                fireMediaStateChange(State.Playing);
             }
         } catch(Throwable t) {
             // some exceptions might occur here, with all the various illegal states they rarely matter
@@ -191,10 +199,11 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
     }
 
     @Override
-    public void pause() {
+    protected void pauseImpl() {
         try {
             if (player != null) {
                 player.pause();
+                fireMediaStateChange(State.Paused);
             }
         } catch(Throwable t) {
             // some exceptions might occur here, with all the various illegal states they rarely matter
@@ -354,6 +363,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                 // resume playback
                 if (!isPlaying() && player != null && pausedDueToExternal) {
                     player.start();
+                    fireMediaStateChange(State.Playing);
                     if(tempVolume > -1) {
                         setVolume(tempVolume);
                         tempVolume = -1;
@@ -375,6 +385,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                 if (isPlaying()) {
                     pause();
                     pausedDueToExternal = true;
+                    fireMediaStateChange(State.Paused);
                 }
                 break;
 

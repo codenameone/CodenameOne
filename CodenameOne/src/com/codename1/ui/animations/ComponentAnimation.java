@@ -23,7 +23,11 @@
 
 package com.codename1.ui.animations;
 
+import com.codename1.ui.AnimationManager;
+import com.codename1.ui.Container;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Parent class representing an animation object within the AnimationManager queue.
@@ -157,7 +161,7 @@ public abstract class ComponentAnimation {
     public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
         return new CompoundAnimation(anims);
     }
-
+    
     /**
      * Allows us to create an animation that places several separate animations in a sequence so they appear as a 
      * single animation to the system and process one after the other
@@ -169,7 +173,7 @@ public abstract class ComponentAnimation {
     }
     
     static class CompoundAnimation extends ComponentAnimation {
-        private ComponentAnimation[] anims;
+        ComponentAnimation[] anims;
         int sequence;
         public CompoundAnimation(ComponentAnimation[] anims) {
             this.anims = anims;
@@ -210,7 +214,7 @@ public abstract class ComponentAnimation {
                 return;
             }
             for(ComponentAnimation a : anims) {
-                a.updateState();
+                a.updateAnimationState();
             }
         }
         
@@ -220,5 +224,130 @@ public abstract class ComponentAnimation {
                 a.flush();
             }
         }
+
+        @Override
+        public int getMaxSteps() {
+            if (sequence > -1) {
+                int out = 0;
+                for (ComponentAnimation a : anims) {
+                    out += a.getMaxSteps();
+                }
+                return out;
+            } else {
+                int out = 0;
+                for (ComponentAnimation a : anims) {
+                    out = Math.max(a.getMaxSteps(), out);
+                }
+                return out;
+            }
+            
+        }
+
+        @Override
+        public void setStep(int step) {
+            super.setStep(step);
+            if (sequence > -1) {
+                int animIdx = 0;
+                int len = anims.length;
+                while (animIdx < anims.length && anims[animIdx].getMaxSteps() <= step) {
+                    ComponentAnimation anim = anims[animIdx];
+                    anim.setStep(anim.getMaxSteps());
+                    step -= anim.getMaxSteps();
+                    animIdx++;
+                }
+                while (animIdx < len) {
+                    anims[animIdx].setStep(0);
+                    animIdx++;
+                }
+                
+            } else {
+                for (ComponentAnimation anim : anims) {
+                    anim.setStep(Math.min(anim.getMaxSteps(), step));
+                }
+            }
+        }
+        
+        
+        
+    }
+    
+    /**
+     * A special kind of ComponentAnimation that encapsulates a mutation of the 
+     * user interface.  This class used internally to allow compatible UI mutation
+     * animations to run concurrently.  Two UI mutations are compatible if the containers
+     * that they mutate reside in separate branches of the UI tree.  I.e. As long as neither
+     * container contains the other, their mutations are compatible.
+     * 
+     * @since 7.0
+     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation) 
+     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation, java.lang.Runnable) 
+     */
+    public static class UIMutation extends CompoundAnimation {
+        
+        /**
+         * Containers that are being mutated as a part of this animation.
+         */
+        private Set<Container> containers = new HashSet<Container>();
+        
+        /**
+         * A flag that is set the first time updateState() is called.  Once this 
+         * flag is set, the UIMutation will not accept any more mutations.
+         */
+        private boolean isStarted;
+        
+        /**
+         * Creates a new UIMutation which mutates the given container with the provided
+         * animation.
+         * @param cnt The container that is being mutated.
+         * @param anim The animation.
+         */
+        public UIMutation(Container cnt, ComponentAnimation anim) {
+            super(new ComponentAnimation[]{anim});
+        }
+
+        /**
+         * Tries to add another mutation to this UIMutation.
+         * 
+         * @param cnt The container that is being mutated.
+         * @param anim The animation
+         * @return True if it was successfully added.  False otherwise.  This will return false if
+         * {@link #isLocked() } returns true (i.e. the animation has already stared), or if the mutation
+         * is incompatible with any of the existing mutations in this mutation.
+         */
+        public boolean add(Container cnt, ComponentAnimation anim) {
+            if (isStarted) {
+                return false;
+            }
+            for (Container existing : containers) {
+                if (cnt == existing || existing.contains(cnt) || cnt.contains(existing)) {
+                    return false;
+                }
+            }
+            
+            ComponentAnimation[] newAnims = new ComponentAnimation[anims.length+1];
+            System.arraycopy(anims, 0, newAnims, 0, anims.length);
+            newAnims[anims.length] = anim;
+            anims = newAnims;
+            containers.add(cnt);
+            return true;
+        }
+        
+        /**
+         * Checks if this mutation is locked.  Once a mutation animation has started,
+         * it becomes locked, and cannot have any further mutations added to it.
+         * @return 
+         */
+        public boolean isLocked() {
+            return isStarted;
+        }
+        
+        
+        @Override
+        protected void updateState() {
+            isStarted = true;
+            super.updateState();
+        }
+        
+        
     }
 }

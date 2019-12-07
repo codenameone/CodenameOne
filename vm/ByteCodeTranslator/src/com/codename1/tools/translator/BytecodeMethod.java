@@ -1235,7 +1235,7 @@ public class BytecodeMethod implements SignatureSet {
                         Instruction prev = instructions.get(iter-1);
                         if (prev instanceof CustomInvoke) {
                             CustomInvoke inv = (CustomInvoke)prev;
-                            if (inv.methodHasReturnValue()) {
+                            if (inv.methodHasReturnValue() && !inv.isNoReturn()) {
                                 inv.setNoReturn(true);
                                 instructions.remove(iter);
                                 iter--;
