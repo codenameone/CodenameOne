@@ -80,8 +80,6 @@
 #ifdef ENABLE_WKWEBVIEW
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <WebKit/WebKit.h>
-//#define CN1_USE_AVKIT
-#import <AVKit/AVKit.h>
 #define supportsWKWebKit
 #endif
 #endif
@@ -89,9 +87,20 @@
 #import "ZooZ.h"
 #endif
 #import "Rotate.h"
+//#define CN1_USE_AVKIT
+#ifdef CN1_USE_AVKIT
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
+#import <AVKit/AVKit.h>
+#define CN1_AVPLAYERVIEWCONTROLLER = AVPlayerViewController*
+#else
+#define CN1_AVPLAYERVIEWCONTROLLER id
+#endif
+#else
+#define CN1_AVPLAYERVIEWCONTROLLER id
+#endif
 extern int popoverSupported();
 
-#define INCLUDE_CN1_PUSH2
+//#define INCLUDE_CN1_PUSH2
 #ifdef INCLUDE_CN1_PUSH2
 #import <UserNotifications/UserNotifications.h>
 #endif
@@ -3451,7 +3460,7 @@ AVPlayer* getAVPlayer(JAVA_LONG peer) {
 #endif
 }
 
-AVPlayerViewController* getAVPlayerController(JAVA_LONG peer) {
+CN1_AVPLAYERVIEWCONTROLLER getAVPlayerController(JAVA_LONG peer) {
 #ifdef CN1_USE_AVKIT
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayerViewController* m = nil;;
@@ -6638,7 +6647,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_Stri
     __block JAVA_OBJECT c = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-#ifndef NO_UIWEBVIEW
+#ifdef NO_UIWEBVIEW
     WKWebView *webView = [[WKWebView alloc] initWithFrame:CGRectZero];
     [webView loadHTMLString:@"<html></html>" baseURL:nil];
 
