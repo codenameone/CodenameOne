@@ -29,9 +29,15 @@
 #import <WebKit/WKNavigationDelegate.h>
 #endif
 
-@interface UIWebViewEventDelegate : NSObject<UIWebViewDelegate
+@interface UIWebViewEventDelegate : NSObject<
+#ifndef NO_UIWEBVIEW
+UIWebViewDelegate
+#endif
 #ifdef ENABLE_WKWEBVIEW
-        ,WKNavigationDelegate, WKUIDelegate
+#ifndef NO_UIWEBVIEW
+,
+#endif
+        WKNavigationDelegate, WKUIDelegate
 #endif
 >{
     void *c;

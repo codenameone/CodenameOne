@@ -105,6 +105,7 @@ import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
@@ -5972,6 +5973,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getAppArg();
     }
 
+    private static Map<String,AsyncResource> callbacks = new HashMap<String,AsyncResource>();
+    
+    static void completeStringCallback(String callbackId, String value) {
+        AsyncResource<String> res = (AsyncResource<String>)callbacks.get(callbackId);
+        if (res != null) {
+            res.complete(value);
+        }
+    }
     
     
     @Override
@@ -5994,7 +6003,32 @@ public class IOSImplementation extends CodenameOneImplementation {
             } 
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";*/
             if(userAgent == null) {
-                userAgent = nativeInstance.getUserAgentString();
+                final String callbackId = key+System.currentTimeMillis();
+                AsyncResource<String> out = new AsyncResource<String>() {
+                    @Override
+                    public void complete(String value) {
+                        callbacks.remove(callbackId);
+                        super.complete(value); 
+                    }
+
+                    @Override
+                    public void error(Throwable t) {
+                        callbacks.remove(callbackId);
+                        super.error(t);
+                    }
+                    
+                    
+                };
+                callbacks.put(callbackId, out);
+                userAgent = nativeInstance.getUserAgentString(callbackId);
+                if (userAgent == null) {
+                    try {
+                        userAgent = out.get();
+                    } catch (Exception ex) {
+                        
+                    }
+                }
+                
             }
             return userAgent;
         }

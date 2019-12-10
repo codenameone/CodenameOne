@@ -442,7 +442,7 @@ public final class IOSNative {
     native void addCookie(String key, String value, String domain, String path, boolean secure, boolean httpOnly, long expires);
     native void getCookiesForURL(String url, Vector out);
 
-    native String getUserAgentString();
+    native String getUserAgentString(String callbackId);
     
     native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight, int minuteStep);
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);

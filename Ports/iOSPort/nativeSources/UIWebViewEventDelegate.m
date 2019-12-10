@@ -44,7 +44,7 @@ extern int connections;
     return self;
 }
 
-
+#ifndef NO_UIWEBVIEW
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
      if ([error code] != NSURLErrorCancelled) {
         com_codename1_impl_ios_IOSImplementation_fireWebViewError___com_codename1_ui_BrowserComponent_int(CN1_THREAD_GET_STATE_PASS_ARG c, [error code]);
@@ -54,7 +54,6 @@ extern int connections;
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
      }
 }
-
 
 - (void)webViewDidStartLoad:(UIWebView *)webView {
      connections++;
@@ -89,7 +88,7 @@ extern int connections;
 #endif
     com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.request.URL.absoluteString.UTF8String));
 }
-
+#endif
 
 #ifdef ENABLE_WKWEBVIEW
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
