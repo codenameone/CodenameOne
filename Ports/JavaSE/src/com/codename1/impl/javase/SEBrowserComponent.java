@@ -405,8 +405,13 @@ public class SEBrowserComponent extends PeerComponent {
         
     }
     
-    public SEBrowserComponent(final JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
+    public SEBrowserComponent() {
         super(null);
+    }
+    
+    public void SEBrowserComponent_init(final JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
+        
+        //System.out.println("In SEBrowserComponent_init");
         this.web = web;
         this.instance = instance;
         this.frm = (JFrame)f.getTopLevelAncestor();
@@ -441,7 +446,7 @@ public class SEBrowserComponent extends PeerComponent {
      * @return
      */
     public String executeAndReturnString(final String js){
-        if (Platform.isFxApplicationThread()) {
+        if (isFXThread()) {
             try {
                 return ""+web.getEngine().executeScript(js);
             } catch (Throwable jse) {
@@ -500,8 +505,12 @@ public class SEBrowserComponent extends PeerComponent {
         }
     }
     
+    private static boolean isFXThread() {
+        return Platform.isFxApplicationThread();
+    }
+    
     public void execute(final String js) {
-        if (Platform.isFxApplicationThread()) {
+        if (isFXThread()) {
             executeImpl(js);
         } else {
             Platform.runLater(new Runnable() {

@@ -66,7 +66,7 @@ public class RequestBuilder {
 
     private Map<String, String> pathParams = new HashMap();
     
-    private Integer timeout;
+    private Integer timeout, readTimeout;
     
     private Data body;
         
@@ -292,6 +292,18 @@ public class RequestBuilder {
     public RequestBuilder timeout(int timeout) {
         checkFetched();
         this.timeout = timeout;
+        return this;
+    }
+    
+    /**
+     * Sets the request read timeout.  Only used if {@link ConnectionRequest#isReadTimeoutSupported() }
+     * is true on this platform.
+     * @param timeout The timeout.
+     * @return RequestBuilder instance.
+     */
+    public RequestBuilder readTimeout(int timeout) {
+        checkFetched();
+        this.readTimeout = timeout;
         return this;
     }
     
@@ -812,6 +824,9 @@ public class RequestBuilder {
         }
         if(timeout != null){
             req.setTimeout(timeout);
+        }
+        if (readTimeout != null) {
+            req.setReadTimeout(readTimeout);
         }
         for (String key : queryParams.keySet()) {
             req.addArgument(key, queryParams.get(key));

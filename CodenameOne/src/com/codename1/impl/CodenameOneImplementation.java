@@ -6593,8 +6593,26 @@ public abstract class CodenameOneImplementation {
         
     }
 
+    /**
+     * Sets the read timeout of a connection.
+     * @param connection
+     * @param readTimeout 
+     * @since 7.0
+     */
+    public void setReadTimeout(Object connection, int readTimeout) {
+        
+    }
+
     
 
+    /**
+     * Checks if this platform supports read timeout in network connections.
+     * @since 7.0
+     * @return True if the platform supports read timeouts.
+     */
+    public boolean isReadTimeoutSupported() {
+        return false;
+    }
     
 
     

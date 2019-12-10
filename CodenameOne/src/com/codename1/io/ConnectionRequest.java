@@ -320,6 +320,7 @@ public class ConnectionRequest implements IOProgressListener {
     private static boolean defaultFollowRedirects = true;
     private boolean followRedirects = defaultFollowRedirects;
     private int timeout = -1;
+    private int readTimeout = -1;
     private InputStream input;
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
@@ -495,6 +496,35 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     /**
+     * Sets the read timeout for the connection.  This is only used if {@link #isReadTimeoutSupported() }
+     * is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+     * @param timeout The read timeout. If less than or equal to zero, then there is no timeout.
+     * @see #isReadTimeoutSupported() 
+     */
+    public void setReadTimeout(int timeout) {
+        readTimeout = timeout;
+    }
+    
+    /**
+     * Gets the read timeout for this connection. This is only used if {@link #isReadTimeoutSupported() }
+     * is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+     * @return The read timeout.
+     * @since 7.0
+     */
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+    
+    /**
+     * Checks if this platform supports read timeouts.
+     * @since 7.0
+     * @return True if this connection supports read timeouts;
+     */
+    public static boolean isReadTimeoutSupported() {
+        return Util.getImplementation().isReadTimeoutSupported();    
+    }
+    
+    /**
      * Invoked to initialize HTTP headers, cookies etc. 
      * 
      * @param connection the connection object
@@ -504,6 +534,9 @@ public class ConnectionRequest implements IOProgressListener {
         timeSinceLastUpdate = System.currentTimeMillis();
         CodenameOneImplementation impl = Util.getImplementation();
         impl.setPostRequest(connection, isPost());
+        if (readTimeout > 0) {
+            impl.setReadTimeout(connection, readTimeout);
+        }
         impl.setConnectionId(connection, id);
 
         if(getUserAgent() != null) {

@@ -462,4 +462,46 @@ public class AsyncResource<V> extends Observable  {
 
     }
     
+    /**
+     * Adds another AsyncResource as a listener to this async resource.
+     * @param resource 
+     * @since 7.0
+     */
+    public void addListener(final AsyncResource<V> resource) {
+        ready(new SuccessCallback<V>() {
+            @Override
+            public void onSucess(V value) {
+                if (!resource.isDone()) {
+                    resource.complete(value);
+                }
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                if (!resource.isDone()) {
+                    resource.error(value);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Combines ready() and except() into a single callback with 2 parameters.  
+     * @param onResult A callback that handles both the ready() case and the except() case.
+     * @since 7.0
+     */
+    public void onResult(final AsyncResult<V> onResult) {
+        ready(new SuccessCallback<V>() {
+            @Override
+            public void onSucess(V value) {
+                onResult.onReady(value, null);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                onResult.onReady(null, value);
+            }
+        });
+    }
+    
 }

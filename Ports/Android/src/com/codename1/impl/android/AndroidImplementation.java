@@ -5743,6 +5743,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         con.setDoOutput(write);
         return con;
     }
+    
+    @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        if (connection instanceof URLConnection) {
+            ((URLConnection)connection).setReadTimeout(readTimeout);
+        }
+    }
+
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+    
+    
 
     /**
      * @inheritDoc

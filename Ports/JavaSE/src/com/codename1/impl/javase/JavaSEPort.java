@@ -8535,6 +8535,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        if (connection instanceof URLConnection) {
+            ((URLConnection)connection).setReadTimeout(readTimeout);
+        }
+    }
+
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
+    
+    
+    
+    @Override
     public void addConnectionToQueue(ConnectionRequest req) {
         super.addConnectionToQueue(req);
         if (netMonitor != null) {
@@ -11263,7 +11278,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel webContainer = new CN1JFXPanel();
         final SEBrowserComponent[] bc = new SEBrowserComponent[1];
+        
+        
 
+        final SEBrowserComponent bcc = new SEBrowserComponent();
+        Platform.setImplicitExit(false);
         Platform.runLater(new Runnable() {
 
             @Override
@@ -11274,7 +11293,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 webContainer.setScene(new Scene(root));
                 
                 // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, ((JPanel)canvas.getParent()), webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
+                JPanel parentPanel =  ((JPanel)canvas.getParent());
+                
+                bcc.SEBrowserComponent_init(
+                        JavaSEPort.this, 
+                        parentPanel, 
+                        webContainer, 
+                        webView, 
+                        (BrowserComponent) parent, 
+                        hSelector, 
+                        vSelector
+                );
+                
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
                         bc[0] = bcc;
@@ -11286,7 +11316,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
         });
-        Display.getInstance().invokeAndBlock(new Runnable() {
+        if (bc[0] == null && err[0] == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
 
             @Override
             public void run() {
@@ -11300,6 +11331,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         });
+        }
+        
         return bc[0];
     }
 
@@ -12802,6 +12835,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.canExecute(url);
     }
 
+    
+    
     
     
     @Override
