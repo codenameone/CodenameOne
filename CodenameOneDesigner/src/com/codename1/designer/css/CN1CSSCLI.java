@@ -207,14 +207,17 @@ public class CN1CSSCLI extends Application {
     private static List<File> findLibCSSFiles(File inputFile) throws IOException {
         ArrayList<File> out = new ArrayList<>();
         File cssDir = getLibCSSDirectory(inputFile);
-        for (File child : cssDir.listFiles()) {
-            if (child.isDirectory()) {
-                File themeCss = new File(child, "theme.css");
-                if (themeCss.exists()) {
-                    out.add(themeCss);
+        if (cssDir.exists() && cssDir.isDirectory()) {
+            for (File child : cssDir.listFiles()) {
+                if (child.isDirectory()) {
+                    File themeCss = new File(child, "theme.css");
+                    if (themeCss.exists()) {
+                        out.add(themeCss);
+                    }
                 }
             }
         }
+        
         return out;
        
     }
