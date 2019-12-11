@@ -25,6 +25,7 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
@@ -356,7 +357,7 @@ public class NetworkManager {
                         if(frameRate > -1) {
                             Display.getInstance().setFramerate(frameRate);
                         }
-
+                        currentRequest.complete = true;
                         if(progressListeners != null) {
                             progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                         }
@@ -679,13 +680,24 @@ public class NetworkManager {
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
         class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
+            private boolean edt = CN.isEdt();
             private boolean finishedWaiting;
             public void run() {
-                while(!finishedWaiting) {
-                    try {
-                        Thread.sleep(30);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
+                if (edt) {
+                    while(!finishedWaiting) {
+                        try {
+                            Thread.sleep(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                } else {
+                    while(!request.complete) {
+                        try {
+                            Thread.sleep(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
             }
@@ -712,12 +724,13 @@ public class NetworkManager {
             }
         }
         WaitingClass w = new WaitingClass();
-        addProgressListener(w);
-        addErrorListener(w);
-        addToQueue(request);
         if(Display.getInstance().isEdt()) {
+            addProgressListener(w);
+            addErrorListener(w);
+            addToQueue(request);
             Display.getInstance().invokeAndBlock(w);
         } else {
+            addToQueue(request);
             w.run();
         }
     }

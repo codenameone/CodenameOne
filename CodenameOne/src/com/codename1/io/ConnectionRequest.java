@@ -333,6 +333,7 @@ public class ConnectionRequest implements IOProgressListener {
     private Dialog disposeOnCompletion;
     private byte[] data;
     private int responseCode;
+    boolean complete;
     private String responseErrorMessge;
     private String httpMethod;
     private int silentRetryCount = 0;
@@ -471,6 +472,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     void prepare() {
+        complete = false;
         timeSinceLastUpdate = System.currentTimeMillis();
     }
     
