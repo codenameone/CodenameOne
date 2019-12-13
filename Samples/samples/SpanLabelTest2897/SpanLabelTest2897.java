@@ -62,7 +62,7 @@ public class SpanLabelTest2897 {
         
         
         SpanLabel label1 = new SpanLabel("Set span label text component row count manually. We need to update the columns for rendering, otherwise it will still wrap at the old number of columns.");
-        label1.getTextComponent().setRows(4);
+        //label1.getTextComponent().setRows(4);
         container.add(label1);
         SpanButton btn = new SpanButton("Hello");
         container.add(btn);

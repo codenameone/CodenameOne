@@ -90,6 +90,18 @@ class StubLocationManager extends LocationManager {
             checked = true;
         }
     }
+
+    @Override
+    public boolean isGPSDetectionSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isGPSEnabled() {
+        return true;
+    }
+    
+    
     
     public static LocationManager getLocationManager() {
         return instance;

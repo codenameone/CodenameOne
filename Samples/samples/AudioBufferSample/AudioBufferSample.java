@@ -94,7 +94,8 @@ public class AudioBufferSample {
             hi.getToolbar().addCommandToRightBar("", icon, (ev) -> {
                 try {
                     String path = "tmpBuffer.pcm";
-                    WAVWriter wavFileWriter = new WAVWriter(new File("tmpBuffer.wav"), 44100, 1, 16);
+                    int wavSampleRate = 16000;
+                    WAVWriter wavFileWriter = new WAVWriter(new File("tmpBuffer.wav"), wavSampleRate, 1, 16);
                     AudioBuffer audioBuffer = MediaManager.getAudioBuffer(path, true, 64);
                     MediaRecorderBuilder options = new MediaRecorderBuilder()
                             .audioChannels(1)
@@ -105,9 +106,13 @@ public class AudioBufferSample {
                     System.out.println("Builder isredirect? "+options.isRedirectToAudioBuffer());
                     float[] byteBuffer = new float[audioBuffer.getMaxSize()];
                     audioBuffer.addCallback(buf->{
+                        if (buf.getSampleRate() > wavSampleRate) {
+                            buf.downSample(wavSampleRate);
+                        }
                         buf.copyTo(byteBuffer);
+                        
                         try {
-                            wavFileWriter.write(byteBuffer, 0, audioBuffer.getSize());
+                            wavFileWriter.write(byteBuffer, 0, buf.getSize());
                         } catch (Throwable t) {
                             Log.e(t);
                         }

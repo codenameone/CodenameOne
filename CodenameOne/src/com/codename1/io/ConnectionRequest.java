@@ -34,6 +34,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
@@ -319,6 +320,7 @@ public class ConnectionRequest implements IOProgressListener {
     private static boolean defaultFollowRedirects = true;
     private boolean followRedirects = defaultFollowRedirects;
     private int timeout = -1;
+    private int readTimeout = -1;
     private InputStream input;
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
@@ -331,6 +333,7 @@ public class ConnectionRequest implements IOProgressListener {
     private Dialog disposeOnCompletion;
     private byte[] data;
     private int responseCode;
+    boolean complete;
     private String responseErrorMessge;
     private String httpMethod;
     private int silentRetryCount = 0;
@@ -469,6 +472,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     void prepare() {
+        complete = false;
         timeSinceLastUpdate = System.currentTimeMillis();
     }
     
@@ -494,6 +498,35 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     /**
+     * Sets the read timeout for the connection.  This is only used if {@link #isReadTimeoutSupported() }
+     * is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+     * @param timeout The read timeout. If less than or equal to zero, then there is no timeout.
+     * @see #isReadTimeoutSupported() 
+     */
+    public void setReadTimeout(int timeout) {
+        readTimeout = timeout;
+    }
+    
+    /**
+     * Gets the read timeout for this connection. This is only used if {@link #isReadTimeoutSupported() }
+     * is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+     * @return The read timeout.
+     * @since 7.0
+     */
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+    
+    /**
+     * Checks if this platform supports read timeouts.
+     * @since 7.0
+     * @return True if this connection supports read timeouts;
+     */
+    public static boolean isReadTimeoutSupported() {
+        return Util.getImplementation().isReadTimeoutSupported();    
+    }
+    
+    /**
      * Invoked to initialize HTTP headers, cookies etc. 
      * 
      * @param connection the connection object
@@ -503,6 +536,9 @@ public class ConnectionRequest implements IOProgressListener {
         timeSinceLastUpdate = System.currentTimeMillis();
         CodenameOneImplementation impl = Util.getImplementation();
         impl.setPostRequest(connection, isPost());
+        if (readTimeout > 0) {
+            impl.setReadTimeout(connection, readTimeout);
+        }
         impl.setConnectionId(connection, id);
 
         if(getUserAgent() != null) {
@@ -2418,6 +2454,48 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     /**
+     * Fetches JSON asynchronously.
+     * @param url The URL to fetch.
+     * @return AsyncResource that will resolve with either an exception or the parsed JSON data.
+     * @since 7.0
+     */
+    public static AsyncResource<Map<String, Object>> fetchJSONAsync(String url) {
+        final AsyncResource<Map<String, Object>> out = new AsyncResource<Map<String, Object>>();
+        final ConnectionRequest cr = new ConnectionRequest();
+        cr.setFailSilently(true);
+        cr.setPost(false);
+        cr.setUrl(url);
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                if (out.isDone()) {
+                    return;
+                }
+                if(cr.getResponseData() == null) {
+                    if(cr.failureException != null) {
+                        out.error(new IOException(cr.failureException.toString()));
+                        return;
+                    } else {
+                        out.error(new IOException("Server returned error code: " + cr.failureErrorCode));
+                        return;
+                    }
+                }
+                JSONParser jp = new JSONParser();
+                Map<String,Object> result = null;
+                try {
+                    result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
+                } catch (IOException ex) {
+                    out.error(ex);
+                    return;
+                }
+                out.complete(result);
+            }
+        });
+        NetworkManager.getInstance().addToQueue(cr);
+        return out;
+    }
+    
+    /**
      * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
      * If useCache is true, then this will first try to load the image from Storage if it exists.
      * @param storageFile The storage file where the file should be saved.
@@ -2429,6 +2507,44 @@ public class ConnectionRequest implements IOProgressListener {
     public void downloadImageToStorage(String storageFile, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
         setDestinationStorage(storageFile);
         downloadImage(onSuccess, onFail, useCache);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously returning an AsyncResource that resolves to the resulting image.. 
+     * @param storageFile The storage file where the file should be saved.
+     * @return AsyncResource<Image> that will resolve to the loaded image.
+     * @since 7.0
+     */
+    public AsyncResource<Image> downloadImageToStorage(String storageFile) {
+        return downloadImageToStorage(storageFile, true);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously returning an AsyncResource that resolves to the resulting image..  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * @param storageFile The storage file where the file should be saved.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @return AsyncResource<Image> that will resolve to the loaded image.
+     * @since 7.0
+     */
+    public AsyncResource<Image> downloadImageToStorage(String storageFile, boolean useCache) {
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        downloadImageToStorage(storageFile, new SuccessCallback<Image>() {
+            @Override
+            public void onSucess(Image value) {
+                if (!out.isDone()) {
+                    out.complete(value);
+                }
+            }
+        }, new FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                if (!out.isDone()) {
+                    out.error(err);
+                }
+            }
+        }, useCache);
+        return out;
     }
     
     /**
@@ -2467,6 +2583,53 @@ public class ConnectionRequest implements IOProgressListener {
     public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         downloadImageToStorage(storageFile, onSuccess, onFail, true);
     }
+    
+    /**
+     * Downloads an image to a the file system asynchronously returning an AsyncResource object that resolves to the loaded image..  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @return AsyncResource resolving to the downloaded image.
+     * @since 7.0
+     */
+    public AsyncResource<Image> downloadImageToFileSystem(String file, boolean useCache) {
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        downloadImageToFileSystem(file, new SuccessCallback<Image>() {
+            @Override
+            public void onSucess(Image value) {
+                if (out.isDone()) {
+                    return;
+                }
+                out.complete(value);
+            }
+        }, new FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                if (out.isDone()) {
+                    return;
+                }
+                out.error(err);
+            }
+        }, useCache);
+        return out;
+    }
+    
+    
+    /**
+     * Downloads an image to a the file system asynchronously returning an AsyncResource object that resolves to the loaded image..  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.  This is a wrapper around {@link #downloadImageToFileSystem(java.lang.String, boolean) }
+     * with {@literal true} as the 2nd parameter.
+     * 
+     * @param file The storage file where the file should be saved.
+     
+     * @return AsyncResource resolving to the downloaded image.
+     * @since 7.0
+     */
+    public AsyncResource<Image> downloadImageToFileSystem(String file) {
+        return downloadImageToFileSystem(file, true);
+    }
+    
     
     /**
      * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  

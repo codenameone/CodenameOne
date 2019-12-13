@@ -23,6 +23,7 @@
 *.jar
 *.class
 **/private/*
+**/.idea/*
 **/build/*
 **/dist/*
 *.zip

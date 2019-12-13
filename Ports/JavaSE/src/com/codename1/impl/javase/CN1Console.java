@@ -186,11 +186,11 @@ public class CN1Console {
             List<URL> jars = new ArrayList<>();
             for (File jar : lib.listFiles()) {
                 if (jar.getName().endsWith(".jar")) {
-                    jars.add(jar.toURL());
+                    jars.add(jar.toURI().toURL());
                 } else if (jar.isDirectory()) {
                     for (File j2 : jar.listFiles()) {
                         if (j2.getName().endsWith(".jar")) {
-                            jars.add(j2.toURL());
+                            jars.add(j2.toURI().toURL());
                         }
                     }
                 }

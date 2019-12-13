@@ -28,10 +28,12 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>
@@ -76,6 +78,7 @@ public class SpanButton extends Container {
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setColumns(100);
         text.setUIID("Button");
+        text.setGrowByContent(true);
         text.setEditable(false);
         text.setFocusable(false);
         text.setActAsLabel(true);
@@ -86,7 +89,10 @@ public class SpanButton extends Container {
         actualButton = new Button();
         actualButton.setUIID("icon");
         addComponent(BorderLayout.WEST, actualButton);
-        addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
+        Container center = BoxLayout.encloseYCenter(text);
+        center.getStyle().setMargin(0, 0, 0, 0);
+        center.getStyle().setPadding(0, 0, 0, 0);
+        addComponent(BorderLayout.CENTER, center);
         setLeadComponent(actualButton);
     }
 
@@ -426,16 +432,28 @@ public class SpanButton extends Container {
     public void setAutoRelease(boolean autoRelease) {
         this.actualButton.setAutoRelease(autoRelease);
     }
-    
-    
+
     @Override
-    public void layoutContainer() {
-        // We may need to layout the container twice due to the preferred size calculation
-        // of the TextArea depending on its width at the time of the calculation.
-        // https://github.com/codenameone/CodenameOne/issues/2897
-        super.layoutContainer();
-        setShouldCalcPreferredSize(true);
-        super.layoutContainer();
+    protected Dimension calcPreferredSize() {
+        
+        int w = getWidth();
+        int h = getHeight();
+        Dimension d = getLayout().getPreferredSize(this);
+        setWidth(d.getWidth());
+        setHeight(d.getHeight());
+        d = getLayout().getPreferredSize(this);
+        Style style = getStyle();
+        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
+            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
+        }
+        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
+        setWidth(w);
+        setHeight(h);
+        return d;
     }
     
     

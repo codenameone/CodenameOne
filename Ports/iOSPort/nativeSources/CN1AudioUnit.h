@@ -43,4 +43,6 @@
 -(AudioStreamBasicDescription)fmt;
 -(NSString*)path;
 -(JAVA_ARRAY)convertedSampleBuffer;
+-(float)sampleRate;
+-(int)channels;
 @end

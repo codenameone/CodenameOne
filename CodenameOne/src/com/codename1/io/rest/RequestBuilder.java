@@ -66,7 +66,7 @@ public class RequestBuilder {
 
     private Map<String, String> pathParams = new HashMap();
     
-    private Integer timeout;
+    private Integer timeout, readTimeout;
     
     private Data body;
         
@@ -296,6 +296,18 @@ public class RequestBuilder {
     }
     
     /**
+     * Sets the request read timeout.  Only used if {@link ConnectionRequest#isReadTimeoutSupported() }
+     * is true on this platform.
+     * @param timeout The timeout.
+     * @return RequestBuilder instance.
+     */
+    public RequestBuilder readTimeout(int timeout) {
+        checkFetched();
+        this.readTimeout = timeout;
+        return this;
+    }
+    
+    /**
      * Sets the request to be a gzip request
      * 
      * @return RequestBuilder instance
@@ -404,7 +416,13 @@ public class RequestBuilder {
         CN.addToQueueAndWait(request);
         Response res = null;
         try {
-            res = new Response(request.getResponseCode(), new String(request.getResponseData(), "UTF-8"), request.getResponseErrorMessage());
+            byte[] respData = request.getResponseData();
+            String resp = null;
+            if(respData != null) {
+                resp = new String(respData, "UTF-8");
+            }
+            res = new Response(request.getResponseCode(), resp, 
+                request.getResponseErrorMessage());
         } catch (UnsupportedEncodingException ex) {
             ex.printStackTrace();
         }
@@ -806,6 +824,9 @@ public class RequestBuilder {
         }
         if(timeout != null){
             req.setTimeout(timeout);
+        }
+        if (readTimeout != null) {
+            req.setReadTimeout(readTimeout);
         }
         for (String key : queryParams.keySet()) {
             req.addArgument(key, queryParams.get(key));

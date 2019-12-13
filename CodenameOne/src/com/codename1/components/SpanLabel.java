@@ -26,10 +26,12 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>A multi line label component that can be easily localized, this is simply based
@@ -71,6 +73,7 @@ public class SpanLabel extends Container {
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setActAsLabel(true);
         text.setColumns(text.getText().length() + 1);
+        text.setGrowByContent(true);
         text.setUIID("Label");
         text.setEditable(false);
         text.setFocusable(false);
@@ -411,13 +414,31 @@ public class SpanLabel extends Container {
         return text.isTextSelectionEnabled();
     }
 
+    
     @Override
-    public void layoutContainer() {
-        // We may need to layout the container twice due to the preferred size calculation
-        // of the TextArea depending on its width at the time of the calculation.
-        // https://github.com/codenameone/CodenameOne/issues/2897
-        super.layoutContainer();
-        setShouldCalcPreferredSize(true);
-        super.layoutContainer();
+    protected Dimension calcPreferredSize() {
+        
+        int w = getWidth();
+        int h = getHeight();
+        Dimension d = getLayout().getPreferredSize(this);
+        setWidth(d.getWidth());
+        setHeight(d.getHeight());
+        d = getLayout().getPreferredSize(this);
+        Style style = getStyle();
+        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
+            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
+        }
+        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
+            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
+            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
+        setWidth(w);
+        setHeight(h);
+        return d;
     }
+    
+    
+    
+    
 }

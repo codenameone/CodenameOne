@@ -256,7 +256,9 @@ public class MediaPlayer extends Container {
                         float pos = video.getTime();
                         int offset = (int)(pos / dur * 100.0f);
                         if(offset > -1 && offset < 101) {
-                            progress.setProgress(offset);
+                            if (progress != null) {
+                                progress.setProgress(offset);
+                            }
                         }
                     }
                 }
@@ -435,9 +437,11 @@ public class MediaPlayer extends Container {
                 public void actionPerformed(ActionEvent evt) {
                     float dur = video.getDuration();
                     if(dur > 0) {
-                        float pos = progress.getProgress();
-                        int t = (int)(pos / 100.0f * dur);
-                        video.setTime(t);
+                        if (progress != null) {
+                            float pos = progress.getProgress();
+                            int t = (int)(pos / 100.0f * dur);
+                            video.setTime(t);
+                        }
                     }
                 }
             });

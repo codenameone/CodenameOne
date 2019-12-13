@@ -376,6 +376,10 @@ public abstract class CodenameOneImplementation {
      */
     public abstract void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode);
 
+    public boolean nativeEditorPaintsHint() {
+        return true;
+    }
+    
     /**
      * Returns true if we are currently editing a component
      * @return whether a component is being edited
@@ -6589,8 +6593,26 @@ public abstract class CodenameOneImplementation {
         
     }
 
+    /**
+     * Sets the read timeout of a connection.
+     * @param connection
+     * @param readTimeout 
+     * @since 7.0
+     */
+    public void setReadTimeout(Object connection, int readTimeout) {
+        
+    }
+
     
 
+    /**
+     * Checks if this platform supports read timeout in network connections.
+     * @since 7.0
+     * @return True if the platform supports read timeouts.
+     */
+    public boolean isReadTimeoutSupported() {
+        return false;
+    }
     
 
     

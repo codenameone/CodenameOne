@@ -309,9 +309,12 @@ public class AutoCompleteTextField extends TextField {
         if (f != null) {
             Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
             Container parent = popup.getParent();
-            lay.removeComponent(parent);
-            popup.remove();
-            f.revalidate();
+            if (parent != null) {
+                lay.removeComponent(parent);
+                popup.remove();
+                f.revalidateWithAnimationSafety();
+            }
+            
         }
     }
 

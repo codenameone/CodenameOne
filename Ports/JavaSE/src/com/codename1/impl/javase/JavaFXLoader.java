@@ -202,7 +202,7 @@ public class JavaFXLoader {
                 continue;
             }
             try {
-                java.net.URL u = f.toURL();
+                java.net.URL u = f.toURI().toURL();
                 javafxUrls.add(u);
             } catch (Exception ex2) {
                 ex2.printStackTrace();
@@ -214,7 +214,7 @@ public class JavaFXLoader {
         }
 
         try {
-            javafxUrls.add(javafxLibDir.toURL()); // Necessary for loading native libs
+            javafxUrls.add(javafxLibDir.toURI().toURL()); // Necessary for loading native libs
         } catch (MalformedURLException mex) {
             throw new RuntimeException(mex);
         }
@@ -232,7 +232,7 @@ public class JavaFXLoader {
         if (System.getProperty("JavaFXLoader.loaded", null) != null) {
             // Make sure that we don't cause infinite recursion.
             return false;
-        }
+        }        
         System.setProperty("JavaFXLoader.loaded", "1");
         ClassLoader cl;
         try {
@@ -278,7 +278,7 @@ public class JavaFXLoader {
         urls.addAll(Arrays.asList(paths));
         for (String part : parts) {
             try {
-                java.net.URL url = new File(part).toURL();
+                java.net.URL url = new File(part).toURI().toURL();
                 urls.add(url);
             } catch (Exception ex){
                 ex.printStackTrace();
@@ -293,6 +293,7 @@ public class JavaFXLoader {
                 } else {
                     newCp.append(File.pathSeparator);
                 }
+                
                 newCp.append(new File(url.toURI()).getAbsolutePath());
             } catch (Exception ex){
                 ex.printStackTrace();

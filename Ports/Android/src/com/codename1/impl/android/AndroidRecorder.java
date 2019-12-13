@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.media.MediaRecorder;
+import com.codename1.media.AbstractMedia;
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
 
@@ -30,7 +31,14 @@ import com.codename1.ui.Component;
  *
  * @author Chen
  */
-public class AndroidRecorder implements Media{
+public class AndroidRecorder extends AbstractMedia{
+    
+    private MediaRecorder.OnErrorListener onErrorListener = new MediaRecorder.OnErrorListener() {
+        @Override
+        public void onError(MediaRecorder mr, int i, int i1) {
+            fireMediaError(AndroidImplementation.createMediaException(i1));
+        }
+    };
     
     private MediaRecorder recorder;
     
@@ -38,28 +46,32 @@ public class AndroidRecorder implements Media{
     
     public AndroidRecorder(MediaRecorder recorder) {
         this.recorder = recorder;
+        recorder.setOnErrorListener(onErrorListener);
     }
 
     
     @Override
-    public void play() {
+    protected void playImpl() {
         recorder.start();
         isPlaying = true;
+        fireMediaStateChange(State.Playing);
     }
 
     public void prepare() {
     }
 
     @Override
-    public void pause() {
+    protected void pauseImpl() {
         recorder.stop();
         isPlaying = false;
+        fireMediaStateChange(State.Paused);
     }
 
     @Override
     public void cleanup() {
         recorder.release();
         isPlaying = false;
+        fireMediaStateChange(State.Paused);
     }
 
     @Override

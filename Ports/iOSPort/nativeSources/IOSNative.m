@@ -80,8 +80,6 @@
 #ifdef ENABLE_WKWEBVIEW
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <WebKit/WebKit.h>
-//#define CN1_USE_AVKIT
-#import <AVKit/AVKit.h>
 #define supportsWKWebKit
 #endif
 #endif
@@ -89,9 +87,20 @@
 #import "ZooZ.h"
 #endif
 #import "Rotate.h"
+//#define CN1_USE_AVKIT
+#ifdef CN1_USE_AVKIT
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
+#import <AVKit/AVKit.h>
+#define CN1_AVPLAYERVIEWCONTROLLER = AVPlayerViewController*
+#else
+#define CN1_AVPLAYERVIEWCONTROLLER id
+#endif
+#else
+#define CN1_AVPLAYERVIEWCONTROLLER id
+#endif
 extern int popoverSupported();
 
-#define INCLUDE_CN1_PUSH2
+//#define INCLUDE_CN1_PUSH2
 #ifdef INCLUDE_CN1_PUSH2
 #import <UserNotifications/UserNotifications.h>
 #endif
@@ -2326,9 +2335,11 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
     });
 #endif
 }
-
+#ifndef NO_UIWEBVIEW
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
+#endif
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
+#ifndef NO_UIWEBVIEW
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
@@ -2345,6 +2356,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
     UIWebView* r = com_codename1_impl_ios_IOSNative_createBrowserComponent;
     com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
     return (JAVA_LONG)((BRIDGE_CAST void*)r);
+#else
+    return 0;
+#endif
 }
 #ifdef supportsWKWebKit
 WKWebView* com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
@@ -2363,9 +2377,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
             
-    #ifndef CN1_USE_ARC
-            [com_codename1_impl_ios_IOSNative_createWKBrowserComponent retain];
-    #endif
         });
         id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
         com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
@@ -2397,8 +2408,10 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
 #endif
             
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w loadHTMLString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG html) baseURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG baseUrl)]];
+#endif
         }
         POOL_END();
     });
@@ -2426,9 +2439,11 @@ void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_T
 
             //w.allows=enabled;
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
 
             w.scalesPageToFit=enabled;
+#endif
         }
         
         POOL_END();
@@ -2446,10 +2461,12 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
             w.scrollView.bounces = enabled;
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
 
             w.scrollView.scrollEnabled = enabled;
             w.scrollView.bounces = enabled;
+#endif
         }
         
         POOL_END();
@@ -2468,11 +2485,13 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
             [w loadRequest:r];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             NSURL* nu = [NSURL URLWithString:str];
             NSURLRequest* r = [NSURLRequest requestWithURL:nu];
             [w loadRequest:r];
+#endif
         }
         POOL_END();
     });
@@ -2500,6 +2519,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
             [w loadRequest:request];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
@@ -2515,7 +2535,9 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
             }
 
             [w loadRequest:request];
+#endif
         }
+
         POOL_END();
     });
 }
@@ -2529,8 +2551,10 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_
             [w goBack];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w goBack];
+#endif
         }
         POOL_END();
     });
@@ -2545,8 +2569,10 @@ void com_codename1_impl_ios_IOSNative_browserStop___long(CN1_THREAD_STATE_MULTI_
             [w stopLoading];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w stopLoading];
+#endif
         }
         POOL_END();
     });
@@ -2583,6 +2609,7 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
         }
 #endif
     } else {
+#ifndef NO_UIWEBVIEW
         if ([NSThread isMainThread]) {
             POOL_BEGIN();
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
@@ -2596,6 +2623,7 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
                 POOL_END();
             });
         }
+#endif
     }
 }
 
@@ -2638,6 +2666,7 @@ void com_codename1_impl_ios_IOSNative_browserExecuteAndReturnStringCallback___lo
         }
 #endif
     } else {
+#ifndef NO_UIWEBVIEW
         if ([NSThread isMainThread]) {
             POOL_BEGIN();
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
@@ -2657,6 +2686,7 @@ void com_codename1_impl_ios_IOSNative_browserExecuteAndReturnStringCallback___lo
                 POOL_END();
             });
         }
+#endif
     }
 }
 
@@ -2669,8 +2699,10 @@ void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MUL
             [w goForward];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w goForward];
+#endif
         }
         POOL_END();
     });
@@ -2686,8 +2718,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_S
             booleanResponse = [w canGoBack];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             booleanResponse = [w canGoBack];
+#endif
         }
         POOL_END();
     });
@@ -2703,8 +2737,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREA
             booleanResponse = [w canGoForward];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             booleanResponse = [w canGoForward];
+#endif
         }
         POOL_END();
     });
@@ -2720,8 +2756,10 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
             [w reload];
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             [w reload];
+#endif
         }
         POOL_END();
     });
@@ -2737,9 +2775,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_S
             returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.title);
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             NSString* theTitle = [w stringByEvaluatingJavaScriptFromString:@"document.title"];
             returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG theTitle);
+#endif
         }
         POOL_END();
     });
@@ -2755,8 +2795,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
             returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.URL.absoluteString);
 #endif
         } else {
+#ifndef NO_UIWEBVIEW
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
             returnString = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG w.request.URL.absoluteString);
+#endif
         }
         POOL_END();
     });
@@ -2784,6 +2826,7 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
 }
 
 void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
+#ifdef CN1_USE_AVKIT
     id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:moviePlayer
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
         /*
@@ -2801,6 +2844,7 @@ void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, J
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+#endif
 }
 
 extern BOOL CN1_blockPaste;
@@ -2885,6 +2929,7 @@ void addPlaybackToAudioSession() {
 }
 
 JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
      __block AVPlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -2909,6 +2954,9 @@ JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletio
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else
+        return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
@@ -2948,6 +2996,7 @@ JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCom
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
     __block AVPlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
@@ -2964,6 +3013,9 @@ JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCom
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else
+        return 0;
+#endif
 }
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     if (useAVKit()) {
@@ -3011,6 +3063,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
 }
 JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
     __block AVPlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -3042,6 +3095,9 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else
+        return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
@@ -3055,6 +3111,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___byte_1ARRAY_in
 
 
 JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
     __block AVPlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -3079,6 +3136,9 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else
+        return 0;
+#endif
 }
 JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
@@ -3156,6 +3216,7 @@ JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCa
 }
 
 JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
     __block AVPlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -3180,6 +3241,9 @@ JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCa
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else 
+        return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -3218,6 +3282,7 @@ JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onComple
 }
 
 JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+#ifdef CN1_USE_AVKIT
     __block AVPlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -3237,6 +3302,9 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
             POOL_END();
         });
         return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+#else
+        return 0;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -3377,6 +3445,7 @@ MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
 }
 
 AVPlayer* getAVPlayer(JAVA_LONG peer) {
+#ifdef CN1_USE_AVKIT
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayer* m = nil;;
     if([obj isKindOfClass:[AVPlayer class]]) {
@@ -3386,9 +3455,13 @@ AVPlayer* getAVPlayer(JAVA_LONG peer) {
         m = mv.player;
     }
     return m;
+#else
+    return nil;
+#endif
 }
 
-AVPlayerViewController* getAVPlayerController(JAVA_LONG peer) {
+CN1_AVPLAYERVIEWCONTROLLER getAVPlayerController(JAVA_LONG peer) {
+#ifdef CN1_USE_AVKIT
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayerViewController* m = nil;;
     if([obj isKindOfClass:[AVPlayer class]]) {
@@ -3398,6 +3471,9 @@ AVPlayerViewController* getAVPlayerController(JAVA_LONG peer) {
         
     }
     return m;
+#else
+    return nil;
+#endif
 }
 
 
@@ -3412,12 +3488,14 @@ void startVideoComponentMP(JAVA_LONG peer) {
 }
 
 void startVideoComponentAV(JAVA_LONG peer) {
+#ifdef CN1_USE_AVKIT
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         addPlaybackToAudioSession();
         [getAVPlayer(peer) play];
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -3438,13 +3516,14 @@ void stopVideoComponentMP(JAVA_LONG peer) {
     });
 }
 void stopVideoComponentAV(JAVA_LONG peer) {
-    
+#ifdef CN1_USE_AVKIT
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         [getAVPlayer(peer) seekToTime:CMTimeMake(0, 1)];
         [getAVPlayer(peer) pause];
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -3474,12 +3553,14 @@ void pauseVideoComponentMP(JAVA_LONG peer) {
     });
 }
 void pauseVideoComponentAV(JAVA_LONG peer) {
+#ifdef CN1_USE_AVKIT
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         
         [getAVPlayer(peer) pause];
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -3503,11 +3584,15 @@ void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_ST
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
         AVPlayer* m = getAVPlayer(peer);
         if (m == nil) {
             return 0;
         }
         return CMTimeGetSeconds(m.currentTime) * 1000;
+#else
+        return 0;
+#endif
     } else {
         return (int)[getMPPlayer(peer) currentPlaybackTime] * 1000;
     }
@@ -3517,8 +3602,12 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
     if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
         [getAVPlayer(peer) seekToTime:CMTimeMakeWithSeconds(time/1000, 1000)];
         return CMTimeGetSeconds([getAVPlayer(peer) currentTime]);
+#else
+        return 0;
+#endif
     } else {
         [getMPPlayer(peer) setCurrentPlaybackTime:time/1000];
         return [getMPPlayer(peer) currentPlaybackTime];
@@ -3532,8 +3621,10 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STA
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
             CMTime duration = getAVPlayer(peer).currentItem.asset.duration;
             responseGetMediaDuration = CMTimeGetSeconds(duration) * 1000;
+#endif
         } else {
             responseGetMediaDuration = (int)getMPPlayer(peer).duration * 1000;
         }
@@ -3641,7 +3732,9 @@ void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_bool
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
             getAVPlayerController(peer).showsPlaybackControls = value;
+#endif
         } else {
             NSObject* obj = (BRIDGE_CAST NSObject*)peer;
             MPMoviePlayerController* m = nil;;
@@ -3701,7 +3794,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
             responseIsVideoPlaying = getAVPlayer(peer).rate != 0 && getAVPlayer(peer).error == nil;
+#endif
         } else{
             NSObject* obj = (BRIDGE_CAST NSObject*)peer;
             MPMoviePlayerController* m = nil;;
@@ -3779,8 +3874,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREA
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
         AVPlayerViewController *m = getAVPlayerController(peer);
         return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
+#else
+        return 0;
+#endif
     } else {
         MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
         return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
@@ -3792,7 +3891,9 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
+#ifdef CN1_USE_AVKIT
             [[CodenameOne_GLViewController instance] presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
+#endif
         } else {
             NSObject* obj = (BRIDGE_CAST NSObject*)peer;
             if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
@@ -3807,6 +3908,16 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGPSEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_LOCATION_USAGE
+    return [CLLocationManager locationServicesEnabled] && 
+   [CLLocationManager authorizationStatus] != kCLAuthorizationStatusDenied;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_LOCATION_USAGE
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5308,10 +5419,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
 
 
 void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        NSError *err = nil;
+        [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
+        POOL_END();
+    });
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit start];
     
 }
+
 
 void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
@@ -6449,6 +6568,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
         NSLog(@"browserExecuteAndReturnString not supported for WKWebView");
         return JAVA_NULL;
     } else {
+#ifndef NO_UIWEBVIEW
         if ([NSThread isMainThread]) {
             POOL_BEGIN();
             UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
@@ -6465,7 +6585,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
             });
             return out;
         }
+#else
+        return 0;
+#endif
     }
+
 }
 
 JAVA_OBJECT java_util_TimeZone_getTimezoneId__(CN1_THREAD_STATE_SINGLE_ARG) {
@@ -6519,15 +6643,36 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long(CN1_THREAD
     return result;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT callbackId) {
     __block JAVA_OBJECT c = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+#ifdef NO_UIWEBVIEW
+    WKWebView *webView = [[WKWebView alloc] initWithFrame:CGRectZero];
+    [webView loadHTMLString:@"<html></html>" baseURL:nil];
+
+    [webView evaluateJavaScript:@"navigator.appName" completionHandler:^(id __nullable appName, NSError * __nullable error) {
+        NSLog(@"%@", appName);
+        // Netscape
+    }];
+    [webView retain];
+    [webView evaluateJavaScript:@"navigator.userAgent" completionHandler:^(id __nullable userAgent, NSError * __nullable error) {
+        com_codename1_impl_ios_IOSImplementation_completeStringCallback___java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG 
+            callbackId,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userAgent)
+        );
+        [webView release];
+        
+    }];
+    
+#else
         UIWebView* webView = [[UIWebView alloc] initWithFrame:CGRectZero];
         NSString* userAgentString = [webView stringByEvaluatingJavaScriptFromString:@"navigator.userAgent"];
         c = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userAgentString);
 #ifndef CN1_USE_ARC
         [webView release];
+#endif
 #endif
         POOL_END();
     });
@@ -8386,8 +8531,8 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(
     return java_util_TimeZone_isTimezoneDST___java_lang_String_long(CN1_THREAD_STATE_PASS_ARG name, millis);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return com_codename1_impl_ios_IOSNative_getUserAgentString__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT callbackId) {
+    return com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, callbackId);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {

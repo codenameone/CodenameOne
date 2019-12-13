@@ -191,7 +191,7 @@ public class CSSImageImporter {
         File destImage = copyImageToCSSDirectory();
         StringBuilder css = new StringBuilder();
         css.append("import-").append(System.currentTimeMillis()).append("{\n")
-                .append("  background-image: url(images/").append(destImage.getName()).append(");\n")
+                .append("  background-image: url(\"images/").append(destImage.getName()).append("\");\n")
                 .append("  cn1-source-dpi: ").append(sourceDpi).append(";\n")
                 .append("}\n");
         appendCSS(css.toString());

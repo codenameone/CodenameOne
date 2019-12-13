@@ -1532,6 +1532,9 @@ public class TextField extends TextArea {
         
         //the native input will show the string.
         if(useNativeTextInput && Display.getInstance().isNativeEditorVisible(this)) {
+            if (!Display.impl.nativeEditorPaintsHint()) {
+                paintHint(g);
+            }
             return;
         }
 

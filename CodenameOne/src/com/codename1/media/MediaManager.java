@@ -22,12 +22,19 @@
  */
 package com.codename1.media;
 
+import com.codename1.io.Util;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * <p>
@@ -352,5 +359,147 @@ public class MediaManager {
         }
         
         return Display.getInstance().createMediaRecorder(path, mimeType);
+    }
+    
+    /**
+     * Converts the media object into an AsyncMedia object.  Many media objects
+     * area already instances of AsyncMedia, so this method would perform
+     * a simple cast.  For media objects that are not already async, this will
+     * return an Async wrapper.
+     * @param media The media object to convert.
+     * @return The media object as an AsyncMedia instance.
+     * @since 7.0
+     */
+    public static AsyncMedia getAsyncMedia(final Media media) {
+        if (media instanceof AsyncMedia) {
+            return (AsyncMedia)media;
+        }
+        return new AbstractMedia() {
+            @Override
+            protected void playImpl() {
+                State oldState = getState();
+                media.play();
+                if (media.isPlaying() && oldState != State.Playing) {
+                    fireMediaStateChange(State.Playing);
+                }
+                if (!media.isPlaying()) {
+                    final Timer t = new Timer();
+                    t.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            if (media.isPlaying()) {
+                                t.cancel();
+                                fireMediaStateChange(State.Playing);
+                            }
+                        }
+
+                    }, 50, 50);
+                }
+                
+            }
+
+            @Override
+            protected void pauseImpl() {
+                State oldState = getState();
+                media.pause();
+                if (!media.isPlaying() && oldState != State.Paused) {
+                    fireMediaStateChange(State.Paused);
+                }
+                if (media.isPlaying()) {
+                    final Timer t = new Timer();
+                    t.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            if (!media.isPlaying()) {
+                                t.cancel();
+                                fireMediaStateChange(State.Paused);
+                            }
+                        }
+
+                    }, 50, 50);
+                }
+            }
+
+            @Override
+            public void prepare() {
+                media.prepare();
+            }
+
+            @Override
+            public void cleanup() {
+                media.cleanup();
+            }
+
+            @Override
+            public int getTime() {
+                return media.getTime();
+            }
+
+            @Override
+            public void setTime(int time) {
+                 media.setTime(time);
+            }
+
+            @Override
+            public int getDuration() {
+                return media.getDuration();
+            }
+
+            @Override
+            public void setVolume(int vol) {
+                media.setVolume(vol);
+            }
+
+            @Override
+            public int getVolume() {
+                return media.getVolume();
+            }
+
+            @Override
+            public boolean isPlaying() {
+                return media.isPlaying();
+            }
+
+            @Override
+            public Component getVideoComponent() {
+                return media.getVideoComponent();
+            }
+
+            @Override
+            public boolean isVideo() {
+                return media.isVideo();
+            }
+
+            @Override
+            public boolean isFullScreen() {
+                return media.isFullScreen();
+            }
+
+            @Override
+            public void setFullScreen(boolean fullScreen) {
+                media.setFullScreen(fullScreen);
+            }
+
+            @Override
+            public void setNativePlayerMode(boolean nativePlayer) {
+                media.setNativePlayerMode(nativePlayer);
+            }
+
+            @Override
+            public boolean isNativePlayerMode() {
+                return media.isNativePlayerMode();
+            }
+
+            @Override
+            public void setVariable(String key, Object value) {
+                media.setVariable(key, value);
+            }
+
+            @Override
+            public Object getVariable(String key) {
+                return media.getVariable(key);
+            }
+        
+        };
     }
 }
