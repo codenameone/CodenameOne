@@ -301,7 +301,23 @@ public class JavaFXLoader {
         }
         System.setProperty("java.class.path", newCp.toString());
         
-        return new URLClassLoader(urls.toArray(new java.net.URL[urls.size()])) {
+        return new URLClassLoader(urls.toArray(new java.net.URL[urls.size()]), Executor.class.getClassLoader()) {
+            @Override
+            public Class<?> loadClass(String name) throws ClassNotFoundException {
+                if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop") || name.startsWith("org.w3c.dom")) {
+                    return super.loadClass(name);
+                }
+                Class cls = findLoadedClass(name);
+                if (cls != null) {
+                    return cls;
+                }
+                try {
+                    return findClass(name);
+                } catch (ClassNotFoundException ex) {
+                    return super.loadClass(name); //To change body of generated methods, choose Tools | Templates.
+                }
+            }
+            
             @Override
             public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
                 if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop") || name.startsWith("org.w3c.dom")) {
