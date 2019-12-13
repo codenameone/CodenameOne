@@ -1274,7 +1274,6 @@ public final class Display extends CN1Constants {
      * Used by the EDT to process all the calls submitted via call serially
      */
     void processSerialCalls() {
-        disableInvokeAndBlock = false;
         processingSerialCalls = true;
         int size = pendingSerialCalls.size();
         if(size > 0) {

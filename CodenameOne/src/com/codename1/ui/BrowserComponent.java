@@ -603,7 +603,16 @@ public class BrowserComponent extends Container {
      * @param key see the documentation with the CodenameOne Implementation for further details
      * @param value see the documentation with the CodenameOne Implementation for further details
      */
-    public void setProperty(String key, Object value) {
+    public void setProperty(final String key, final Object value) {
+         if (internal == null) {
+            
+            onReady(new Runnable() {
+                public void run() {
+                    setProperty(key, value);
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserProperty(internal, key, value);
     }
 
