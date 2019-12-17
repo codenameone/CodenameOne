@@ -100,7 +100,7 @@
 #endif
 extern int popoverSupported();
 
-//#define INCLUDE_CN1_PUSH2
+#define INCLUDE_CN1_PUSH2
 #ifdef INCLUDE_CN1_PUSH2
 #import <UserNotifications/UserNotifications.h>
 #endif
