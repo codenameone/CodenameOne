@@ -733,8 +733,15 @@ public class ConnectionRequest implements IOProgressListener {
      * Performs the actual network request on behalf of the network manager
      */
     void performOperation() throws IOException {
+        performOperationComplete();
+    }
+    /**
+     * Performs the actual network request on behalf of the network manager
+     * @return true if the operation completed, false if the network request is scheduled to be retried.
+     */
+    boolean performOperationComplete() throws IOException {
         if(shouldStop()) {
-            return;
+            return true;
         }
         if(cacheMode == CachingMode.OFFLINE) {
             InputStream is = getCachedData();
@@ -745,7 +752,7 @@ public class ConnectionRequest implements IOProgressListener {
                 responseCode = 404;
                 throw new IOException("File unavilable in cache");
             }
-            return;
+            return true;
         }
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
@@ -760,7 +767,7 @@ public class ConnectionRequest implements IOProgressListener {
                 connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());
             }
             if(shouldStop()) {
-                return;
+                return true;
             }
             initConnection(connection);
             if(httpMethod != null) {
@@ -807,14 +814,14 @@ public class ConnectionRequest implements IOProgressListener {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
                 checkSSLCertificates(sslCertificates);
                     if(shouldStop()) {
-                    return;
+                    return true;
                 }
             }
             if(isWriteRequest()) {
                 progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
                 if(shouldStop()) {
-                    return;
+                    return true;
                 }
                 if(NetworkManager.getInstance().hasProgressListeners() && output instanceof BufferedOutputStream) {
                     ((BufferedOutputStream)output).setProgressListener(this);
@@ -832,12 +839,12 @@ public class ConnectionRequest implements IOProgressListener {
                     buildRequestBody(output);
                 }
                 if(shouldStop()) {
-                    return;
+                    return true;
                 }
                 if(output instanceof BufferedOutputStream) {
                     ((BufferedOutputStream)output).flushBuffer();
                     if(shouldStop()) {
-                        return;
+                        return true;
                     }
                 }
             }
@@ -862,7 +869,7 @@ public class ConnectionRequest implements IOProgressListener {
             
             if(responseCode == 304 && cacheMode != CachingMode.OFF) {
                 cacheUnmodified();
-                return;
+                return true;
             }
             
             if(responseCode - 200 < 0 || responseCode - 200 > 100) {
@@ -896,14 +903,15 @@ public class ConnectionRequest implements IOProgressListener {
                     if(!onRedirect(url)){
                         redirecting = true;
                         retry();
+                        return false;
                     }
-                    return;
+                    return true;
                 }
 
                 responseErrorMessge = impl.getResponseMessage(connection);
                 handleErrorResponseCode(responseCode, responseErrorMessge);
                 if(!isReadResponseForErrors()) {
-                    return;
+                    return true;
                 }
             }
             responseContentType = getHeader(connection, "Content-Type");
@@ -922,7 +930,7 @@ public class ConnectionRequest implements IOProgressListener {
             if(isReadRequest()) {
                 input = impl.openInputStream(connection);
                 if(shouldStop()) {
-                    return;
+                    return true;
                 }
                 if(input instanceof BufferedInputStream) {
                     if(NetworkManager.getInstance().hasProgressListeners()) {
@@ -961,6 +969,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             });
         }
+        return true;
     }
     
     /**
