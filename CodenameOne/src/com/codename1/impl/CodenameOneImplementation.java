@@ -2277,8 +2277,17 @@ public abstract class CodenameOneImplementation {
      * @param y the position of the event
      */
     protected void pointerDragged(final int[] x, final int[] y) {
-        
-        if (dragStarted || hasDragStarted(x, y)) {
+        boolean hasDragStartedXY = false;
+        if (!dragStarted) {
+            try {
+                hasDragStartedXY = hasDragStarted(x, y);
+            } catch ( Throwable t) {
+                // Since this method may be running off the EDT
+                // It is possible that hasDragStarted will throw an NPE
+                // as the UI may be in an inconsistent state.
+            }
+        }
+        if (dragStarted || hasDragStartedXY) {
             dragStarted = true;
             Display.getInstance().pointerDragged(x, y);
         }
