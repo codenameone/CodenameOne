@@ -2479,10 +2479,17 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
             WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-            NSURL* nu = [NSURL URLWithString:str];
-            NSURLRequest* r = [NSURLRequest requestWithURL:nu];
-            [w loadRequest:r];
+            if ([str hasPrefix:@"http://"] || [str hasPrefix:@"https://"]) {
+                NSURL* nu = [NSURL URLWithString:str];
+                NSURLRequest* r = [NSURLRequest requestWithURL:nu];
+                [w loadRequest:r];
+            } else {
+                NSURL* nu = [NSURL fileURLWithPath:str];           
+                [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
+            }
+
 #endif
         } else {
 #ifndef NO_UIWEBVIEW
