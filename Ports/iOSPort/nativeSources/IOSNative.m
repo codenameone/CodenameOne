@@ -91,7 +91,7 @@
 #ifdef CN1_USE_AVKIT
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <AVKit/AVKit.h>
-#define CN1_AVPLAYERVIEWCONTROLLER = AVPlayerViewController*
+#define CN1_AVPLAYERVIEWCONTROLLER AVPlayerViewController*
 #else
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
