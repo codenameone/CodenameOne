@@ -148,6 +148,11 @@ public class Tabs extends Container {
         }
     }
 
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+        return isSwipeActivated();
+    }
+    
     private void checkTabsCanBeSeen() {
         if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
             for(int iter = 0 ; iter < getTabCount() ; iter++) {
@@ -1275,14 +1280,15 @@ public class Tabs extends Container {
         return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
     }
     
+    private boolean blockSwipe;
+    private boolean riskySwipe;
     class SwipeListener implements ActionListener{
 
         private final static int PRESS = 0;
         private final static int DRAG = 1;
         private final static int RELEASE = 2;
         private final int type;
-        private boolean blockSwipe;
-        private boolean riskySwipe;
+        
 
         public SwipeListener(int type) {
             this.type = type;
@@ -1290,7 +1296,7 @@ public class Tabs extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             
-            if (getComponentCount() == 0 || !swipeActivated ||animate()) {
+            if (getComponentCount() == 0 || !swipeActivated ||slideToDestMotion != null) {
                 return;
             }
             final int x = evt.getX();
