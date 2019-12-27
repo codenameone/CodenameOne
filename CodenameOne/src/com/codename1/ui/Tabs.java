@@ -148,10 +148,18 @@ public class Tabs extends Container {
         }
     }
 
+    // A flag that is used internally to temporily override the output of the 
+    // shoudlBlockSideSwipe method, so that we don't block our own side swipes.
+    private boolean doNotBlockSideSwipe;
+    
     @Override
     protected boolean shouldBlockSideSwipe() {
+        if (doNotBlockSideSwipe) {
+            return false;
+        }
         return isSwipeActivated();
     }
+    
     
     private void checkTabsCanBeSeen() {
         if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
@@ -1308,28 +1316,33 @@ public class Tabs extends Container {
                     if (contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
                         if(testCmp != null && testCmp != contentPane) {
-                            while(testCmp != null && testCmp != contentPane) {
-                                if(testCmp.shouldBlockSideSwipe()) {
-                                    lastX = -1;
-                                    initialX = -1;
-                                    blockSwipe = true;
-                                    return;
-                                }
-                                if(testCmp.isScrollable()) {
-                                    if(testCmp.isScrollableX()) {
-                                        // we need to block swipe since the user is trying to scroll a component
+                            doNotBlockSideSwipe = true;
+                            try {
+                                while(testCmp != null && testCmp != contentPane) {
+                                    if(testCmp.shouldBlockSideSwipe()) {
                                         lastX = -1;
                                         initialX = -1;
                                         blockSwipe = true;
                                         return;
                                     }
+                                    if(testCmp.isScrollable()) {
+                                        if(testCmp.isScrollableX()) {
+                                            // we need to block swipe since the user is trying to scroll a component
+                                            lastX = -1;
+                                            initialX = -1;
+                                            blockSwipe = true;
+                                            return;
+                                        }
 
-                                    // scrollable Y component, we want to make side scrolling
-                                    // slightly harder so it doesn't bother the vertical swipe
-                                    riskySwipe = true;
-                                    break;
+                                        // scrollable Y component, we want to make side scrolling
+                                        // slightly harder so it doesn't bother the vertical swipe
+                                        riskySwipe = true;
+                                        break;
+                                    }
+                                    testCmp = testCmp.getParent();
                                 }
-                                testCmp = testCmp.getParent();
+                            } finally {
+                                doNotBlockSideSwipe = false;
                             }
                         }
                         lastX = x;
