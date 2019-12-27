@@ -84,6 +84,11 @@ public class RoundRectBorder extends Border {
     private int shadowOpacity = 0;
 
     /**
+     * The color of the shadow as an RRGGBB color (no alpha)
+     */
+    private int shadowColor = 0;
+    
+    /**
      * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
      */
     private float shadowX = 0.5f;
@@ -215,6 +220,16 @@ public class RoundRectBorder extends Border {
         return this;
     }
 
+    /**
+     * Sets the color of the shadow as an RRGGBB color
+     * @param shadowColor the color of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowColor(int shadowColor) {
+        this.shadowColor = shadowColor;
+        return this;
+    }
+    
     /**
      * The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
      * @param shadowX the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
@@ -373,7 +388,7 @@ public class RoundRectBorder extends Border {
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
                 int iterOpacity = Math.max(0, Math.min(255, (int)(shadowOpacity * (shadowSpreadL - iter)/(float)shadowSpreadL)));
-                drawShape(tg, 0, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
+                drawShape(tg, shadowColor, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
                 tg.translate(-iter, -iter);
             }
             
@@ -750,6 +765,14 @@ public class RoundRectBorder extends Border {
     }
 
     /**
+     * The color of the shadow as an RRGGBB color
+     * @return the shadowColor
+     */
+    public int getShadowColor() {
+        return shadowColor;
+    }
+    
+    /**
      * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
      * @return the shadowX
      */
@@ -834,6 +857,9 @@ public class RoundRectBorder extends Border {
             return false;
         }
         if (this.shadowOpacity != other.shadowOpacity) {
+            return false;
+        }
+        if (this.shadowColor != other.shadowColor) {
             return false;
         }
         if (this.shadowX != other.shadowX) {
