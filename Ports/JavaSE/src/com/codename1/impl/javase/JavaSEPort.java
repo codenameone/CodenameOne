@@ -167,10 +167,13 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaPlayer.Status;
 import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
@@ -9901,8 +9904,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
     
+    
+    
     class CodenameOneMediaPlayer extends AbstractMedia {
-
+        private java.util.Timer endMediaPoller;
         private Runnable onCompletion;
         private List<Runnable> completionHandlers;
         private javafx.scene.media.MediaPlayer player;
@@ -9913,11 +9918,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame frm;
         private boolean playing = false;
         private boolean nativePlayerMode;
+        private AsyncResource<Media> _callback;
+        
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onPaused = new Runnable() {
+            public void run() {
+                if (endMediaPoller != null) {
+                    endMediaPoller.cancel();
+                    endMediaPoller = null;
+                }
+                stopEndMediaPoller();
+                playing = false;
+
+                fireMediaStateChange(State.Paused);
+            }
+        };
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onPlaying = new Runnable() {
+            @Override
+            public void run() {
+                playing = true;
+                startEndMediaPoller();
+                fireMediaStateChange(State.Playing);
+            }
+            
+        };
+        
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onError = new Runnable() {
+            public void run() {
+                if (_callback != null && !_callback.isDone()) {
+                    _callback.error(player.errorProperty().get());
+                    return;
+                } else {
+                    Log.e(player.errorProperty().get());
+                }
+                fireMediaError(createMediaException(player.errorProperty().get()));
+                if (!playing) {
+                    stopEndMediaPoller();
+                    fireMediaStateChange(State.Playing);
+                    fireMediaStateChange(State.Paused);
+                }
+
+            }
+        };
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
+            _callback = callback;
             if (onCompletion != null) {
                 addCompletionHandler(onCompletion);
             }
+            
             this.onCompletion = new Runnable() {
 
                 @Override
@@ -9925,6 +9994,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (callback != null && !callback.isDone()) {
                         callback.complete(CodenameOneMediaPlayer.this);
                     }
+                    stopEndMediaPoller();
                     playing = false;
                     
                     fireMediaStateChange(State.Paused);
@@ -9959,7 +10029,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     stream.close();
                     uri = temp.toURI().toURL().toExternalForm();
                 }
+                
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                
                 player.setOnReady(new Runnable() {
                     public void run() {
                         if (callback != null && !callback.isDone()) {
@@ -9968,39 +10040,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 });
 
-                player.setOnPaused(new Runnable() {
-                    public void run() {
-                        playing = false;
-                        fireMediaStateChange(State.Paused);
-                    }
-                });
-                player.setOnPlaying(new Runnable() {
-                    public void run() {
-                        playing = true;
-                        fireMediaStateChange(State.Playing);
-                    }
-                });
-                
-                player.setOnEndOfMedia(this.onCompletion);
+                installFxCallbacks();
                 if (isVideo) {
                     videoPanel = fx;
                 }
-                player.setOnError(new Runnable() {
-                    public void run() {
-                        if (callback != null && !callback.isDone()) {
-                            callback.error(player.errorProperty().get());
-                            return;
-                        } else {
-                            Log.e(player.errorProperty().get());
-                        }
-                        fireMediaError(createMediaException(player.errorProperty().get()));
-                        if (!playing) {
-                            fireMediaStateChange(State.Playing);
-                            fireMediaStateChange(State.Paused);
-                        }
-                        
-                    }
-                });
+                
 
             } catch (Exception ex) {
                 if (callback != null && !callback.isDone()) {
@@ -10044,6 +10088,75 @@ public class JavaSEPort extends CodenameOneImplementation {
                     
             }
             return new com.codename1.media.AsyncMedia.MediaException(type, ex);
+        }
+        
+        /**
+         * This starts a timer which checks the status of media every Xms so that it can fire
+         * status change events and on completion events.  The JavaFX media player has onPlaying,
+         * onPaused, etc.. status events of its own that seem to not work in many cases, so we
+         * need to use this timer to poll for the status.  That really sucks!!
+         */
+        private void startEndMediaPoller() {
+            stopEndMediaPoller();
+            endMediaPoller = new java.util.Timer();
+            endMediaPoller.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    
+                    // Check if the media is playing but we haven't updated our status.
+                    // If so, we change our status to playing, and fire a state change event.
+                    if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
+                        Platform.runLater(new Runnable() {
+                            // State tracking on the fx thread to avoid race conditions.
+                            public void run() {
+                                if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
+                                    playing = true;
+                                    fireMediaStateChange(State.Playing);
+                                }
+                            }
+                            
+                        });
+                        
+                    } else if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
+                        stopEndMediaPoller();
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
+                                    
+                                    playing = false;
+                                    fireMediaStateChange(State.Paused);
+                                }
+                            }
+                            
+                        });
+                    }
+                    double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
+                    if (playing && diff < 0.01) {
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
+                                if (playing && diff < 0.01) {
+                                    Runnable completionCallback = CodenameOneMediaPlayer.this.onCompletion;
+                                    if (completionCallback != null) {
+                                        completionCallback.run();
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+            }, 100, 100);
+        }
+        
+        /**
+         * Stop the media state poller. This is called when the media is paused.
+         */
+        private void stopEndMediaPoller() {
+            if (endMediaPoller != null) {
+                endMediaPoller.cancel();
+                endMediaPoller = null;
+            }
         }
         
         public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
@@ -10093,7 +10206,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    
+                    if (callback != null && !callback.isDone()) {
+                        callback.complete(CodenameOneMediaPlayer.this);
+                    }
+                    stopEndMediaPoller();
                     playing = false;
+                    
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
                 }
             };
@@ -10108,29 +10228,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
-                player.setOnPaused(new Runnable() {
-                    public void run() {
-                        playing = false;
-                    }
-                });
-                player.setOnPlaying(new Runnable() {
-                    public void run() {
-                        playing = true;
-                                    }
-                            });
-                player.setOnEndOfMedia(this.onCompletion);
+                installFxCallbacks();
                 if (isVideo) {
                     videoPanel = fx;
                 }
-                player.setOnError(new Runnable() {
-                    public void run() {
-                        if (callback != null) {
-                            callback.error(player.errorProperty().get());
-                        } else {
-                            Log.e(player.errorProperty().get());
-                        }
-                    }
-                });
+                
 
             } catch (Exception ex) {
                 if (callback != null) {
@@ -10201,8 +10303,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     @Override
                     protected void onShow() {
-                        player.play();
-                        playing = true;
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                playInternal();
+                            }
+
+                        });
                     }
                     
                 };
@@ -10210,7 +10316,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 playerForm.setToolbar(tb);
                 tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
                     public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                        player.pause();
+                        pauseInternal();
                         currForm.showBack();
                     }
                 });
@@ -10224,24 +10330,56 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
                 
             }
-            player.play();
-            playing = true;
+            playInternal();
+            
         }
 
+        private void playInternal() {
+            
+            installFxCallbacks();
+            player.play();
+            startEndMediaPoller();
+        }
+        
+        private void pauseInternal() {
+            player.pause();
+            
+            
+        
+        }
+        
+        /**
+         * Installs listeners for the javafx media player.  Unfortunately these are
+         * incredibly unreliable.  onPlaying only first the first time it plays.  OnPaused
+         * also stops firing after the first pause.  onEndOfMedia sometimes fires but not
+         * other times.  We use the endOfMediaPoller timer as a backup to test for status
+         * changes.
+         */
+        private void installFxCallbacks() {
+            
+            player.setOnPlaying(onPlaying);
+            player.setOnPaused(onPaused);
+            player.setOnError(onError);
+            player.setOnEndOfMedia(onCompletion);
+           
+        }
+        
         @Override
         protected void pauseImpl() {
-            if(playing) {
-                player.pause();
+            if(player.getStatus() == Status.PLAYING) {
+                pauseInternal();
             }
-            playing = false;
+            //playing = false;
+            
         }
 
         public int getTime() {
             return (int) player.getCurrentTime().toMillis();
         }
 
-        public void setTime(int time) {
-            player.seek(new Duration(time));
+        public void setTime(final int time) {
+           player.seek(new Duration(time));
+            
         }
 
         public int getDuration() {
