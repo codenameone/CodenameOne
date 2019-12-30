@@ -10201,14 +10201,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     @Override
                     protected void onShow() {
                         player.play();
-                            playing = true;
-                        }
+                        playing = true;
+                    }
                     
                 };
                 com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
                 playerForm.setToolbar(tb);
                 tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
                     public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                        player.pause();
                         currForm.showBack();
                     }
                 });
