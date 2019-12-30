@@ -2834,7 +2834,7 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
 
 void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
 #ifdef CN1_USE_AVKIT
-    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:moviePlayer
+    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:[moviePlayer currentItem]
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
         /*
          * I'm not sure if we need to handle the callback differently in different cases
