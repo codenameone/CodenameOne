@@ -10145,6 +10145,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private void fireCompletionHandlers() {
             if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                
                 Display.getInstance().callSerially(new Runnable() {
 
                     @Override
@@ -10632,7 +10633,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(resource.startsWith("raw")) {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
-        
+        if ("/theme.res".equals(resource)) {
+            File srcThemeRes = new File("src" + File.separator + "theme.res");
+            if (srcThemeRes.exists()) {
+                try {
+                    return new FileInputStream(srcThemeRes);
+                } catch (IOException err){
+                    System.err.println("Failed to load "+srcThemeRes+" . "+err.getMessage());
+                }
+            }
+        }
         if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);
