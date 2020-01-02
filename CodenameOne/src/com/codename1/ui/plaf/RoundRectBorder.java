@@ -49,7 +49,7 @@ import com.codename1.ui.geom.Rectangle;
  */
 public class RoundRectBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rrbcache";
-        
+    private boolean dirty; 
     /**
      * The color of the edge of the border if applicable
      */
@@ -290,7 +290,11 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topLeftMode(boolean topLeft) {
-        this.topLeft = topLeft;
+        if (topLeft != this.topLeft) {
+            this.topLeft = topLeft;
+            dirty = true;
+        }
+        
         return this;
     }
     
@@ -301,7 +305,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topRightMode(boolean topRight) {
-        this.topRight = topRight;
+        if (!topRight != this.topRight) {
+            this.topRight = topRight;
+            dirty = true;
+        }
         return this;
     }
     
@@ -312,7 +319,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
-        this.bottomLeft = bottomLeft;
+        if (bottomLeft != this.bottomLeft) {
+            this.bottomLeft = bottomLeft;
+            dirty = true;
+        }
         return this;
     }
     
@@ -323,7 +333,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomRightMode(boolean bottomRight) {
-        this.bottomRight = bottomRight;
+        if (bottomRight != this.bottomRight) {
+            this.bottomRight = bottomRight;
+            dirty = true;
+        }
         return this;
     }
     
@@ -335,13 +348,13 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
         if(topOnlyMode) {
-            this.topLeft = false;
-            this.topRight = false;
-            this.bottomLeft = true;
-            this.bottomRight = true;
+            topLeftMode(false);
+            topRightMode(false);
+            bottomLeftMode(true);
+            bottomRightMode(true);
         } else {
-            this.topLeft = true;
-            this.topRight = true;
+            topLeftMode(true);
+            topRightMode(true);
         }
         return this;
     }
@@ -354,13 +367,13 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
         if(bottomOnlyMode) {
-            this.topLeft = true;
-            this.topRight = true;
-            this.bottomLeft = false;
-            this.bottomRight = false;
+            topLeftMode(true);
+            topRightMode(true);
+            bottomLeftMode(false);
+            bottomRightMode(false);
         } else {
-            this.bottomLeft = true;
-            this.bottomRight = true;
+            bottomLeftMode(true);
+            bottomRightMode(true);
         }
         return this;
     }
@@ -511,7 +524,7 @@ public class RoundRectBorder extends Border {
             }
             if(w > 0 && h > 0) {
                 Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-                if(background != null && background.getWidth() == w && background.getHeight() == h) {
+                if(!dirty && background != null && background.getWidth() == w && background.getHeight() == h) {
                     g.drawImage(background, x, y);
                     return;
                 }
@@ -522,7 +535,7 @@ public class RoundRectBorder extends Border {
             Image target = createTargetImage(c, w, h, true);
             g.drawImage(target, x, y);
             c.putClientProperty(CACHE_KEY + instanceVal, target);
-
+            dirty = false;
             // update the cache with a more refined version and repaint
             Display.getInstance().callSeriallyOnIdle(new Runnable() {
                 public void run() {
