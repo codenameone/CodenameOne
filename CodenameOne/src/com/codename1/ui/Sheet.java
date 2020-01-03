@@ -406,33 +406,33 @@ public class Sheet extends Container {
         if (border instanceof RoundRectBorder) {
             RoundRectBorder b = (RoundRectBorder)border;
             
-            switch (getPosition()) {
-                case BorderLayout.CENTER:
+            switch (getPositionInt()) {
+                case C:
                     b.bottomRightMode(true);
                     b.bottomLeftMode(true);
                     b.topLeftMode(true);
                     b.topRightMode(true);
                     break;
-                case BorderLayout.EAST:
+                case E:
                     b.bottomLeftMode(true);
                     b.topLeftMode(true);
                     b.topRightMode(false);
                     b.bottomRightMode(false);
                     break;
-                case BorderLayout.WEST:
+                case W:
                     b.bottomLeftMode(false);
                     b.bottomRightMode(true);
                     b.topLeftMode(false);
                     b.topRightMode(true);
                     break;
-                case BorderLayout.SOUTH:
+                case S:
                     b.topLeftMode(true);
                     b.topRightMode(true);
                     b.bottomLeftMode(false);
                     b.bottomRightMode(false);
                     break;
                     
-                case BorderLayout.NORTH:
+                case N:
                     b.topLeftMode(false);
                     b.topRightMode(false);
                     b.bottomLeftMode(true);
@@ -478,15 +478,15 @@ public class Sheet extends Container {
      * @return 
      */
     private int getHiddenX(Container cnt) {
-        switch (getPosition()) {
-            case BorderLayout.SOUTH:
-            case BorderLayout.NORTH:
+        switch (getPositionInt()) {
+            case S:
+            case N:
                 return 0;
-            case BorderLayout.CENTER:
+            case C:
                 return (cnt.getWidth() - getPreferredW(cnt))/2;
-            case BorderLayout.EAST:
+            case E:
                 return cnt.getWidth();
-            case BorderLayout.WEST:
+            case W:
                 return -getPreferredW(cnt);
         }
         return 0;
@@ -499,14 +499,14 @@ public class Sheet extends Container {
      * @return 
      */
     private int getHiddenY(Container cnt) {
-        switch (getPosition()) {
-            case BorderLayout.SOUTH:
-            case BorderLayout.CENTER:
+        switch (getPositionInt()) {
+            case S:
+            case C:
                 return cnt.getHeight();
-            case BorderLayout.WEST:
-            case BorderLayout.EAST:
+            case W:
+            case E:
                 return 0;
-            case BorderLayout.NORTH:
+            case N:
                 return -getPreferredH(cnt); 
         }
         return 0;
@@ -521,19 +521,44 @@ public class Sheet extends Container {
      * @return 
      */
     private int getPreferredW(Container cnt) {
-        switch (getPosition()) {
-            case BorderLayout.NORTH:
-            case BorderLayout.SOUTH:
+        switch (getPositionInt()) {
+            case N:
+            case S:
                 return cnt.getWidth();
-            case BorderLayout.CENTER:
-            case BorderLayout.WEST:
-            case BorderLayout.EAST:
+            case C:
+            case W:
+            case E:
                 return Math.min(getPreferredW(), cnt.getWidth());
             
   
         }
         return getPreferredW();
         
+    }
+    private static final int N=0;
+    private static final int S=1;
+    private static final int E=2;
+    private static final int W=3;
+    private static final int C=4;
+    
+    private int getPositionInt() {
+        String pos = getPosition();
+        if (BorderLayout.NORTH.equals(pos)) {
+            return N;
+        }
+        if (BorderLayout.SOUTH.equals(pos)) {
+            return S;
+        }
+        if (BorderLayout.EAST.equals(pos)) {
+            return E;
+        }
+        if (BorderLayout.WEST.equals(pos)) {
+            return W;
+        }
+        if (BorderLayout.CENTER.equals(pos)) {
+            return C;
+        }
+        return S;
     }
     
     /**
@@ -545,9 +570,9 @@ public class Sheet extends Container {
      * @return 
      */
     private int getPreferredH(Container cnt) {
-        switch(getPosition()) {
-            case BorderLayout.WEST:
-            case BorderLayout.EAST:
+        switch(getPositionInt()) {
+            case W:
+            case E:
                 return cnt.getHeight();
             default:
                 return Math.min(getPreferredH(), cnt.getHeight());
