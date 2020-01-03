@@ -321,6 +321,8 @@ public class JavaFXLoader {
          processBuilder.inheritIO();
          Process process = processBuilder.start();
          process.waitFor();
+         int exitCode = process.exitValue();
+         System.exit(exitCode);
       } catch (Exception e) {
          e.printStackTrace();
       }
