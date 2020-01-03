@@ -305,7 +305,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topRightMode(boolean topRight) {
-        if (!topRight != this.topRight) {
+        if (topRight != this.topRight) {
             this.topRight = topRight;
             dirty = true;
         }
@@ -348,13 +348,15 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
         if(topOnlyMode) {
-            topLeftMode(false);
-            topRightMode(false);
-            bottomLeftMode(true);
-            bottomRightMode(true);
+            topLeftMode(true);
+            topRightMode(true);
+            bottomLeftMode(false);
+            bottomRightMode(false);
         } else {
             topLeftMode(true);
             topRightMode(true);
+            bottomLeftMode(false);
+            bottomRightMode(false);
         }
         return this;
     }
@@ -367,10 +369,10 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
         if(bottomOnlyMode) {
-            topLeftMode(true);
-            topRightMode(true);
-            bottomLeftMode(false);
-            bottomRightMode(false);
+            topLeftMode(false);
+            topRightMode(false);
+            bottomLeftMode(true);
+            bottomRightMode(true);
         } else {
             bottomLeftMode(true);
             bottomRightMode(true);
