@@ -74,6 +74,13 @@ import java.util.Vector;
  */
 public class Container extends Component implements Iterable<Component>{
     static boolean enableLayoutOnPaint = true;
+    
+    // A 2nd flag for enabling layout on paint.  In order for layoutOnPaint to occur,
+    // both the enableLayoutOnPaint and allowEnableLayoutOnPaint flags must be true.
+    // This flag can be set on any Container (e.g. form), and will cause it to be propagated
+    // down to its children.  So you can set this at the form level, in order to enable this behaviour
+    // for the whole form.
+    private boolean allowEnableLayoutOnPaint = false;
     private Component leadComponent;
     private Layout layout;
     private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
@@ -1115,6 +1122,10 @@ public class Container extends Component implements Iterable<Component>{
         if (!isInitialized()) {
             super.initComponentImpl();
         }
+        Container p = getParent();
+        if (p != null) {
+            allowEnableLayoutOnPaint = p.allowEnableLayoutOnPaint;
+        }
         int componentCount = components.size();
         for(int iter = 0 ; iter < componentCount ; iter++) {
             Component cmp = components.get(iter);
@@ -1604,10 +1615,38 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
+     * Activates enableLayoutOnPaint behaviour for this container. This is package private because 
+     * this flag is more complicated than a simple setter.  When the container is initialized
+     * it will take on the value of its parent, so it only makes sense to call this method on the
+     * top-level container, like a Form.  Form overrides this method and makes it public.
+     * 
+     * <p>Development Note:  enableLayoutOnPaint causes the container to be laid out whenever paint()
+     * is called.  This has been part of codename one since the beginning (initial commit to google code), but
+     * this taxes rendering performance fairly seriously in some of the complex layouts, and it isn't clear
+     * why it was ever necessary.  Perhaps it was to help in an edge case that is no longer relevant.</p>
+     * 
+     * <p>We are adding this additionally flag which defaults to false to try to gain performance, and just in
+     * case the edge case still exists, developers are able to "enable" it again on a form-by-form basis.</p>
+     * @param allow Whether to allow enable layout on paint.
+     * @since 7.0
+     * @see #enableLayoutOnPaint
+     */
+    void setAllowEnableLayoutOnPaint(boolean allow) {
+        allowEnableLayoutOnPaint = allow;
+    }
+    
+    /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(enableLayoutOnPaint) {
+        // Q: Why two flags for enableLayoutOnPaint?
+        // A: enableLayoutOnPaint is managed internally, and it enabled/renabled 
+        //    in CN1 code during certain performance-sensitive periods.
+        //    allowEnableLayoutOnPaint is a flag controlled by the developer so that
+        //    they can enable/disable this behaviour at form level via the setAllowEnableLayoutOnPaint(boolean)
+        //    method.  See javadocs for Form.setAllowEnableOnPaint(boolean) for historical background
+        //    this feature.  
+        if(allowEnableLayoutOnPaint && enableLayoutOnPaint) {
             layoutContainer();
         }
         g.translate(getX(), getY());
