@@ -23,12 +23,16 @@
  */
 package com.codename1.impl.javase;
 
+import java.awt.EventQueue;
 import java.io.File;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 /**
@@ -96,13 +100,14 @@ public class Simulator {
         
         }
         loadFXRuntime();
-        ClassLoader ldr = new ClassPathLoader(files.toArray(new File[files.size()]));
+        final ClassLoader ldr = new ClassPathLoader( files.toArray(new File[files.size()]));
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
 
         new Thread() {
             public void run() {
+                setContextClassLoader(ldr);
                 while (true) {
                     try {
                         sleep(500);
@@ -123,24 +128,28 @@ public class Simulator {
         }.start();
     }
 
+    private static void addToSystemClassLoader(File f) {
+        ClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+        Class<?> sysclass = URLClassLoader.class;
+        try {
+            Method method = sysclass.getDeclaredMethod("addURL", new Class[]{URL.class});
+            method.setAccessible(true);
+            method.invoke(sysloader, new Object[]{f.toURI().toURL()});
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }//end try catch    
+    }
+    
     static void loadFXRuntime() {
         String javahome = System.getProperty("java.home");
         String fx = javahome + "/lib/jfxrt.jar";
         File f = new File(fx);
         if (f.exists()) {
-            URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-            Class<?> sysclass = URLClassLoader.class;
-            try {
-                Method method = sysclass.getDeclaredMethod("addURL", new Class[]{URL.class});
-                method.setAccessible(true);
-                method.invoke(sysloader, new Object[]{f.toURI().toURL()});
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }//end try catch                        
+            addToSystemClassLoader(f);
 
-        }
-
-
+        } 
     }
+    
+    
 }
 

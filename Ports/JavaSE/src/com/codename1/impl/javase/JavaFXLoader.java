@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.impl.javase.JavaFXLoader.JavaFXNotLoadedException;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -39,10 +40,14 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -184,7 +189,7 @@ public class JavaFXLoader {
         }
     }
     
-    private ClassLoader addJavaFXToClassPath() throws IOException  {
+    public URL[] getJavaFXJars() throws IOException {
         if (!javafxDir.exists()) {
             downloadJavaFX();
         }
@@ -218,8 +223,30 @@ public class JavaFXLoader {
         } catch (MalformedURLException mex) {
             throw new RuntimeException(mex);
         }
-        return addToClassPath(javafxUrls.toArray(new java.net.URL[javafxUrls.size()]));
+        return javafxUrls.toArray(new java.net.URL[javafxUrls.size()]);
     }
+    
+    public File[] getJavaFXJarFiles() throws IOException, URISyntaxException {
+        URL[] urls = getJavaFXJars();
+        File[] files = new File[urls.length];
+        for (int i=0; i<urls.length; i++) {
+            files[i] = new File(urls[i].toURI());
+        }
+        return files;
+    }
+    
+    public String getJavaFXClassPath() throws IOException, URISyntaxException {
+        StringBuilder sb = new StringBuilder();
+        for (File f : getJavaFXJarFiles()) {
+            if (sb.length() > 0) {
+                sb.append(File.pathSeparator);
+            }
+            sb.append(f.getAbsolutePath());
+        }
+        return sb.toString();
+    }
+    
+   
     
     
     public static class JavaFXNotLoadedException extends Exception {
@@ -228,117 +255,78 @@ public class JavaFXLoader {
         }
     }
     
-    public boolean runWithJavaFX(Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
-        if (System.getProperty("JavaFXLoader.loaded", null) != null) {
-            // Make sure that we don't cause infinite recursion.
-            return false;
-        }        
-        System.setProperty("JavaFXLoader.loaded", "1");
-        ClassLoader cl;
+    public static boolean isJavaFXLoaded() {
         try {
-            Class webEngineClass = mainClass.getClassLoader().loadClass("javafx.scene.web.WebEngine");
-            cl = mainClass.getClassLoader();
+            ClassLoader.getSystemClassLoader().loadClass("javafx.scene.web.WebEngine");
+            return true;
         } catch (ClassNotFoundException ex) {
-            
-            try {
-                cl = addJavaFXToClassPath();
-            } catch (IOException ex1) {
-                throw new JavaFXNotLoadedException(ex1);
-            }
+            return false;
         }
-        Class executorClass;
-        try {
-            executorClass = cl.loadClass(mainClass.getName());
-        } catch (ClassNotFoundException ex1) {
-            Logger.getLogger(JavaFXLoader.class.getName()).log(Level.SEVERE, null, ex1);
-            throw new JavaFXNotLoadedException(ex1);
-        }
-        Method mainMethod;
-        try {
-            mainMethod = executorClass.getDeclaredMethod("main", new Class[]{String[].class});
-        } catch (Exception ex1) {
-            throw new RuntimeException("Main class supplied to runWithJavaFX has no main method; or failed to load the main method", ex1);
-        }
-        try {
-            mainMethod.invoke(null, new Object[]{args});
-        } catch (IllegalAccessException ex1) {
-            Logger.getLogger(JavaFXLoader.class.getName()).log(Level.SEVERE, null, ex1);
-            throw new RuntimeException("main() method doesn't seem to allow access", ex1);
-        } catch (IllegalArgumentException ex1) {
-            Logger.getLogger(JavaFXLoader.class.getName()).log(Level.SEVERE, null, ex1);
-            throw new RuntimeException("main() method invalid argument", ex1);
-        } 
-        
-        return true;
     }
     
-    private ClassLoader addToClassPath(java.net.URL... paths) {
-        String[] parts = System.getProperty("java.class.path", "").split(File.pathSeparator);
-        java.util.List<java.net.URL> urls = new java.util.ArrayList<java.net.URL>();
-        urls.addAll(Arrays.asList(paths));
-        for (String part : parts) {
-            try {
-                java.net.URL url = new File(part).toURI().toURL();
-                urls.add(url);
-            } catch (Exception ex){
-                ex.printStackTrace();
-            }
-        }
-        StringBuilder newCp = new StringBuilder();
-        boolean first = true;
-        for (java.net.URL url : urls) {
-            try {
-                if (first) {
-                    first = false;
-                } else {
-                    newCp.append(File.pathSeparator);
-                }
-                
-                newCp.append(new File(url.toURI()).getAbsolutePath());
-            } catch (Exception ex){
-                ex.printStackTrace();
-            }
-        }
-        System.setProperty("java.class.path", newCp.toString());
-        
-        return new URLClassLoader(urls.toArray(new java.net.URL[urls.size()]), Executor.class.getClassLoader()) {
-            @Override
-            public Class<?> loadClass(String name) throws ClassNotFoundException {
-                if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop") || name.startsWith("org.w3c.dom")) {
-                    return super.loadClass(name);
-                }
-                Class cls = findLoadedClass(name);
-                if (cls != null) {
-                    return cls;
-                }
-                try {
-                    return findClass(name);
-                } catch (ClassNotFoundException ex) {
-                    return super.loadClass(name); //To change body of generated methods, choose Tools | Templates.
-                }
-            }
+    public boolean runWithJavaFX(Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
+        if (!JavaFXLoader.isJavaFXLoaded()) {
+            Properties props = new Properties();
             
-            @Override
-            public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-                if (name.startsWith("java") || name.startsWith("com.sun") || name.startsWith("org.jdesktop") || name.startsWith("org.w3c.dom")) {
-                    return super.loadClass(name, resolve);
-                }
-                Class cls = findLoadedClass(name);
-                if (cls != null) {
-                    return cls;
-                }
-                try {
-                    return findClass(name);
-                } catch (ClassNotFoundException ex) {
-                    return super.loadClass(name, resolve); //To change body of generated methods, choose Tools | Templates.
-                }
+            try {
+                props.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + getJavaFXClassPath());
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to load JavaFX");
             }
+            restartJVM(props, args);
+            return true;
             
-        };
+        }
+        return false;
     }
+    
+    
+    
+    
     public static boolean main(Class mainClass, String[] argv) throws JavaFXNotLoadedException, InvocationTargetException {
         return new JavaFXLoader().runWithJavaFX(mainClass, argv);
     }
+    
+    public static boolean restartJVM(Properties props, String[] args) {
+      
+      String osName = System.getProperty("os.name");
+      
+      
+      // get current jvm process pid
+      String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
+      // get environment variable on whether XstartOnFirstThread is enabled
+      String env = System.getenv("JAVA_STARTED_ON_FIRST_THREAD_" + pid);
+      
+      // restart jvm with -XstartOnFirstThread
+      String separator = System.getProperty("file.separator");
+      String classpath = props.getProperty("java.class.path", System.getProperty("java.class.path"));
+      String mainClass = System.getenv("JAVA_MAIN_CLASS_" + pid);
+      String jvmPath = System.getProperty("java.home") + separator + "bin" + separator + "java";
+      
+      List<String> inputArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
+      
+      ArrayList<String> jvmArgs = new ArrayList<String>();
+      
+      jvmArgs.add(jvmPath);
+      //jvmArgs.add("-XstartOnFirstThread");
+      jvmArgs.addAll(inputArguments);
+      jvmArgs.add("-cp");
+      jvmArgs.add(classpath);
+      jvmArgs.add(mainClass);
+      for (String arg : args) {
+          jvmArgs.add(arg);
+      }
+      try {
+         ProcessBuilder processBuilder = new ProcessBuilder(jvmArgs);
+         processBuilder.inheritIO();
+         Process process = processBuilder.start();
+         process.waitFor();
+      } catch (Exception e) {
+         e.printStackTrace();
+      }
+      return true;
+   }
+    
 }
 
 class UnzipUtility {
@@ -391,6 +379,8 @@ class UnzipUtility {
         }
         bos.close();
     }
+    
+    
     
     
 }
