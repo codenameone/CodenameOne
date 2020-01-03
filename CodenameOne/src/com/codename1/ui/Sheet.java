@@ -417,13 +417,13 @@ public class Sheet extends Container {
                     b.bottomLeftMode(true);
                     b.topLeftMode(true);
                     b.topRightMode(false);
-                    b.topLeftMode(false);
+                    b.bottomRightMode(false);
                     break;
                 case BorderLayout.WEST:
                     b.bottomLeftMode(false);
                     b.bottomRightMode(true);
                     b.topLeftMode(false);
-                    b.topLeftMode(true);
+                    b.topRightMode(true);
                     break;
                 case BorderLayout.SOUTH:
                     b.topLeftMode(true);
@@ -526,10 +526,9 @@ public class Sheet extends Container {
             case BorderLayout.SOUTH:
                 return cnt.getWidth();
             case BorderLayout.CENTER:
-            
             case BorderLayout.WEST:
             case BorderLayout.EAST:
-                return getPreferredW();
+                return Math.min(getPreferredW(), cnt.getWidth());
             
   
         }
@@ -551,7 +550,7 @@ public class Sheet extends Container {
             case BorderLayout.EAST:
                 return cnt.getHeight();
             default:
-                return getPreferredH();
+                return Math.min(getPreferredH(), cnt.getHeight());
         }
     }
     
