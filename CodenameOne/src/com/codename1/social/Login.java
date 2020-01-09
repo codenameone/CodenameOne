@@ -200,7 +200,12 @@ public abstract class Login {
                         if(callback != null){
                             Exception e = (Exception) evt.getSource();
                             Log.e(e);
-                            callback.loginFailed(e.getMessage());
+                            System.out.println("Calling loginFailed of callback "+callback);
+                            String msg = e.getMessage();
+                            if (msg == null) {
+                                msg = "Unknown error";
+                            }
+                            callback.loginFailed(msg);
                         }
                         
                     }
@@ -426,8 +431,9 @@ public abstract class Login {
         public void loginFailed(final String errorMessage) {
             if(callbackEnabled){
                 if(loginCallback != null){
-                    loginCallback.loginFailed(errorMessage);
-                    while (!loginCallbacksSingleUse.isEmpty()) {
+                    loginCallback.loginFailed(errorMessage);                    
+                }
+                while (!loginCallbacksSingleUse.isEmpty()) {
                     final LoginCallback cb = loginCallbacksSingleUse.remove(0);
                     if (!CN.isEdt()) {
                         CN.callSerially(new Runnable() {
@@ -439,7 +445,6 @@ public abstract class Login {
                         cb.loginFailed(errorMessage);
                     }
                 }
-                }        
                 return;
             }
             callbackEnabled = true;

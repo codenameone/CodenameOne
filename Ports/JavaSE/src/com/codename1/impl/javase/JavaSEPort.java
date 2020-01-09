@@ -113,6 +113,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -5058,12 +5059,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
-            System.out.println("Set bounds to "+textCmp.getBounds());
+            //System.out.println("Set bounds to "+textCmp.getBounds());
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-            System.out.println("Set bounds to "+textCmp.getBounds());
+            //System.out.println("Set bounds to "+textCmp.getBounds());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
@@ -13283,4 +13284,96 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         }
     }
+   
+    // START NATIVE BROWSER WINDOW METHODS---------------------------------------
+   
+    /**
+     * We create a default browser window factory that always creates a JavaFX 
+     * browser.  We use a factory to make it easier for libraries to provide their 
+     * own browser implementation depending on their needs.  For example, the AppleSignin cn1lib
+     * provides its own WebView implementation because Apple login doesn't seem to work
+     * in JavaFX's webview.
+     */
+    private BrowserWindowFactory browserWindowFactory = new BrowserWindowFactory() {
+         @Override
+         public AbstractBrowserWindowSE createBrowserWindow(String startURL) {
+             return new FXBrowserWindowSE(startURL);
+         }
+
+    };
+   
+    /**
+     * Gets the factory used for creating BrowserWindows.
+     * @return 
+     */
+    public BrowserWindowFactory getBrowserWindowFactory() {
+        return browserWindowFactory;
+    }
+
+    /**
+     * Sets the browser window factory used to create new browser windows.
+     * @param newFactory The new factory.
+     * @return The old factory.
+     */
+    public BrowserWindowFactory setBrowserWindowFactory(BrowserWindowFactory newFactory) {
+        BrowserWindowFactory old = browserWindowFactory;
+        browserWindowFactory = newFactory;
+        return old;
+    }
+   
+    @Override
+    public Object createNativeBrowserWindow(String startURL) {
+        
+        return browserWindowFactory.createBrowserWindow(startURL);
+    }
+    
+   @Override
+    public void addNativeBrowserWindowOnLoadListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).addLoadListener(l);
+    }
+    public void removeNativeBrowserWindowOnLoadListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).removeLoadListener(l);
+    }
+    
+    @Override
+    public void nativeBrowserWindowSetSize(Object window, int width, int height) {
+        ((AbstractBrowserWindowSE)window).setSize(width, height);
+    }
+    
+    @Override
+    public void nativeBrowserWindowSetTitle(Object window, String title) {
+        ((AbstractBrowserWindowSE)window).setTitle(title);
+    }
+    
+    @Override
+    public void nativeBrowserWindowShow(Object window) {
+        ((AbstractBrowserWindowSE)window).show();
+    }
+    
+    @Override
+    public void nativeBrowserWindowHide(Object window) {
+        ((AbstractBrowserWindowSE)window).hide();
+    }
+    
+    @Override
+    public void nativeBrowserWindowCleanup(Object window) {
+        ((AbstractBrowserWindowSE)window).cleanup();
+    }
+    
+    @Override
+    public void nativeBrowserWindowEval(Object window, BrowserWindow.EvalRequest req) {
+        ((AbstractBrowserWindowSE)window).eval(req);
+    }
+    
+    @Override
+    public void nativeBrowserWindowAddCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).addCloseListener(l);
+    }
+
+    @Override
+    public void nativeBrowserWindowRemoveCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).removeCloseListener(l);
+        
+    }
+    // END NATIVE BROWSER WINDOW METHODS---------------------------------------------------------
 }

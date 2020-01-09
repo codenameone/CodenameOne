@@ -25,6 +25,8 @@ package com.codename1.io;
 
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
+import com.codename1.ui.BrowserWindow;
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
@@ -51,6 +53,7 @@ import java.util.Map;
  */
 public class Oauth2 {
 
+    private boolean useBrowserWindow = "true".equals(CN.getProperty("oauth2.useBrowserWindow", "true"));
     public static final String TOKEN = "access_token";
 
     /**
@@ -184,6 +187,29 @@ public class Oauth2 {
 
         return token;
     }
+    
+    /**
+     * Set this OAuth2 object to use a {@link BrowserWindow} for the login process.  You can set the global default via the "oauth2.useBrowserWindow"
+     * display property with either a "true" or "false" value.
+     * 
+     * <p>When this property is set, the login prompt will be displayed in a separate Window containing a web browser on the desktop.  Platforms that 
+     * don't have windows (e.g. iOS/Android) will fall back to a separate Form with a webview).</p>
+     * 
+     * @param useBrowserWindow True to use a browser window for the login process.
+     * @since 7.0
+     */
+    public void setUseBrowserWindow(boolean useBrowserWindow) {
+        this.useBrowserWindow = useBrowserWindow;
+    }
+    
+    /**
+     * Checks if this component will use an external web browser window for the login process.
+     * @return True if this component will use an external web browser window.
+     * @since 7.0
+     */
+    public boolean isUseBrowserWindow() {
+        return useBrowserWindow;
+    }
 
     /**
      * This method creates a component which can authenticate. You will receive
@@ -207,7 +233,26 @@ public class Oauth2 {
      * @return a component that should be displayed to the user in order to
      * perform the authentication
      */
-    public void showAuthentication(ActionListener al) {
+    public void showAuthentication(final ActionListener al) {
+        
+        if (useBrowserWindow) {
+            final BrowserWindow win = new BrowserWindow(buildURL());
+            win.setTitle("Login");
+            win.addLoadListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    String url = (String)evt.getSource();
+                    if (url.startsWith(redirectURI)) {
+                        win.close();
+                        handleURL((String)evt.getSource(), null, al, null, null, null);
+                    }    
+                }
+            });
+
+            win.show(); 
+            return;
+            
+        }
+        
         final Form old = Display.getInstance().getCurrent();
         InfiniteProgress inf = new InfiniteProgress();
         final Dialog progress = inf.showInifiniteBlocking();
@@ -233,12 +278,11 @@ public class Oauth2 {
         authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
     }
 
-    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
-
-        String URL = oauth2URL + "?client_id=" + clientId
+    private String buildURL() {
+        String URL = oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
                 + "&redirect_uri=" + Util.encodeUrl(redirectURI);
         if (scope != null) {
-            URL += "&scope=" + scope;
+            URL += "&scope=" + Util.encodeUrl(scope);
         }
         if (clientSecret != null) {
             URL += "&response_type=code";
@@ -251,9 +295,15 @@ public class Oauth2 {
             while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
                 String val = additionalParams.get(key).toString();
-                URL += "&" + key + "=" + val;
+                URL += "&" + Util.encodeUrl(key) + "=" + Util.encodeUrl(val);
             }
         }
+        return URL;
+    }
+    
+    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+
+        String URL = buildURL();
 
         DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);
         final WebBrowser[] web = new WebBrowser[1];
@@ -278,7 +328,9 @@ public class Oauth2 {
                 progress.dispose();
             }
 
-            web.stop();
+            if (web != null) {
+                web.stop();
+            }
 
             //remove the browser component.
             if (login != null) {
@@ -288,8 +340,9 @@ public class Oauth2 {
 
             if (url.indexOf("code=") > -1) {
                 Hashtable params = getParamsFromURL(url);
-                ConnectionRequest req = new ConnectionRequest() {
-
+                
+                class TokenRequest extends ConnectionRequest {
+                    boolean callbackCalled;
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
                         String t = new String(tok);
@@ -340,23 +393,37 @@ public class Oauth2 {
                     }
 
                     protected void handleException(Exception err) {
-                        if (backToForm != null) {
+                        if (backToForm != null && !callbackCalled) {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
+                            if (!callbackCalled) {
+                                callbackCalled = true;
+                                al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
+                            }
                         }
                     }
 
                     protected void postResponse() {
-                        if (backToParent && backToForm != null) {
+                        
+                        if (backToParent && backToForm != null && !callbackCalled) {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken),ActionEvent.Type.Response));
+                            if (!callbackCalled) {
+                                callbackCalled = true;
+                                if (getResponseCode() >= 200 && getResponseCode() < 300) {
+                                    al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken),ActionEvent.Type.Response));
+                                } else {
+                                    al.actionPerformed(new ActionEvent(new IOException(getResponseErrorMessage()),ActionEvent.Type.Exception));
+                                }
+                            }
                         }
                     }
                 };
+                final TokenRequest req = new TokenRequest();
+                req.setReadResponseForErrors(true);
+                
                 req.setUrl(tokenRequestURL);
                 req.setPost(true);
                 req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");

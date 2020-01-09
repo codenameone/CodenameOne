@@ -79,17 +79,40 @@ public class AsyncResource<V> extends Observable  {
         } catch (Throwable t){}
     }
     
-
     /**
      * Gets the resource synchronously. This will wait until either the resource failed
      * with an exception, or the loading was canceled, or was done without error.
      * 
      * <p>If on edt, this uses invokeAndBlock to block safely.</p>
+     * 
+     
      * @return The wrapped resource.
      * @throws AsyncExecutionException if the resource failed with an error.  To get the actual error, use {@link Throwable#getCause() }.
      * 
      */
     public V get() {
+        try {
+            return get(-1);
+        } catch (InterruptedException ex) {
+            // This should never happen
+            throw new RuntimeException("Interrupted exception occurred, but this should never happen.  Likely programming error.");
+        }
+    }
+    
+    /**
+     * Gets the resource synchronously. This will wait until either the resource failed
+     * with an exception, or the loading was canceled, or was done without error.
+     * 
+     * <p>If on edt, this uses invokeAndBlock to block safely.</p>
+     * 
+     * @param timeout Timeout
+     * @return The wrapped resource.
+     * @throws AsyncExecutionException if the resource failed with an error.  To get the actual error, use {@link Throwable#getCause() }.
+     * @throws InterruptedException if timeout occurs.
+     * 
+     */
+    public V get(final int timeout) throws InterruptedException {
+        final long startTime = (timeout > 0) ? System.currentTimeMillis() : 0;
         if (done && error == null) {
             return value;
         }
@@ -106,16 +129,28 @@ public class AsyncResource<V> extends Observable  {
             }
         }};
         addObserver(observer);
+        
         while (!complete[0]) {
+            if (timeout > 0 && System.currentTimeMillis() > startTime + timeout) {
+                throw new InterruptedException("Timeout occurred in get()");
+            }
             if (isEdt()) {
                 CN.invokeAndBlock(new Runnable(){public void run(){
                     synchronized(complete) {
-                        Util.wait(complete);
+                        if (timeout > 0) {
+                            Util.wait(complete, (int)Math.max(1, timeout - (System.currentTimeMillis() - startTime)));
+                        } else {
+                            Util.wait(complete);
+                        }
                     }
                 }});
             } else {
                 synchronized(complete) {
-                    Util.wait(complete);
+                    if (timeout > 0) {
+                        Util.wait(complete, (int)Math.max(1, timeout - (System.currentTimeMillis() - startTime)));
+                    } else {
+                        Util.wait(complete);
+                    }
                 }
             }
         }
