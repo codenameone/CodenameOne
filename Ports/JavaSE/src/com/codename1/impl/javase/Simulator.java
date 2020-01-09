@@ -85,19 +85,19 @@ public class Simulator {
             files.add(new File(t.nextToken()));
         }
         File javase = new File("native" + File.separator + "javase");
-        File libJavase = new File("lib" + File.separator + " impl" + File.separator + "native" + File.separator + "javase");
+        File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
         for (File dir : new File[]{javase, libJavase}) {
             if (dir.exists()) {
+                
                 for (File jar : dir.listFiles()) {
                     if (jar.getName().endsWith(".jar")) {
                         if (!files.contains(jar)) {
-                            System.out.println("Adding jar to classpath "+jar);
                             files.add(jar);
+                            System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());
                         }
                     }
                 }
             }
-        
         }
         loadFXRuntime();
         final ClassLoader ldr = new ClassPathLoader( files.toArray(new File[files.size()]));
