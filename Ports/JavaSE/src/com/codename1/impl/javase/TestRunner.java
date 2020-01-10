@@ -244,7 +244,7 @@ public class TestRunner {
      */
     public static void main(String[] argv) {
         try {
-            if (JavaFXLoader.main(TestRunner.class, argv)) {
+            if (JavaFXLoader.main(TestRunner.class, TestRunner.class, argv)) {
                 return;
             }
         } catch (JavaFXLoader.JavaFXNotLoadedException notLoaded) {

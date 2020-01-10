@@ -264,7 +264,7 @@ public class JavaFXLoader {
         }
     }
     
-    public boolean runWithJavaFX(Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
+    public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
             Properties props = new Properties();
             
@@ -273,7 +273,7 @@ public class JavaFXLoader {
             } catch (Exception ex) {
                 throw new RuntimeException("Failed to load JavaFX");
             }
-            restartJVM(props, args);
+            restartJVM(launchClass, props, args);
             return true;
             
         }
@@ -283,11 +283,11 @@ public class JavaFXLoader {
     
     
     
-    public static boolean main(Class mainClass, String[] argv) throws JavaFXNotLoadedException, InvocationTargetException {
-        return new JavaFXLoader().runWithJavaFX(mainClass, argv);
+    public static boolean main(Class launchClass, Class mainClass, String[] argv) throws JavaFXNotLoadedException, InvocationTargetException {
+        return new JavaFXLoader().runWithJavaFX(launchClass, mainClass, argv);
     }
     
-    public static boolean restartJVM(Properties props, String[] args) {
+    public static boolean restartJVM(Class launchClass, Properties props, String[] args) {
       
       String osName = System.getProperty("os.name");
       
@@ -301,6 +301,9 @@ public class JavaFXLoader {
       String separator = System.getProperty("file.separator");
       String classpath = props.getProperty("java.class.path", System.getProperty("java.class.path"));
       String mainClass = System.getenv("JAVA_MAIN_CLASS_" + pid);
+      if (mainClass == null) {
+          mainClass = launchClass.getName();
+      }
       String jvmPath = System.getProperty("java.home") + separator + "bin" + separator + "java";
       
       List<String> inputArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
