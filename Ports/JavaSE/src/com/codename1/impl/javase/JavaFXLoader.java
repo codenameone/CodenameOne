@@ -169,6 +169,7 @@ public class JavaFXLoader {
                 javafxDir.mkdir();
                 File libDirTmp = findDir(tmpDir, "lib");
                 File legalDirTmp = findDir(tmpDir, "legal");
+                File binDirTmp = findDir(tmpDir, "bin");
                 if (libDirTmp == null || !libDirTmp.exists()) {
                     throw new IOException("No lib dir found within JavaFX zip");
                 }
@@ -177,6 +178,10 @@ public class JavaFXLoader {
                 }
                 libDirTmp.renameTo(new File(javafxDir, "lib"));
                 legalDirTmp.renameTo(new File(javafxDir, "legal"));
+                if (binDirTmp.exists()) {
+                    binDirTmp.renameTo(new File(javafxDir, "bin"));
+                }
+                
                 
             } finally {
                 delTree(tmpDir);
