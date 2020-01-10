@@ -37,6 +37,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.regex.StringReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -76,6 +77,7 @@ public class Oauth2 {
     private String token;
     private static String expires;
     private String refreshToken;
+    private String identityToken;
     
     private String clientId;
     private String redirectURI;
@@ -321,7 +323,98 @@ public class Oauth2 {
 
         return web[0];
     }
+    
+    /**
+     * Processes token request responses that are formatted as a JSON object.  May be overridden
+     * by subclasses, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     * @param map Parsed JSON object of response.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(Map map) {
+        token = (String) map.get("access_token");
+        Object ex = map.get("expires_in");
+        if(ex == null){
+            ex = map.get("expires");
+        }
+        if(ex != null){
+            expires = ex.toString();
+        }
+        refreshToken = (String)map.get("refresh_token");
+        identityToken = (String)map.get("id_token");
+        
+    }
+    
+    /**
+     * Processes token request responses that are formatted as HTTP query strings.  May be
+     * overridden by subclass, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     * @param t The query string.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(String t) {
+        token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
+        int off = t.indexOf("expires=");
+        int start = 8;
+        if(off == -1){
+            off = t.indexOf("expires_in=");
+            start = 11;
+        }
+        if (off > -1) {
+            int end = t.indexOf('&', off);
+            if (end < 0 || end < off) {
+                end = t.length();
+            }
+            expires = t.substring(off + start, end);
 
+        }
+        off = t.indexOf("refresh_token=");
+        refreshToken = null;
+        start = "refresh_token=".length();
+        if (off > -1) {
+            int end = t.indexOf('&', off);
+            if (end < 0 || end < off) {
+                end = t.length();
+            }
+            refreshToken = t.substring(off +  start, end);
+        }
+    }
+
+    /**
+     * Method that can be overridden by subclasses to intercept parameters extracted from
+     * the redirect URL when the login flow reaches the redirect URL.  This will give subclasses
+     * an opportunity to parse out special information that the OAuth2 service provides in the callback.
+     * @param params Parsed query parameters passed to the redirect URL.
+     */
+    protected void handleRedirectURLParams(Map params) {
+        
+    }
+    
+    public class RefreshTokenRequest extends AsyncResource<AccessToken> {
+        
+    }
+    
+    public RefreshTokenRequest refreshToken(String refreshToken) {
+        final RefreshTokenRequest out = new RefreshTokenRequest();
+        refreshToken(refreshToken, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if (out.isDone()) {
+                    return;
+                }
+                if (evt.getSource() instanceof Throwable) {
+                    out.error(new AsyncResource.AsyncExecutionException((Throwable)evt.getSource()));
+                } else {
+                    out.complete((AccessToken)evt.getSource());
+                }
+            }
+        });
+        return out;
+    }
+    
+    private void refreshToken(String refreshToken, ActionListener al) {
+        handleURL(redirectURI + "?code="+Util.encodeUrl(refreshToken)+"&cn1_refresh_token=1", null, al, null, null, null);
+    }
+    
     private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
             if (Display.getInstance().getCurrent() == progress) {
@@ -340,7 +433,7 @@ public class Oauth2 {
 
             if (url.indexOf("code=") > -1) {
                 Hashtable params = getParamsFromURL(url);
-                
+                handleRedirectURLParams(params);
                 class TokenRequest extends ConnectionRequest {
                     boolean callbackCalled;
                     protected void readResponse(InputStream input) throws IOException {
@@ -350,42 +443,9 @@ public class Oauth2 {
                         if(t.startsWith("{")){
                             JSONParser p = new JSONParser();
                             Map map = p.parseJSON(new StringReader(t));
-                            token = (String) map.get("access_token");
-                            Object ex = map.get("expires_in");
-                            if(ex == null){
-                                ex = map.get("expires");
-                            }
-                            if(ex != null){
-                                expires = ex.toString();
-                            }
-                            refreshToken = (String)map.get("refresh_token");
-
+                            handleTokenRequestResponse(map);
                         }else{
-                            token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
-                            int off = t.indexOf("expires=");
-                            int start = 8;
-                            if(off == -1){
-                                off = t.indexOf("expires_in=");
-                                start = 11;
-                            }
-                            if (off > -1) {
-                                int end = t.indexOf('&', off);
-                                if (end < 0 || end < off) {
-                                    end = t.length();
-                                }
-                                expires = t.substring(off + start, end);
-                                
-                            }
-                            off = t.indexOf("refresh_token=");
-                            refreshToken = null;
-                            start = "refresh_token=".length();
-                            if (off > -1) {
-                                int end = t.indexOf('&', off);
-                                if (end < 0 || end < off) {
-                                    end = t.length();
-                                }
-                                refreshToken = t.substring(off +  start, end);
-                            }
+                            handleTokenRequestResponse(t);
                         }
                         if (login != null) {
                             login.dispose();
@@ -413,7 +473,7 @@ public class Oauth2 {
                             if (!callbackCalled) {
                                 callbackCalled = true;
                                 if (getResponseCode() >= 200 && getResponseCode() < 300) {
-                                    al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken),ActionEvent.Type.Response));
+                                    al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken, identityToken),ActionEvent.Type.Response));
                                 } else {
                                     al.actionPerformed(new ActionEvent(new IOException(getResponseErrorMessage()),ActionEvent.Type.Exception));
                                 }
@@ -430,8 +490,13 @@ public class Oauth2 {
                 req.addArgument("client_id", clientId);
                 req.addArgument("redirect_uri", redirectURI);
                 req.addArgument("client_secret", clientSecret);
-                req.addArgument("code", (String) params.get("code"));
-                req.addArgument("grant_type", "authorization_code");
+                if (params.containsKey("cn1_refresh_token")) {
+                    req.addArgument("grant_type", "refresh_token");
+                    req.addArgument("refresh_token", (String)params.get("code"));
+                } else {
+                    req.addArgument("code", (String) params.get("code"));
+                    req.addArgument("grant_type", "authorization_code");
+                }
 
                 NetworkManager.getInstance().addToQueue(req);
             } else if (url.indexOf("error_reason=") > -1) {

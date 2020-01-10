@@ -22,10 +22,13 @@
  */
 package com.codename1.social;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.io.AccessToken;
 import com.codename1.io.Log;
 import com.codename1.io.Oauth2;
+import com.codename1.io.Oauth2.RefreshTokenRequest;
 import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -33,6 +36,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -239,6 +243,10 @@ public abstract class Login {
         if (isNativeLoginSupported()) {
             return nativeIsLoggedIn();
         } else {
+            AccessToken accessTok = getAccessToken();
+            if (accessTok != null && accessTok.getExpiryDate() != null && accessTok.isExpired()) {
+                return false;
+            }
             return token != null;
         }
     }
@@ -288,6 +296,10 @@ public abstract class Login {
      * @return the token
      */
     public AccessToken getAccessToken() {
+        if (token == null) {
+            Util.register(new AccessToken());
+            token = (AccessToken)Storage.getInstance().readObject(getClass().getName()+"AccessToken");
+        }
         return token;
     }
 
@@ -298,11 +310,23 @@ public abstract class Login {
      * The method blocks until a valid token has been granted
      */ 
     public void validateToken() throws IOException{
+        
         String token = Preferences.get(Login.this.getClass().getName() + "Token", null);
-        if(token == null){            
-            throw new RuntimeException("No token to validate");
-        }
-        if(!validateToken(token)){
+        if(token == null || !validateToken(token)){
+            AccessToken accessTok = getAccessToken();
+            if (accessTok != null && accessTok.getRefreshToken() != null){
+                String refreshTok = accessTok.getRefreshToken();
+                RefreshTokenRequest refreshReq = createOauth2().refreshToken(refreshTok);
+                try {
+                    System.out.println("Attempting to refresh the access token");
+                    AccessToken newTok = refreshReq.get(5000);
+                    setAccessToken(newTok);
+                    Preferences.set(Login.this.getClass().getName() + "Token", getAccessToken().getToken());
+                    return;
+                } catch (Throwable t) {}
+            }
+            
+            // At this point We'll need to attempt to login again.
             callbackEnabled = false;
             doLogin();            
             Display.getInstance().invokeAndBlock(new Runnable() {
@@ -332,8 +356,13 @@ public abstract class Login {
      * Sets the Login access token
      */ 
     public void setAccessToken(AccessToken token) {
-        this.token = token;
+        if (!Objects.equals(token, this.token)) {
+            this.token = token;
+            Storage.getInstance().writeObject(getClass().getName()+"AccessToken", token);
+        }
     }
+    
+    
     
     /**
      * Sets the login callback that will receive event callback notification

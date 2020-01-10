@@ -36,6 +36,8 @@ import com.codename1.util.DateUtil;
  * @author Chen
  */
 public class AccessToken implements Externalizable{
+
+   
     
     private String token;
     
@@ -55,6 +57,8 @@ public class AccessToken implements Externalizable{
     private Date expiryDate;
     
     private String refreshToken;
+    
+    private String identityToken;
 
     /**
      * Constructor with parameters
@@ -75,10 +79,24 @@ public class AccessToken implements Externalizable{
      * @ince 7.0
      */ 
     public AccessToken(String token, String expires, String refreshToken) {
+        this(token, expires, refreshToken, null);
+    }
+    
+    /**
+     * Constructor with parameters
+     * 
+     * @param token the token string
+     * @param expires the access token expires date
+     * @param refreshToken The refresh token.
+     * @param identityToken The identity token
+     * @ince 7.0
+     */ 
+    public AccessToken(String token, String expires, String refreshToken, String identityToken) {
         this.token = token;
         this.expires = expires;
         this.expiryDate = parseDate(expires);
         this.refreshToken = refreshToken;
+        this.identityToken = identityToken;
     }
     
     /**
@@ -119,7 +137,7 @@ public class AccessToken implements Externalizable{
 
     @Override
     public int getVersion() {
-        return 3;
+        return 4;
     }
 
     @Override
@@ -128,6 +146,7 @@ public class AccessToken implements Externalizable{
         Util.writeUTF(expires, out);
         Util.writeObject(expiryDate, out);
         Util.writeUTF(refreshToken, out);
+        Util.writeUTF(identityToken, out);
     }
 
     @Override
@@ -139,6 +158,9 @@ public class AccessToken implements Externalizable{
         }
         if (version >= 3) {
             refreshToken = Util.readUTF(in);
+        }
+        if (version >= 4) {
+            identityToken = Util.readUTF(in);
         }
     }
 
@@ -267,5 +289,20 @@ public class AccessToken implements Externalizable{
         return expiryDate != null && DateUtil.compare(expiryDate,  new Date()) < 0;
     }
     
+     /**
+     * @return the identityToken
+     * @since 7.0
+     */
+    public String getIdentityToken() {
+        return identityToken;
+    }
+
+    /**
+     * @param identityToken the identityToken to set
+     * @since 7.0
+     */
+    public void setIdentityToken(String identityToken) {
+        this.identityToken = identityToken;
+    }
     
 }
