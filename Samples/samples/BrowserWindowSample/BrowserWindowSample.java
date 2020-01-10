@@ -57,14 +57,14 @@ public class BrowserWindowSample {
         
         Button openBrowser = new Button("Open Browser");
         openBrowser.addActionListener(e->{
-            BrowserWindow win = new BrowserWindow();
+            BrowserWindow win = new BrowserWindow("https://weblite.ca");
             win.addCloseListener(evt->{
                 System.out.println("Browser was closed");
             });
             win.addLoadListener(evt->{
                 System.out.println("Loaded page "+evt.getSource());
             });
-            win.setURL("https://weblite.ca");
+            
             win.setTitle("Web Browser");
             win.show();
         });
