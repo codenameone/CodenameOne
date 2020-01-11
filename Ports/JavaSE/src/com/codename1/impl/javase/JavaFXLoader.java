@@ -276,7 +276,7 @@ public class JavaFXLoader {
             try {
                 props.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + getJavaFXClassPath());
             } catch (Exception ex) {
-                throw new RuntimeException("Failed to load JavaFX");
+                throw new RuntimeException("Failed to load JavaFX", ex);
             }
             restartJVM(launchClass, props, args);
             return true;
