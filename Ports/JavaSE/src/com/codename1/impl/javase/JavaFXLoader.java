@@ -178,7 +178,7 @@ public class JavaFXLoader {
                 }
                 libDirTmp.renameTo(new File(javafxDir, "lib"));
                 legalDirTmp.renameTo(new File(javafxDir, "legal"));
-                if (binDirTmp.exists()) {
+                if (binDirTmp != null && binDirTmp.exists()) {
                     binDirTmp.renameTo(new File(javafxDir, "bin"));
                 }
                 
