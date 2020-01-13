@@ -35,11 +35,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -48,6 +51,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -271,6 +275,7 @@ public class JavaFXLoader {
     
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
+            System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
             Properties props = new Properties();
             
             try {
@@ -278,10 +283,64 @@ public class JavaFXLoader {
             } catch (Exception ex) {
                 throw new RuntimeException("Failed to load JavaFX", ex);
             }
+            /*
+            
+            // Update the nbProject properties file so that we don't have to do this every time.
+            File nbProjectProperties = new File("nbproject" + File.separator + "project.properties");
+            if (nbProjectProperties.exists()) {
+                String contents = null;
+                try {
+                    try (FileInputStream fos = new FileInputStream(nbProjectProperties)) {
+                        byte[] buf = new byte[(int)nbProjectProperties.length()];
+                        fos.read(buf);
+                        contents = new String(buf, "UTF-8");
+                    }
+                    if (contents != null) {
+                        int runClassPathPos = contents.indexOf("run.classpath=");
+                        boolean changed = false;
+                        if (runClassPathPos > 0) {
+                            int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
+                            if (pos > 0) {
+                                String before = contents.substring(0, pos);
+                                String after = contents.substring(pos + "${build.classes.dir}".length());
+                                contents = before + "${build.classes.dir}:${user.home}/.codenameone/javafx/lib/*" + after;
+                                contents = contents.replace("${user.home}/.codenameone/javafx/lib/*:${user.home}/.codenameone/javafx/lib/*", "${user.home}/.codenameone/javafx/lib/*");
+                                changed = true;
+                               
+                            }
+                        }
+                        runClassPathPos = contents.indexOf("run.test.classpath=");
+                        
+                        if (runClassPathPos > 0) {
+                            int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
+                            if (pos > 0) {
+                                String before = contents.substring(0, pos);
+                                String after = contents.substring(pos + "${build.classes.dir}".length());
+                                contents = before + "${build.classes.dir}:${user.home}/.codenameone/javafx/lib/*" + after;
+                                contents = contents.replace("${user.home}/.codenameone/javafx/lib/*:${user.home}/.codenameone/javafx/lib/*", "${user.home}/.codenameone/javafx/lib/*");
+                                changed = true;
+                               
+                            }
+                        }
+                        
+                        if (changed) {
+                             try (FileOutputStream fos = new FileOutputStream(nbProjectProperties)) {
+                                fos.write(contents.getBytes("UTF-8"));
+                            }
+                        }
+                    }
+                    
+                } catch (IOException ex) {
+                    System.err.println("Failed to update "+nbProjectProperties+" with JavaFX path");
+                    ex.printStackTrace(System.err);
+                }
+            }
+            */
             restartJVM(launchClass, props, args);
             return true;
             
         }
+        System.out.println("JavaFX is loaded");
         return false;
     }
     
@@ -337,6 +396,32 @@ public class JavaFXLoader {
       return true;
    }
     
+    
+    public static void main(String[] args) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream out = new PrintStream(baos);
+        PrintStream stdOut = System.out;
+        PrintStream stdErr = System.err;
+        System.setOut(out);
+        System.setErr(out);
+        JavaFXLoader jfxLoader = new JavaFXLoader();
+        if (!isJavaFXLoaded()) {
+            try {
+                jfxLoader.getJavaFXClassPath();
+                stdOut.print( System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx" + File.separator + "lib" + File.separator + "*");
+            } catch (Exception ex){
+                stdErr.print("Failed to load JavaFX jars");
+                ex.printStackTrace(stdErr);
+                System.exit(1);
+            }
+            
+        } else {
+            //stdOut.print(".");
+        }
+        System.exit(0);
+        
+    }
+    
 }
 
 class UnzipUtility {
@@ -389,6 +474,8 @@ class UnzipUtility {
         }
         bos.close();
     }
+    
+    
     
     
     
