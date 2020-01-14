@@ -5,7 +5,7 @@
     To learn more about Codename One go to https://www.codenameone.com/
     -->
         
-    <project name="SampleProjectTemplate" default="default" basedir=".">
+    <project name="SampleProjectTemplate" default="default" basedir="." xmlns:j2seproject1="http://www.netbeans.org/ns/j2se-project/1">
     <description>Builds, tests, and runs the project SampleProjectTemplate.</description>
     <import file="nbproject/build-impl.xml"/>
     <property file="codenameone_settings.properties"/>
@@ -504,11 +504,6 @@
     </target>
       
     <target name="-pre-init">
-        <echo>Adding JavaFX to Classpath if missing</echo>
-        <java classpath="JavaSE.jar" 
-              classname="com.codename1.impl.javase.JavaFXLoader" 
-              outputproperty="javafx.path" failonerror="true" fork="true"/>
-        <echo message="javafx.path = ${javafx.path}"/>
         <property name="application.args" value="${codename1.packageName}.${codename1.mainName}"/>
         <property name="javac.source" value="1.8" />
         <property name="javac.target" value="1.8" />
