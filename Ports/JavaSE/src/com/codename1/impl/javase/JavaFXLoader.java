@@ -273,6 +273,137 @@ public class JavaFXLoader {
         }
     }
     
+    private File findEclipseLaunchFile() {
+        
+        for (File child : new File(".").listFiles()) {
+            if (child.getName().startsWith("Simulator_") && child.getName().endsWith(".launch")) {
+                return child;
+            }
+        }
+        return null;
+    }
+    
+    
+    
+    private void updateEclipseLaunchClasspath() {
+        File launchFile = findEclipseLaunchFile();
+        if (launchFile == null || !launchFile.exists()) {
+            return;
+        }
+        String contents = null;
+            try {
+                try (FileInputStream fos = new FileInputStream(launchFile)) {
+                    byte[] buf = new byte[(int)launchFile.length()];
+                    fos.read(buf);
+                    contents = new String(buf, "UTF-8");
+                }
+                
+                String javafxListEntry = "<listEntry value=\"&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#10;&lt;runtimeClasspathEntry id=&quot;org.eclipse.jdt.launching.classpathentry.variableClasspathEntry&quot;&gt;&#10;    &lt;memento path=&quot;5&quot; variableString=&quot;${system_property:user.home}/.codenameone/javafx/lib/*&quot;/&gt;&#10;&lt;/runtimeClasspathEntry&gt;&#10;\"/>";
+                boolean changed = false;
+                if (!contents.contains(".codenameone/javafx/lib")) {
+                    int pos = contents.indexOf("<listAttribute key=\"org.eclipse.jdt.launching.CLASSPATH\">");
+                    if (pos < 0) {
+                        return;
+                    }
+                    String endTag = "</listAttribute>";
+                    int closingPos = contents.indexOf(endTag, pos);
+                    contents = contents.substring(0, closingPos)
+                            + "    " + javafxListEntry + "\n    " + endTag
+                            + contents.substring(closingPos + endTag.length());
+                    changed = true;
+                   
+                }
+                
+                if (changed) {
+                    System.out.println("Adding JavaFX to your Eclipse launch classpath at "+launchFile);
+                    System.out.println("JavaFX should be correctly loaded the next time you run this project.");
+                     try (FileOutputStream fos = new FileOutputStream(launchFile)) {
+                        fos.write(contents.getBytes("UTF-8"));
+                    }
+                    
+                }
+                
+            } catch (IOException ex) {
+                System.err.println("Failed to update "+launchFile+" with JavaFX path");
+                ex.printStackTrace(System.err);
+            }
+        
+    }
+    
+    private void updateNbProjectProperties() {
+        // Update the nbProject properties file so that we don't have to do this every time.
+        File nbProjectProperties = new File("nbproject" + File.separator + "project.properties");
+        if (nbProjectProperties.exists()) {
+            String contents = null;
+            try {
+                try (FileInputStream fos = new FileInputStream(nbProjectProperties)) {
+                    byte[] buf = new byte[(int)nbProjectProperties.length()];
+                    fos.read(buf);
+                    contents = new String(buf, "UTF-8");
+                }
+                //System.out.println("Starting contents="+contents);
+                String jfxPath = "${user.home}/.codenameone/javafx/lib/*";
+                boolean changed = false;
+                if (contents != null) {
+
+
+                    if (contents.contains("cn1.javafx.path=")) {
+                        String newContents = contents.replaceAll("^cn1\\.javafx\\.path=.*$","cn1.javafx.path="+jfxPath);
+                        if (!newContents.equals(contents)) {
+                            contents = newContents;
+                            changed = true;
+                        }
+                    } else {
+                        contents += System.getProperty("line.separator") + "cn1.javafx.path="+jfxPath;
+                        changed = true;
+                    }
+                    if (!contents.contains("${cn1.javafx.path}")) {
+                        int runClassPathPos = contents.indexOf("run.classpath=");
+
+                        if (runClassPathPos > 0) {
+                            int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
+                            if (pos > 0) {
+                                String before = contents.substring(0, pos);
+                                String after = contents.substring(pos + "${build.classes.dir}".length());
+                                contents = before + "${build.classes.dir}:${cn1.javafx.path}" + after;
+                                contents = contents.replace("${cn1.javafx.path}:${cn1.javafx.path}", "${cn1.javafx.path}");
+                                changed = true;
+
+                            }
+                        }
+                        runClassPathPos = contents.indexOf("run.test.classpath=");
+
+                        if (runClassPathPos > 0) {
+                            int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
+                            if (pos > 0) {
+                                String before = contents.substring(0, pos);
+                                String after = contents.substring(pos + "${build.classes.dir}".length());
+                                contents = before + "${build.classes.dir}:${cn1.javafx.path}" + after;
+                                contents = contents.replace("${cn1.javafx.path}:${cn1.javafx.path}", "${cn1.javafx.path}");
+                                changed = true;
+
+                            }
+                        }
+
+
+                    }
+                }
+                if (changed) {
+                    System.out.println("Adding JavaFX to your project properties file at "+nbProjectProperties);
+                    System.out.println("JavaFX should be correctly loaded the next time you run this project.");
+                     try (FileOutputStream fos = new FileOutputStream(nbProjectProperties)) {
+                        fos.write(contents.getBytes("ISO-8859-1"));
+                    }
+                }
+
+            } catch (IOException ex) {
+                System.err.println("Failed to update "+nbProjectProperties+" with JavaFX path");
+                ex.printStackTrace(System.err);
+            }
+        }
+    }
+    
+    
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
             System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
@@ -285,77 +416,9 @@ public class JavaFXLoader {
                 throw new RuntimeException("Failed to load JavaFX", ex);
             }
             
+            updateNbProjectProperties();
+            updateEclipseLaunchClasspath();
             
-            // Update the nbProject properties file so that we don't have to do this every time.
-            File nbProjectProperties = new File("nbproject" + File.separator + "project.properties");
-            if (nbProjectProperties.exists()) {
-                String contents = null;
-                try {
-                    try (FileInputStream fos = new FileInputStream(nbProjectProperties)) {
-                        byte[] buf = new byte[(int)nbProjectProperties.length()];
-                        fos.read(buf);
-                        contents = new String(buf, "ISO-8859-1");
-                    }
-                    //System.out.println("Starting contents="+contents);
-                    String jfxPath = "${user.home}/.codenameone/javafx/lib/*";
-                    boolean changed = false;
-                    if (contents != null) {
-                        
-                    
-                        if (contents.contains("cn1.javafx.path=")) {
-                            String newContents = contents.replaceAll("^cn1\\.javafx\\.path=.*$","cn1.javafx.path="+jfxPath);
-                            if (!newContents.equals(contents)) {
-                                contents = newContents;
-                                changed = true;
-                            }
-                        } else {
-                            contents += System.getProperty("line.separator") + "cn1.javafx.path="+jfxPath;
-                            changed = true;
-                        }
-                        if (!contents.contains("${cn1.javafx.path}")) {
-                            int runClassPathPos = contents.indexOf("run.classpath=");
-
-                            if (runClassPathPos > 0) {
-                                int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
-                                if (pos > 0) {
-                                    String before = contents.substring(0, pos);
-                                    String after = contents.substring(pos + "${build.classes.dir}".length());
-                                    contents = before + "${build.classes.dir}:${cn1.javafx.path}" + after;
-                                    contents = contents.replace("${cn1.javafx.path}:${cn1.javafx.path}", "${cn1.javafx.path}");
-                                    changed = true;
-
-                                }
-                            }
-                            runClassPathPos = contents.indexOf("run.test.classpath=");
-
-                            if (runClassPathPos > 0) {
-                                int pos = contents.indexOf("${build.classes.dir}", runClassPathPos);
-                                if (pos > 0) {
-                                    String before = contents.substring(0, pos);
-                                    String after = contents.substring(pos + "${build.classes.dir}".length());
-                                    contents = before + "${build.classes.dir}:${cn1.javafx.path}" + after;
-                                    contents = contents.replace("${cn1.javafx.path}:${cn1.javafx.path}", "${cn1.javafx.path}");
-                                    changed = true;
-
-                                }
-                            }
-
-
-                        }
-                    }
-                    if (changed) {
-                        System.out.println("Adding JavaFX to your project properties file at "+nbProjectProperties);
-                        System.out.println("JavaFX should be correctly loaded the next time you run this project.");
-                         try (FileOutputStream fos = new FileOutputStream(nbProjectProperties)) {
-                            fos.write(contents.getBytes("ISO-8859-1"));
-                        }
-                    }
-                    
-                } catch (IOException ex) {
-                    System.err.println("Failed to update "+nbProjectProperties+" with JavaFX path");
-                    ex.printStackTrace(System.err);
-                }
-            }
             System.out.println("Restarting JVM with JavaFX in the classpath.");
             System.out.println("NOTE: If you are trying to debug the project, you'll need to cancel this run and try running debug on the project again.  JavaFX should now be in your classpath.");
             restartJVM(launchClass, props, args);
