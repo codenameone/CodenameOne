@@ -49,7 +49,7 @@ class ClassPathLoader extends ClassLoader {
     }
 
     public Class loadClass(String className) throws ClassNotFoundException {
-        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
+        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop") || className.startsWith("netscape.javascript") || className.startsWith("javafx")) {
             return super.loadClass(className);
         }
         return findClass(className);
@@ -57,7 +57,7 @@ class ClassPathLoader extends ClassLoader {
 
     @Override
     protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
-        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop")) {
+        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop") || className.startsWith("netscape.javascript") || className.startsWith("javafx")) {
             return super.loadClass(className, resolve);
         }
         return findClass(className);

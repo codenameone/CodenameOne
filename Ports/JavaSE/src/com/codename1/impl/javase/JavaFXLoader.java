@@ -50,8 +50,10 @@ import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -71,10 +73,10 @@ import java.util.zip.ZipInputStream;
  */
 public class JavaFXLoader {
     private static String OS = System.getProperty("os.name").toLowerCase();
-    private File javafxDir = new File(System.getProperty("javafx.install.dir", new File(System.getProperty("user.home"), ".codenameone" + File.separator + "javafx").getAbsolutePath()));
-    private String winUrl = System.getProperty("javafx.win.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx-win.zip");
-    private String macUrl = System.getProperty("javafx.mac.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx-mac.zip");
-    private String linuxUrl = System.getProperty("javafx.linux.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx-linux.zip");
+    private File javafxDir = new File(System.getProperty("javafx.install.dir", new File(System.getProperty("user.home"), ".codenameone" + File.separator + "javafx" + getJavaFXVersionStr()).getAbsolutePath()));
+    private String winUrl = System.getProperty("javafx.win.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx"+getJavaFXVersionStr()+"-win.zip");
+    private String macUrl = System.getProperty("javafx.mac.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx"+getJavaFXVersionStr()+"-mac.zip");
+    private String linuxUrl = System.getProperty("javafx.linux.url", "https://github.com/codenameone/cn1-binaries/raw/master/javafx"+getJavaFXVersionStr()+"-linux.zip");
     
     
     private static boolean delTree(File f) throws IOException {
@@ -187,6 +189,7 @@ public class JavaFXLoader {
                 }
                 
                 
+                
             } finally {
                 delTree(tmpDir);
                 javafxZip.delete();
@@ -210,8 +213,14 @@ public class JavaFXLoader {
         if (!javafxLibDir.exists()) {
             throw new RuntimeException("JavaFX is missing.  This application requires a JDK with JavaFX.");
         }
+        File jarsDir = javafxLibDir;
+        if ("8".equals(getJavaFXVersionStr())) {
+            // JavaFX 8 jar files are in the lib/ext directory
+            jarsDir = new File(javafxLibDir, "ext");
+        }
+        
         java.util.List<java.net.URL> javafxUrls = new ArrayList<java.net.URL>();
-        for (File f : javafxLibDir.listFiles()) {
+        for (File f : jarsDir.listFiles()) {
             if (!f.getName().endsWith(".jar")) {
                 continue;
             }
@@ -265,11 +274,21 @@ public class JavaFXLoader {
     }
     
     public static boolean isJavaFXLoaded() {
+        boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
+        if (!isJavaFX8 && System.getProperty("java.class.path").contains(".codenameone/javafx8/lib")) {
+            // We're using javafx8 in jdk9 or higher...
+            // we should claim that javafx isn't loaded so that we can fix it.
+            return false;
+        }
         try {
             ClassLoader.getSystemClassLoader().loadClass("javafx.scene.web.WebEngine");
             return true;
         } catch (ClassNotFoundException ex) {
             return false;
+        } catch (UnsupportedClassVersionError er) {
+            
+            return false;
+        
         }
     }
     
@@ -297,10 +316,26 @@ public class JavaFXLoader {
                     fos.read(buf);
                     contents = new String(buf, "UTF-8");
                 }
-                
+                boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
                 String javafxListEntry = "<listEntry value=\"&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#10;&lt;runtimeClasspathEntry id=&quot;org.eclipse.jdt.launching.classpathentry.variableClasspathEntry&quot;&gt;&#10;    &lt;memento path=&quot;5&quot; variableString=&quot;${system_property:user.home}/.codenameone/javafx/lib/*&quot;/&gt;&#10;&lt;/runtimeClasspathEntry&gt;&#10;\"/>";
+                String javafx8ListEntry = "<listEntry value=\"&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#10;&lt;runtimeClasspathEntry id=&quot;org.eclipse.jdt.launching.classpathentry.variableClasspathEntry&quot;&gt;&#10;    &lt;memento path=&quot;5&quot; variableString=&quot;${system_property:user.home}/.codenameone/javafx8/lib/ext/*&quot;/&gt;&#10;&lt;/runtimeClasspathEntry&gt;&#10;\"/>";
                 boolean changed = false;
-                if (!contents.contains(".codenameone/javafx/lib")) {
+                
+                if (isJavaFX8 && contents.contains(".codenameone/javafx/lib")) {
+                    // This is javafx 8 but we have javafx11 on the classpath - REMOVE THEM
+                    System.out.println("Detected Incompatible version of JavaFX. Removing incompatible libs from the classpath");
+                    contents = contents.replaceAll("<listEntry .*\\.codenameone/javafx/lib.*/>", "");
+                    changed = true;
+                } else if (!isJavaFX8 && contents.contains(".codenameone/javafx8/lib")) {
+                    System.out.println("Detected Incompatible version of JavaFX.  Removing incompatible libs from the classpath");
+                    // This is javafx11 but we have javafx8 on the classpath - REMOVE THEM
+                    contents = contents.replaceAll("<listEntry .*\\.codenameone/javafx8/lib.*/>", "");
+                    changed = true;
+                }
+                
+                if (!isJavaFX8 && !contents.contains(".codenameone/javafx/lib")) {
+                    // This is JDK9 or higher and the javafx libs havent' been added to the classpath yet.
+                    System.out.println("Adding OpenJFX11 to the classpath");
                     int pos = contents.indexOf("<listAttribute key=\"org.eclipse.jdt.launching.CLASSPATH\">");
                     if (pos < 0) {
                         return;
@@ -312,6 +347,19 @@ public class JavaFXLoader {
                             + contents.substring(closingPos + endTag.length());
                     changed = true;
                    
+                } else if (isJavaFX8 && !contents.contains(".codenameone/javafx8/lib")) {
+                    System.out.println("Adding OpenJFX8 to the classpath");
+                    // This is JDK 8 and javafx libs haven't been added to the classpath yet.
+                    int pos = contents.indexOf("<listAttribute key=\"org.eclipse.jdt.launching.CLASSPATH\">");
+                    if (pos < 0) {
+                        return;
+                    }
+                    String endTag = "</listAttribute>";
+                    int closingPos = contents.indexOf(endTag, pos);
+                    contents = contents.substring(0, closingPos)
+                            + "    " + javafx8ListEntry + "\n    " + endTag
+                            + contents.substring(closingPos + endTag.length());
+                    changed = true;
                 }
                 
                 if (changed) {
@@ -342,19 +390,36 @@ public class JavaFXLoader {
                     contents = new String(buf, "UTF-8");
                 }
                 //System.out.println("Starting contents="+contents);
-                String jfxPath = "${user.home}/.codenameone/javafx/lib/*";
+                boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
+                String jfxPath = isJavaFX8 ? "${user.home}/.codenameone/javafx8/lib/ext/*" :
+                        "${user.home}/.codenameone/javafx/lib/*";
+                
                 boolean changed = false;
                 if (contents != null) {
 
 
                     if (contents.contains("cn1.javafx.path=")) {
-                        String newContents = contents.replaceAll("^cn1\\.javafx\\.path=.*$","cn1.javafx.path="+jfxPath);
+                        int pos = contents.indexOf("cn1.javafx.path=");
+                        String newContents = contents;
+                        if (pos > -1) {
+                            int eqPos = contents.indexOf("=", pos);
+                            int newlinePos = contents.indexOf("\n", pos);
+                            if (newlinePos < 0) {
+                                newlinePos = contents.length();
+                            }
+                            newContents = contents.substring(0, pos) + contents.substring(newlinePos);
+                        }
+                        
                         if (!newContents.equals(contents)) {
                             contents = newContents;
                             changed = true;
                         }
                     } else {
-                        contents += System.getProperty("line.separator") + "cn1.javafx.path="+jfxPath;
+                        String sep = System.getProperty("line.separator");
+                        if (!contents.endsWith(sep)) {
+                            contents += sep;
+                        }
+                        contents += "cn1.javafx.path="+jfxPath;
                         changed = true;
                     }
                     if (!contents.contains("${cn1.javafx.path}")) {
@@ -392,7 +457,7 @@ public class JavaFXLoader {
                     System.out.println("Adding JavaFX to your project properties file at "+nbProjectProperties);
                     System.out.println("JavaFX should be correctly loaded the next time you run this project.");
                      try (FileOutputStream fos = new FileOutputStream(nbProjectProperties)) {
-                        fos.write(contents.getBytes("ISO-8859-1"));
+                        fos.write(contents.getBytes("UTF-8"));
                     }
                 }
 
@@ -403,15 +468,96 @@ public class JavaFXLoader {
         }
     }
     
+    private static int cachedJavaVersion=-1;
+    /**
+     * Returns the Java version as an int value.
+     *
+     * @return the Java version as an int value (8, 9, etc.)
+     * @since 12130
+     */
+    private static int getJavaVersion() {
+        if (cachedJavaVersion < 0) {
+
+            String version = System.getProperty("java.version");
+            if (version.startsWith("1.")) {
+                version = version.substring(2);
+            }
+            // Allow these formats:
+            // 1.8.0_72-ea
+            // 9-ea
+            // 9
+            // 9.0.1
+            int dotPos = version.indexOf('.');
+            int dashPos = version.indexOf('-');
+            if (dotPos < 0 && dashPos < 0) {
+                cachedJavaVersion = Integer.parseInt(version);
+                return cachedJavaVersion;
+            }
+            cachedJavaVersion = Integer.parseInt(version.substring(0,
+                    dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+            return cachedJavaVersion;
+        }
+        return cachedJavaVersion;
+    }
+    
+    /**
+     * Because of the historical order in which we supported sideloading JavaFX, JDK9, 10, and 11
+     * have an empty string for the version string. And JDK 8 has "8".  The javafx libs 
+     * are downloaded to ${user.home}/.codenameone/javafx${versionstr}.  E.g.
+     * on JDK 8 it would be ${user.home}/.codenameone/javafx8, and oh 9, 10, 11, it would 
+     * just be ${user.home}/.codenameone/javafx
+     * @return 
+     */
+    private static String getJavaFXVersionStr() {
+        return (getJavaVersion() == 8) ? "8" : "";
+    }
+    
     
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
             System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
             
             Properties props = new Properties();
-            
+            boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
             try {
-                props.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + getJavaFXClassPath());
+                String cp = System.getProperty("java.class.path");
+                List<String> cpParts = new ArrayList<String>(Arrays.asList(cp.split(Pattern.quote(File.pathSeparator))));
+                if (isJavaFX8 && cp.contains(".codenameone/javafx/lib")) {
+                    //cp = cp.replace(".codenameone/javafx/lib/*", ".codenameone/javafx8/lib/ext/*");
+                    ListIterator<String> lit = cpParts.listIterator();
+                    while (lit.hasNext()) {
+                        String nex = lit.next();
+                        if (nex.contains(".codenameone/javafx/lib")) {
+                            lit.remove();
+                        }
+                    }
+                    cp = String.join(File.pathSeparator, cpParts.toArray(new String[cpParts.size()]));
+                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx8/lib/ext/*";
+                    
+                } else if (!isJavaFX8 && cp.contains(".codenameone/javafx8/lib/ext")) {
+                   // cp = cp.replace(".codenameone/javafx8/lib/ext/*", ".codenameone/javafx/lib/*");
+                   ListIterator<String> lit = cpParts.listIterator();
+                    while (lit.hasNext()) {
+                        String nex = lit.next();
+                        if (nex.contains(".codenameone/javafx8/lib/ext")) {
+                            lit.remove();
+                        }
+                    }
+                    cp = String.join(File.pathSeparator, cpParts.toArray(new String[cpParts.size()]));
+                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx/lib/*";
+                } else if (isJavaFX8 && !cp.contains(".codenameone/javafx8/lib")) {
+                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx8/lib/ext/*";
+                    
+                } else if (!isJavaFX8 && !cp.contains(".codenameone/javafx/lib")) {
+                    cp += File.pathSeparator + System.getProperty("user.home") + "/.codenameone/javafx/lib/*";
+                } else {
+                    String javafxPath = isJavaFX8 ?
+                            System.getProperty("user.home") + "/.codenameone/javafx8" :
+                            System.getProperty("user.home") + "/.codenameone/javafx";
+                    System.err.println("Project could not be run because JavaFX is missing.  It already has JavaFX in the class path so something else must be wrong.  Ensure that the "+javafxPath+" directory exists and contains the proper files.  You may want to try just deleting the entire directory and try running this project again, as it should autonmatically re-download it.");
+                    System.exit(1);
+                }
+                props.setProperty("java.class.path", cp);
             } catch (Exception ex) {
                 throw new RuntimeException("Failed to load JavaFX", ex);
             }
@@ -493,7 +639,10 @@ public class JavaFXLoader {
         if (!isJavaFXLoaded()) {
             try {
                 jfxLoader.getJavaFXClassPath();
-                stdOut.print( System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx" + File.separator + "lib" + File.separator + "*");
+                boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
+                String path = isJavaFX8 ?  System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx8" + File.separator + "lib" + File.separator + "ext" + File.separator + "*":
+                        System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx" + File.separator + "lib" + File.separator + "*";
+                stdOut.print(path) ;
             } catch (Exception ex){
                 stdErr.print("Failed to load JavaFX jars");
                 ex.printStackTrace(stdErr);
