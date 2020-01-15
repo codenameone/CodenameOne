@@ -101,6 +101,7 @@ public class JavaFXLoader {
         if (conn instanceof HttpURLConnection) {
             HttpURLConnection http = (HttpURLConnection)conn;
             http.setInstanceFollowRedirects(true);
+            http.setDefaultUseCaches(false);
             
         }
         
@@ -169,21 +170,35 @@ public class JavaFXLoader {
             javafxDir.getParentFile().mkdirs();
             File javafxZip = new File(javafxDir.getParentFile(), "javafx.zip");
             downloadToFile(url, javafxZip);
+            System.out.println("Downladed "+javafxZip+" "+javafxZip.length()+" bytes");
             File tmpDir = new File(javafxZip.getParentFile(), "javafx.tmp."+System.currentTimeMillis());
             try {
                 new UnzipUtility().unzip(javafxZip.getAbsolutePath(), tmpDir.getAbsolutePath());
                 javafxDir.mkdir();
                 File libDirTmp = findDir(tmpDir, "lib");
+                
                 File legalDirTmp = findDir(tmpDir, "legal");
                 File binDirTmp = findDir(tmpDir, "bin");
                 if (libDirTmp == null || !libDirTmp.exists()) {
                     throw new IOException("No lib dir found within JavaFX zip");
                 }
-                if (legalDirTmp == null || !legalDirTmp.exists()) {
-                    throw new IOException("No legal dir found within JavaFX zip");
-                }
+                //System.out.println("Files:");
+                //for (File f : libDirTmp.listFiles()) {
+                //    System.out.println(f);
+                //    if (f.isDirectory()) {
+                //        for (File child : f.listFiles()) {
+                //            System.out.println("  "+child);
+                 //       }
+                //    }
+                //}
+                //if (legalDirTmp == null || !legalDirTmp.exists()) {
+                //    throw new IOException("No legal dir found within JavaFX zip");
+                //}
+                
                 libDirTmp.renameTo(new File(javafxDir, "lib"));
-                legalDirTmp.renameTo(new File(javafxDir, "legal"));
+                if (legalDirTmp != null && legalDirTmp.exists()) {
+                    legalDirTmp.renameTo(new File(javafxDir, "legal"));
+                }
                 if (binDirTmp != null && binDirTmp.exists()) {
                     binDirTmp.renameTo(new File(javafxDir, "bin"));
                 }
@@ -516,7 +531,12 @@ public class JavaFXLoader {
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
             System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
-            
+            try {
+                getJavaFXJarFiles();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                return false;
+            }
             Properties props = new Properties();
             boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
             try {
