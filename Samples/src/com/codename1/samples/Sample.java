@@ -202,6 +202,10 @@ public class Sample {
         copyFile(context.getCodenameOneBuildClientJar(), new File(getBuildProjectDir(context), "CodeNameOneBuildClient.jar"));
     }
     
+    private void copyJavaSE(SamplesContext context) throws IOException {
+        copyFile(context.getJavaSEJar(), new File(getBuildProjectDir(context), "JavaSE.jar"));
+    }
+    
     /**
      * Synchronize any changes in the sample into the sample's project.
      * @param context
@@ -215,6 +219,7 @@ public class Sample {
             updateBuildProjectSettings(context);
             updateBuildProjectXml(context);
             copyCodenameOneBuildClient(context);
+            copyJavaSE(context);
             updateCodenameOneSettings(context);
             
         }
