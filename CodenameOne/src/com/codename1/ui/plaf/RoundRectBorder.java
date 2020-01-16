@@ -49,7 +49,7 @@ import com.codename1.ui.geom.Rectangle;
  */
 public class RoundRectBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rrbcache";
-    private boolean dirty; 
+    private boolean dirty=true; 
     /**
      * The color of the edge of the border if applicable
      */
@@ -143,7 +143,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder strokeOpacity(int strokeOpacity) {
-        this.strokeOpacity = strokeOpacity;
+        if (strokeOpacity != this.strokeOpacity) {
+            this.strokeOpacity = strokeOpacity;
+            dirty = true;
+        }
         return this;
     }
     
@@ -153,7 +156,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder strokeColor(int strokeColor) {
-        this.strokeColor = strokeColor;
+        if (strokeColor != this.strokeColor) {
+            this.strokeColor = strokeColor;
+            dirty = true;
+        }
         return this;
     }
 
@@ -168,6 +174,7 @@ public class RoundRectBorder extends Border {
     		strokeMM = false;
     	}
         this.stroke = stroke;
+        dirty = true;
         return this;
     }
 
@@ -196,7 +203,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowSpread(float shadowSpread) {
-        this.shadowSpread = shadowSpread;
+        if (shadowSpread != this.shadowSpread) {
+            this.shadowSpread = shadowSpread;
+            dirty = true;
+        }
         return this;
     }
 
@@ -207,6 +217,7 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder shadowSpread(int shadowSpread) {
         this.shadowSpread = shadowSpread * 100f/Display.getInstance().convertToPixels(100f);
+        dirty = true;
         return this;
     }
 
@@ -216,7 +227,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowOpacity(int shadowOpacity) {
-        this.shadowOpacity = shadowOpacity;
+        if (shadowOpacity != this.shadowOpacity) {
+            this.shadowOpacity = shadowOpacity;
+            dirty = true;
+        }
         return this;
     }
 
@@ -226,7 +240,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowColor(int shadowColor) {
-        this.shadowColor = shadowColor;
+        if (shadowColor != this.shadowColor) {
+            this.shadowColor = shadowColor;
+            dirty = true;
+        }
         return this;
     }
     
@@ -236,7 +253,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowX(float shadowX) {
-        this.shadowX = shadowX;
+        if (shadowX != this.shadowX) {
+            this.shadowX = shadowX;
+            dirty = true;
+        }
         return this;
     }
 
@@ -246,7 +266,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowY(float shadowY) {
-        this.shadowY = shadowY;
+        if (shadowY != this.shadowY) {
+            this.shadowY = shadowY;
+            dirty = true;
+        }
         return this;
     }
 
@@ -256,7 +279,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowBlur(float shadowBlur) {
-        this.shadowBlur = shadowBlur;
+        if (shadowBlur != this.shadowBlur) {
+            this.shadowBlur = shadowBlur;
+            dirty = true;
+        }
         return this;
     }
         
@@ -267,7 +293,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder cornerRadius(float cornerRadius) {
-        this.cornerRadius = cornerRadius;
+        if (cornerRadius != cornerRadius) {
+           this.cornerRadius = cornerRadius;
+           dirty = true;
+        }
         return this;
     }
     
@@ -278,7 +307,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bezierCorners(boolean bezierCorners) {
-        this.bezierCorners = bezierCorners;
+        if (bezierCorners != bezierCorners) {
+            this.bezierCorners = bezierCorners;
+            dirty = true;
+        }
         return this;
     }
     
@@ -340,6 +372,8 @@ public class RoundRectBorder extends Border {
         return this;
     }
     
+    
+    
     /**
      * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
      * 
@@ -353,10 +387,9 @@ public class RoundRectBorder extends Border {
             bottomLeftMode(false);
             bottomRightMode(false);
         } else {
-            topLeftMode(true);
-            topRightMode(true);
-            bottomLeftMode(false);
-            bottomRightMode(false);
+            topLeftMode(false);
+            topRightMode(false);
+
         }
         return this;
     }
@@ -374,8 +407,9 @@ public class RoundRectBorder extends Border {
             bottomLeftMode(true);
             bottomRightMode(true);
         } else {
-            bottomLeftMode(true);
-            bottomRightMode(true);
+            bottomLeftMode(false);
+            bottomRightMode(false);
+
         }
         return this;
     }

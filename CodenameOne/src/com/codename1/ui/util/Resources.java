@@ -1609,7 +1609,7 @@ public class Resources {
                             
             // round rect border
             case 0xff13:                    
-                    return RoundRectBorder.create().
+                    RoundRectBorder out = RoundRectBorder.create().
                             stroke(input.readFloat(), input.readBoolean()).
                             strokeColor(input.readInt()).
                             strokeOpacity(input.readInt()).
@@ -1619,9 +1619,17 @@ public class Resources {
                             shadowX(input.readFloat()).
                             shadowY(input.readFloat()).
                             cornerRadius(input.readFloat()).
-                            bezierCorners(input.readBoolean()).
-                            topOnlyMode(input.readBoolean()).
-                            bottomOnlyMode(input.readBoolean());
+                            bezierCorners(input.readBoolean());
+                    if (input.readBoolean()) {
+                        out.topOnlyMode(true);
+                    }
+                    if (input.readBoolean()) {
+                        out.bottomOnlyMode(true);
+                    }
+                    return out;
+                    
+                            //topOnlyMode(input.readBoolean()).
+                            //bottomOnlyMode(input.readBoolean());
             // round rect border with top-left, top-right, bottom-right, bottom-left corners
             // specified independently
             case 0xff15:                    
