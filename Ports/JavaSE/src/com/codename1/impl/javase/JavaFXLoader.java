@@ -290,7 +290,7 @@ public class JavaFXLoader {
     
     public static boolean isJavaFXLoaded() {
         boolean isJavaFX8 = "8".equals(getJavaFXVersionStr());
-        if (!isJavaFX8 && System.getProperty("java.class.path").contains(".codenameone/javafx8/lib")) {
+        if (!isJavaFX8 && containsJavaFX8(System.getProperty("java.class.path"))) {
             // We're using javafx8 in jdk9 or higher...
             // we should claim that javafx isn't loaded so that we can fix it.
             return false;
@@ -336,19 +336,19 @@ public class JavaFXLoader {
                 String javafx8ListEntry = "<listEntry value=\"&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#10;&lt;runtimeClasspathEntry id=&quot;org.eclipse.jdt.launching.classpathentry.variableClasspathEntry&quot;&gt;&#10;    &lt;memento path=&quot;5&quot; variableString=&quot;${system_property:user.home}/.codenameone/javafx8/lib/ext/*&quot;/&gt;&#10;&lt;/runtimeClasspathEntry&gt;&#10;\"/>";
                 boolean changed = false;
                 
-                if (isJavaFX8 && contents.contains(".codenameone/javafx/lib")) {
+                if (isJavaFX8 && containsJavaFX(contents)) {
                     // This is javafx 8 but we have javafx11 on the classpath - REMOVE THEM
                     System.out.println("Detected Incompatible version of JavaFX. Removing incompatible libs from the classpath");
                     contents = contents.replaceAll("<listEntry .*\\.codenameone/javafx/lib.*/>", "");
                     changed = true;
-                } else if (!isJavaFX8 && contents.contains(".codenameone/javafx8/lib")) {
+                } else if (!isJavaFX8 && containsJavaFX8(contents)) {
                     System.out.println("Detected Incompatible version of JavaFX.  Removing incompatible libs from the classpath");
                     // This is javafx11 but we have javafx8 on the classpath - REMOVE THEM
                     contents = contents.replaceAll("<listEntry .*\\.codenameone/javafx8/lib.*/>", "");
                     changed = true;
                 }
                 
-                if (!isJavaFX8 && !contents.contains(".codenameone/javafx/lib")) {
+                if (!isJavaFX8 && !containsJavaFX(contents)) {
                     // This is JDK9 or higher and the javafx libs havent' been added to the classpath yet.
                     System.out.println("Adding OpenJFX11 to the classpath");
                     int pos = contents.indexOf("<listAttribute key=\"org.eclipse.jdt.launching.CLASSPATH\">");
@@ -362,7 +362,7 @@ public class JavaFXLoader {
                             + contents.substring(closingPos + endTag.length());
                     changed = true;
                    
-                } else if (isJavaFX8 && !contents.contains(".codenameone/javafx8/lib")) {
+                } else if (isJavaFX8 && !containsJavaFX8(contents)) {
                     System.out.println("Adding OpenJFX8 to the classpath");
                     // This is JDK 8 and javafx libs haven't been added to the classpath yet.
                     int pos = contents.indexOf("<listAttribute key=\"org.eclipse.jdt.launching.CLASSPATH\">");
@@ -527,7 +527,22 @@ public class JavaFXLoader {
         return (getJavaVersion() == 8) ? "8" : "";
     }
     
-    
+    private static boolean containsJavaFX8(String classpath) {
+        return classpath.contains(".codenameone/javafx8/lib/ext") || classpath.contains(".codenameone\\javafx8\\lib\\ext");
+    }
+
+    private static boolean containsJavaFX(String classpath) {
+        return classpath.contains(".codenameone/javafx/lib") || classpath.contains(".codenameone\\javafx\\lib");
+    }
+
+    private static String p(String path) {
+        if ("\\".equals(File.separator)) {
+            return path.replace("/", "\\");
+        } else {
+            return path.replace("\\", "/");
+        }
+    }
+
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
         if (!JavaFXLoader.isJavaFXLoaded()) {
             System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
@@ -542,38 +557,39 @@ public class JavaFXLoader {
             try {
                 String cp = System.getProperty("java.class.path");
                 List<String> cpParts = new ArrayList<String>(Arrays.asList(cp.split(Pattern.quote(File.pathSeparator))));
-                if (isJavaFX8 && cp.contains(".codenameone/javafx/lib")) {
+                if (isJavaFX8 && containsJavaFX(cp)) {
                     //cp = cp.replace(".codenameone/javafx/lib/*", ".codenameone/javafx8/lib/ext/*");
                     ListIterator<String> lit = cpParts.listIterator();
                     while (lit.hasNext()) {
                         String nex = lit.next();
-                        if (nex.contains(".codenameone/javafx/lib")) {
+                        if (containsJavaFX(nex)) {
                             lit.remove();
                         }
+                        
                     }
                     cp = String.join(File.pathSeparator, cpParts.toArray(new String[cpParts.size()]));
-                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx8/lib/ext/*";
+                    cp += File.pathSeparator + System.getProperty("user.home")+p("/.codenameone/javafx8/lib/ext/*");
                     
-                } else if (!isJavaFX8 && cp.contains(".codenameone/javafx8/lib/ext")) {
+                } else if (!isJavaFX8 && containsJavaFX8(cp)) {
                    // cp = cp.replace(".codenameone/javafx8/lib/ext/*", ".codenameone/javafx/lib/*");
                    ListIterator<String> lit = cpParts.listIterator();
                     while (lit.hasNext()) {
                         String nex = lit.next();
-                        if (nex.contains(".codenameone/javafx8/lib/ext")) {
+                        if (containsJavaFX8(nex)) {
                             lit.remove();
                         }
                     }
                     cp = String.join(File.pathSeparator, cpParts.toArray(new String[cpParts.size()]));
-                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx/lib/*";
-                } else if (isJavaFX8 && !cp.contains(".codenameone/javafx8/lib")) {
-                    cp += File.pathSeparator + System.getProperty("user.home")+"/.codenameone/javafx8/lib/ext/*";
+                    cp += File.pathSeparator + System.getProperty("user.home")+p("/.codenameone/javafx/lib/*");
+                } else if (isJavaFX8 && !containsJavaFX8(cp)) {
+                    cp += File.pathSeparator + System.getProperty("user.home")+p("/.codenameone/javafx8/lib/ext/*");
                     
-                } else if (!isJavaFX8 && !cp.contains(".codenameone/javafx/lib")) {
-                    cp += File.pathSeparator + System.getProperty("user.home") + "/.codenameone/javafx/lib/*";
+                } else if (!isJavaFX8 && !containsJavaFX(cp)) {
+                    cp += File.pathSeparator + System.getProperty("user.home") + p("/.codenameone/javafx/lib/*");
                 } else {
                     String javafxPath = isJavaFX8 ?
-                            System.getProperty("user.home") + "/.codenameone/javafx8" :
-                            System.getProperty("user.home") + "/.codenameone/javafx";
+                            System.getProperty("user.home") + p("/.codenameone/javafx8") :
+                            System.getProperty("user.home") + p("/.codenameone/javafx");
                     System.err.println("Project could not be run because JavaFX is missing.  It already has JavaFX in the class path so something else must be wrong.  Ensure that the "+javafxPath+" directory exists and contains the proper files.  You may want to try just deleting the entire directory and try running this project again, as it should autonmatically re-download it.");
                     System.exit(1);
                 }
