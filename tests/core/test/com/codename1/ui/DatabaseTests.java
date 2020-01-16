@@ -41,10 +41,10 @@ public class DatabaseTests extends AbstractTest {
         this.assertTrue(Database.exists(dbName), "Database.exists() returns false after openOrCreate");
         
         String path = Database.getDatabasePath(dbName);
-        this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation");
+        this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation.  Expected to be at "+path);
         
         Database.delete(dbName);
-        this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database.");
+        this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database.  Still exists at "+path);
         
     }
     

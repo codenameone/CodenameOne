@@ -11361,7 +11361,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             File dir = file.getParentFile();
             if (!dir.exists()) {
-                dir.mkdir();
+                dir.mkdirs();
             }
             java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
                     file.getAbsolutePath(),
