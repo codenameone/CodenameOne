@@ -65,8 +65,9 @@ public class DatabaseTests extends AbstractTest {
             this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation with custom path: "+dbName);
 
             this.assertEqual(dbFile.getAbsolutePath(), path, "Result of getDatabasePath() doesn't match input path with custom path");
-
+            db.close();
             Database.delete(dbName);
+            
             this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database with custom path: "+dbName);
         } else {
             Throwable ex = null;
