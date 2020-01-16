@@ -78,6 +78,8 @@ jobs:
       with:
         java-version: 1.8
         java-package: jdk+fx
+    - name: "Install Ant"
+      run: brew install ant
     - name: Build with Ant
       env:
         ANT_PATH: ant
@@ -94,6 +96,8 @@ jobs:
       with:
         java-version: 11
         java-package: jdk+fx
+    - name: "Install Ant"
+      run: brew install ant
     - name: Build with Ant
       env:
         ANT_PATH: ant
@@ -110,6 +114,8 @@ jobs:
       with:
         java-version: 11
         java-package: jdk
+    - name: "Install Ant"
+      run: brew install ant
     - name: Build with Ant
       env:
         ANT_PATH: ant
