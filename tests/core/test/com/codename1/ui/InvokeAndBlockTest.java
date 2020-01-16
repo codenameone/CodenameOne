@@ -16,7 +16,7 @@ public class InvokeAndBlockTest extends AbstractTest {
 
         @Override
         public boolean shouldExecuteOnEDT() {
-            return super.shouldExecuteOnEDT(); //To change body of generated methods, choose Tools | Templates.
+            return true;
         }
 
         @Override

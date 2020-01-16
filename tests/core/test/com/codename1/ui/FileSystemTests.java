@@ -140,4 +140,11 @@ public class FileSystemTests extends AbstractTest {
 
     }
 
+    @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+    
+    
+
 }

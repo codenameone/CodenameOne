@@ -149,4 +149,11 @@ public class DatabaseTests extends AbstractTest {
 
     }
 
+    @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+    
+    
+
 }

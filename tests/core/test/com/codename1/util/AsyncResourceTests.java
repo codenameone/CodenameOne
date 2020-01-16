@@ -93,4 +93,11 @@ public class AsyncResourceTests extends AbstractTest {
         return true;
     }
 
+    @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+    
+    
+
 }
