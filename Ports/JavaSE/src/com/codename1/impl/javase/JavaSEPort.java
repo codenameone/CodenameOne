@@ -1279,7 +1279,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             // we need to work in a thread-safe way - since we can't control
             // when paintComponent() is called.
             blitCounter++;
-            
+            boolean bufferUpdated = false;
             if (blitCounter > 5) {
                 // blit() has been called more than 5 times since last
                 // paintComponent() - we'll disable buffer thread safety
@@ -1294,9 +1294,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // blit() has not been called more than 5 times since 
                 // last paintComponent() call - so we'll enable buffer
                 // thread safety.
+                
                 if (!bufferSafeMode) {
                     bufferSafeMode = true;
-                    buffer = null;
+                    synchronized(bufferLock) {
+                        buffer = null;
+                        updateBuffer(edtBuffer);
+                        updateEdtBufferSize();
+                        bufferUpdated = true;
+                    }
                     //System.out.println("On");
                 }
             }
@@ -1306,9 +1312,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // to the buffer in a synchronized block so that 
                 // there is no possible conflict when paintComponent()
                 // is called.
-                synchronized (bufferLock) {
-                    updateBuffer(edtBuffer);
-                    updateEdtBufferSize();
+                if (!bufferUpdated) {
+                    synchronized (bufferLock) {
+                        updateBuffer(edtBuffer);
+                        updateEdtBufferSize();
+                    }
                 }
             } else {
                 
@@ -1386,6 +1394,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
+            if (buffer == null) {
+                return false;
+            }
             //g.setColor(Color.white);
             //g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             AffineTransform t = ((Graphics2D)g).getTransform();
