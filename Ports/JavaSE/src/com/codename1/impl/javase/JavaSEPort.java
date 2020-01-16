@@ -11400,11 +11400,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void deleteDB(String databaseName) throws IOException {
         System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
-        System.out.println("Deleting database file "+f);
         if (f.exists()) {
-            f.delete();
-        } else {
-            System.out.println("Failed to delete database file because it doesn't exist");
+            if (!f.delete()) {
+                throw new IOException("Failed to delete database file "+f+".  It may be in use.  Make sure to close the database connection before deleting the database.");
+            }
+            
         }
     }
     
