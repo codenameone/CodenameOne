@@ -1458,7 +1458,9 @@ public class List<T> extends Component {
         int oHeight = g.getClipHeight();
         //g.pushClip();
         g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
-
+        if (cmp instanceof Container) {
+            ((Container)cmp).layoutContainer();
+        }
         cmp.paint(g);
         Border b = s.getBorder();
         if(b != null && !b.isBackgroundPainter()) {
@@ -1482,6 +1484,9 @@ public class List<T> extends Component {
         int cH = g.getClipHeight();
         //g.pushClip();
         g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
+        if (cmp instanceof Container) {
+            ((Container)cmp).layoutContainer();
+        }
         cmp.paintComponentBackground(g);
         g.setClip(cX, cY, cW, cH);
         //g.popClip();
