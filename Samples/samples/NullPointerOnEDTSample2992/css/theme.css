@@ -1,0 +1,9 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+TextField {
+    border: 1pt #3399ff cn1-pill-border;
+    margin: 5mm;
+    padding-left: 5mm;
+}

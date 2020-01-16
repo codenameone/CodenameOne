@@ -4882,6 +4882,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                         int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
                         int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
                         Rectangle bounds;
                         if (getSkin() != null) {
                             bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
@@ -4894,8 +4898,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
                             textCmp.setBounds(bounds);
+                            textCmp.setBorder(BorderFactory.createCompoundBorder(
+                                textCmp.getBorder(), 
+                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                            );
                         }
-
+                        
                         
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
@@ -4911,6 +4919,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                         int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
                         int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
                         Rectangle bounds;
                         if (getSkin() != null) {
                             bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
@@ -4923,8 +4935,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
                             textCmp.setBounds(bounds);
+                            textCmp.setBorder(BorderFactory.createCompoundBorder(
+                                textCmp.getBorder(), 
+                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                            );
                         }
-
+                        
                         
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
@@ -4971,6 +4987,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                     int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
                     int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                    int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
                     Rectangle bounds;
                     if (getSkin() != null) {
                         bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
@@ -4983,6 +5003,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     if(textCmp != null && !textCmp.getBounds().equals(bounds)){
                         textCmp.setBounds(bounds);
+                        textCmp.setBorder(BorderFactory.createCompoundBorder(
+                            textCmp.getBorder(), 
+                            BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                        );
                     }
                     
                     Display.getInstance().callSerially(new Runnable() {
