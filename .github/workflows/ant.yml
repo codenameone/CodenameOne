@@ -36,5 +36,5 @@ jobs:
         java-package: jdk+fx
     - name: Build with Ant
       env:
-        ANT_PATH: ant.cmd
+        ANT_PATH: ant
       run: ant test-javase
