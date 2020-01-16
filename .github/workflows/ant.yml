@@ -35,4 +35,6 @@ jobs:
         java-version: 1.8
         java-package: jdk+fx
     - name: Build with Ant
+      env:
+        ANT_PATH: ant
       run: ant test-javase
