@@ -13,6 +13,7 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 11
+        java-package: jdk+fx
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install xvfb
     - name: Build with Ant
