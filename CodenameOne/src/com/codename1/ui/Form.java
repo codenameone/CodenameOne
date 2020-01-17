@@ -64,6 +64,7 @@ import java.util.ListIterator;
  * @author Chen Fishbein
  */
 public class Form extends Container {
+    private Command sourceCommand;
     private boolean globalAnimationLock;
     static int activePeerCount;
     private Painter glassPane;
@@ -270,6 +271,26 @@ public class Form extends Container {
      */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
+    }
+    
+    /**
+     * Sets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @param sourceCommand The source command. 
+     * @since 7.0
+     */
+    public void setSourceCommand(Command sourceCommand) {
+        this.sourceCommand = sourceCommand;
+    }
+    
+    /**
+     * Gets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @return The source command. 
+     * @since 7.0
+     */
+    public Command getSourceCommand() {
+        return sourceCommand;
     }
     
     /**
