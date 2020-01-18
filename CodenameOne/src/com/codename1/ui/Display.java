@@ -1345,6 +1345,29 @@ public final class Display extends CN1Constants {
     }
     
     /**
+     * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
+     * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
+     * it will result in a {@link BlockingDisallowedException} being thrown.
+     * @param r RunnableWithResultSync to be run immediately.
+     * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
+     * anywhere in the Runnable.
+     * 
+     * @since 7.0
+     */
+    public static <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
+        if (disableInvokeAndBlock || !isEdt()) {
+            return r.run();
+        } else {
+            disableInvokeAndBlock = true;
+            try {
+                return r.run();
+            } finally {
+                disableInvokeAndBlock = false;
+            }
+        }
+    }
+    
+    /**
      * Invokes runnable and blocks the current thread, if the current thread is the
      * EDT it will still be blocked in a way that doesn't break event dispatch .
      * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
