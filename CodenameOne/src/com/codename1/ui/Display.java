@@ -1355,7 +1355,7 @@ public final class Display extends CN1Constants {
      * 
      * @since 7.0
      */
-    public static <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
+    public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
         if (disableInvokeAndBlock || !isEdt()) {
             return r.run();
         } else {
