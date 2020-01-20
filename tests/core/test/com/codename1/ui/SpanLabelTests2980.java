@@ -56,6 +56,7 @@ public class SpanLabelTests2980 extends AbstractTest {
         f.show();
         waitForFormName("testBorderLayout");
         clickButtonByName("showBorderLayout");
+        waitFor(500); // give time for click to take effect
         SpanLabel spanLabel = (SpanLabel)findByName("messageSpanLabel");
         Label l = new Label("Tap the following");
 
