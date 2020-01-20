@@ -33,13 +33,13 @@ public class SpanLabelTests2980 extends AbstractTest {
     
     private void testBorderLayout() {
         System.out.println("Testing SpanLabel preferred size in BorderLayout.  https://github.com/codenameone/CodenameOne/issues/3000");
-        Button showPopUp = new Button("Show PopUp in Border Layout");
+        //Button showPopUp = new Button("Show PopUp in Border Layout");
         Form f = new Form(BoxLayout.y());
         f.setName("testBorderLayout");
-        f.add(showPopUp);
+        //f.add(showPopUp);
 
-        showPopUp.addActionListener((e) -> {
-
+        //showPopUp.addActionListener((e) -> {
+        Runnable showPopup = () -> {
             SpanLabel messageSpanLabel = new SpanLabel("Tap the following button to open the gallery. You should be able to select multiple images and videos. Tap the following button to open the gallery. You should be able to select multiple images and videos.");
             messageSpanLabel.setName("messageSpanLabel");
             Container centerContainerOuter = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER));
@@ -51,11 +51,12 @@ public class SpanLabelTests2980 extends AbstractTest {
             layeredPane.setVisible(true);
 
             getCurrentForm().revalidate();     
-        });
-        showPopUp.setName("showBorderLayout");
+        };
+        //showPopUp.setName("showBorderLayout");
         f.show();
         waitForFormName("testBorderLayout");
-        clickButtonByName("showBorderLayout");
+        //clickButtonByName("showBorderLayout");
+        showPopup.run();
         waitFor(500); // give time for click to take effect
         SpanLabel spanLabel = (SpanLabel)findByName("messageSpanLabel");
         Label l = new Label("Tap the following");
