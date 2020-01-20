@@ -87,7 +87,7 @@ public class InvokeAndBlockTest extends AbstractTest {
             CN.callSerially(()->{
                 sb.append("G");
                 CN.invokeAndBlock(()->{
-                    Util.sleep(60);
+                    Util.sleep(500);
                     sb.append("F");
                 });
                 sb.append("H");
@@ -98,14 +98,14 @@ public class InvokeAndBlockTest extends AbstractTest {
             CN.callSerially(()->{
                sb.append("X");
                CN.invokeAndBlock(()->{
-                    Util.sleep(120);
+                    Util.sleep(1000);
                     sb.append("Y");
                });
                sb.append("Z");
             });
             CN.callSerially(()->sb.append("Q"));
             CN.invokeAndBlock(()->{
-                Util.sleep(1000);
+                Util.sleep(3000);
                 // Give them all a chance to finish.
             });
             assertEqual("EGIXQFYZH", sb.toString(), "Calls in wrong order");
