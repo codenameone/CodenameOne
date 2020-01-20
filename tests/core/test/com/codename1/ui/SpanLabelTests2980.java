@@ -8,9 +8,14 @@ package com.codename1.ui;
 import com.codename1.components.SpanButton;
 import com.codename1.components.SpanLabel;
 import com.codename1.testing.AbstractTest;
+import static com.codename1.ui.CN.CENTER;
+import static com.codename1.ui.CN.CENTER_BEHAVIOR_CENTER;
+import static com.codename1.ui.CN.getCurrentForm;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 
 /**
@@ -24,6 +29,39 @@ public class SpanLabelTests2980 extends AbstractTest {
     @Override
     public boolean shouldExecuteOnEDT() {
         return true;
+    }
+    
+    private void testBorderLayout() {
+        System.out.println("Testing SpanLabel preferred size in BorderLayout.  https://github.com/codenameone/CodenameOne/issues/3000");
+        Button showPopUp = new Button("Show PopUp in Border Layout");
+        Form f = new Form(BoxLayout.y());
+        f.setName("testBorderLayout");
+        f.add(showPopUp);
+
+        showPopUp.addActionListener((e) -> {
+
+            SpanLabel messageSpanLabel = new SpanLabel("Tap the following button to open the gallery. You should be able to select multiple images and videos. Tap the following button to open the gallery. You should be able to select multiple images and videos.");
+            messageSpanLabel.setName("messageSpanLabel");
+            Container centerContainerOuter = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER));
+            centerContainerOuter.add(CENTER, messageSpanLabel);
+
+            Container layeredPane = getCurrentForm().getLayeredPane();
+            layeredPane.setLayout(new LayeredLayout());        
+            layeredPane.add(centerContainerOuter);
+            layeredPane.setVisible(true);
+
+            getCurrentForm().revalidate();     
+        });
+        showPopUp.setName("showBorderLayout");
+        f.show();
+        waitForFormName("testBorderLayout");
+        clickButtonByName("showBorderLayout");
+        SpanLabel spanLabel = (SpanLabel)findByName("messageSpanLabel");
+        Label l = new Label("Tap the following");
+
+        assertTrue(spanLabel.getHeight() > l.getPreferredH() * 2, "Span Label height is too small.  Should be at least a few lines.");
+        System.out.println("Finished SpanLabel BorderLayout test");
+
     }
 
     @Override
@@ -83,6 +121,9 @@ public class SpanLabelTests2980 extends AbstractTest {
         cnt.layoutContainer();
         assertTrue(sb.getHeight() > label.getPreferredH() * 2, "Span button height is too low for layout " + layout + ": was " + sb.getHeight() + " but should be at least " + (label.getPreferredH() * 2));
 
+        
+        testBorderLayout();
+        
         return true;
     }
 
