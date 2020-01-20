@@ -37,10 +37,10 @@ public class SpanLabelTests2980 extends AbstractTest {
         Form f = new Form(BoxLayout.y());
         f.setName("testBorderLayout");
         //f.add(showPopUp);
-
+        SpanLabel messageSpanLabel = new SpanLabel("Tap the following button to open the gallery. You should be able to select multiple images and videos. Tap the following button to open the gallery. You should be able to select multiple images and videos.");
         //showPopUp.addActionListener((e) -> {
         Runnable showPopup = () -> {
-            SpanLabel messageSpanLabel = new SpanLabel("Tap the following button to open the gallery. You should be able to select multiple images and videos. Tap the following button to open the gallery. You should be able to select multiple images and videos.");
+            
             messageSpanLabel.setName("messageSpanLabel");
             Container centerContainerOuter = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER));
             centerContainerOuter.add(CENTER, messageSpanLabel);
@@ -58,7 +58,7 @@ public class SpanLabelTests2980 extends AbstractTest {
         //clickButtonByName("showBorderLayout");
         showPopup.run();
         waitFor(500); // give time for click to take effect
-        SpanLabel spanLabel = (SpanLabel)findByName("messageSpanLabel");
+        SpanLabel spanLabel = messageSpanLabel; //(SpanLabel)findByName("messageSpanLabel");
         Label l = new Label("Tap the following");
 
         assertTrue(spanLabel.getHeight() > l.getPreferredH() * 2, "Span Label height is too small.  Should be at least a few lines.");
