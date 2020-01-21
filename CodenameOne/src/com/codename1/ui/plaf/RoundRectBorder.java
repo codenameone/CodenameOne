@@ -293,7 +293,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder cornerRadius(float cornerRadius) {
-        if (cornerRadius != cornerRadius) {
+        if (cornerRadius != this.cornerRadius) {
            this.cornerRadius = cornerRadius;
            dirty = true;
         }
