@@ -24,6 +24,11 @@ public class RoundRectBorderTest extends AbstractTest {
         RoundRectBorder border = RoundRectBorder.create();
         border.cornerRadius(5f);
         assertTrue(Math.abs(border.getCornerRadius() - 5f) < 0.00001, "Setting corner radius has no effect");
+        
+        border.bezierCorners(false);
+        assertTrue(!border.isBezierCorners(), "Setting bezier corners to false failed.");
+        border.bezierCorners(true);
+        assertTrue(border.isBezierCorners(), "Setting bezier corners to true failed.");
         return true;
         
     }

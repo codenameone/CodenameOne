@@ -307,7 +307,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bezierCorners(boolean bezierCorners) {
-        if (bezierCorners != bezierCorners) {
+        if (bezierCorners != this.bezierCorners) {
             this.bezierCorners = bezierCorners;
             dirty = true;
         }
