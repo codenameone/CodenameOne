@@ -405,7 +405,23 @@ public class Sheet extends Container {
         Border border = getStyle().getBorder();
         if (border instanceof RoundRectBorder) {
             RoundRectBorder b = (RoundRectBorder)border;
-            
+            RoundRectBorder nb = RoundRectBorder.create();
+            nb.bezierCorners(b.isBezierCorners());
+            nb.bottomLeftMode(b.isBottomLeft());
+            nb.bottomRightMode(b.isBottomRight());
+            nb.topRightMode(b.isTopRight());
+            nb.topLeftMode(b.isTopLeft());
+            nb.cornerRadius(b.getCornerRadius());
+            nb.shadowBlur(b.getShadowBlur());
+            nb.shadowColor(b.getShadowColor());
+            nb.shadowOpacity(b.getShadowOpacity());
+            nb.shadowSpread(b.getShadowSpread());
+            nb.shadowX(b.getShadowX());
+            nb.shadowY(b.getShadowY());
+            nb.strokeColor(b.getStrokeColor());
+            nb.strokeOpacity(b.getStrokeOpacity());
+            nb.stroke(b.getStrokeThickness(), b.isStrokeMM());
+            b = nb;
             switch (getPositionInt()) {
                 case C:
                     b.bottomRightMode(true);
@@ -436,10 +452,12 @@ public class Sheet extends Container {
                     b.topLeftMode(false);
                     b.topRightMode(false);
                     b.bottomLeftMode(true);
-                    b.bottomLeftMode(false);
+                    b.bottomRightMode(true);
                     break;
                    
             }
+            getStyle().setBorder(b);
+            
         }
         
     }

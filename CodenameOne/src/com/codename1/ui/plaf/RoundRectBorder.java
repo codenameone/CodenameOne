@@ -874,12 +874,7 @@ public class RoundRectBorder extends Border {
         return (!topLeft) && (!topRight) && bottomLeft && bottomRight;
     }
     
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 43 * hash + strokeColor;
-        return hash;
-    }
+    
 
     @Override
     public boolean equals(Object obj) {
@@ -923,7 +918,41 @@ public class RoundRectBorder extends Border {
         if (this.bezierCorners != other.bezierCorners) {
             return false;
         }
+        if (this.topLeft != other.topLeft) {
+            return false;
+        }
+        if (this.topRight != other.topRight) {
+            return false;
+        }
+        if (this.bottomLeft != other.bottomLeft) {
+            return false;
+        }
+        if (this.bottomRight != other.bottomRight) {
+            return false;
+        }
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 79 * hash + this.strokeColor;
+        hash = 79 * hash + this.strokeOpacity;
+        hash = 79 * hash + Float.floatToIntBits(this.strokeThickness);
+        hash = 79 * hash + (this.strokeMM ? 1 : 0);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowSpread);
+        hash = 79 * hash + this.shadowOpacity;
+        hash = 79 * hash + this.shadowColor;
+        hash = 79 * hash + Float.floatToIntBits(this.shadowX);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowY);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowBlur);
+        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
+        hash = 79 * hash + (this.bezierCorners ? 1 : 0);
+        hash = 79 * hash + (this.topLeft ? 1 : 0);
+        hash = 79 * hash + (this.topRight ? 1 : 0);
+        hash = 79 * hash + (this.bottomLeft ? 1 : 0);
+        hash = 79 * hash + (this.bottomRight ? 1 : 0);
+        return hash;
     }
 
     /**
