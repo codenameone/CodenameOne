@@ -2243,7 +2243,7 @@ public class UIBuilder { //implements Externalizable {
         Form currentForm = Display.getInstance().getCurrent();
         Command backCommand = currentForm.getBackCommand(); 
         Form newForm = (Form)createContainer(fetchResourceFile(), currentForm.getName());
-
+        newForm.setSourceCommand(currentForm.getSourceCommand());
         if (backCommand != null) {
             setBackCommand(newForm, backCommand);
 
@@ -2458,7 +2458,7 @@ public class UIBuilder { //implements Externalizable {
                 }
             }
             onBackNavigation();
-            beforeShow(f);
+            beforeShow(f, sourceCommand);
             f.showBack();
             postShowImpl(f);
         } else {
@@ -2500,7 +2500,7 @@ public class UIBuilder { //implements Externalizable {
                 }
             }
             if(f instanceof Dialog) {
-                beforeShow(f);
+                beforeShow(f, sourceCommand);
                 if(sourceComponent != null) {
                     // we are cheating with the post show here since we are using a modal
                     // dialog to prevent the "double clicking button" problem by using
@@ -2515,7 +2515,7 @@ public class UIBuilder { //implements Externalizable {
                     postShowImpl(f);
                 }
             } else {
-                beforeShow(f);
+                beforeShow(f, sourceCommand);
                 f.show();
                 postShowImpl(f);
             }
@@ -2582,6 +2582,15 @@ public class UIBuilder { //implements Externalizable {
      * @param f the form about to be shown
      */
     protected void beforeShow(Form f) {
+    }
+    
+    
+    
+    private void beforeShow(Form f, Command sourceCommand) {
+        if (sourceCommand != null) {
+            f.setSourceCommand(sourceCommand);
+        }
+        beforeShow(f);
     }
 
     /**
@@ -2810,7 +2819,7 @@ public class UIBuilder { //implements Externalizable {
                         exitForm(Display.getInstance().getCurrent());
                     }
                     Form f = (Form)createContainer(fetchResourceFile(), nextForm);
-                    beforeShow(f);
+                    beforeShow(f, currentAction);
                     f.show();
                     postShowImpl(f);
                 } else {
@@ -2874,7 +2883,7 @@ public class UIBuilder { //implements Externalizable {
                         beforeShow(f);
                         f.showBack();
                     } else {
-                        beforeShow(f);
+                        beforeShow(f, cmd);
                         f.show();
                     }
                     postShowImpl(f);
@@ -2894,7 +2903,7 @@ public class UIBuilder { //implements Externalizable {
                         beforeShow(f);
                         f.showBack();
                     } else {
-                        beforeShow(f);
+                        beforeShow(f, cmd);
                         f.show();
                     }
                     postShowImpl(f);

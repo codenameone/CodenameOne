@@ -32,6 +32,7 @@ import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -397,6 +398,20 @@ public class CN extends  CN1Constants {
      */
     public static void invokeWithoutBlocking(Runnable r) {
         Display.INSTANCE.invokeWithoutBlocking(r);
+    }
+    
+    /**
+     * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
+     * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
+     * it will result in a {@link BlockingDisallowedException} being thrown.
+     * @param r Runnable to be run immediately.
+     * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
+     * anywhere in the Runnable.
+     * 
+     * @since 7.0
+     */
+    public static <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
+        return Display.INSTANCE.invokeWithoutBlockingWithResultSync(r);
     }
 
     /**

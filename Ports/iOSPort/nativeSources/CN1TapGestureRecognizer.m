@@ -74,7 +74,14 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     // We DO want to process touches from peer components
     // We DO NOT want to process touches from popovers like datepickers and openGallery.
     // See the OpenGalleryTest2793 sample to test events for openGallery.
-    BOOL ignore = (touch == nil || pressedView == nil || ![pressedView isDescendantOfView:ctrl.view]);
+    UIView *v = ctrl.view;
+    
+    // Sometimes we receive an event from a view that has already been removed from
+    // the view hierarchy.  The call to [pressedView isDescendantOfView:xxx] will throw
+    // a EXC_BAD_ACCESS in this case, so we need to test for this case.
+    BOOL viewInWindow = [pressedView window] != nil;
+    
+    BOOL ignore = (touch == nil || pressedView == nil || !viewInWindow || ![pressedView isDescendantOfView:v]);
 
     return ignore;
 }

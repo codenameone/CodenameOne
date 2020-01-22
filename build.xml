@@ -2,8 +2,14 @@
 <project name="CodenameOne" default="default" basedir=".">
     <available file="../cn1-binaries" property="cn1.binaries" value="true"/>
     <available file="../codenameone-skins" property="codenameone.skins" value="true"/>
-    <property name="cn1.cli" value="node_modules/.bin/cn1"/>
+    <condition property="cn1.cli" value="./node_modules/.bin/cn1" else="node_modules/.bin/cn1">
+		<os family="windows" />
+	</condition>
     <property name="cn1.iphone.target" value="iphone" />
+    <condition property="npm" value="npm.cmd" else="npm">
+        <os family="windows" />
+    </condition>
+    
 
     <target name="get-cn1-binaries" unless="cn1.binaries">
       <get src="https://github.com/codenameone/cn1-binaries/archive/master.zip" dest="master.zip"/>
@@ -61,22 +67,27 @@
       </delete>
     </target>
 
-    <target name="install-cli">
+    <target name="install-cli-se">
+      <echo>Installing Codename One CLI...</echo>
+	  <get src="https://github.com/shannah/codenameone-cli/archive/master.zip" dest="master.zip"/>
+      <unzip src="master.zip" dest=".."/>
+      <move file="../codenameone-cli-master" tofile="../codenameone-cli" />
+    </target>
+
+	<target name="install-cli">
       <echo>Installing Codename One CLI...</echo>
       <echo>Requires NodeJS/NPM to be installed.  npm must be on your environment PATH.</echo>
       <mkdir dir="tests/node_modules"/>
-      <exec executable="npm" dir="tests">
+      <exec executable="${npm}" dir="tests">
         <arg value="install"/>
         <arg value="codenameone-cli"/>
       </exec>
     </target>
-
-    <target name="test-javase" depends="javase,install-cli" description="Run Unit Tests on Simulator">
+    <target name="test-javase" depends="javase,install-cli-se" description="Run Unit Tests on Simulator">
       <echo>Codename One JavaSE Unit Tests</echo>
       <echo>This target will compile the Codename one sources, build the unit tests located in &quot;tests&quot; directory, and run them in the Codename One simulator.</echo>
       <echo>Requirements:</echo>
-      <echo>1. NodeJS/npm must be installed.  npm must be in PATH.</echo>
-      <exec executable="${cn1.cli}" dir="tests" failonerror="true">
+      <java jar="../codenameone-cli/bin/codenameone-cli.jar" dir="tests" failonerror="true" fork="true">
         <arg value="test"/>
         <arg value="-cn1Sources"/>
         <arg value=".." />
@@ -84,7 +95,7 @@
         <arg value="-e"/>
         <arg value="-skipCompileCn1Sources"/>
         <!--<arg value="-v"/>-->
-      </exec>
+      </java>
     </target>
 
     <target name="test-android" depends="android,install-cli" description="Run Unit Tests on Android">
@@ -122,7 +133,7 @@
     <target name="start-appium" description="Start Appium Server">
       <echo>Installing Appium in tests...</echo>
       <mkdir dir="tests/node_modules"/>
-      <exec executable="npm" dir="tests" failonerror="true">
+      <exec executable="${npm}" dir="tests" failonerror="true">
         <arg value="install"/>
         <arg value="appium"/>
       </exec>

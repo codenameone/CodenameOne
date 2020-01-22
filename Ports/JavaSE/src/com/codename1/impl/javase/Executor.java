@@ -108,9 +108,14 @@ public class Executor {
             }
         }
     }
+   
+    public static void main(String[] args) throws Exception {
+        main(Simulator.class, args);
+    }
     
-    public static void main(final String[] argv) throws Exception {
-        if (JavaFXLoader.main(Executor.class, argv)) {
+    
+    public static void main(Class launcherClass, final String[] argv) throws Exception {
+        if (JavaFXLoader.main(launcherClass, Executor.class, argv)) {
             return;
         }
         

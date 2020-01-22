@@ -64,6 +64,7 @@ import java.util.ListIterator;
  * @author Chen Fishbein
  */
 public class Form extends Container {
+    private Command sourceCommand;
     private boolean globalAnimationLock;
     static int activePeerCount;
     private Painter glassPane;
@@ -218,6 +219,27 @@ public class Form extends Container {
 
         initGlobalToolbar();
     }
+
+    /**
+     * <p>Enabling "layoutOnPaint" behaviour.  Setting this flag to true will cause
+     * this form and all of its containers to lay themselves out whenever they are painted.
+     * This carries a performance penalty.</p>
+     * 
+     * <p>Historical Note: "layoutOnPaint" behaviour has been "on" since the original commit 
+     * to Google code in 2012, but it isn't clear, now, why it was necessary.  It was likely
+     * to fix an edge case in certain layouts that is no longer relevant.  As of 7.0, we are
+     * disabling this behaviour by default because it carries such performance penalties, but allowing
+     * developers to opt-in to it using this method.</p>
+     * 
+     * @param allow Whether to allow layoutOnPaint behaviour in this this form and it's containers.
+     * @since 7.0</p>
+     */
+    @Override
+    public void setAllowEnableLayoutOnPaint(boolean allow) {
+        super.setAllowEnableLayoutOnPaint(allow);
+    }
+    
+    
     
     /**
      * Gets TextSelection support for this form.
@@ -249,6 +271,26 @@ public class Form extends Container {
      */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
+    }
+    
+    /**
+     * Sets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @param sourceCommand The source command. 
+     * @since 7.0
+     */
+    public void setSourceCommand(Command sourceCommand) {
+        this.sourceCommand = sourceCommand;
+    }
+    
+    /**
+     * Gets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @return The source command. 
+     * @since 7.0
+     */
+    public Command getSourceCommand() {
+        return sourceCommand;
     }
     
     /**

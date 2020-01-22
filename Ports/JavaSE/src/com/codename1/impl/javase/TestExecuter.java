@@ -69,6 +69,7 @@ public class TestExecuter {
                                 TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
                                 failed = !test.runTest();
                                 test.cleanup();
+                                TestReporting.getInstance().finishedTestCase(test, !failed);
                             } catch(Exception err) {
                                 failed = true;
                                 TestReporting.getInstance().logException(err);

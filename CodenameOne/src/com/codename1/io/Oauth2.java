@@ -25,6 +25,8 @@ package com.codename1.io;
 
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
+import com.codename1.ui.BrowserWindow;
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
@@ -35,6 +37,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.regex.StringReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,6 +54,7 @@ import java.util.Map;
  */
 public class Oauth2 {
 
+    private boolean useBrowserWindow = "true".equals(CN.getProperty("oauth2.useBrowserWindow", "true"));
     public static final String TOKEN = "access_token";
 
     /**
@@ -73,6 +77,7 @@ public class Oauth2 {
     private String token;
     private static String expires;
     private String refreshToken;
+    private String identityToken;
     
     private String clientId;
     private String redirectURI;
@@ -184,6 +189,29 @@ public class Oauth2 {
 
         return token;
     }
+    
+    /**
+     * Set this OAuth2 object to use a {@link BrowserWindow} for the login process.  You can set the global default via the "oauth2.useBrowserWindow"
+     * display property with either a "true" or "false" value.
+     * 
+     * <p>When this property is set, the login prompt will be displayed in a separate Window containing a web browser on the desktop.  Platforms that 
+     * don't have windows (e.g. iOS/Android) will fall back to a separate Form with a webview).</p>
+     * 
+     * @param useBrowserWindow True to use a browser window for the login process.
+     * @since 7.0
+     */
+    public void setUseBrowserWindow(boolean useBrowserWindow) {
+        this.useBrowserWindow = useBrowserWindow;
+    }
+    
+    /**
+     * Checks if this component will use an external web browser window for the login process.
+     * @return True if this component will use an external web browser window.
+     * @since 7.0
+     */
+    public boolean isUseBrowserWindow() {
+        return useBrowserWindow;
+    }
 
     /**
      * This method creates a component which can authenticate. You will receive
@@ -207,7 +235,26 @@ public class Oauth2 {
      * @return a component that should be displayed to the user in order to
      * perform the authentication
      */
-    public void showAuthentication(ActionListener al) {
+    public void showAuthentication(final ActionListener al) {
+        
+        if (useBrowserWindow) {
+            final BrowserWindow win = new BrowserWindow(buildURL());
+            win.setTitle("Login");
+            win.addLoadListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    String url = (String)evt.getSource();
+                    if (url.startsWith(redirectURI)) {
+                        win.close();
+                        handleURL((String)evt.getSource(), null, al, null, null, null);
+                    }    
+                }
+            });
+
+            win.show(); 
+            return;
+            
+        }
+        
         final Form old = Display.getInstance().getCurrent();
         InfiniteProgress inf = new InfiniteProgress();
         final Dialog progress = inf.showInifiniteBlocking();
@@ -233,12 +280,11 @@ public class Oauth2 {
         authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
     }
 
-    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
-
-        String URL = oauth2URL + "?client_id=" + clientId
+    private String buildURL() {
+        String URL = oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
                 + "&redirect_uri=" + Util.encodeUrl(redirectURI);
         if (scope != null) {
-            URL += "&scope=" + scope;
+            URL += "&scope=" + Util.encodeUrl(scope);
         }
         if (clientSecret != null) {
             URL += "&response_type=code";
@@ -251,9 +297,15 @@ public class Oauth2 {
             while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
                 String val = additionalParams.get(key).toString();
-                URL += "&" + key + "=" + val;
+                URL += "&" + Util.encodeUrl(key) + "=" + Util.encodeUrl(val);
             }
         }
+        return URL;
+    }
+    
+    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+
+        String URL = buildURL();
 
         DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);
         final WebBrowser[] web = new WebBrowser[1];
@@ -271,14 +323,107 @@ public class Oauth2 {
 
         return web[0];
     }
+    
+    /**
+     * Processes token request responses that are formatted as a JSON object.  May be overridden
+     * by subclasses, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     * @param map Parsed JSON object of response.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(Map map) {
+        token = (String) map.get("access_token");
+        Object ex = map.get("expires_in");
+        if(ex == null){
+            ex = map.get("expires");
+        }
+        if(ex != null){
+            expires = ex.toString();
+        }
+        refreshToken = (String)map.get("refresh_token");
+        identityToken = (String)map.get("id_token");
+        
+    }
+    
+    /**
+     * Processes token request responses that are formatted as HTTP query strings.  May be
+     * overridden by subclass, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     * @param t The query string.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(String t) {
+        token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
+        int off = t.indexOf("expires=");
+        int start = 8;
+        if(off == -1){
+            off = t.indexOf("expires_in=");
+            start = 11;
+        }
+        if (off > -1) {
+            int end = t.indexOf('&', off);
+            if (end < 0 || end < off) {
+                end = t.length();
+            }
+            expires = t.substring(off + start, end);
 
+        }
+        off = t.indexOf("refresh_token=");
+        refreshToken = null;
+        start = "refresh_token=".length();
+        if (off > -1) {
+            int end = t.indexOf('&', off);
+            if (end < 0 || end < off) {
+                end = t.length();
+            }
+            refreshToken = t.substring(off +  start, end);
+        }
+    }
+
+    /**
+     * Method that can be overridden by subclasses to intercept parameters extracted from
+     * the redirect URL when the login flow reaches the redirect URL.  This will give subclasses
+     * an opportunity to parse out special information that the OAuth2 service provides in the callback.
+     * @param params Parsed query parameters passed to the redirect URL.
+     */
+    protected void handleRedirectURLParams(Map params) {
+        
+    }
+    
+    public class RefreshTokenRequest extends AsyncResource<AccessToken> {
+        
+    }
+    
+    public RefreshTokenRequest refreshToken(String refreshToken) {
+        final RefreshTokenRequest out = new RefreshTokenRequest();
+        refreshToken(refreshToken, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if (out.isDone()) {
+                    return;
+                }
+                if (evt.getSource() instanceof Throwable) {
+                    out.error(new AsyncResource.AsyncExecutionException((Throwable)evt.getSource()));
+                } else {
+                    out.complete((AccessToken)evt.getSource());
+                }
+            }
+        });
+        return out;
+    }
+    
+    private void refreshToken(String refreshToken, ActionListener al) {
+        handleURL(redirectURI + "?code="+Util.encodeUrl(refreshToken)+"&cn1_refresh_token=1", null, al, null, null, null);
+    }
+    
     private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
             if (Display.getInstance().getCurrent() == progress) {
                 progress.dispose();
             }
 
-            web.stop();
+            if (web != null) {
+                web.stop();
+            }
 
             //remove the browser component.
             if (login != null) {
@@ -288,8 +433,9 @@ public class Oauth2 {
 
             if (url.indexOf("code=") > -1) {
                 Hashtable params = getParamsFromURL(url);
-                ConnectionRequest req = new ConnectionRequest() {
-
+                handleRedirectURLParams(params);
+                class TokenRequest extends ConnectionRequest {
+                    boolean callbackCalled;
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
                         String t = new String(tok);
@@ -297,42 +443,9 @@ public class Oauth2 {
                         if(t.startsWith("{")){
                             JSONParser p = new JSONParser();
                             Map map = p.parseJSON(new StringReader(t));
-                            token = (String) map.get("access_token");
-                            Object ex = map.get("expires_in");
-                            if(ex == null){
-                                ex = map.get("expires");
-                            }
-                            if(ex != null){
-                                expires = ex.toString();
-                            }
-                            refreshToken = (String)map.get("refresh_token");
-
+                            handleTokenRequestResponse(map);
                         }else{
-                            token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
-                            int off = t.indexOf("expires=");
-                            int start = 8;
-                            if(off == -1){
-                                off = t.indexOf("expires_in=");
-                                start = 11;
-                            }
-                            if (off > -1) {
-                                int end = t.indexOf('&', off);
-                                if (end < 0 || end < off) {
-                                    end = t.length();
-                                }
-                                expires = t.substring(off + start, end);
-                                
-                            }
-                            off = t.indexOf("refresh_token=");
-                            refreshToken = null;
-                            start = "refresh_token=".length();
-                            if (off > -1) {
-                                int end = t.indexOf('&', off);
-                                if (end < 0 || end < off) {
-                                    end = t.length();
-                                }
-                                refreshToken = t.substring(off +  start, end);
-                            }
+                            handleTokenRequestResponse(t);
                         }
                         if (login != null) {
                             login.dispose();
@@ -340,31 +453,50 @@ public class Oauth2 {
                     }
 
                     protected void handleException(Exception err) {
-                        if (backToForm != null) {
+                        if (backToForm != null && !callbackCalled) {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
+                            if (!callbackCalled) {
+                                callbackCalled = true;
+                                al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
+                            }
                         }
                     }
 
                     protected void postResponse() {
-                        if (backToParent && backToForm != null) {
+                        
+                        if (backToParent && backToForm != null && !callbackCalled) {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken),ActionEvent.Type.Response));
+                            if (!callbackCalled) {
+                                callbackCalled = true;
+                                if (getResponseCode() >= 200 && getResponseCode() < 300) {
+                                    al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken, identityToken),ActionEvent.Type.Response));
+                                } else {
+                                    al.actionPerformed(new ActionEvent(new IOException(getResponseErrorMessage()),ActionEvent.Type.Exception));
+                                }
+                            }
                         }
                     }
                 };
+                final TokenRequest req = new TokenRequest();
+                req.setReadResponseForErrors(true);
+                
                 req.setUrl(tokenRequestURL);
                 req.setPost(true);
                 req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");
                 req.addArgument("client_id", clientId);
                 req.addArgument("redirect_uri", redirectURI);
                 req.addArgument("client_secret", clientSecret);
-                req.addArgument("code", (String) params.get("code"));
-                req.addArgument("grant_type", "authorization_code");
+                if (params.containsKey("cn1_refresh_token")) {
+                    req.addArgument("grant_type", "refresh_token");
+                    req.addArgument("refresh_token", (String)params.get("code"));
+                } else {
+                    req.addArgument("code", (String) params.get("code"));
+                    req.addArgument("grant_type", "authorization_code");
+                }
 
                 NetworkManager.getInstance().addToQueue(req);
             } else if (url.indexOf("error_reason=") > -1) {

@@ -23,10 +23,16 @@
  */
 package com.codename1.impl.javase;
 
+import java.awt.EventQueue;
 import java.io.File;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 /**
@@ -73,19 +79,35 @@ public class Simulator {
         if(argv.length > 0) {
             System.setProperty("MainClass", argv[0]);
         }
-        File[] files = new File[t.countTokens()];
-        for (int iter = 0; iter < files.length; iter++) {
-            files[iter] = new File(t.nextToken());
+        List<File> files = new ArrayList<File>();
+        int len = t.countTokens();
+        for (int iter = 0; iter < len; iter++) {
+            files.add(new File(t.nextToken()));
         }
-        
+        File javase = new File("native" + File.separator + "javase");
+        File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
+        for (File dir : new File[]{javase, libJavase}) {
+            if (dir.exists()) {
+                
+                for (File jar : dir.listFiles()) {
+                    if (jar.getName().endsWith(".jar")) {
+                        if (!files.contains(jar)) {
+                            files.add(jar);
+                            System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());
+                        }
+                    }
+                }
+            }
+        }
         loadFXRuntime();
-        ClassLoader ldr = new ClassPathLoader(files);
+        final ClassLoader ldr = new ClassPathLoader( files.toArray(new File[files.size()]));
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
 
         new Thread() {
             public void run() {
+                setContextClassLoader(ldr);
                 while (true) {
                     try {
                         sleep(500);
@@ -106,24 +128,28 @@ public class Simulator {
         }.start();
     }
 
+    private static void addToSystemClassLoader(File f) {
+        ClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+        Class<?> sysclass = URLClassLoader.class;
+        try {
+            Method method = sysclass.getDeclaredMethod("addURL", new Class[]{URL.class});
+            method.setAccessible(true);
+            method.invoke(sysloader, new Object[]{f.toURI().toURL()});
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }//end try catch    
+    }
+    
     static void loadFXRuntime() {
         String javahome = System.getProperty("java.home");
         String fx = javahome + "/lib/jfxrt.jar";
         File f = new File(fx);
         if (f.exists()) {
-            URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-            Class<?> sysclass = URLClassLoader.class;
-            try {
-                Method method = sysclass.getDeclaredMethod("addURL", new Class[]{URL.class});
-                method.setAccessible(true);
-                method.invoke(sysloader, new Object[]{f.toURI().toURL()});
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }//end try catch                        
+            addToSystemClassLoader(f);
 
-        }
-
-
+        } 
     }
+    
+    
 }
 

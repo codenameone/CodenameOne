@@ -20,6 +20,13 @@ import com.codename1.ui.layouts.BoxLayout;
 public class BoxLayoutTests extends AbstractTest {
 
     @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+
+    
+    
+    @Override
     public boolean runTest() throws Exception {
         BoxLayout l = new BoxLayout(BoxLayout.Y_AXIS);
         Container cnt = new Container(l);

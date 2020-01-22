@@ -16,7 +16,7 @@ public class InvokeAndBlockTest extends AbstractTest {
 
         @Override
         public boolean shouldExecuteOnEDT() {
-            return super.shouldExecuteOnEDT(); //To change body of generated methods, choose Tools | Templates.
+            return true;
         }
 
         @Override
@@ -74,7 +74,41 @@ public class InvokeAndBlockTest extends AbstractTest {
                 Util.sleep(1000);
                 // Give them all a chance to finish.
             });
+            
+            
             assertEqual("BADCEGIFH", sb.toString(), "Calls run in wrong order");
+            
+            sb.setLength(0);
+            // Finally, this test ensures that the invokeAndBlock call be allowed to 
+            // proceed in between callSerially runnables that are in the queue.
+            CN.callSerially(()->{
+                sb.append("E");
+            });
+            CN.callSerially(()->{
+                sb.append("G");
+                CN.invokeAndBlock(()->{
+                    Util.sleep(500);
+                    sb.append("F");
+                });
+                sb.append("H");
+            });
+            CN.callSerially(()->{
+                sb.append("I");
+            });
+            CN.callSerially(()->{
+               sb.append("X");
+               CN.invokeAndBlock(()->{
+                    Util.sleep(1000);
+                    sb.append("Y");
+               });
+               sb.append("Z");
+            });
+            CN.callSerially(()->sb.append("Q"));
+            CN.invokeAndBlock(()->{
+                Util.sleep(3000);
+                // Give them all a chance to finish.
+            });
+            assertEqual("EGIXQFYZH", sb.toString(), "Calls in wrong order");
             return true;
         }
     

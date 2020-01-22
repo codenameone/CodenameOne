@@ -31,6 +31,8 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
@@ -131,6 +133,27 @@ public class Sheet extends Container {
     ));
     private Container contentPane = new Container(BoxLayout.y());
     private static int DEFAULT_TRANSITION_DURATION=300;
+    
+    /**
+     * The position on the screen where the sheet is displayed on phones.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     * 
+     * @see #setPosition(java.lang.String) 
+     * @see #setPosition(java.lang.String, java.lang.String) 
+     */
+    private String position = BorderLayout.SOUTH;
+    /**
+     * The position on the screen where the sheet is displayed on tablets.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     * 
+     * @see #setPosition(java.lang.String) 
+     * @see #setPosition(java.lang.String, java.lang.String) 
+     */
+    private String tabletPosition = position;
+    
+    
     private ActionListener formPointerListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
@@ -172,6 +195,10 @@ public class Sheet extends Container {
      * the title bar's UIID will be {@literal uiid + "TitleBar"}, and the back/close button's UIID will be {@literal uiid + "BackButton"}.
      */
     public Sheet(Sheet parent, String title, String uiid) {
+        if (parent != null) {
+            position = parent.position;
+            tabletPosition = parent.tabletPosition;
+        }
         if (uiid == null) {
             uiid = "Sheet";
         }
@@ -268,7 +295,7 @@ public class Sheet extends Container {
         }
         Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
         if (!(cnt.getLayout() instanceof BorderLayout)) {
-            cnt.setLayout(new BorderLayout());
+            cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
             
             cnt.getStyle().setBgPainter(new Painter() {
                 @Override
@@ -325,12 +352,230 @@ public class Sheet extends Container {
             cnt.replace(existing, this, null);
             cnt.animateLayout(duration);
         } else {
-            cnt.add(BorderLayout.SOUTH, this);
-            this.setWidth(cnt.getWidth());
-            this.setHeight(getPreferredH());
-            this.setX(0);
-            this.setY(cnt.getHeight());
+            cnt.add(getPosition(), this);
+            this.setWidth(getPreferredW(cnt));
+            this.setHeight(getPreferredH(cnt));
+            this.setX(getHiddenX(cnt));
+            this.setY(getHiddenY(cnt));
             cnt.animateLayout(duration);
+        }
+    }
+    
+    /**
+     * Gets the position where the Sheet is to be displayed. 
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     * 
+     * @see #setPosition(java.lang.String) 
+     * @see #setPosition(java.lang.String, java.lang.String) 
+     */
+    public String getPosition() {
+        if (CN.isTablet()) {
+            return tabletPosition;
+        }
+        return position;
+    }
+    
+    /**
+     * Sets the position where the Sheet is to be displayed. 
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     * 
+     * @param position One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @see #setPosition(java.lang.String) 
+     * @see #setPosition(java.lang.String, java.lang.String) 
+     * @since 7.0
+     */
+    public void setPosition(String position) {
+        if (CN.isTablet()) {
+            if (!position.equals(tabletPosition)) {
+                tabletPosition = position;
+                updateBorderForPosition();
+            }
+        } else {
+            if (!position.equals(this.position)) {
+                this.position = position;
+                updateBorderForPosition();
+            }
+        }
+    }
+    
+    private void updateBorderForPosition() {
+        Border border = getStyle().getBorder();
+        if (border instanceof RoundRectBorder) {
+            RoundRectBorder b = (RoundRectBorder)border;
+            
+            switch (getPositionInt()) {
+                case C:
+                    b.bottomRightMode(true);
+                    b.bottomLeftMode(true);
+                    b.topLeftMode(true);
+                    b.topRightMode(true);
+                    break;
+                case E:
+                    b.bottomLeftMode(true);
+                    b.topLeftMode(true);
+                    b.topRightMode(false);
+                    b.bottomRightMode(false);
+                    break;
+                case W:
+                    b.bottomLeftMode(false);
+                    b.bottomRightMode(true);
+                    b.topLeftMode(false);
+                    b.topRightMode(true);
+                    break;
+                case S:
+                    b.topLeftMode(true);
+                    b.topRightMode(true);
+                    b.bottomLeftMode(false);
+                    b.bottomRightMode(false);
+                    break;
+                    
+                case N:
+                    b.topLeftMode(false);
+                    b.topRightMode(false);
+                    b.bottomLeftMode(true);
+                    b.bottomLeftMode(false);
+                    break;
+                   
+            }
+        }
+        
+    }
+    
+    /**
+     * Sets the position where the Sheet is to be displayed. 
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     * 
+     * @param phonePosition Position to use on a phone (i.e. non-tablet). One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @param tabletPosition Position to use on a tablet and desktop. One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @see #setPosition(java.lang.String) 
+     * @see #setPosition(java.lang.String, java.lang.String) 
+     * @since 7.0
+     */
+    public void setPosition(String phonePosition, String tabletPosition) {
+        boolean changed = false;
+        if (CN.isTablet() && !tabletPosition.equals(this.tabletPosition)) {
+            changed = true;
+        } else if (!CN.isTablet() && !phonePosition.equals(position)) {
+            changed = true;
+        }
+        position = phonePosition;
+        this.tabletPosition = tabletPosition;
+        if (changed) {
+            updateBorderForPosition();
+        }
+    }
+    
+    /**
+     * Gets X-coordinate of the sheet when it is hidden off-screen.  This will be different
+     * depending on the position of the sheet.
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return 
+     */
+    private int getHiddenX(Container cnt) {
+        switch (getPositionInt()) {
+            case S:
+            case N:
+                return 0;
+            case C:
+                return (cnt.getWidth() - getPreferredW(cnt))/2;
+            case E:
+                return cnt.getWidth();
+            case W:
+                return -getPreferredW(cnt);
+        }
+        return 0;
+    }
+    
+    /**
+     * Gets Y-coordinate of the sheet when it is hidden off-screen.  This will be different
+     * depending on the position of the sheet.
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return 
+     */
+    private int getHiddenY(Container cnt) {
+        switch (getPositionInt()) {
+            case S:
+            case C:
+                return cnt.getHeight();
+            case W:
+            case E:
+                return 0;
+            case N:
+                return -getPreferredH(cnt); 
+        }
+        return 0;
+    }
+    
+    /**
+     * Gets the preferred width of the sheet.  Will depend on where it is rendered.  If position is CENTER,
+     * then the preferred width will be the natural preferred width of the sheet.  But NORTH or SOUTH,
+     * the preferred width will be the full container width.
+     * 
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return 
+     */
+    private int getPreferredW(Container cnt) {
+        switch (getPositionInt()) {
+            case N:
+            case S:
+                return cnt.getWidth();
+            case C:
+            case W:
+            case E:
+                return Math.min(getPreferredW(), cnt.getWidth());
+            
+  
+        }
+        return getPreferredW();
+        
+    }
+    private static final int N=0;
+    private static final int S=1;
+    private static final int E=2;
+    private static final int W=3;
+    private static final int C=4;
+    
+    private int getPositionInt() {
+        String pos = getPosition();
+        if (BorderLayout.NORTH.equals(pos)) {
+            return N;
+        }
+        if (BorderLayout.SOUTH.equals(pos)) {
+            return S;
+        }
+        if (BorderLayout.EAST.equals(pos)) {
+            return E;
+        }
+        if (BorderLayout.WEST.equals(pos)) {
+            return W;
+        }
+        if (BorderLayout.CENTER.equals(pos)) {
+            return C;
+        }
+        return S;
+    }
+    
+    /**
+     * Gets the preferred height of the sheet.  Will depend on where it is rendered.  If position is CENTER, NORTH, or SOUTH
+     * then the preferred height will be the natural preferred width of the sheet.  But WEST or EAST,
+     * the preferred height will be the full container height.
+     * 
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return 
+     */
+    private int getPreferredH(Container cnt) {
+        switch(getPositionInt()) {
+            case W:
+            case E:
+                return cnt.getHeight();
+            default:
+                return Math.min(getPreferredH(), cnt.getHeight());
         }
     }
     
@@ -358,9 +603,12 @@ public class Sheet extends Container {
     }
     
 
+    
+    
     private void hide(int duration) {
         final Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
-        setY(cnt.getHeight());
+        setX(getHiddenX(cnt));
+        setY(getHiddenY(cnt));
         cnt.animateUnlayout(duration, 255, new Runnable() {
             public void run() {
                 Container parent = cnt.getParent();

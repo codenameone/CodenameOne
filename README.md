@@ -57,7 +57,7 @@ While Codename One itself works with all major IDE's the code in this repository
 
 <img src="http://codenameone.com/img/NetBeans-logo.png" width="120">
 
-<img src="http://codenameone.com/img/intellij_idea-logo.png" width="120">
+<img src="http://resources.jetbrains.com/storage/products/intellij-idea/img/meta/intellij-idea_logo_300x300.png" width="120">
 
 <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
 

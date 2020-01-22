@@ -3617,7 +3617,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                     }
                     nativeInstance.showNativePlayerController(moviePlayerPeer);
-                    return;
                 }
                 if(moviePlayerPeer != 0) {
                     nativeInstance.startVideoComponent(moviePlayerPeer);

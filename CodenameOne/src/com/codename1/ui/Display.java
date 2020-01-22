@@ -54,6 +54,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -1338,6 +1339,29 @@ public final class Display extends CN1Constants {
             disableInvokeAndBlock = true;
             try {
                 r.run();
+            } finally {
+                disableInvokeAndBlock = false;
+            }
+        }
+    }
+    
+    /**
+     * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
+     * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
+     * it will result in a {@link BlockingDisallowedException} being thrown.
+     * @param r RunnableWithResultSync to be run immediately.
+     * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
+     * anywhere in the Runnable.
+     * 
+     * @since 7.0
+     */
+    public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
+        if (disableInvokeAndBlock || !isEdt()) {
+            return r.run();
+        } else {
+            disableInvokeAndBlock = true;
+            try {
+                return r.run();
             } finally {
                 disableInvokeAndBlock = false;
             }

@@ -91,7 +91,7 @@
 #ifdef CN1_USE_AVKIT
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <AVKit/AVKit.h>
-#define CN1_AVPLAYERVIEWCONTROLLER = AVPlayerViewController*
+#define CN1_AVPLAYERVIEWCONTROLLER AVPlayerViewController*
 #else
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
@@ -100,7 +100,7 @@
 #endif
 extern int popoverSupported();
 
-//#define INCLUDE_CN1_PUSH2
+#define INCLUDE_CN1_PUSH2
 #ifdef INCLUDE_CN1_PUSH2
 #import <UserNotifications/UserNotifications.h>
 #endif
@@ -2479,10 +2479,17 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
             WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-            NSURL* nu = [NSURL URLWithString:str];
-            NSURLRequest* r = [NSURLRequest requestWithURL:nu];
-            [w loadRequest:r];
+            if ([str hasPrefix:@"http://"] || [str hasPrefix:@"https://"]) {
+                NSURL* nu = [NSURL URLWithString:str];
+                NSURLRequest* r = [NSURLRequest requestWithURL:nu];
+                [w loadRequest:r];
+            } else {
+                NSURL* nu = [NSURL fileURLWithPath:str];           
+                [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
+            }
+
 #endif
         } else {
 #ifndef NO_UIWEBVIEW
@@ -2827,7 +2834,7 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
 
 void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
 #ifdef CN1_USE_AVKIT
-    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:moviePlayer
+    id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:[moviePlayer currentItem]
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
         /*
          * I'm not sure if we need to handle the callback differently in different cases

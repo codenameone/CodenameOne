@@ -303,6 +303,10 @@ public class NetworkManager {
                     }
 
                     int frameRate = -1;
+                    boolean requestWasCompleted=true;
+                        // Default this to true because if, for some reason an exception is thrown
+                        // before calling performOperationComplete(), then the request
+                        // won't be retried.
                     try {
                         // for higher priority tasks increase the thread priority, for lower
                         // prioirty tasks decrease it. In critical priority reduce the Codename One
@@ -333,7 +337,7 @@ public class NetworkManager {
                             currentRequest.getShowOnInit().showModeless();
                         }
 
-                        currentRequest.performOperation();
+                        requestWasCompleted = currentRequest.performOperationComplete();
                     } catch(IOException e) {
                         if(!currentRequest.isFailSilently()) {
                             if(!handleException(currentRequest, e)) {
@@ -357,7 +361,9 @@ public class NetworkManager {
                         if(frameRate > -1) {
                             Display.getInstance().setFramerate(frameRate);
                         }
-                        currentRequest.complete = true;
+                        if (requestWasCompleted) {
+                            currentRequest.complete = true;
+                        }
                         if(progressListeners != null) {
                             progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                         }
