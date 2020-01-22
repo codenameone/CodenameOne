@@ -65,7 +65,9 @@ public class RoundRectBorderTest {
         l.getStyle().setBorder(b().topOnlyMode(true));
         hi.add(l);
         l = l("Bottom Only");
+        
         l.getStyle().setBorder(b().bottomOnlyMode(true));
+        hi.add(l);
         l = l("Top Left Only");
         l.getStyle().setBorder(b().topLeftMode(true).topRightMode(false).bottomLeftMode(false).bottomRightMode(false));
         hi.add(l);
