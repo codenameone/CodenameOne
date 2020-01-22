@@ -212,6 +212,7 @@ public class Sheet extends Container {
         this.parentSheet = parent;
         this.title.setText(title);
         initUI();
+        updateBorderForPosition();
         
     }
 
@@ -281,6 +282,20 @@ public class Sheet extends Container {
      * @see #show() 
      */
     public void show(final int duration) {
+        int titleMargin = Math.max(
+                commandsContainer.getPreferredW() + commandsContainer.getStyle().getHorizontalMargins(), 
+                backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()
+        );
+
+
+        title.getParent().getStyle().setMarginLeft(titleMargin);
+        title.getParent().getStyle().setMarginRight(titleMargin);
+        Border border = getStyle().getBorder();
+        if (border instanceof RoundRectBorder) {
+            RoundRectBorder b = (RoundRectBorder)border;
+            
+            $(contentPane).setPaddingMillimeters(b.getCornerRadius());
+        }
         Form f = CN.getCurrentForm();
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
@@ -353,6 +368,7 @@ public class Sheet extends Container {
             cnt.animateLayout(duration);
         } else {
             cnt.add(getPosition(), this);
+            
             this.setWidth(getPreferredW(cnt));
             this.setHeight(getPreferredH(cnt));
             this.setX(getHiddenX(cnt));
@@ -546,7 +562,7 @@ public class Sheet extends Container {
             case C:
             case W:
             case E:
-                return Math.min(getPreferredW(), cnt.getWidth());
+                return Math.min(getPreferredW() + (backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins())* 2, cnt.getWidth()) ;
             
   
         }
