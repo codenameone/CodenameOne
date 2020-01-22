@@ -33,6 +33,8 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
@@ -282,20 +284,48 @@ public class Sheet extends Container {
      * @see #show() 
      */
     public void show(final int duration) {
+        
+        // We need to add some margin to the title  to prevent overlap with the 
+        // back button and the commaneds.
         int titleMargin = Math.max(
                 commandsContainer.getPreferredW() + commandsContainer.getStyle().getHorizontalMargins(), 
                 backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()
         );
 
-
-        title.getParent().getStyle().setMarginLeft(titleMargin);
-        title.getParent().getStyle().setMarginRight(titleMargin);
-        Border border = getStyle().getBorder();
+        // Set the padding in the content pane to match the corner radius
+        Style s = getStyle();
+        Style titleParentStyle = title.getParent().getStyle();
+        titleParentStyle.setMarginLeft(titleMargin);
+        titleParentStyle.setMarginRight(titleMargin);
+        Border border = s.getBorder();
         if (border instanceof RoundRectBorder) {
             RoundRectBorder b = (RoundRectBorder)border;
             
             $(contentPane).setPaddingMillimeters(b.getCornerRadius());
         }
+        
+        // Deal with iPhoneX notch.
+        UIManager uim = UIManager.getInstance();
+        
+        Style statusBarStyle =  uim.getComponentStyle("StatusBar");
+        Style titleAreaStyle = uim.getComponentStyle("TitleArea");
+        
+        int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
+        int positionInt = getPositionInt();
+        if (positionInt == S || positionInt == C) {
+            // For Center and South position we use margin to 
+            // prevent overlap with top notch.  This looks better as overlap is only
+            // an edge case that occurs when the sheet is the full screen height.
+            $(this).setMargin(topPadding, 0 , 0, 0);
+        } else {
+            // For other cases we use padding to prevent overlap with top notch.  This looks
+            // better as it appears that the sheet bleeds all the way to the top edge of the screen,
+            // but the content is not obscured by the notch.
+            $(this).setPadding(topPadding, s.getPaddingRightNoRTL(), s.getPaddingBottom(), s.getPaddingLeftNoRTL());
+        }
+       
+        // END Deal with iPhoneX notch
+        
         Form f = CN.getCurrentForm();
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
