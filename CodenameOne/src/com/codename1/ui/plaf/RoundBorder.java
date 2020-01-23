@@ -680,12 +680,7 @@ public class RoundBorder extends Border {
         return rectangle;
     }
 
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 43 * hash + this.color;
-        return hash;
-    }
+    
 
     @Override
     public boolean equals(Object obj) {
@@ -735,7 +730,35 @@ public class RoundBorder extends Border {
         if (this.rectangle != other.rectangle) {
             return false;
         }
+        if (this.onlyLeftRounded != other.onlyLeftRounded) {
+            return false;
+        }
+        if (this.onlyRightRounded != other.onlyRightRounded) {
+            return false;
+        }
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 41 * hash + this.color;
+        hash = 41 * hash + this.opacity;
+        hash = 41 * hash + this.strokeColor;
+        hash = 41 * hash + this.strokeOpacity;
+        hash = 41 * hash + Float.floatToIntBits(this.strokeThickness);
+        hash = 41 * hash + (this.strokeMM ? 1 : 0);
+        hash = 41 * hash + this.shadowSpread;
+        hash = 41 * hash + this.shadowOpacity;
+        hash = 41 * hash + Float.floatToIntBits(this.shadowX);
+        hash = 41 * hash + Float.floatToIntBits(this.shadowY);
+        hash = 41 * hash + Float.floatToIntBits(this.shadowBlur);
+        hash = 41 * hash + (this.shadowMM ? 1 : 0);
+        hash = 41 * hash + (this.rectangle ? 1 : 0);
+        hash = 41 * hash + (this.onlyLeftRounded ? 1 : 0);
+        hash = 41 * hash + (this.onlyRightRounded ? 1 : 0);
+        hash = 41 * hash + this.strokeAngle;
+        return hash;
     }
     
 
