@@ -930,6 +930,9 @@ public class RoundRectBorder extends Border {
         if (this.bottomRight != other.bottomRight) {
             return false;
         }
+        if (this.cornerRadius != other.cornerRadius) {
+            return false;
+        }
         return true;
     }
 
@@ -952,6 +955,7 @@ public class RoundRectBorder extends Border {
         hash = 79 * hash + (this.topRight ? 1 : 0);
         hash = 79 * hash + (this.bottomLeft ? 1 : 0);
         hash = 79 * hash + (this.bottomRight ? 1 : 0);
+        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
         return hash;
     }
 
