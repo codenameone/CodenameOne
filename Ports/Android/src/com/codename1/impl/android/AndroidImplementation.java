@@ -6470,10 +6470,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         File newFile = new File(mediaStorageDir.getPath() + File.separator
-                + "IMG_" + timeStamp + "_" + cn1File.getName());
+                    + cn1File.getName());
+        if(newFile.exists()) {
+            // Create a media file name
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            newFile = new File(mediaStorageDir.getPath() + File.separator
+                    + "IMG_" + timeStamp + "_" + cn1File.getName());
+        }
 
 
         //Uri fileUri = Uri.fromFile(newFile);
