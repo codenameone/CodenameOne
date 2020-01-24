@@ -88,6 +88,34 @@ public class SpanLabel extends Container {
         addComponent(BorderLayout.WEST, iconWrapper);
         addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
     }
+
+    private int preferredW=-1;
+    
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setPreferredW(int preferredW) {
+        //We need to override preferredW for this component because the default
+        // implementation will prevent calcPreferredSize() from ever being called,
+        // and we still want to calculate the preferred height based on this preferred width.
+        this.preferredW = preferredW;
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     */
+    @Override
+    public int getPreferredW() {
+        if (preferredW != -1) {
+            return preferredW;
+        }
+        return super.getPreferredW();
+    }
+    
+    
+    
     
     /**
      * Returns the TextArea holding the actual text
@@ -416,11 +444,7 @@ public class SpanLabel extends Container {
         return text.isTextSelectionEnabled();
     }
 
-    @Override
-    protected Dimension calcPreferredSize() {
-        return super.calcPreferredSize(); //To change body of generated methods, choose Tools | Templates.
-    }
-
+    
     
    
     @Override
