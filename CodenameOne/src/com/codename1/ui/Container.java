@@ -801,7 +801,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(insertion);
                         }
-                        revalidate();
+                        revalidateWithAnimationSafety();
                     }
                 }
 
@@ -1195,7 +1195,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(removed);
                         }
-                        revalidate();
+                        revalidateWithAnimationSafety();
                     }
                 }
 
