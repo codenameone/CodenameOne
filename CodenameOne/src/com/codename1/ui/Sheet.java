@@ -129,6 +129,7 @@ public class Sheet extends Container {
     private Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Label title = new Label();
     private Container commandsContainer = new Container(BoxLayout.x());
+    private boolean allowClose = true;
     private Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
             BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
@@ -198,6 +199,7 @@ public class Sheet extends Container {
      */
     public Sheet(Sheet parent, String title, String uiid) {
         if (parent != null) {
+            allowClose = parent.allowClose;
             position = parent.position;
             tabletPosition = parent.tabletPosition;
         }
@@ -216,6 +218,41 @@ public class Sheet extends Container {
         initUI();
         updateBorderForPosition();
         
+    }
+    
+    /**
+     * Sets whether the user is able to close this sheet.  Default is true.  If you set
+     * this value to false, then there will be no close button, and pressing outside of the sheet
+     * will have no effect.
+     * 
+     * <p>Child sheets will assume the settings of the parent.  The back button will still work,
+     * but the top level sheet will not include a close button.</p>
+     * 
+     * @param allowClose True to allow user to close the sheet.  False to prevent it.
+     * @since 7.0
+     */
+    public void setAllowClose(boolean allowClose) {
+        if (allowClose != this.allowClose) {
+            this.allowClose = allowClose;
+            if (!allowClose && isInitialized()) {
+                form.removePointerPressedListener(formPointerListener);
+            } else if (allowClose && isInitialized()) {
+                form.addPointerPressedListener(formPointerListener);
+            }
+            if (parentSheet == null) {
+                backButton.setVisible(allowClose);
+                backButton.setEnabled(allowClose);
+            }
+        }
+    }
+    
+    /**
+     * Checks whether the user is allowed to close this sheet.
+     * @return True if user can close the sheet.
+     * 
+     */
+    public boolean isAllowClose() {
+        return allowClose;
     }
 
     /**
@@ -704,7 +741,7 @@ public class Sheet extends Container {
     protected void initComponent() {
         super.initComponent();
         form = getComponentForm();
-        if (form != null) {
+        if (form != null && allowClose) {
             form.addPointerPressedListener(formPointerListener);
         }
     }
