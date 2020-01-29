@@ -411,7 +411,7 @@ public class Form extends Container {
     public Rectangle getSafeArea() {
         if (safeAreaDirty) {
             Display.impl.getDisplaySafeArea(safeArea);
-            safeAreaDirty = false;
+            //safeAreaDirty = false;
         }
         return safeArea;
     }

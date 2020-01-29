@@ -1847,6 +1847,10 @@ public class Container extends Component implements Iterable<Component>{
             return false;
         }
         Rectangle safeArea = f.getSafeArea();
+        
+        if (safeArea.getX() == 0 && safeArea.getY() == 0 && safeArea.getWidth() == CN.getDisplayWidth() && safeArea.getHeight() == CN.getDisplayHeight()) {
+            return false;
+        }
         Style style = getStyle();
         int safeX1 = safeArea.getX();
         int safeX2 = safeArea.getWidth() + safeX1;
@@ -1900,10 +1904,12 @@ public class Container extends Component implements Iterable<Component>{
                 if (newPaddingTop != paddingTop) {
                     style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingTop(newPaddingTop);
+                    System.out.println("Changing top padding "+newPaddingTop);
                 }
                 if (newPaddingBottom != paddingBottom) {
                     style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingBottom(newPaddingBottom);
+                    System.out.println("Changing bottom padding "+newPaddingBottom);
                 }
                
             }   
@@ -1940,8 +1946,8 @@ public class Container extends Component implements Iterable<Component>{
         byte topUnit, leftUnit, bottomUnit, rightUnit;
         
         private void set(Style style){
-            boolean suppressEvents = style.isSuppressChangeEvents();
-            style.setSuppressChangeEvents(true);
+            //boolean suppressEvents = style.isSuppressChangeEvents();
+            //style.setSuppressChangeEvents(true);
             top = style.getPaddingValue(false, TOP);
             left = style.getPaddingValue(false, LEFT);
             bottom = style.getPaddingValue(false, BOTTOM);
@@ -1955,7 +1961,7 @@ public class Container extends Component implements Iterable<Component>{
             } else {
                 topUnit = leftUnit = bottomUnit = rightUnit = Style.UNIT_TYPE_PIXELS;
             }
-            style.setSuppressChangeEvents(suppressEvents);
+            //style.setSuppressChangeEvents(suppressEvents);
         }
         
         private void restore(Style style) {
