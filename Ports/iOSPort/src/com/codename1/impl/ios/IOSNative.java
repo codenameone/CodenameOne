@@ -705,6 +705,14 @@ public final class IOSNative {
 
     native void setConnectionId(long peer, int id);
 
+    native int getDisplaySafeInsetLeft();
+
+    native int getDisplaySafeInsetTop();
+
+    native int getDisplaySafeInsetRight();
+
+    native int getDisplaySafeInsetBottom();
+
     
 
     

@@ -58,6 +58,12 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Chen Fishbein
  */
 public class Style {
+    
+    /**
+     * Flag to suppress change events
+     */
+    private boolean suppressChangeEvents;
+    
     private Style[] proxyTo;
     
     /**
@@ -1448,6 +1454,52 @@ public class Style {
         return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
     }
     
+    private void initPaddingUnits() {
+        if (paddingUnit == null) {
+            paddingUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};
+        }
+    }
+    
+    /**
+     * Sets left padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitLeft(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.LEFT] = unit;
+    }
+    
+    /**
+     * Sets right padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitRight(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.RIGHT] = unit;
+    }
+    
+    /**
+     * Sets top padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitTop(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.TOP] = unit;
+    }
+    
+    /**
+     * Sets bottom padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitBottom(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.BOTTOM] = unit;
+    }
+    
     
     /**
      * Returns the right padding in pixel or left padding in an RTL situation
@@ -2339,12 +2391,31 @@ public class Style {
             firePropertyChanged(MARGIN);
         }
     }
-
+    
+    
+    /**
+     * Checks to see if change events are currently suppressed.
+     * @return True if change events are suppressed.
+     * @since 7.0
+     */
+    public boolean isSuppressChangeEvents() {
+        return suppressChangeEvents;
+    }
+    
+    /**
+     * Enables or disables events.  Use this to temporarily suppress change events.
+     * @param suppress True to suppress change events.
+     * @since 7.0
+     */
+    public void setSuppressChangeEvents(boolean suppress) {
+        this.suppressChangeEvents = suppress;
+    }
     
     private void firePropertyChanged(String propertName) {
+        
         roundRectCache = null;
         nativeOSCache = null;
-        if (listeners == null) {
+        if (listeners == null || suppressChangeEvents) {
             return;
         }
         listeners.fireStyleChangeEvent(propertName, this);

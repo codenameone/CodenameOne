@@ -698,6 +698,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private BufferedImage portraitSkin;
     private BufferedImage landscapeSkin;
     private boolean roundedSkin;
+    private Rectangle safeAreaPortrait = null;
+    private Rectangle safeAreaLandscape = null;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -1077,6 +1079,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
+                    safeAreaLandscape = null;
+                    safeAreaPortrait = null;
                     h.remove("@paintsTitleBarBool");
                 }
                 UIManager.getInstance().setThemeProps(h);
@@ -2456,8 +2460,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-
             if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+                safeAreaLandscape = new Rectangle();
+                safeAreaPortrait = new Rectangle();
+
+            
                 portraitScreenCoordinates.x = Integer.parseInt(props.getProperty("displayX"));
                 portraitScreenCoordinates.y = Integer.parseInt(props.getProperty("displayY"));
                 portraitScreenCoordinates.width = Integer.parseInt(props.getProperty("displayWidth"));
@@ -2466,11 +2473,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                 landscapeScreenCoordinates.y = portraitScreenCoordinates.x;
                 landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
                 landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
+                safeAreaPortrait.setBounds(
+                        Integer.parseInt(props.getProperty("safePortaitX", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitY", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safePortraitHeight", ""+portraitScreenCoordinates.height))
+                );
+                safeAreaLandscape.setBounds(
+                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
+                );
                 roundedSkin = true;
             } else {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
             }
+            
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -2574,6 +2594,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
         }
     }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
+        if (!isSimulator() || safeAreaPortrait == null || safeAreaLandscape == null) {
+            return super.getDisplaySafeArea(rect);
+        }
+        if (rect == null) {
+            rect = new com.codename1.ui.geom.Rectangle();
+        }
+        if (portrait) {
+            rect.setBounds((int)safeAreaPortrait.getX(), (int)safeAreaPortrait.getY(), (int)safeAreaPortrait.getWidth(), (int)safeAreaPortrait.getHeight());
+        } else {
+            rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
+        }
+        return rect;
+    }
+    
+    
     
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
@@ -4243,6 +4281,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
+            safeAreaLandscape = null;
+            safeAreaPortrait = null;
             Toolkit tk = Toolkit.getDefaultToolkit();
             setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
             pixelMilliRatio = getDefaultPixelMilliRatio();

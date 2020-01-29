@@ -463,6 +463,7 @@ public final class Display extends CN1Constants {
     private EventDispatcher virtualKeyboardListeners;
     
     private int lastSizeChangeEventWH = -1;
+    
 
     /**
      * Private constructor to prevent instanciation
@@ -1502,7 +1503,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidate();
+            current.revalidateWithAnimationSafety();
             current.repaint();
             current.onShowCompletedImpl();
             return;
@@ -1550,9 +1551,12 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
+            
         }
 
         boolean transitionExists = false;
@@ -2131,6 +2135,8 @@ public final class Display extends CN1Constants {
         }        
     }
     
+    private Rectangle tmpRect = new Rectangle();
+    private Rectangle lastSizeChangedSafeArea = new Rectangle();
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2143,12 +2149,18 @@ public final class Display extends CN1Constants {
         if(current == null) {
             return;
         }
+        impl.getDisplaySafeArea(tmpRect);
         if(w == current.getWidth() && h == current.getHeight()) {
             // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == current.getWidth() + current.getHeight()) {
-                return;            
+            if (lastSizeChangedSafeArea.equals(tmpRect)) {
+                if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
+                    return;            
+                }
             }
         }
+        
+        
+        lastSizeChangedSafeArea.setBounds(tmpRect);
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }

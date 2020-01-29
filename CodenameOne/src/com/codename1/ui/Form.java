@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
@@ -378,6 +379,43 @@ public class Form extends Container {
         return bottomPaddingMode;
     }
     
+    /**
+     * A flag indicating if the safe area may be dirty, and needs to be recaculated.
+     * @see #getSafeArea() 
+     */
+    private boolean safeAreaDirty = true;
+    
+    /**
+     * Rectangle storing the safe area on the form.
+     */
+    private final Rectangle safeArea = new Rectangle();
+    
+   
+    
+    /**
+     * This method returns a rectangle defining the "safe" area of the display, which excludes
+     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
+     * 
+     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
+     * is displayed on the screen near the bottom edge, and can interfere with components
+     * that are laid out at the bottom of the screen.</p>
+     * 
+     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+     * will return a rectangle that excludes the notch, and task bar regions.</p>
+     * @return The safe area on which to draw.
+     * @see CodenameOneImplementation#getDisplaySafeArea(com.codename1.ui.geom.Rectangle) 
+     * @see Container#setSafeArea(boolean) 
+     * @see Container#isSafeArea() 
+     * @since 7.0
+     */
+    public Rectangle getSafeArea() {
+        if (safeAreaDirty) {
+            Display.impl.getDisplaySafeArea(safeArea);
+            safeAreaDirty = false;
+        }
+        return safeArea;
+    }
+    
     void initAdPadding(Display d) {
         // this is injected automatically by the implementation in case of ads
         String adPaddingBottom = d.getProperty("adPaddingBottom", null);
@@ -682,6 +720,7 @@ public class Form extends Container {
         h = h - (formStyle.getVerticalMargins());
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
+        safeAreaDirty = true;
         doLayout();
         focused = getFocused();
         if (focused != null) {
@@ -710,6 +749,7 @@ public class Form extends Container {
         }
         
         repaint();
+        revalidateWithAnimationSafety();
     }
 
     /**
@@ -2151,7 +2191,7 @@ public class Form extends Container {
         if (getParent() == null) {
             com.codename1.ui.Display.getInstance().setCurrent(this, reverse);
         } else {
-            revalidate();
+            revalidateWithAnimationSafety();
         }
     }
     

@@ -3625,6 +3625,29 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * This method returns a rectangle defining the "safe" area of the display, which excludes
+     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
+     * 
+     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
+     * is displayed on the screen near the bottom edge, and can interfere with components
+     * that are laid out at the bottom of the screen.</p>
+     * 
+     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+     * will return a rectangle that excludes the notch, and task bar regions.</p>
+     * @param rect Out parameter where safe bounds are set.
+     * @return The same rectangle that was passed as a parameter.
+     * @since 7.0
+     * @see Form#getSafeArea() 
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        rect.setBounds(0, 0, getDisplayWidth(), getDisplayHeight());
+        return rect;
+    }
+    
+    /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
      * in.

@@ -31,6 +31,10 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
+import static com.codename1.ui.Component.BOTTOM;
+import static com.codename1.ui.Component.LEFT;
+import static com.codename1.ui.Component.RIGHT;
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -1752,10 +1756,248 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
 
+    private boolean hasScrollableYParentInternal() {
+        if (getParent() == null) {
+            return false;
+        }
+        if (getParent().scrollableYFlag()) {
+            return true;
+        }
+        return getParent().hasScrollableYParentInternal();
+    }
+    
+    private boolean hasScrollableXParentInternal() {
+        if (getParent() == null) {
+            return false;
+        }
+        if (getParent().scrollableXFlag()) {
+            return true;
+        }
+        return getParent().hasScrollableXParentInternal();
+    }
+    
+    /**
+     * Flag to 
+     */
+    private boolean safeArea;
+    
+    /**
+     * Marks this container as a "safe area", meaning that it will automatically supply
+     * sufficient padding as necessary for its children to be laid out inside the 
+     * safe area of the screen.
+     * 
+     * <p>This was primarily added for the iPhone X which covers portions of the screen
+     * and may interfere with components that are rendered there.</p>
+     * @param safeArea True to make this container a safe area.
+     * @since 7.0
+     */
+    public void setSafeArea(boolean safeArea) {
+        this.safeArea = safeArea;
+    }
+    
+    /**
+     * Checks if this container is a "safe area".  A "safe area" is a container whose 
+     * contents will always be displayed inside the device's "safe display area".  
+     * <p>This feature was added primarily for the iPhone X which covers some parts of 
+     * the screen and would cover or interfere with any content drawn in those regions. In particular,
+     * the notch, the rounded corners, and the task bar cover portions of the screen.</p>
+     * 
+     * <p>A container that is a safe area will automatically add appropriate padding 
+     * on layout so that its children will be rendered completely in the safe area of
+     * the screen.  This only applies if the container has no scrollable parents.  If a 
+     * "safe" container has scrollable parents, then it is assumed that the user can
+     * just scroll it into a safe area.</p>
+     * 
+     * @return True if this container is a safe area.
+     * @since 7.0
+     */
+    public boolean isSafeArea() {
+        return this.safeArea;
+    }
+    
+    /**
+     * Checks to see if this container or any of its parents are safe areas.
+     * @param checkParents True to check parents too.  False to just check this container.
+     * @return 
+     */
+    private boolean isSafeAreaInternal(boolean checkParents) {
+        if (safeArea) {
+            return true;
+        }
+        if (checkParents) {
+            Container parent = getParent();
+            if (parent != null) {
+                return parent.isSafeAreaInternal(true);
+            }
+        }
+        return false;
+    }
+    
+
+    /**
+     * For iPhone X primarily.  This will check if the current bounds goes outside the
+     * safe area.  If so, it will add padding to make the contents fit the safe area.
+     */
+    private boolean snapToSafeAreaInternal() {
+        if (!isInitialized()) {
+            return false;
+        }
+        Form f = getComponentForm();
+        if (f == null) {
+            return false;
+        }
+        Rectangle safeArea = f.getSafeArea();
+        Style style = getStyle();
+        int safeX1 = safeArea.getX();
+        int safeX2 = safeArea.getWidth() + safeX1;
+        int safeY1 = safeArea.getY();
+        int safeY2 = safeArea.getHeight() + safeY1;
+        
+        
+        
+        int paddingLeft = style.getPaddingLeftNoRTL();
+        int paddingRight = style.getPaddingRightNoRTL();
+        int paddingTop = style.getPaddingTop();
+        int paddingBottom = style.getPaddingBottom();
+        
+        
+        int newPaddingTop = paddingTop;
+        int newPaddingBottom = paddingBottom;
+        int newPaddingLeft = paddingLeft;
+        int newPaddingRight = paddingRight;
+        
+        
+            
+        
+        int absX = getAbsoluteX();
+        int w = getWidth();
+        int absX2 = absX + w;
+
+        if (absX + paddingLeft < safeX1) {
+            newPaddingLeft = safeX1 - absX;
+        }
+        if (absX2 - paddingRight > safeX2) {
+            newPaddingRight = absX2 - safeX2;
+        }
+            
+        int absY = getAbsoluteY();
+        int h = getHeight();
+        int absY2 = absY + h;
+
+        if (absY + paddingTop < safeY1) {
+            newPaddingTop = safeY1 - absY;
+        }
+        if (absY2 - paddingBottom > safeY2) {
+            newPaddingBottom = absY2 - safeY2;
+        }
+        boolean changed = false;
+        if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
+            if (!hasScrollableYParentInternal()) {
+                //setY(getY() + newPaddingTop - paddingTop);
+                //setHeight(getHeight() - (newPaddingTop + newPaddingBottom - paddingTop - paddingBottom));
+                changed = true;
+                
+                if (newPaddingTop != paddingTop) {
+                    style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingTop(newPaddingTop);
+                }
+                if (newPaddingBottom != paddingBottom) {
+                    style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingBottom(newPaddingBottom);
+                }
+               
+            }   
+        }
+        
+        if (newPaddingLeft != paddingLeft || newPaddingRight != paddingRight) {
+            if (!hasScrollableXParentInternal()) {
+                //setX(getX() + newPaddingLeft - paddingLeft);
+                //setWidth(getWidth() - (newPaddingLeft + newPaddingRight - paddingLeft - paddingRight));
+                changed = true;
+                
+                if (newPaddingLeft != paddingLeft) {
+                    style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingLeft(newPaddingLeft);
+                }
+                if (newPaddingRight != paddingRight) {
+                    style.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingRight(newPaddingRight);
+                }
+                
+                        
+            }
+        }
+        return changed;
+        
+    }
+    
     /**
      * Lays out the container
      */
+    
+    private static class TmpInsets {
+        float top, left, bottom, right;
+        byte topUnit, leftUnit, bottomUnit, rightUnit;
+        
+        private void set(Style style){
+            boolean suppressEvents = style.isSuppressChangeEvents();
+            style.setSuppressChangeEvents(true);
+            top = style.getPaddingValue(false, TOP);
+            left = style.getPaddingValue(false, LEFT);
+            bottom = style.getPaddingValue(false, BOTTOM);
+            right = style.getPaddingValue(false, RIGHT);
+            byte[] units = style.getPaddingUnit();
+            if (units != null) {
+                topUnit = units[TOP];
+                leftUnit = units[LEFT];
+                bottomUnit = units[BOTTOM];
+                rightUnit = units[RIGHT];
+            } else {
+                topUnit = leftUnit = bottomUnit = rightUnit = Style.UNIT_TYPE_PIXELS;
+            }
+            style.setSuppressChangeEvents(suppressEvents);
+        }
+        
+        private void restore(Style style) {
+            boolean suppressEvents = style.isSuppressChangeEvents();
+            style.setSuppressChangeEvents(true);
+            style.setPadding(TOP, top, true);
+            style.setPadding(LEFT, left, true);
+            style.setPadding(BOTTOM, bottom, true);
+            style.setPadding(RIGHT, right, true);
+            byte[] units = style.getPaddingUnit();
+            if (units != null) {
+                units[TOP] = topUnit;
+                units[BOTTOM] = bottomUnit;
+                units[LEFT] = leftUnit;
+                units[RIGHT] = rightUnit;
+            } else {
+                style.setPaddingUnit(topUnit, leftUnit, bottomUnit, rightUnit);
+            }
+            style.setSuppressChangeEvents(suppressEvents);
+        }
+        
+    }
+
+    private TmpInsets tmpInsets;
     void doLayout() {
+        boolean restoreBounds = false;
+        if (safeArea) {
+            // If this container is marked as a safe area
+            // then we may need to add padding to make it *safe*
+            Container parent = getParent();
+            if (parent == null || !parent.isSafeAreaInternal(true)) {
+                // For efficiency, we check if the parent is a safe area.
+                // If so, we don't need to worry because it has already
+                // added appropriate padding.
+                if (tmpInsets == null) {
+                    tmpInsets = new TmpInsets();
+                }
+                Style s = getStyle();
+                tmpInsets.set(s);
+                restoreBounds = snapToSafeAreaInternal();
+            }
+        }
         layout.layoutContainer(this);
         int count = getComponentCount();
         for (int i = 0; i < count; i++) {
@@ -1766,10 +2008,14 @@ public class Container extends Component implements Iterable<Component>{
                 c.laidOut();
             }
         }
+        if (restoreBounds && tmpInsets != null) {
+            tmpInsets.restore(getStyle());
+        }
         laidOut();
         if(Form.activePeerCount > 0) {
             onParentPositionChange();
         }
+        
     }
 
     /**
