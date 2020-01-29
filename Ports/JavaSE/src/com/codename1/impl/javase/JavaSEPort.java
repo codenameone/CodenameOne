@@ -2608,6 +2608,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
         }
+        System.out.println("Getting safe area "+rect);
         return rect;
     }
     
@@ -4923,82 +4924,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         //}
         
         checkEDT();
+        
+        class Repainter {
+            JComponent jcmp;
+            javax.swing.border.Border origBorder;
+            
+            Repainter(JComponent jcmp) {
+                this.jcmp = jcmp;
+            }
+            void repaint(long tm, int x, int y, int width, int height) {
+                int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
+                Rectangle bounds;
+                if (getSkin() != null) {
+                    bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                            (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                            (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                            (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                } else {
+                    bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                }
+                if (!jcmp.getBounds().equals(bounds)) {
+                    jcmp.setBounds(bounds);
+                    if (origBorder == null) {
+                        origBorder = jcmp.getBorder();
+                    }
+                    //jcmp.setBorder(BorderFactory.createCompoundBorder(
+                    //    origBorder, 
+                    //    BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                    //);
+                    jcmp.setBorder( BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight));
+                }
+
+
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        cmp.repaint();
+                    }
+                });
+            }
+        }
+        
         javax.swing.text.JTextComponent swingT;
         if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
             JTextComponent t;
             if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                            textCmp.setBorder(BorderFactory.createCompoundBorder(
-                                textCmp.getBorder(), 
-                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                            );
-                        }
-                        
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
                     }
                 };
             } else {
                 t = new JTextField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                            textCmp.setBorder(BorderFactory.createCompoundBorder(
-                                textCmp.getBorder(), 
-                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                            );
-                        }
-                        
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
-                        
                     }
                 };
                 
@@ -5028,50 +5022,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             textCmp = swingT;
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
-                
-                
-                
-                public void repaint(long tm, int x, int y, int width, int height) {
-                    
-                    int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                    int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                    int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                    int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                    int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                    Rectangle bounds;
-                    if (getSkin() != null) {
-                        bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
-                                (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
-                        
-                    } else {
-                        bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-                    }
-                    if(textCmp != null && !textCmp.getBounds().equals(bounds)){
-                        textCmp.setBounds(bounds);
-                        textCmp.setBorder(BorderFactory.createCompoundBorder(
-                            textCmp.getBorder(), 
-                            BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                        );
-                    }
-                    
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            cmp.repaint();
-                        }
-                    });
-                }
-                
-            };
+            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()); 
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
-            JScrollPane pane = new JScrollPane(swingT);
+            JScrollPane pane = new JScrollPane(swingT){
+                
+                Repainter repainter = new Repainter(this);
+                
+                @Override
+                public void repaint(long tm, int x, int y, int width, int height) {
+
+                    
+                    if (repainter != null) {
+                        repainter.repaint(tm, x, y, width, height); 
+                    }
+                }
+
+            };
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
@@ -5106,7 +5074,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         });
-        swingT.setBorder(null);
+        //swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
         swingT.setCaretColor(new Color(cmp.getUnselectedStyle().getFgColor()));
