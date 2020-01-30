@@ -573,6 +573,16 @@ public class BrowserComponent extends Container {
         }
     }
     
+    /**
+     * Registers a callback to be run when the BrowserComponent is "ready".  The browser component
+     * is considered to be ready once the onLoad event has been fired on the first page.
+     * If this method is called after the browser component is already "ready", then the callback
+     * will be executed immediately.  Otherwise it will be called in the first onLoad event.
+     * @param onReady Callback to be executed when the browser component is ready.
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #waitForReady() 
+     */
     public BrowserComponent ready(final SuccessCallback<BrowserComponent> onReady) {
         if (ready) {
             onReady.onSucess(this);
