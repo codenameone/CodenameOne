@@ -8,21 +8,23 @@ package com.codename1.ui;
 import com.codename1.testing.AbstractTest;
 import static com.codename1.ui.CN.BASELINE;
 import static com.codename1.ui.CN.BOTTOM;
+import static com.codename1.ui.CN.CENTER;
+import static com.codename1.ui.CN.RIGHT;
 import static com.codename1.ui.CN.TOP;
-import static com.codename1.ui.Component.CENTER;
 import static com.codename1.ui.Component.LEFT;
-import static com.codename1.ui.Component.RIGHT;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BoxLayout;
 
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.UIManager;
 
 /**
  *
  * @author shannah
  */
-public class FlowLayoutTests extends AbstractTest {
+public class LayoutTests extends AbstractTest {
 
     @Override
     public boolean shouldExecuteOnEDT() {
@@ -31,6 +33,198 @@ public class FlowLayoutTests extends AbstractTest {
 
     @Override
     public boolean runTest() throws Exception {
+        flowLayoutTests();
+        layeredLayoutTests();
+        boxLayoutTests();
+        return true;
+    }
+    
+    public void layeredLayoutTests() throws Exception {
+        System.out.println("LayeredLayout tests");
+        Container cnt = new Container(new LayeredLayout());
+        Label l = new Label("Hello World");
+        int prefW = l.getPreferredW();
+        int prefH = l.getPreferredH();
+        cnt.add(l);
+
+        int cntW = 1000;
+        int cntH = 1000;
+
+        cnt.setWidth(cntW);
+        cnt.setHeight(cntH);
+        $(cnt).setPadding(0);
+        $(cnt, l).setMargin(0);
+        LayeredLayout ll = (LayeredLayout)cnt.getLayout();
+        ll.setInsets(l, "0");
+
+        cnt.revalidate();
+        assertEqual(cntW, l.getWidth());
+        assertEqual(cntH, l.getHeight());
+        assertEqual(0, l.getX());
+        assertEqual(0, l.getY());
+
+        ll.setInsets(l, "auto");
+        cnt.revalidate();
+
+        // NOTE:  We give a relative error grace of 1.0 because of the way that 
+        // Layered layout calculates insets.  Since it uses floating point arithmetic
+        // internallay, it is possible that widths will be off by +- 1.
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+
+        assertEqual((cntW-prefW)/2, l.getX(), 1.0);
+        assertEqual((cntH-prefH)/2, l.getY(), 1.0);
+
+
+        ll.setInsets(l, "auto 0 0 0");
+        cnt.revalidate();
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(cntW, l.getWidth(), 1.0);
+        assertEqual(cntW-l.getHeight(), l.getY(), 1.0);
+        assertEqual(0, l.getX(), 1.0);
+
+        ll.setInsets(l, "0 auto 0 0");
+        cnt.revalidate();
+        assertEqual(cntH, l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual(0, l.getY(), 1.0);
+        assertEqual(0, l.getX(), 1.0);
+
+        ll.setInsets(l, "0 0 auto 0");
+        cnt.revalidate();
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(cntW, l.getWidth(), 1.0);
+        assertEqual(0, l.getY(), 1.0);
+        assertEqual(0, l.getX(), 1.0);
+
+        ll.setInsets(l, "0 0 0 auto");
+        cnt.revalidate();
+        assertEqual(cntH, l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual(0, l.getY(), 1.0);
+        assertEqual(cntW - prefW, l.getX(), 1.0);
+
+        $(cnt).setPadding(10);
+        cnt.revalidate();
+        assertEqual(cntH - cnt.getStyle().getVerticalPadding(), l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual(cnt.getStyle().getPaddingTop(), l.getY(), 1.0);
+        assertEqual(cntW - prefW - cnt.getStyle().getPaddingRightNoRTL(), l.getX(), 1.0);
+
+        ll.setInsets(l, "auto");
+        cnt.revalidate();
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual((cntW-prefW)/2, l.getX(), 1.0);
+        assertEqual((cntH-prefH)/2, l.getY(), 1.0);
+
+        $(cnt).setPadding(0, 10, 10, 0);
+        cnt.revalidate();
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual((cntW-prefW-10)/2, l.getX(), 1.0);
+        assertEqual((cntH-prefH-10)/2, l.getY(), 1.0);
+
+        $(cnt).setPadding(0);
+        ll.setInsets(l, "10mm");
+        int inset = CN.convertToPixels(10);
+        cnt.revalidate();
+        assertEqual(cnt.getHeight() - 2*inset, l.getHeight(), 1.0);
+        assertEqual(cnt.getWidth() - 2*inset, l.getWidth(), 1.0);
+        assertEqual(inset, l.getX(), 1.0);
+        assertEqual(inset, l.getY(), 1.0);
+
+        ll.setInsets(l, "10%");
+        int insetH = (int)Math.round(cnt.getWidth() * 0.1);
+        int insetV = (int)Math.round(cnt.getHeight() * 0.1);
+        cnt.revalidate();
+        assertEqual(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
+        assertEqual(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
+        assertEqual(insetH, l.getX(), 1.0);
+        assertEqual(insetV, l.getY(), 1.0);
+
+        ll.setInsets(l, "10px");
+        insetH = 10;
+        insetV = 10;
+        cnt.revalidate();
+        assertEqual(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
+        assertEqual(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
+        assertEqual(insetH, l.getX(), 1.0);
+        assertEqual(insetV, l.getY(), 1.0);
+
+        Label l2 = new Label("Label 2");
+        Label l3 = new Label("Label 3");
+        $(l2, l3).setMargin(0);
+        cnt.addAll(l2, l3);
+        ll.setInsets(l, "0 auto auto 0"); // top left
+        ll.setInsets(l2, "0");
+        ll.setInsets(l3, "10mm auto 10mm auto");
+        int l3Inset = CN.convertToPixels(10);
+        ll.setReferenceComponentLeft(l2, l, 1f);
+        ll.setReferenceComponentLeft(l3, l2);
+        cnt.revalidate();
+        assertEqual(0, l.getX(), 1.0);
+        assertEqual(0, l.getY(), 1.0);
+        assertEqual(prefW, l.getWidth(), 1.0);
+        assertEqual(prefH, l.getHeight(), 1.0);
+        assertEqual(l.getX() + l.getWidth(), l2.getX(), 1.0);
+        assertEqual(0, l2.getY(), 1.0);
+        assertEqual(cnt.getWidth() - l.getWidth(), l2.getWidth(), 1.0);
+        assertEqual(cnt.getHeight(), l2.getHeight());
+
+        assertEqual(l3.getPreferredW(), l3.getWidth(), 1.0);
+        assertEqual(l3Inset, l3.getY());
+        assertEqual(l2.getX() + (l2.getWidth() - l3.getWidth())/2, l3.getX(), 1.0);
+        assertEqual(cnt.getHeight() - 2*inset, l3.getHeight());
+
+        ll.setReferenceComponentLeft(l3, null);
+        ll.setReferenceComponentRight(l3, l2, 1f);
+        cnt.revalidate();
+        assertEqual((l2.getX() - l3.getPreferredW())/2, l3.getX(), 1.0);
+        assertEqual(l3.getPreferredW(), l3.getWidth(), 1.0);
+
+        ll.setReferenceComponentLeft(l3, l2, 0);
+        ll.setReferenceComponentRight(l3, l2, 0);
+        ll.setReferenceComponentTop(l3, l2, 0);
+        ll.setReferenceComponentBottom(l3, l2, 0);
+        cnt.revalidate();
+        assertEqual(l2.getX() + (l2.getWidth() - l3.getPreferredW())/2, l3.getX());
+        assertEqual(l2.getY() + l3Inset, l3.getY(), 1.0);
+        assertEqual(l2.getHeight() - 2 * l3Inset, l3.getHeight(), 1.0);
+        assertEqual(l3.getPreferredW(), l3.getWidth(), 1.0);
+
+
+        // Percent inset anchors tests
+        ll.setInsets(l, "auto 50% auto auto");
+        ll.setPercentInsetAnchorHorizontal(l, 1);
+        cnt.revalidate();
+        assertEqual(cnt.getWidth()/2, l.getX(), 1.0);
+        assertEqual(l.getPreferredW(), l.getWidth(), 1.0);
+        assertEqual(l.getPreferredH(), l.getHeight(), 1.0);
+        assertEqual((cnt.getHeight() - l.getPreferredH())/2, l.getY(), 1.0);
+
+        ll.setPercentInsetAnchorVertical(l, 1);
+        cnt.revalidate();
+        assertEqual(cnt.getWidth()/2, l.getX(), 1.0);
+        assertEqual(l.getPreferredW(), l.getWidth(), 1.0);
+        assertEqual(l.getPreferredH(), l.getHeight(), 1.0);
+        assertEqual((cnt.getHeight() - l.getPreferredH())/2, l.getY(), 1.0);
+
+        ll.setInsets(l, "50% 50% auto auto");
+        cnt.revalidate();
+        assertEqual(cnt.getWidth()/2, l.getX(), 1.0);
+        assertEqual(l.getPreferredW(), l.getWidth(), 1.0);
+        assertEqual(l.getPreferredH(), l.getHeight(), 1.0);
+        assertEqual(cnt.getHeight()/2 - l.getPreferredH(), l.getY(), 1.0);
+
+        ll.setPercentInsetAnchorVertical(l, 0);
+        cnt.revalidate();
+        assertEqual(cnt.getHeight()/2, l.getY(), 1.0);
+            
+    }
+    
+    public boolean flowLayoutTests() throws Exception {
+        System.out.println("FlowLayout Tests");
         boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
         try {
             UIManager.getInstance().getLookAndFeel().setRTL(false);
@@ -328,5 +522,128 @@ public class FlowLayoutTests extends AbstractTest {
 
         };
     }
+    
+    
+
+    public boolean boxLayoutTests() throws Exception {
+        System.out.println("BoxLayout Tests");
+        BoxLayout l = new BoxLayout(BoxLayout.Y_AXIS);
+        Container cnt = new Container(l);
+        cnt.setRTL(false);
+        int w = 500;
+        int h = 500;
+
+        cnt.setWidth(w);
+        cnt.setHeight(h);
+
+        Component child1 = createEmptyComponent(100, 100);
+        Component child2 = createEmptyComponent(200, 50);
+        cnt.add(child1).add(child2);
+
+        $(child1, child2, cnt).setPadding(0).setMargin(0);
+        cnt.layoutContainer();
+        assertEqual(0, child1.getY(), "child1 should be aligned top");
+        assertEqual(100, child2.getY(), "child 2 should be aligned top just after child1 ");
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(w, child1.getWidth(), "Child1 not taking full width");
+        assertEqual(0, child2.getX(), "Child2 not aligned left");
+        assertEqual(w, child2.getWidth(), "Child2 not taking full width");
+
+        l.setAlign(BOTTOM);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+        assertEqual(500, child2.getY() + child2.getHeight(), "Child2 should be aligned bottom");
+        assertEqual(450, child1.getY() + child1.getHeight(), "child 1 should be aligned bottom just above child2");
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(w, child1.getWidth(), "Child1 not taking full width");
+        assertEqual(0, child2.getX(), "Child2 not aligned left");
+        assertEqual(w, child2.getWidth(), "Child2 not taking full width");
+
+        l.setAlign(CENTER);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+        assertEqual(325, child2.getY() + child2.getHeight(), "Child2 should be aligned bottom");
+        assertEqual(175, child1.getY(), "child 1 should be aligned bottom just above child2");
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(w, child1.getWidth(), "Child1 not taking full width");
+        assertEqual(0, child2.getX(), "Child2 not aligned left");
+        assertEqual(w, child2.getWidth(), "Child2 not taking full width");
+
+        Component child3 = createEmptyComponent(500, 500);
+        $(child3).setPadding(0).setMargin(0);
+        cnt.add(child3);
+        // This is a component to tip it over the edge.
+
+        // NOTICE:  When the children fill the height of the container, the align property
+        // ceases to have meaning.  We do NOT try to align the components once the container is filled.
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+        assertEqual(0, child1.getY(), "Child1 should be aligned top");
+        assertEqual(100, child2.getY(), "Child 2 should be aligned just after");
+        assertEqual(150, child3.getY(), "Child 3 should be just after");
+
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(w, child1.getWidth(), "Child1 not taking full width");
+        assertEqual(0, child2.getX(), "Child2 not aligned left");
+        assertEqual(w, child2.getWidth(), "Child2 not taking full width");
+
+        l.setAlign(BOTTOM);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+        assertEqual(0, child1.getY(), "Child1 should be aligned top");
+        assertEqual(100, child2.getY(), "Child 2 should be aligned just after");
+        assertEqual(150, child3.getY(), "Child 3 should be just after");
+
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(w, child1.getWidth(), "Child1 not taking full width");
+        assertEqual(0, child2.getX(), "Child2 not aligned left");
+        assertEqual(w, child2.getWidth(), "Child2 not taking full width");
+
+        //Now test the x axis
+        l = BoxLayout.x();
+        cnt.setLayout(l);
+        cnt.removeComponent(child3);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+
+        assertEqual(0, child1.getX(), "Child1 not aligned left");
+        assertEqual(100, child1.getWidth(), "Child2 not taking preferred width");
+        assertEqual(h, child1.getHeight(), "Child1 not taking full height");
+        assertEqual(0, child1.getY(), "Child1 not aligning top");
+        assertEqual(100, child2.getX(), "Child2 should be aligned next to child1");
+        assertEqual(200, child2.getWidth(), "Child 2 not taking preferred width");
+        assertEqual(h, child2.getHeight(), "Child 2 not taking full height of container");
+        assertEqual(0, child2.getY(), "Child2 not aligning top");
+
+        l.setAlign(CENTER);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+
+        assertEqual(100, child1.getX(), "Child1 not aligned left");
+        assertEqual(100, child1.getWidth(), "Child2 not taking preferred width");
+        assertEqual(h, child1.getHeight(), "Child1 not taking full height");
+        assertEqual(0, child1.getY(), "Child1 not aligning top");
+        assertEqual(200, child2.getX(), "Child2 should be aligned next to child1");
+        assertEqual(200, child2.getWidth(), "Child 2 not taking preferred width");
+        assertEqual(h, child2.getHeight(), "Child 2 not taking full height of container");
+        assertEqual(0, child2.getY(), "Child2 not aligning top");
+
+        l.setAlign(RIGHT);
+        cnt.setShouldCalcPreferredSize(true);
+        cnt.layoutContainer();
+
+        assertEqual(200, child1.getX(), "Child1 not aligned left");
+        assertEqual(100, child1.getWidth(), "Child2 not taking preferred width");
+        assertEqual(h, child1.getHeight(), "Child1 not taking full height");
+        assertEqual(0, child1.getY(), "Child1 not aligning top");
+        assertEqual(300, child2.getX(), "Child2 should be aligned next to child1");
+        assertEqual(200, child2.getWidth(), "Child 2 not taking preferred width");
+        assertEqual(h, child2.getHeight(), "Child 2 not taking full height of container");
+        assertEqual(0, child2.getY(), "Child2 not aligning top");
+
+        return true;
+    }
+
+   
 
 }

@@ -2723,11 +2723,13 @@ public class LayeredLayout extends Layout {
                         
                         int oppositeBaseValue = oppositeInset.calcBaseValue(top, left, bottom, right);
                         if (isVerticalInset()) {
+                            float anchorV = LayeredLayoutConstraint.this.getPercentInsetAnchorVertical(); 
                             calculatedValue = (int)(baseValue + (h - oppositeBaseValue - baseValue) * value / 100f
-                                    - getOuterPreferredH(cmp) * (LayeredLayoutConstraint.this.getPercentInsetAnchorVertical()));
+                                    - (anchorV!=0? (getOuterPreferredH(cmp) * anchorV):0));
                         } else {
+                            float anchorH = LayeredLayoutConstraint.this.getPercentInsetAnchorHorizontal();
                             calculatedValue = (int)(baseValue + (w - oppositeBaseValue - baseValue) * value / 100f  
-                                    - getOuterPreferredW(cmp) * (LayeredLayoutConstraint.this.getPercentInsetAnchorHorizontal()));
+                                    - (anchorH != 0 ? (getOuterPreferredW(cmp) * anchorH) : 0));
                         }
                         break;
                     }
