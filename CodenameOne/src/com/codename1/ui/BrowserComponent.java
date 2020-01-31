@@ -593,6 +593,7 @@ public class BrowserComponent extends Container {
                     onReady.onSucess(BrowserComponent.this);
                 }
             };
+            addWebEventListener(onStart, l);
         }
         return this;
     }
