@@ -55,6 +55,14 @@ extern void repaintUI();
 
 extern BOOL isRetina();
 extern BOOL isRetinaBug();
+extern void screenSizeChanged(int width, int height);
+extern int displayWidth;
+extern int displayHeight;
+
+- (void)safeAreaInsetsDidChange {
+    [super safeAreaInsetsDidChange];
+    screenSizeChanged(displayWidth, displayHeight);
+}
 
 -(BOOL)isPaintPeersBehindEnabled {
     return com_codename1_impl_ios_IOSImplementation_isPaintPeersBehindEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);

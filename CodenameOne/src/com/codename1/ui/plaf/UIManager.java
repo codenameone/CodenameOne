@@ -499,7 +499,8 @@ public class UIManager {
                             .cornerRadius(2f)
                     );
             */
-            
+            themeProps.put("Sheet.padding", "0,0,0,0");
+            themeProps.put("Sheet.margin", "0,0,0,0");
             themeProps.put("Sheet.bgType", new Byte(Style.BACKGROUND_NONE));
             themeProps.put("Sheet.bgColor", "FFFFFF");
             themeProps.put("Sheet.transparency", "255");

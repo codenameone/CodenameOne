@@ -105,6 +105,7 @@ import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
@@ -228,6 +229,20 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public int getActualDisplayHeight() {
         return nativeInstance.getDisplayHeight();
+    }
+    
+    @Override
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        int x = nativeInstance.getDisplaySafeInsetLeft();
+        int y = nativeInstance.getDisplaySafeInsetTop();
+        int w = getDisplayWidth() - nativeInstance.getDisplaySafeInsetRight() - x;
+        int h = getDisplayHeight() - nativeInstance.getDisplaySafeInsetBottom() - y;
+        rect.setBounds(x, y, w, h);
+        
+        return rect;
     }
 
     public boolean isNativeInputImmediate() {
@@ -3616,7 +3631,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                     }
                     nativeInstance.showNativePlayerController(moviePlayerPeer);
-                    return;
                 }
                 if(moviePlayerPeer != 0) {
                     nativeInstance.startVideoComponent(moviePlayerPeer);
@@ -5972,6 +5986,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getAppArg();
     }
 
+    private static Map<String,AsyncResource> callbacks = new HashMap<String,AsyncResource>();
+    
+    static void completeStringCallback(String callbackId, String value) {
+        AsyncResource<String> res = (AsyncResource<String>)callbacks.get(callbackId);
+        if (res != null) {
+            res.complete(value);
+        }
+    }
     
     
     @Override
@@ -5994,7 +6016,32 @@ public class IOSImplementation extends CodenameOneImplementation {
             } 
             return "Mozilla/5.0 (iPhone; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1C25 Safari/419.3";*/
             if(userAgent == null) {
-                userAgent = nativeInstance.getUserAgentString();
+                final String callbackId = key+System.currentTimeMillis();
+                AsyncResource<String> out = new AsyncResource<String>() {
+                    @Override
+                    public void complete(String value) {
+                        callbacks.remove(callbackId);
+                        super.complete(value); 
+                    }
+
+                    @Override
+                    public void error(Throwable t) {
+                        callbacks.remove(callbackId);
+                        super.error(t);
+                    }
+                    
+                    
+                };
+                callbacks.put(callbackId, out);
+                userAgent = nativeInstance.getUserAgentString(callbackId);
+                if (userAgent == null) {
+                    try {
+                        userAgent = out.get();
+                    } catch (Exception ex) {
+                        
+                    }
+                }
+                
             }
             return userAgent;
         }

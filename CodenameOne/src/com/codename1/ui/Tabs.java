@@ -126,6 +126,7 @@ public class Tabs extends Container {
         contentPane.setUIID("TabbedPane");
         super.addComponent(BorderLayout.CENTER, contentPane);
         tabsContainer = new Container();
+        tabsContainer.setSafeArea(true);
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
         tabsContainer.getStyle().setMargin(0, 0, 0, 0);
@@ -146,8 +147,22 @@ public class Tabs extends Container {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
+        
     }
 
+    // A flag that is used internally to temporily override the output of the 
+    // shoudlBlockSideSwipe method, so that we don't block our own side swipes.
+    private boolean doNotBlockSideSwipe;
+    
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+        if (doNotBlockSideSwipe) {
+            return false;
+        }
+        return isSwipeActivated();
+    }
+    
+    
     private void checkTabsCanBeSeen() {
         if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
             for(int iter = 0 ; iter < getTabCount() ; iter++) {
@@ -1275,14 +1290,15 @@ public class Tabs extends Container {
         return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
     }
     
+    private boolean blockSwipe;
+    private boolean riskySwipe;
     class SwipeListener implements ActionListener{
 
         private final static int PRESS = 0;
         private final static int DRAG = 1;
         private final static int RELEASE = 2;
         private final int type;
-        private boolean blockSwipe;
-        private boolean riskySwipe;
+        
 
         public SwipeListener(int type) {
             this.type = type;
@@ -1290,7 +1306,7 @@ public class Tabs extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             
-            if (getComponentCount() == 0 || !swipeActivated ||animate()) {
+            if (getComponentCount() == 0 || !swipeActivated ||slideToDestMotion != null) {
                 return;
             }
             final int x = evt.getX();
@@ -1302,28 +1318,33 @@ public class Tabs extends Container {
                     if (contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
                         if(testCmp != null && testCmp != contentPane) {
-                            while(testCmp != null && testCmp != contentPane) {
-                                if(testCmp.shouldBlockSideSwipe()) {
-                                    lastX = -1;
-                                    initialX = -1;
-                                    blockSwipe = true;
-                                    return;
-                                }
-                                if(testCmp.isScrollable()) {
-                                    if(testCmp.isScrollableX()) {
-                                        // we need to block swipe since the user is trying to scroll a component
+                            doNotBlockSideSwipe = true;
+                            try {
+                                while(testCmp != null && testCmp != contentPane) {
+                                    if(testCmp.shouldBlockSideSwipe()) {
                                         lastX = -1;
                                         initialX = -1;
                                         blockSwipe = true;
                                         return;
                                     }
+                                    if(testCmp.isScrollable()) {
+                                        if(testCmp.isScrollableX()) {
+                                            // we need to block swipe since the user is trying to scroll a component
+                                            lastX = -1;
+                                            initialX = -1;
+                                            blockSwipe = true;
+                                            return;
+                                        }
 
-                                    // scrollable Y component, we want to make side scrolling
-                                    // slightly harder so it doesn't bother the vertical swipe
-                                    riskySwipe = true;
-                                    break;
+                                        // scrollable Y component, we want to make side scrolling
+                                        // slightly harder so it doesn't bother the vertical swipe
+                                        riskySwipe = true;
+                                        break;
+                                    }
+                                    testCmp = testCmp.getParent();
                                 }
-                                testCmp = testCmp.getParent();
+                            } finally {
+                                doNotBlockSideSwipe = false;
                             }
                         }
                         lastX = x;

@@ -78,6 +78,11 @@ public class TestRunner {
                 int pos = 1;
                 while(pos < argv.length) {
                     String s = argv[pos];
+                    if (s.equalsIgnoreCase("-stopOnFail")) {
+                        pos++;
+                        stopOnFail = true;
+                        continue;
+                    }
                     if(s.equalsIgnoreCase("-testCases")) {
                         pos++;
                         testCases = argv[pos].split(",");
@@ -217,12 +222,14 @@ public class TestRunner {
                 }
             }      
             TestReporting.getInstance().testExecutionFinished();
+            int exitCode = 0;
             if(failedTests > 0) {
                 System.out.println("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
+                exitCode = 100;
             } else {
                 System.out.println("All tests passed. Total " + passedTests + " tests passed");
             }
-            System.exit(0);
+            System.exit(exitCode);
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(3);
@@ -237,7 +244,7 @@ public class TestRunner {
      */
     public static void main(String[] argv) {
         try {
-            if (JavaFXLoader.main(TestRunner.class, argv)) {
+            if (JavaFXLoader.main(TestRunner.class, TestRunner.class, argv)) {
                 return;
             }
         } catch (JavaFXLoader.JavaFXNotLoadedException notLoaded) {

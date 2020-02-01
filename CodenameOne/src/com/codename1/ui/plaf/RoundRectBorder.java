@@ -49,7 +49,7 @@ import com.codename1.ui.geom.Rectangle;
  */
 public class RoundRectBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rrbcache";
-        
+    private boolean dirty=true; 
     /**
      * The color of the edge of the border if applicable
      */
@@ -83,6 +83,11 @@ public class RoundRectBorder extends Border {
      */
     private int shadowOpacity = 0;
 
+    /**
+     * The color of the shadow as an RRGGBB color (no alpha)
+     */
+    private int shadowColor = 0;
+    
     /**
      * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
      */
@@ -138,7 +143,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder strokeOpacity(int strokeOpacity) {
-        this.strokeOpacity = strokeOpacity;
+        if (strokeOpacity != this.strokeOpacity) {
+            this.strokeOpacity = strokeOpacity;
+            dirty = true;
+        }
         return this;
     }
     
@@ -148,7 +156,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder strokeColor(int strokeColor) {
-        this.strokeColor = strokeColor;
+        if (strokeColor != this.strokeColor) {
+            this.strokeColor = strokeColor;
+            dirty = true;
+        }
         return this;
     }
 
@@ -163,6 +174,7 @@ public class RoundRectBorder extends Border {
     		strokeMM = false;
     	}
         this.stroke = stroke;
+        dirty = true;
         return this;
     }
 
@@ -191,7 +203,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowSpread(float shadowSpread) {
-        this.shadowSpread = shadowSpread;
+        if (shadowSpread != this.shadowSpread) {
+            this.shadowSpread = shadowSpread;
+            dirty = true;
+        }
         return this;
     }
 
@@ -202,6 +217,7 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder shadowSpread(int shadowSpread) {
         this.shadowSpread = shadowSpread * 100f/Display.getInstance().convertToPixels(100f);
+        dirty = true;
         return this;
     }
 
@@ -211,17 +227,36 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowOpacity(int shadowOpacity) {
-        this.shadowOpacity = shadowOpacity;
+        if (shadowOpacity != this.shadowOpacity) {
+            this.shadowOpacity = shadowOpacity;
+            dirty = true;
+        }
         return this;
     }
 
+    /**
+     * Sets the color of the shadow as an RRGGBB color
+     * @param shadowColor the color of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowColor(int shadowColor) {
+        if (shadowColor != this.shadowColor) {
+            this.shadowColor = shadowColor;
+            dirty = true;
+        }
+        return this;
+    }
+    
     /**
      * The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
      * @param shadowX the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowX(float shadowX) {
-        this.shadowX = shadowX;
+        if (shadowX != this.shadowX) {
+            this.shadowX = shadowX;
+            dirty = true;
+        }
         return this;
     }
 
@@ -231,7 +266,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowY(float shadowY) {
-        this.shadowY = shadowY;
+        if (shadowY != this.shadowY) {
+            this.shadowY = shadowY;
+            dirty = true;
+        }
         return this;
     }
 
@@ -241,7 +279,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowBlur(float shadowBlur) {
-        this.shadowBlur = shadowBlur;
+        if (shadowBlur != this.shadowBlur) {
+            this.shadowBlur = shadowBlur;
+            dirty = true;
+        }
         return this;
     }
         
@@ -252,7 +293,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder cornerRadius(float cornerRadius) {
-        this.cornerRadius = cornerRadius;
+        if (cornerRadius != this.cornerRadius) {
+           this.cornerRadius = cornerRadius;
+           dirty = true;
+        }
         return this;
     }
     
@@ -263,7 +307,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bezierCorners(boolean bezierCorners) {
-        this.bezierCorners = bezierCorners;
+        if (bezierCorners != this.bezierCorners) {
+            this.bezierCorners = bezierCorners;
+            dirty = true;
+        }
         return this;
     }
     
@@ -275,7 +322,11 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topLeftMode(boolean topLeft) {
-        this.topLeft = topLeft;
+        if (topLeft != this.topLeft) {
+            this.topLeft = topLeft;
+            dirty = true;
+        }
+        
         return this;
     }
     
@@ -286,7 +337,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topRightMode(boolean topRight) {
-        this.topRight = topRight;
+        if (topRight != this.topRight) {
+            this.topRight = topRight;
+            dirty = true;
+        }
         return this;
     }
     
@@ -297,7 +351,10 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
-        this.bottomLeft = bottomLeft;
+        if (bottomLeft != this.bottomLeft) {
+            this.bottomLeft = bottomLeft;
+            dirty = true;
+        }
         return this;
     }
     
@@ -308,9 +365,14 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomRightMode(boolean bottomRight) {
-        this.bottomRight = bottomRight;
+        if (bottomRight != this.bottomRight) {
+            this.bottomRight = bottomRight;
+            dirty = true;
+        }
         return this;
     }
+    
+    
     
     /**
      * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
@@ -320,13 +382,14 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
         if(topOnlyMode) {
-            this.topLeft = false;
-            this.topRight = false;
-            this.bottomLeft = true;
-            this.bottomRight = true;
+            topLeftMode(true);
+            topRightMode(true);
+            bottomLeftMode(false);
+            bottomRightMode(false);
         } else {
-            this.topLeft = true;
-            this.topRight = true;
+            topLeftMode(false);
+            topRightMode(false);
+
         }
         return this;
     }
@@ -339,13 +402,14 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
         if(bottomOnlyMode) {
-            this.topLeft = true;
-            this.topRight = true;
-            this.bottomLeft = false;
-            this.bottomRight = false;
+            topLeftMode(false);
+            topRightMode(false);
+            bottomLeftMode(true);
+            bottomRightMode(true);
         } else {
-            this.bottomLeft = true;
-            this.bottomRight = true;
+            bottomLeftMode(false);
+            bottomRightMode(false);
+
         }
         return this;
     }
@@ -373,7 +437,7 @@ public class RoundRectBorder extends Border {
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
                 int iterOpacity = Math.max(0, Math.min(255, (int)(shadowOpacity * (shadowSpreadL - iter)/(float)shadowSpreadL)));
-                drawShape(tg, 0, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
+                drawShape(tg, shadowColor, shadowOpacity-iterOpacity, w - (iter * 2), h - (iter * 2));
                 tg.translate(-iter, -iter);
             }
             
@@ -496,7 +560,7 @@ public class RoundRectBorder extends Border {
             }
             if(w > 0 && h > 0) {
                 Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-                if(background != null && background.getWidth() == w && background.getHeight() == h) {
+                if(!dirty && background != null && background.getWidth() == w && background.getHeight() == h) {
                     g.drawImage(background, x, y);
                     return;
                 }
@@ -507,7 +571,7 @@ public class RoundRectBorder extends Border {
             Image target = createTargetImage(c, w, h, true);
             g.drawImage(target, x, y);
             c.putClientProperty(CACHE_KEY + instanceVal, target);
-
+            dirty = false;
             // update the cache with a more refined version and repaint
             Display.getInstance().callSeriallyOnIdle(new Runnable() {
                 public void run() {
@@ -750,6 +814,14 @@ public class RoundRectBorder extends Border {
     }
 
     /**
+     * The color of the shadow as an RRGGBB color
+     * @return the shadowColor
+     */
+    public int getShadowColor() {
+        return shadowColor;
+    }
+    
+    /**
      * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
      * @return the shadowX
      */
@@ -802,12 +874,7 @@ public class RoundRectBorder extends Border {
         return (!topLeft) && (!topRight) && bottomLeft && bottomRight;
     }
     
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 43 * hash + strokeColor;
-        return hash;
-    }
+    
 
     @Override
     public boolean equals(Object obj) {
@@ -836,6 +903,9 @@ public class RoundRectBorder extends Border {
         if (this.shadowOpacity != other.shadowOpacity) {
             return false;
         }
+        if (this.shadowColor != other.shadowColor) {
+            return false;
+        }
         if (this.shadowX != other.shadowX) {
             return false;
         }
@@ -848,7 +918,45 @@ public class RoundRectBorder extends Border {
         if (this.bezierCorners != other.bezierCorners) {
             return false;
         }
+        if (this.topLeft != other.topLeft) {
+            return false;
+        }
+        if (this.topRight != other.topRight) {
+            return false;
+        }
+        if (this.bottomLeft != other.bottomLeft) {
+            return false;
+        }
+        if (this.bottomRight != other.bottomRight) {
+            return false;
+        }
+        if (this.cornerRadius != other.cornerRadius) {
+            return false;
+        }
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 79 * hash + this.strokeColor;
+        hash = 79 * hash + this.strokeOpacity;
+        hash = 79 * hash + Float.floatToIntBits(this.strokeThickness);
+        hash = 79 * hash + (this.strokeMM ? 1 : 0);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowSpread);
+        hash = 79 * hash + this.shadowOpacity;
+        hash = 79 * hash + this.shadowColor;
+        hash = 79 * hash + Float.floatToIntBits(this.shadowX);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowY);
+        hash = 79 * hash + Float.floatToIntBits(this.shadowBlur);
+        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
+        hash = 79 * hash + (this.bezierCorners ? 1 : 0);
+        hash = 79 * hash + (this.topLeft ? 1 : 0);
+        hash = 79 * hash + (this.topRight ? 1 : 0);
+        hash = 79 * hash + (this.bottomLeft ? 1 : 0);
+        hash = 79 * hash + (this.bottomRight ? 1 : 0);
+        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
+        return hash;
     }
 
     /**

@@ -5,7 +5,7 @@
     To learn more about Codename One go to https://www.codenameone.com/
     -->
         
-    <project name="SampleProjectTemplate" default="default" basedir=".">
+    <project name="SampleProjectTemplate" default="default" basedir="." xmlns:j2seproject1="http://www.netbeans.org/ns/j2se-project/1">
     <description>Builds, tests, and runs the project SampleProjectTemplate.</description>
     <import file="nbproject/build-impl.xml"/>
     <property file="codenameone_settings.properties"/>

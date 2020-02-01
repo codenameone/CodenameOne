@@ -74,6 +74,14 @@ public class Sample {
         return new File(getJavaFile(context).getParentFile(), "css");
     }
     
+    private File getHtmlDir(SamplesContext context) {
+        return new File(getJavaFile(context).getParentFile(), "html");
+    }
+    
+    private File getHtmlDirInBuildDir(SamplesContext context) {
+        return new File(getBuildSrcDir(context), "html");
+    }
+    
     private File getCSSDirInBuildDir(SamplesContext context) {
         return new File(getBuildProjectDir(context), "css");
     }
@@ -186,8 +194,16 @@ public class Sample {
         copyDir(getCSSDir(context), getCSSDirInBuildDir(context));
     }
     
+    private void copyHtmlToBuildDir(SamplesContext context) throws IOException {
+        copyDir(getHtmlDir(context), getHtmlDirInBuildDir(context));
+    }
+    
     private void copyCodenameOneBuildClient(SamplesContext context) throws IOException {
         copyFile(context.getCodenameOneBuildClientJar(), new File(getBuildProjectDir(context), "CodeNameOneBuildClient.jar"));
+    }
+    
+    private void copyJavaSE(SamplesContext context) throws IOException {
+        copyFile(context.getJavaSEJar(), new File(getBuildProjectDir(context), "JavaSE.jar"));
     }
     
     /**
@@ -203,6 +219,7 @@ public class Sample {
             updateBuildProjectSettings(context);
             updateBuildProjectXml(context);
             copyCodenameOneBuildClient(context);
+            copyJavaSE(context);
             updateCodenameOneSettings(context);
             
         }
@@ -217,6 +234,11 @@ public class Sample {
         if (getCSSDir(context).exists()) {
             if (!getCSSDirInBuildDir(context).exists() || lastModifiedRecursive(getCSSDirInBuildDir(context)) < lastModifiedRecursive(getCSSDir(context))) {
                 copyCSSToBuildDir(context);
+            }
+        }
+        if (getHtmlDir(context).exists()) {
+            if (!getHtmlDirInBuildDir(context).exists() || lastModifiedRecursive(getHtmlDirInBuildDir(context)) < lastModifiedRecursive(getHtmlDir(context))) {
+                copyHtmlToBuildDir(context);
             }
         }
         

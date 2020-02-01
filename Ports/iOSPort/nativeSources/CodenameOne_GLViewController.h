@@ -39,6 +39,7 @@
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
 //#define ENABLE_WKWEBVIEW
+//#define NO_UIWEBVIEW
 //#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT

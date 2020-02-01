@@ -279,15 +279,17 @@ public class BorderEditor extends javax.swing.JPanel {
                     rrStrokeOpacity.setValue(rb.getStrokeOpacity());
                     rrStrokeThickness.setValue(rb.getStrokeThickness());
                     rrBezier.setSelected(rb.isBezierCorners());
-                    if(rb.isTopOnlyMode()) {
-                        rrMode.setSelectedIndex(1);
-                    } else {
-                        if(rb.isBottomOnlyMode()) {
-                            rrMode.setSelectedIndex(2);
-                        }
-                    }
+                    
                     rrStrokeMillimeter.setSelected(rb.isStrokeMM());
                     rrRadius.setValue(rb.getCornerRadius());
+                    if(rb.isTopOnlyMode()) {
+                        rrMode.setSelectedIndex(1);
+                    } else if(rb.isBottomOnlyMode()) {
+                        rrMode.setSelectedIndex(2);
+                        
+                    } else {
+                        rrMode.setSelectedIndex(0);
+                     }
                 } else {
                     arcHeight.setValue(new Integer(Math.max(1, Accessor.getArcHeight(border))));
                     arcWidth.setValue(new Integer(Math.max(1, Accessor.getArcWidth(border))));
@@ -1397,9 +1399,20 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                         strokeColor(getColor(rrStrokeColor)).
                         strokeOpacity(((Number)rrStrokeOpacity.getValue()).intValue()).
                         bezierCorners(rrBezier.isSelected()).
-                        cornerRadius(((Number)rrRadius.getValue()).floatValue()).
-                        bottomOnlyMode(rrMode.getSelectedIndex() == 1).
-                        topOnlyMode(rrMode.getSelectedIndex() == 2);
+                        cornerRadius(((Number)rrRadius.getValue()).floatValue())
+                        //bottomOnlyMode(rrMode.getSelectedIndex() == 1).
+                        //topOnlyMode(rrMode.getSelectedIndex() == 2);
+                        ;
+                switch (rrMode.getSelectedIndex()) {
+                    case 1:
+                        ((RoundRectBorder)currentBorder).topOnlyMode(true);
+                        break;
+                    case 2:
+                        ((RoundRectBorder)currentBorder).bottomOnlyMode(true);
+                        break;
+                    //default:
+                    //    ((RoundRectBorder)currentBorder).
+                }
             } else {
                 switch(borderType.getSelectedIndex()) {
                     case 0:
@@ -1534,6 +1547,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
         }
         final CodenameOneComponentWrapper w = (CodenameOneComponentWrapper)imageBorderPreview;
         final Border finalBorder = currentBorder;
+        
         final Button b = (Button)w.getCodenameOneComponent();
         Display.getInstance().callSerially(new Runnable() {
             @Override

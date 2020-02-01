@@ -256,7 +256,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
     public static void main(String[] args) throws Exception {
         // For JDK11 and newer, JavaFX isn't part of the JDK, so we need to 
         // add it to the classpath at runtime.
-        if (JavaFXLoader.main(ResourceEditorApp.class, args)) {
+        if (JavaFXLoader.main(ResourceEditorApp.class, ResourceEditorApp.class, args)) {
             return;
         }
         JavaSEPortWithSVGSupport.blockMonitors();

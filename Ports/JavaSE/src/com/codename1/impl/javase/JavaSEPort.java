@@ -113,6 +113,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -167,10 +168,13 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaPlayer.Status;
 import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
@@ -694,6 +698,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private BufferedImage portraitSkin;
     private BufferedImage landscapeSkin;
     private boolean roundedSkin;
+    private Rectangle safeAreaPortrait = null;
+    private Rectangle safeAreaLandscape = null;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -1073,6 +1079,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
+                    safeAreaLandscape = null;
+                    safeAreaPortrait = null;
                     h.remove("@paintsTitleBarBool");
                 }
                 UIManager.getInstance().setThemeProps(h);
@@ -1275,7 +1283,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             // we need to work in a thread-safe way - since we can't control
             // when paintComponent() is called.
             blitCounter++;
-            
+            boolean bufferUpdated = false;
             if (blitCounter > 5) {
                 // blit() has been called more than 5 times since last
                 // paintComponent() - we'll disable buffer thread safety
@@ -1290,9 +1298,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // blit() has not been called more than 5 times since 
                 // last paintComponent() call - so we'll enable buffer
                 // thread safety.
+                
                 if (!bufferSafeMode) {
                     bufferSafeMode = true;
-                    buffer = null;
+                    synchronized(bufferLock) {
+                        buffer = null;
+                        updateBuffer(edtBuffer);
+                        updateEdtBufferSize();
+                        bufferUpdated = true;
+                    }
                     //System.out.println("On");
                 }
             }
@@ -1302,9 +1316,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // to the buffer in a synchronized block so that 
                 // there is no possible conflict when paintComponent()
                 // is called.
-                synchronized (bufferLock) {
-                    updateBuffer(edtBuffer);
-                    updateEdtBufferSize();
+                if (!bufferUpdated) {
+                    synchronized (bufferLock) {
+                        updateBuffer(edtBuffer);
+                        updateEdtBufferSize();
+                    }
                 }
             } else {
                 
@@ -1382,6 +1398,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
+            if (buffer == null) {
+                return false;
+            }
             //g.setColor(Color.white);
             //g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             AffineTransform t = ((Graphics2D)g).getTransform();
@@ -2441,8 +2460,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-
             if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+                safeAreaLandscape = new Rectangle();
+                safeAreaPortrait = new Rectangle();
+
+            
                 portraitScreenCoordinates.x = Integer.parseInt(props.getProperty("displayX"));
                 portraitScreenCoordinates.y = Integer.parseInt(props.getProperty("displayY"));
                 portraitScreenCoordinates.width = Integer.parseInt(props.getProperty("displayWidth"));
@@ -2451,11 +2473,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                 landscapeScreenCoordinates.y = portraitScreenCoordinates.x;
                 landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
                 landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
+                safeAreaPortrait.setBounds(
+                        Integer.parseInt(props.getProperty("safePortaitX", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitY", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safePortraitHeight", ""+portraitScreenCoordinates.height))
+                );
+                safeAreaLandscape.setBounds(
+                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
+                );
                 roundedSkin = true;
             } else {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
             }
+            
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -2559,6 +2594,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
         }
     }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
+        if (!isSimulator() || safeAreaPortrait == null || safeAreaLandscape == null) {
+            return super.getDisplaySafeArea(rect);
+        }
+        if (rect == null) {
+            rect = new com.codename1.ui.geom.Rectangle();
+        }
+        if (portrait) {
+            rect.setBounds((int)safeAreaPortrait.getX(), (int)safeAreaPortrait.getY(), (int)safeAreaPortrait.getWidth(), (int)safeAreaPortrait.getHeight());
+        } else {
+            rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
+        }
+        System.out.println("Getting safe area "+rect);
+        return rect;
+    }
+    
+    
     
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
@@ -4228,6 +4282,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
+            safeAreaLandscape = null;
+            safeAreaPortrait = null;
             Toolkit tk = Toolkit.getDefaultToolkit();
             setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
             pixelMilliRatio = getDefaultPixelMilliRatio();
@@ -4868,66 +4924,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         //}
         
         checkEDT();
+        
+        class Repainter {
+            JComponent jcmp;
+            javax.swing.border.Border origBorder;
+            
+            Repainter(JComponent jcmp) {
+                this.jcmp = jcmp;
+            }
+            void repaint(long tm, int x, int y, int width, int height) {
+                int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
+                Rectangle bounds;
+                if (getSkin() != null) {
+                    bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                            (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                            (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                            (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                } else {
+                    bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                }
+                if (!jcmp.getBounds().equals(bounds)) {
+                    jcmp.setBounds(bounds);
+                    if (origBorder == null) {
+                        origBorder = jcmp.getBorder();
+                    }
+                    //jcmp.setBorder(BorderFactory.createCompoundBorder(
+                    //    origBorder, 
+                    //    BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                    //);
+                    jcmp.setBorder( BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight));
+                }
+
+
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        cmp.repaint();
+                    }
+                });
+            }
+        }
+        
         javax.swing.text.JTextComponent swingT;
         if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
             JTextComponent t;
             if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                        }
-
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
                     }
                 };
             } else {
                 t = new JTextField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                        }
-
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
-                        
                     }
                 };
                 
@@ -4957,42 +5022,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             textCmp = swingT;
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
-                
-                
-                
-                public void repaint(long tm, int x, int y, int width, int height) {
-                    
-                    int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                    int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                    int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                    int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                    Rectangle bounds;
-                    if (getSkin() != null) {
-                        bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
-                                (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
-                        
-                    } else {
-                        bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-                    }
-                    if(textCmp != null && !textCmp.getBounds().equals(bounds)){
-                        textCmp.setBounds(bounds);
-                    }
-                    
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            cmp.repaint();
-                        }
-                    });
-                }
-                
-            };
+            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()); 
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
-            JScrollPane pane = new JScrollPane(swingT);
+            JScrollPane pane = new JScrollPane(swingT){
+                
+                Repainter repainter = new Repainter(this);
+                
+                @Override
+                public void repaint(long tm, int x, int y, int width, int height) {
+
+                    
+                    if (repainter != null) {
+                        repainter.repaint(tm, x, y, width, height); 
+                    }
+                }
+
+            };
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
@@ -5027,7 +5074,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         });
-        swingT.setBorder(null);
+        //swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
         swingT.setCaretColor(new Color(cmp.getUnselectedStyle().getFgColor()));
@@ -5055,12 +5102,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
-            System.out.println("Set bounds to "+textCmp.getBounds());
+            //System.out.println("Set bounds to "+textCmp.getBounds());
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
             textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-            System.out.println("Set bounds to "+textCmp.getBounds());
+            //System.out.println("Set bounds to "+textCmp.getBounds());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
@@ -8535,6 +8582,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        if (connection instanceof URLConnection) {
+            ((URLConnection)connection).setReadTimeout(readTimeout);
+        }
+    }
+
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
+    
+    
+    
+    @Override
     public void addConnectionToQueue(ConnectionRequest req) {
         super.addConnectionToQueue(req);
         if (netMonitor != null) {
@@ -9886,8 +9948,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
     
+    
+    
     class CodenameOneMediaPlayer extends AbstractMedia {
-
+        private java.util.Timer endMediaPoller;
         private Runnable onCompletion;
         private List<Runnable> completionHandlers;
         private javafx.scene.media.MediaPlayer player;
@@ -9898,11 +9962,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame frm;
         private boolean playing = false;
         private boolean nativePlayerMode;
+        private AsyncResource<Media> _callback;
+        
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onPaused = new Runnable() {
+            public void run() {
+                if (endMediaPoller != null) {
+                    endMediaPoller.cancel();
+                    endMediaPoller = null;
+                }
+                stopEndMediaPoller();
+                playing = false;
+
+                fireMediaStateChange(State.Paused);
+            }
+        };
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onPlaying = new Runnable() {
+            @Override
+            public void run() {
+                playing = true;
+                startEndMediaPoller();
+                fireMediaStateChange(State.Playing);
+            }
+            
+        };
+        
+        /**
+         * This is a callback for the JavaFX media player that is supposed to fire
+         * when the media is paused.  Unfortunately this is unreliable as the status
+         * events seem to stop working after the first time it is paused.  
+         * We use a poller (the endMediaPoller timer) to track the status of the video
+         * so that the change listeners are fired.  This really sucks!
+         */
+        private Runnable onError = new Runnable() {
+            public void run() {
+                if (_callback != null && !_callback.isDone()) {
+                    _callback.error(player.errorProperty().get());
+                    return;
+                } else {
+                    Log.e(player.errorProperty().get());
+                }
+                fireMediaError(createMediaException(player.errorProperty().get()));
+                if (!playing) {
+                    stopEndMediaPoller();
+                    fireMediaStateChange(State.Playing);
+                    fireMediaStateChange(State.Paused);
+                }
+
+            }
+        };
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
+            _callback = callback;
             if (onCompletion != null) {
                 addCompletionHandler(onCompletion);
             }
+            
             this.onCompletion = new Runnable() {
 
                 @Override
@@ -9910,6 +10038,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (callback != null && !callback.isDone()) {
                         callback.complete(CodenameOneMediaPlayer.this);
                     }
+                    stopEndMediaPoller();
                     playing = false;
                     
                     fireMediaStateChange(State.Paused);
@@ -9944,7 +10073,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     stream.close();
                     uri = temp.toURI().toURL().toExternalForm();
                 }
+                
                 player = new MediaPlayer(new javafx.scene.media.Media(uri));
+                
                 player.setOnReady(new Runnable() {
                     public void run() {
                         if (callback != null && !callback.isDone()) {
@@ -9953,39 +10084,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 });
 
-                player.setOnPaused(new Runnable() {
-                    public void run() {
-                        playing = false;
-                        fireMediaStateChange(State.Paused);
-                    }
-                });
-                player.setOnPlaying(new Runnable() {
-                    public void run() {
-                        playing = true;
-                        fireMediaStateChange(State.Playing);
-                    }
-                });
-                
-                player.setOnEndOfMedia(this.onCompletion);
+                installFxCallbacks();
                 if (isVideo) {
                     videoPanel = fx;
                 }
-                player.setOnError(new Runnable() {
-                    public void run() {
-                        if (callback != null && !callback.isDone()) {
-                            callback.error(player.errorProperty().get());
-                            return;
-                        } else {
-                            Log.e(player.errorProperty().get());
-                        }
-                        fireMediaError(createMediaException(player.errorProperty().get()));
-                        if (!playing) {
-                            fireMediaStateChange(State.Playing);
-                            fireMediaStateChange(State.Paused);
-                        }
-                        
-                    }
-                });
+                
 
             } catch (Exception ex) {
                 if (callback != null && !callback.isDone()) {
@@ -10029,6 +10132,75 @@ public class JavaSEPort extends CodenameOneImplementation {
                     
             }
             return new com.codename1.media.AsyncMedia.MediaException(type, ex);
+        }
+        
+        /**
+         * This starts a timer which checks the status of media every Xms so that it can fire
+         * status change events and on completion events.  The JavaFX media player has onPlaying,
+         * onPaused, etc.. status events of its own that seem to not work in many cases, so we
+         * need to use this timer to poll for the status.  That really sucks!!
+         */
+        private void startEndMediaPoller() {
+            stopEndMediaPoller();
+            endMediaPoller = new java.util.Timer();
+            endMediaPoller.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    
+                    // Check if the media is playing but we haven't updated our status.
+                    // If so, we change our status to playing, and fire a state change event.
+                    if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
+                        Platform.runLater(new Runnable() {
+                            // State tracking on the fx thread to avoid race conditions.
+                            public void run() {
+                                if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
+                                    playing = true;
+                                    fireMediaStateChange(State.Playing);
+                                }
+                            }
+                            
+                        });
+                        
+                    } else if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
+                        stopEndMediaPoller();
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
+                                    
+                                    playing = false;
+                                    fireMediaStateChange(State.Paused);
+                                }
+                            }
+                            
+                        });
+                    }
+                    double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
+                    if (playing && diff < 0.01) {
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
+                                if (playing && diff < 0.01) {
+                                    Runnable completionCallback = CodenameOneMediaPlayer.this.onCompletion;
+                                    if (completionCallback != null) {
+                                        completionCallback.run();
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+            }, 100, 100);
+        }
+        
+        /**
+         * Stop the media state poller. This is called when the media is paused.
+         */
+        private void stopEndMediaPoller() {
+            if (endMediaPoller != null) {
+                endMediaPoller.cancel();
+                endMediaPoller = null;
+            }
         }
         
         public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
@@ -10078,7 +10250,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    
+                    if (callback != null && !callback.isDone()) {
+                        callback.complete(CodenameOneMediaPlayer.this);
+                    }
+                    stopEndMediaPoller();
                     playing = false;
+                    
+                    fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
                 }
             };
@@ -10093,29 +10272,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
-                player.setOnPaused(new Runnable() {
-                    public void run() {
-                        playing = false;
-                    }
-                });
-                player.setOnPlaying(new Runnable() {
-                    public void run() {
-                        playing = true;
-                                    }
-                            });
-                player.setOnEndOfMedia(this.onCompletion);
+                installFxCallbacks();
                 if (isVideo) {
                     videoPanel = fx;
                 }
-                player.setOnError(new Runnable() {
-                    public void run() {
-                        if (callback != null) {
-                            callback.error(player.errorProperty().get());
-                        } else {
-                            Log.e(player.errorProperty().get());
-                        }
-                    }
-                });
+                
 
             } catch (Exception ex) {
                 if (callback != null) {
@@ -10130,6 +10291,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private void fireCompletionHandlers() {
             if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                
                 Display.getInstance().callSerially(new Runnable() {
 
                     @Override
@@ -10185,15 +10347,20 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     @Override
                     protected void onShow() {
-                        player.play();
-                            playing = true;
-                        }
+                        Platform.runLater(new Runnable() {
+                            public void run() {
+                                playInternal();
+                            }
+
+                        });
+                    }
                     
                 };
                 com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
                 playerForm.setToolbar(tb);
                 tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
                     public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                        pauseInternal();
                         currForm.showBack();
                     }
                 });
@@ -10207,24 +10374,56 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
                 
             }
-            player.play();
-            playing = true;
+            playInternal();
+            
         }
 
+        private void playInternal() {
+            
+            installFxCallbacks();
+            player.play();
+            startEndMediaPoller();
+        }
+        
+        private void pauseInternal() {
+            player.pause();
+            
+            
+        
+        }
+        
+        /**
+         * Installs listeners for the javafx media player.  Unfortunately these are
+         * incredibly unreliable.  onPlaying only first the first time it plays.  OnPaused
+         * also stops firing after the first pause.  onEndOfMedia sometimes fires but not
+         * other times.  We use the endOfMediaPoller timer as a backup to test for status
+         * changes.
+         */
+        private void installFxCallbacks() {
+            
+            player.setOnPlaying(onPlaying);
+            player.setOnPaused(onPaused);
+            player.setOnError(onError);
+            player.setOnEndOfMedia(onCompletion);
+           
+        }
+        
         @Override
         protected void pauseImpl() {
-            if(playing) {
-                player.pause();
+            if(player.getStatus() == Status.PLAYING) {
+                pauseInternal();
             }
-            playing = false;
+            //playing = false;
+            
         }
 
         public int getTime() {
             return (int) player.getCurrentTime().toMillis();
         }
 
-        public void setTime(int time) {
-            player.seek(new Duration(time));
+        public void setTime(final int time) {
+           player.seek(new Duration(time));
+            
         }
 
         public int getDuration() {
@@ -10616,7 +10815,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(resource.startsWith("raw")) {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
-        
+        if ("/theme.res".equals(resource)) {
+            File srcThemeRes = new File("src" + File.separator + "theme.res");
+            if (srcThemeRes.exists()) {
+                try {
+                    return new FileInputStream(srcThemeRes);
+                } catch (IOException err){
+                    System.err.println("Failed to load "+srcThemeRes+" . "+err.getMessage());
+                }
+            }
+        }
         if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);
@@ -11161,7 +11369,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             File dir = file.getParentFile();
             if (!dir.exists()) {
-                dir.mkdir();
+                dir.mkdirs();
             }
             java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
                     file.getAbsolutePath(),
@@ -11177,7 +11385,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     
     private File getDatabaseFile(String databaseName) {
-        File f = new File(getStorageDir() + "/database/" + databaseName);
+        File f = new File(getStorageDir() + File.separator+ "database" + File.separator + databaseName);
         if (exposeFilesystem) {
             if (databaseName.contains("/") || databaseName.contains("\\")) {
                 f = new File(databaseName);
@@ -11201,7 +11409,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
         if (f.exists()) {
-            f.delete();
+            if (!f.delete()) {
+                throw new IOException("Failed to delete database file "+f+".  It may be in use.  Make sure to close the database connection before deleting the database.");
+            }
+            
         }
     }
     
@@ -11263,7 +11474,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel webContainer = new CN1JFXPanel();
         final SEBrowserComponent[] bc = new SEBrowserComponent[1];
+        
+        
 
+        final SEBrowserComponent bcc = new SEBrowserComponent();
+        Platform.setImplicitExit(false);
         Platform.runLater(new Runnable() {
 
             @Override
@@ -11274,7 +11489,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 webContainer.setScene(new Scene(root));
                 
                 // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, ((JPanel)canvas.getParent()), webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
+                JPanel parentPanel =  ((JPanel)canvas.getParent());
+                
+                bcc.SEBrowserComponent_init(
+                        JavaSEPort.this, 
+                        parentPanel, 
+                        webContainer, 
+                        webView, 
+                        (BrowserComponent) parent, 
+                        hSelector, 
+                        vSelector
+                );
+                
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
                         bc[0] = bcc;
@@ -11286,7 +11512,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
         });
-        Display.getInstance().invokeAndBlock(new Runnable() {
+        if (bc[0] == null && err[0] == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
 
             @Override
             public void run() {
@@ -11300,6 +11527,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         });
+        }
+        
         return bc[0];
     }
 
@@ -12804,6 +13033,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     
     
+    
+    
     @Override
     public Map<String, String> getProjectBuildHints() {
         File cnopFile = new File("codenameone_settings.properties");
@@ -13099,4 +13330,96 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         }
     }
+   
+    // START NATIVE BROWSER WINDOW METHODS---------------------------------------
+   
+    /**
+     * We create a default browser window factory that always creates a JavaFX 
+     * browser.  We use a factory to make it easier for libraries to provide their 
+     * own browser implementation depending on their needs.  For example, the AppleSignin cn1lib
+     * provides its own WebView implementation because Apple login doesn't seem to work
+     * in JavaFX's webview.
+     */
+    private BrowserWindowFactory browserWindowFactory = new BrowserWindowFactory() {
+         @Override
+         public AbstractBrowserWindowSE createBrowserWindow(String startURL) {
+             return new FXBrowserWindowSE(startURL);
+         }
+
+    };
+   
+    /**
+     * Gets the factory used for creating BrowserWindows.
+     * @return 
+     */
+    public BrowserWindowFactory getBrowserWindowFactory() {
+        return browserWindowFactory;
+    }
+
+    /**
+     * Sets the browser window factory used to create new browser windows.
+     * @param newFactory The new factory.
+     * @return The old factory.
+     */
+    public BrowserWindowFactory setBrowserWindowFactory(BrowserWindowFactory newFactory) {
+        BrowserWindowFactory old = browserWindowFactory;
+        browserWindowFactory = newFactory;
+        return old;
+    }
+   
+    @Override
+    public Object createNativeBrowserWindow(String startURL) {
+        
+        return browserWindowFactory.createBrowserWindow(startURL);
+    }
+    
+   @Override
+    public void addNativeBrowserWindowOnLoadListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).addLoadListener(l);
+    }
+    public void removeNativeBrowserWindowOnLoadListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).removeLoadListener(l);
+    }
+    
+    @Override
+    public void nativeBrowserWindowSetSize(Object window, int width, int height) {
+        ((AbstractBrowserWindowSE)window).setSize(width, height);
+    }
+    
+    @Override
+    public void nativeBrowserWindowSetTitle(Object window, String title) {
+        ((AbstractBrowserWindowSE)window).setTitle(title);
+    }
+    
+    @Override
+    public void nativeBrowserWindowShow(Object window) {
+        ((AbstractBrowserWindowSE)window).show();
+    }
+    
+    @Override
+    public void nativeBrowserWindowHide(Object window) {
+        ((AbstractBrowserWindowSE)window).hide();
+    }
+    
+    @Override
+    public void nativeBrowserWindowCleanup(Object window) {
+        ((AbstractBrowserWindowSE)window).cleanup();
+    }
+    
+    @Override
+    public void nativeBrowserWindowEval(Object window, BrowserWindow.EvalRequest req) {
+        ((AbstractBrowserWindowSE)window).eval(req);
+    }
+    
+    @Override
+    public void nativeBrowserWindowAddCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).addCloseListener(l);
+    }
+
+    @Override
+    public void nativeBrowserWindowRemoveCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
+        ((AbstractBrowserWindowSE)window).removeCloseListener(l);
+        
+    }
+    // END NATIVE BROWSER WINDOW METHODS---------------------------------------------------------
 }

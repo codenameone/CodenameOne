@@ -23,6 +23,7 @@
 package com.codename1.testing;
 
 import com.codename1.io.Log;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -105,20 +106,39 @@ public abstract class DeviceRunner {
      */
     public void runTest(String testClassName) {
         try {
-            UnitTest t = (UnitTest)Class.forName(testClassName).newInstance();
+            final UnitTest t = (UnitTest)Class.forName(testClassName).newInstance();
             try {
                 TestReporting.getInstance().startingTestCase(t);
                 startApplicationInstance();
-                t.prepare();
-                boolean result = t.runTest();
-                if (result) {
-                    passedTests++;
+                class RunTestImpl implements Runnable {
+                    boolean result;
+                    public void run() {
+                        try {
+                            t.prepare();
+                            result = t.runTest();
+                            if (result) {
+                                passedTests++;
+                            } else {
+                                failedTests++;
+                            }
+                            t.cleanup();
+                        } catch (Throwable err) {
+                            failedTests++;
+                            TestReporting.getInstance().logException(err);
+                            TestReporting.getInstance().finishedTestCase(t, false);
+                        }
+                    }
+                };
+                RunTestImpl runTest = new RunTestImpl();
+                if (t.shouldExecuteOnEDT() && !CN.isEdt()) {
+                    CN.callSeriallyAndWait(runTest);
+                } else if (!t.shouldExecuteOnEDT() && CN.isEdt()) {
+                    CN.invokeAndBlock(runTest);
                 } else {
-                    failedTests++;
+                    runTest.run();
                 }
-                t.cleanup();
                 stopApplicationInstance();
-                TestReporting.getInstance().finishedTestCase(t, result);
+                TestReporting.getInstance().finishedTestCase(t, runTest.result);
             } catch(Throwable err) {
                 failedTests++;
                 TestReporting.getInstance().logException(err);

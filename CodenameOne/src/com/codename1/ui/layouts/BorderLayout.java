@@ -354,13 +354,25 @@ public class BorderLayout extends Layout {
             switch(centerBehavior) {
                 case CENTER_BEHAVIOR_CENTER_ABSOLUTE: {
                     Dimension d = c.getPreferredSize();
-                    if(d.getWidth() < w) {
-                        int newX = (s.getPaddingLeft(rtl) - s.getPaddingRight(rtl) ) + targetWidth / 2 - d.getWidth() / 2;
-                        if(newX > x) {
-                            x = newX;
+                    int passNum = 0;
+                    while (passNum < 2) {
+                        if(d.getWidth() < w) {
+                            int newX = (s.getPaddingLeft(rtl) - s.getPaddingRight(rtl) ) + targetWidth / 2 - d.getWidth() / 2;
+                            if(newX > x) {
+                                x = newX;
+                            }
+                            w = d.getWidth();
                         }
-                        w = d.getWidth();
+                        if (passNum == 0) {
+                            // Some components, like SpanLabel and SpanButton have preferred heights
+                            // that depend on their width.  So we need to set the width, 
+                            // and then recalc preferred size
+                            c.setWidth(w);
+                            d = c.getPreferredSize();
+                        }
+                        passNum++;
                     }
+                    
                     int append = 0;
                     int th = targetHeight;
                     if(north != null) {
@@ -381,9 +393,21 @@ public class BorderLayout extends Layout {
                 }
                 case CENTER_BEHAVIOR_CENTER: {
                     Dimension d = c.getPreferredSize();
-                    if(d.getWidth() < w) {
-                        x += w / 2 - d.getWidth() / 2;
-                        w = d.getWidth();
+                    int passNum = 0;
+                    while (passNum < 2) {
+                        if(d.getWidth() < w) {
+                            x += w / 2 - d.getWidth() / 2;
+                            w = d.getWidth();
+                        }
+                        if (passNum == 0) {
+                            // Some components, like SpanLabel and SpanButton have preferred heights
+                            // that depend on their width.  So we need to set the width, 
+                            // and then recalc preferred size
+                            c.setWidth(w);
+                            d = c.getPreferredSize();
+                        }
+                        passNum++;
+                        
                     }
                     if(d.getHeight() < h) {
                         y += h / 2 - d.getHeight() / 2;

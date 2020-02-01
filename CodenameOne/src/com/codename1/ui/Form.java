@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
@@ -64,6 +65,7 @@ import java.util.ListIterator;
  * @author Chen Fishbein
  */
 public class Form extends Container {
+    private Command sourceCommand;
     private boolean globalAnimationLock;
     static int activePeerCount;
     private Painter glassPane;
@@ -218,6 +220,27 @@ public class Form extends Container {
 
         initGlobalToolbar();
     }
+
+    /**
+     * <p>Enabling "layoutOnPaint" behaviour.  Setting this flag to true will cause
+     * this form and all of its containers to lay themselves out whenever they are painted.
+     * This carries a performance penalty.</p>
+     * 
+     * <p>Historical Note: "layoutOnPaint" behaviour has been "on" since the original commit 
+     * to Google code in 2012, but it isn't clear, now, why it was necessary.  It was likely
+     * to fix an edge case in certain layouts that is no longer relevant.  As of 7.0, we are
+     * disabling this behaviour by default because it carries such performance penalties, but allowing
+     * developers to opt-in to it using this method.</p>
+     * 
+     * @param allow Whether to allow layoutOnPaint behaviour in this this form and it's containers.
+     * @since 7.0</p>
+     */
+    @Override
+    public void setAllowEnableLayoutOnPaint(boolean allow) {
+        super.setAllowEnableLayoutOnPaint(allow);
+    }
+    
+    
     
     /**
      * Gets TextSelection support for this form.
@@ -249,6 +272,26 @@ public class Form extends Container {
      */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
+    }
+    
+    /**
+     * Sets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @param sourceCommand The source command. 
+     * @since 7.0
+     */
+    public void setSourceCommand(Command sourceCommand) {
+        this.sourceCommand = sourceCommand;
+    }
+    
+    /**
+     * Gets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     * @return The source command. 
+     * @since 7.0
+     */
+    public Command getSourceCommand() {
+        return sourceCommand;
     }
     
     /**
@@ -334,6 +377,43 @@ public class Form extends Container {
      */
     public boolean isFormBottomPaddingEditingMode() {
         return bottomPaddingMode;
+    }
+    
+    /**
+     * A flag indicating if the safe area may be dirty, and needs to be recaculated.
+     * @see #getSafeArea() 
+     */
+    private boolean safeAreaDirty = true;
+    
+    /**
+     * Rectangle storing the safe area on the form.
+     */
+    private final Rectangle safeArea = new Rectangle();
+    
+   
+    
+    /**
+     * This method returns a rectangle defining the "safe" area of the display, which excludes
+     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
+     * 
+     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
+     * is displayed on the screen near the bottom edge, and can interfere with components
+     * that are laid out at the bottom of the screen.</p>
+     * 
+     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+     * will return a rectangle that excludes the notch, and task bar regions.</p>
+     * @return The safe area on which to draw.
+     * @see CodenameOneImplementation#getDisplaySafeArea(com.codename1.ui.geom.Rectangle) 
+     * @see Container#setSafeArea(boolean) 
+     * @see Container#isSafeArea() 
+     * @since 7.0
+     */
+    public Rectangle getSafeArea() {
+        if (safeAreaDirty) {
+            Display.impl.getDisplaySafeArea(safeArea);
+            //safeAreaDirty = false;
+        }
+        return safeArea;
     }
     
     void initAdPadding(Display d) {
@@ -640,6 +720,7 @@ public class Form extends Container {
         h = h - (formStyle.getVerticalMargins());
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
+        safeAreaDirty = true;
         doLayout();
         focused = getFocused();
         if (focused != null) {
@@ -668,6 +749,7 @@ public class Form extends Container {
         }
         
         repaint();
+        revalidateWithAnimationSafety();
     }
 
     /**
@@ -2109,7 +2191,7 @@ public class Form extends Container {
         if (getParent() == null) {
             com.codename1.ui.Display.getInstance().setCurrent(this, reverse);
         } else {
-            revalidate();
+            revalidateWithAnimationSafety();
         }
     }
     

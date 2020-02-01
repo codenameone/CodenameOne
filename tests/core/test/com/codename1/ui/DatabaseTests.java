@@ -41,10 +41,11 @@ public class DatabaseTests extends AbstractTest {
         this.assertTrue(Database.exists(dbName), "Database.exists() returns false after openOrCreate");
         
         String path = Database.getDatabasePath(dbName);
-        this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation");
-        
+        this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation.  Expected to be at "+path);
+        db.close();
         Database.delete(dbName);
-        this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database.");
+        
+        this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database.  Still exists at "+path);
         
     }
     
@@ -64,8 +65,9 @@ public class DatabaseTests extends AbstractTest {
             this.assertTrue(FileSystemStorage.getInstance().exists(path), "Database doesn't exist after creation with custom path: "+dbName);
 
             this.assertEqual(dbFile.getAbsolutePath(), path, "Result of getDatabasePath() doesn't match input path with custom path");
-
+            db.close();
             Database.delete(dbName);
+            
             this.assertTrue(!FileSystemStorage.getInstance().exists(path), "Failed to delete database with custom path: "+dbName);
         } else {
             Throwable ex = null;
@@ -148,5 +150,12 @@ public class DatabaseTests extends AbstractTest {
         return true;
 
     }
+
+    @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+    
+    
 
 }

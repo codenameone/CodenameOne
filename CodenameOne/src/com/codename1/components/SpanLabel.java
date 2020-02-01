@@ -22,6 +22,8 @@
  */
 package com.codename1.components;
 
+import static com.codename1.ui.CN.EAST;
+import static com.codename1.ui.CN.WEST;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -86,6 +88,34 @@ public class SpanLabel extends Container {
         addComponent(BorderLayout.WEST, iconWrapper);
         addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
     }
+
+    private int preferredW=-1;
+    
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setPreferredW(int preferredW) {
+        //We need to override preferredW for this component because the default
+        // implementation will prevent calcPreferredSize() from ever being called,
+        // and we still want to calculate the preferred height based on this preferred width.
+        this.preferredW = preferredW;
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     */
+    @Override
+    public int getPreferredW() {
+        if (preferredW != -1) {
+            return preferredW;
+        }
+        return super.getPreferredW();
+    }
+    
+    
+    
     
     /**
      * Returns the TextArea holding the actual text
@@ -415,27 +445,28 @@ public class SpanLabel extends Container {
     }
 
     
+    
+   
     @Override
-    protected Dimension calcPreferredSize() {
-        
+    public void setWidth(int width) {
         int w = getWidth();
-        int h = getHeight();
-        Dimension d = getLayout().getPreferredSize(this);
-        setWidth(d.getWidth());
-        setHeight(d.getHeight());
-        d = getLayout().getPreferredSize(this);
-        Style style = getStyle();
-        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
-            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
-            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
+        if (w != width) {
+            
+            // We need to update the textarea width whenever we set the width
+            // so that preferred height will be calculated correctly.
+            int newTextW = width;
+            String iconPos = getIconPosition();
+            if (getIcon() != null && EAST.equals(iconPos) || WEST.equals(iconPos)) {
+                newTextW -= iconWrapper.getOuterWidth();
+            }
+            newTextW -= getStyle().getHorizontalPadding();
+            newTextW -= text.getStyle().getHorizontalMargins();
+            text.setWidth(newTextW);
+
+            super.setWidth(width);
+            setShouldCalcPreferredSize(true);
         }
-        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
-            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
-            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
-        }
-        setWidth(w);
-        setHeight(h);
-        return d;
+        
     }
     
     

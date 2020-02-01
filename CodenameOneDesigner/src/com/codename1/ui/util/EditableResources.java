@@ -586,6 +586,7 @@ public class EditableResources extends Resources implements TreeModel {
 
                                         if("round".equals(b.getType())) {
                                             RoundBorder rb = RoundBorder.create();
+                                            rb = rb.opacity(b.getOpacity());
                                             rb = rb.color(b.getRoundBorderColor());
                                             rb = rb.rectangle(b.isRectangle());
                                             rb = rb.shadowBlur(b.getShadowBlur());
@@ -596,6 +597,7 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.stroke(b.getStrokeThickness(), b.isStrokeMM());
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
+                                            
                                             theme.put(b.getKey(), rb);
                                             continue;
                                         }
@@ -611,8 +613,12 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
                                             rb = rb.bezierCorners(b.isBezierCorners());
-                                            rb = rb.bottomOnlyMode(b.isBottomOnlyMode());
-                                            rb = rb.topOnlyMode(b.isTopOnlyMode());
+                                            if (b.isTopOnlyMode()) {
+                                                rb.topOnlyMode(true);
+                                            } else if (b.isBottomOnlyMode()) {
+                                                rb.bottomOnlyMode(true);
+                                            }
+                                            
                                             rb = rb.cornerRadius(b.getCornerRadius());
                                             theme.put(b.getKey(), rb);
                                             continue;

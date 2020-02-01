@@ -25,6 +25,7 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
@@ -302,6 +303,10 @@ public class NetworkManager {
                     }
 
                     int frameRate = -1;
+                    boolean requestWasCompleted=true;
+                        // Default this to true because if, for some reason an exception is thrown
+                        // before calling performOperationComplete(), then the request
+                        // won't be retried.
                     try {
                         // for higher priority tasks increase the thread priority, for lower
                         // prioirty tasks decrease it. In critical priority reduce the Codename One
@@ -332,7 +337,7 @@ public class NetworkManager {
                             currentRequest.getShowOnInit().showModeless();
                         }
 
-                        currentRequest.performOperation();
+                        requestWasCompleted = currentRequest.performOperationComplete();
                     } catch(IOException e) {
                         if(!currentRequest.isFailSilently()) {
                             if(!handleException(currentRequest, e)) {
@@ -356,7 +361,9 @@ public class NetworkManager {
                         if(frameRate > -1) {
                             Display.getInstance().setFramerate(frameRate);
                         }
-
+                        if (requestWasCompleted) {
+                            currentRequest.complete = true;
+                        }
                         if(progressListeners != null) {
                             progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                         }
@@ -679,13 +686,24 @@ public class NetworkManager {
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
         class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
+            private boolean edt = CN.isEdt();
             private boolean finishedWaiting;
             public void run() {
-                while(!finishedWaiting) {
-                    try {
-                        Thread.sleep(30);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
+                if (edt) {
+                    while(!finishedWaiting) {
+                        try {
+                            Thread.sleep(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                } else {
+                    while(!request.complete) {
+                        try {
+                            Thread.sleep(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
             }
@@ -712,12 +730,13 @@ public class NetworkManager {
             }
         }
         WaitingClass w = new WaitingClass();
-        addProgressListener(w);
-        addErrorListener(w);
-        addToQueue(request);
         if(Display.getInstance().isEdt()) {
+            addProgressListener(w);
+            addErrorListener(w);
+            addToQueue(request);
             Display.getInstance().invokeAndBlock(w);
         } else {
+            addToQueue(request);
             w.run();
         }
     }

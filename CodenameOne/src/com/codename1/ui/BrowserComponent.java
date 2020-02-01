@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 import java.util.Hashtable;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
@@ -274,13 +275,29 @@ public class BrowserComponent extends Container {
      * @param targetOrigin The target origin of the message.  E.g. http://example.com:1234
      * @since 7.0
      */
-    public void postMessage(String message, String targetOrigin) {
+    public void postMessage(final String message, final String targetOrigin) {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    postMessage(message, targetOrigin);
+                }
+            });
+            return;
+        }
         if (!Display.impl.postMessage(internal, message, targetOrigin)) {
             execute("window.postMessage(${0}, ${1})", new Object[]{message, targetOrigin});
         }
     }
     
     private void installMessageListener() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    installMessageListener();
+                }
+            });
+            return;
+        }
         if (!Display.impl.installMessageListener(internal)) {
            
             messageCallback = new SuccessCallback<JSRef>() {
@@ -297,7 +314,14 @@ public class BrowserComponent extends Container {
     SuccessCallback<JSRef> messageCallback;
     
     private void uninstallMessageListener() {
-        
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    uninstallMessageListener();
+                }
+            });
+            return;
+        }
         if (!Display.impl.installMessageListener(internal)) {
             //if (messageCallback != null) {
             //    removeJSCallback(messageCallback);
@@ -461,23 +485,65 @@ public class BrowserComponent extends Container {
         return shouldNavigate;
     }
     
+    private Container placeholder = new Container();
+    
+    private LinkedList<Runnable> onReady = new LinkedList<Runnable>();
+    private void onReady(final Runnable r) {
+        if (!CN.isEdt()) {
+            CN.callSerially(new Runnable() {
+                public void run() {
+                    onReady(r);
+                }
+            });
+            return;
+        }
+        onReady.add(r);
+        if (internal != null) {
+            while (!onReady.isEmpty()) {
+                onReady.remove(0).run();
+            }
+        }
+    }
+    
+    private void onReady() {
+        if (internal != null) {
+            while (!onReady.isEmpty()) {
+                onReady.remove(0).run();
+            }
+        }
+    }
     
     /**
      * This constructor will work as expected when a browser component is supported, see isNativeBrowserSupported()
      */
     public BrowserComponent() {
         setUIID("BrowserComponent");
-        PeerComponent c = Display.impl.createBrowserComponent(this);
-        setLayout(new BorderLayout());
-        addComponent(BorderLayout.CENTER, c);
-        internal = c;
-        Style s = internal.getUnselectedStyle();
-        s.setPadding(0, 0, 0, 0);
-        s.setMargin(0, 0, 0, 0);
-        s.setBgTransparency(255);
         
-        s = getUnselectedStyle();
-        s.setPadding(0, 0, 0, 0);
+        setLayout(new BorderLayout());
+        addComponent(BorderLayout.CENTER, placeholder);
+        CN.callSerially(new Runnable() {
+            public void run() {
+                PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);
+                internal = c;
+                removeComponent(placeholder);
+                addComponent(BorderLayout.CENTER, internal);
+                
+                onReady();
+                revalidateWithAnimationSafety();
+            }
+        });
+        onReady(new Runnable() {
+            public void run() {
+                Style s = internal.getUnselectedStyle();
+                s.setPadding(0, 0, 0, 0);
+                s.setMargin(0, 0, 0, 0);
+                s.setBgTransparency(255);
+
+                s = getUnselectedStyle();
+                s.setPadding(0, 0, 0, 0);
+            }
+        });
+       
         
         addWebEventListener(onStart, new ActionListener() {
             @Override
@@ -507,6 +573,16 @@ public class BrowserComponent extends Container {
         }
     }
     
+    /**
+     * Registers a callback to be run when the BrowserComponent is "ready".  The browser component
+     * is considered to be ready once the onLoad event has been fired on the first page.
+     * If this method is called after the browser component is already "ready", then the callback
+     * will be executed immediately.  Otherwise it will be called in the first onLoad event.
+     * @param onReady Callback to be executed when the browser component is ready.
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #waitForReady() 
+     */
     public BrowserComponent ready(final SuccessCallback<BrowserComponent> onReady) {
         if (ready) {
             onReady.onSucess(this);
@@ -517,6 +593,7 @@ public class BrowserComponent extends Container {
                     onReady.onSucess(BrowserComponent.this);
                 }
             };
+            addWebEventListener(onStart, l);
         }
         return this;
     }
@@ -537,7 +614,16 @@ public class BrowserComponent extends Container {
      * @param key see the documentation with the CodenameOne Implementation for further details
      * @param value see the documentation with the CodenameOne Implementation for further details
      */
-    public void setProperty(String key, Object value) {
+    public void setProperty(final String key, final Object value) {
+         if (internal == null) {
+            
+            onReady(new Runnable() {
+                public void run() {
+                    setProperty(key, value);
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserProperty(internal, key, value);
     }
 
@@ -546,6 +632,9 @@ public class BrowserComponent extends Container {
      * @return the title
      */
     public String getTitle() {
+        if (internal == null) {
+            return null;
+        }
         return Display.impl.getBrowserTitle(internal);
     }
 
@@ -554,14 +643,27 @@ public class BrowserComponent extends Container {
      * @return the URL
      */
     public String getURL() {
+        if (internal == null) {
+            return tmpUrl;
+        }
         return Display.impl.getBrowserURL(internal);
     }
 
+    private String tmpUrl;
     /**
      * Sets the page URL, jar: URL's must be supported by the implementation
      * @param url  the URL
      */
-    public void setURL(String url) {
+    public void setURL(final String url) {
+        if (internal == null) {
+            tmpUrl = url;
+            onReady(new Runnable() {
+                public void run() {
+                    setURL(url);
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserURL(internal, url);
     }
     
@@ -587,7 +689,16 @@ public class BrowserComponent extends Container {
      * @param url  the URL
      * @param headers headers to push into the request for the url
      */
-    public void setURL(String url, Map<String, String> headers) {
+    public void setURL(final String url, final Map<String, String> headers) {
+        if (internal == null) {
+            tmpUrl = url;
+            onReady(new Runnable() {
+                public void run() {
+                    setURL(url, headers);
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserURL(internal, url, headers);
     }
 
@@ -604,7 +715,19 @@ public class BrowserComponent extends Container {
      * Sets the page URL while respecting the hierarchy of the html
      * @param url  the URL
      */
-    public void setURLHierarchy(String url) throws IOException {
+    public void setURLHierarchy(final String url) throws IOException {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    try {
+                        setURLHierarchy(url);
+                    } catch (IOException ex) {
+                        Log.e(ex);
+                    }
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserPageInHierarchy(internal, url);
     }
 
@@ -612,6 +735,14 @@ public class BrowserComponent extends Container {
      * Reload the current page
      */
     public void reload() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    reload();
+                }
+            });
+            return;
+        }
         Display.impl.browserReload(internal);
     }
 
@@ -620,6 +751,9 @@ public class BrowserComponent extends Container {
      * @return true if back should work
      */
     public boolean hasBack() {
+        if (internal == null) {
+            return false;
+        }
         return Display.impl.browserHasBack(internal);
     }
 
@@ -628,6 +762,9 @@ public class BrowserComponent extends Container {
      * @return true if forward should work
      */
     public boolean hasForward() {
+        if (internal == null) {
+            return false;
+        }
         return Display.impl.browserHasForward(internal);
     }
 
@@ -635,6 +772,14 @@ public class BrowserComponent extends Container {
      * Navigates back in the history
      */
     public void back() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    back();
+                }
+            });
+            return;
+        }
         Display.impl.browserBack(internal);
     }
 
@@ -642,6 +787,14 @@ public class BrowserComponent extends Container {
      * Navigates forward in the history
      */
     public void forward() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    forward();
+                }
+            });
+            return;
+        }
         Display.impl.browserForward(internal);
     }
 
@@ -649,6 +802,14 @@ public class BrowserComponent extends Container {
      * Clears navigation history
      */
     public void clearHistory() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    clearHistory();
+                }
+            });
+            return;
+        }
         Display.impl.browserClearHistory(internal);
     }
 
@@ -658,8 +819,16 @@ public class BrowserComponent extends Container {
      * 
      * @param e true to enable pinch to zoom, false to disable it
      */
-    public void setPinchToZoomEnabled(boolean e) {
+    public void setPinchToZoomEnabled(final boolean e) {
         pinchToZoom = e;
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    setPinchToZoomEnabled(e);
+                }
+            });
+            return;
+        }
         Display.impl.setPinchToZoomEnabled(internal, e);
     }
 
@@ -677,8 +846,16 @@ public class BrowserComponent extends Container {
      * This flag allows disabling the native browser scrolling on platforms that support it
      * @param b true to enable native scrolling, notice that non-native scrolling might be problematic
      */
-    public void setNativeScrollingEnabled(boolean b) {
+    public void setNativeScrollingEnabled(final boolean b) {
         nativeScrolling = b;
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    setNativeScrollingEnabled(b);
+                }
+            });
+            return;
+        }
         Display.impl.setNativeBrowserScrollingEnabled(internal, b);
     }
     
@@ -697,7 +874,15 @@ public class BrowserComponent extends Container {
      * @param html HTML web page
      * @param baseUrl base URL to associate with the HTML
      */
-    public void setPage(String html, String baseUrl) {
+    public void setPage(final String html, final String baseUrl) {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    setPage(html, baseUrl);
+                }
+            });
+            return;
+        }
         Display.impl.setBrowserPage(internal, html, baseUrl);
     }
 
@@ -752,6 +937,14 @@ public class BrowserComponent extends Container {
      * Cancel the loading of the current page
      */
     public void stop() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    stop();
+                }
+            });
+            return;
+        }
         Display.impl.browserStop(internal);
     }
 
@@ -759,6 +952,14 @@ public class BrowserComponent extends Container {
      * Release native resources of this Browser Component
      */ 
     public void destroy() {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    destroy();
+                }
+            });
+            return;
+        }
         Display.impl.browserDestroy(internal);        
     }
     
@@ -786,7 +987,15 @@ public class BrowserComponent extends Container {
      * 
      * @param javaScript the JavaScript string
      */
-    public void execute(String javaScript) {
+    public void execute(final String javaScript) {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    execute(javaScript);
+                }
+            });
+            return;
+        }
         Display.impl.browserExecute(internal, javaScript);
     }
     
@@ -810,6 +1019,15 @@ public class BrowserComponent extends Container {
      * @return the string returned from the Javascript call
      */
     public String executeAndReturnString(String javaScript){
+        if (internal == null) {
+            while (internal == null) {
+                CN.invokeAndBlock(new Runnable() {
+                    public void run() {
+                        Util.sleep(50);
+                    }
+                });
+            }
+        }
         return Display.impl.browserExecuteAndReturnString(internal, javaScript);
     }
     
@@ -1790,7 +2008,15 @@ public class BrowserComponent extends Container {
      * @deprecated this doesn't work in most platforms see issue 459 for details, use the setBrowserNavigationCallback
      * method instead
      */
-    public void exposeInJavaScript(Object o, String name) {
+    public void exposeInJavaScript(final Object o, final String name) {
+        if (internal == null) {
+            onReady(new Runnable() {
+                public void run() {
+                    exposeInJavaScript(o, name);
+                }
+            });
+            return;
+        }
         Display.impl.browserExposeInJavaScript(internal, o, name);
     }
 

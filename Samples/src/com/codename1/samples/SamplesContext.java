@@ -89,6 +89,10 @@ public class SamplesContext {
     public File getJavaSEProjectDir() {
         return javaSEProjectDir;
     }
+    
+    public File getJavaSEJar() {
+        return new File(getJavaSEProjectDir(), "dist" + File.separator + "JavaSE.jar");
+    }
 
     /**
      * @param javaSEProjectDir the javaSEProjectDir to set

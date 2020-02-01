@@ -44,6 +44,7 @@ is divided into following sections:
     </target>
     <target depends="-pre-init,-init-private" name="-init-user">
         <property file="${user.properties.file}"/>
+        
         <!-- The two properties below are usually overridden -->
         <!-- by the active platform. Just a fallback. -->
         <property name="default.javac.source" value="1.6"/>
@@ -51,7 +52,9 @@ is divided into following sections:
     </target>
     <target depends="-pre-init,-init-private,-init-user" name="-init-project">
         <property file="nbproject/configs/${config}.properties"/>
+        <echo message="about to load project.properties ${javafx.path}"/>
         <property file="nbproject/project.properties"/>
+        <echo message="run.classpath = ${run.classpath}"/>
     </target>
     <target depends="-pre-init,-init-private,-init-user,-init-project,-init-macrodef-property" name="-do-init">
         <property name="platform.java" value="${java.home}/bin/java"/>

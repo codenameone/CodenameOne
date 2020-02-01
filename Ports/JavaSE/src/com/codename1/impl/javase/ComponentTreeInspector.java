@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
@@ -135,7 +136,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            if(currentComponent != null && !currentComponent.getUIID().equals(uiidText)) {
+                            if(currentComponent != null && !Objects.equals(currentComponent.getUIID(), uiidText)) {
                                 currentComponent.setUIID(uiidText);
                                 Display.getInstance().getCurrent().revalidate();
                             }

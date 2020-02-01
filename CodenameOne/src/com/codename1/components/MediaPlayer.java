@@ -248,7 +248,7 @@ public class MediaPlayer extends Container {
 
     private void checkProgressSlider() {
         if(progressUpdater == null) {
-            progressUpdater = UITimer.timer(1000, true, getComponentForm(),
+            progressUpdater = UITimer.timer(50, true, getComponentForm(),
                 new Runnable() {
                 public void run() {
                     float dur = video.getDuration();
@@ -519,7 +519,6 @@ public class MediaPlayer extends Container {
                 if(video == null){
                     return;
                 }
-                
                 if(!video.isPlaying()){
                     video.play();
                     checkProgressSlider();

@@ -792,6 +792,48 @@ public class LayeredLayout extends Layout {
         getOrCreateConstraint(cmp).right().referenceComponent(referenceComponent).referencePosition(position);
         return this;
     }
+    
+    /**
+     * See {@link LayeredLayoutConstraint#setPercentInsetAnchorHorizontal(float) }
+     * @param cmp
+     * @param anchor
+     * @return Self for chaining
+     */
+    public LayeredLayout setPercentInsetAnchorHorizontal(Component cmp, float anchor) {
+        getOrCreateConstraint(cmp).setPercentInsetAnchorHorizontal(anchor);
+        return this;
+    }
+    
+    /**
+     * See {@link LayeredLayoutConstraint#setPercentInsetAnchorVertical(float) }
+     * @param cmp
+     * @param anchor
+     * @return Self for chaining
+     */
+    public LayeredLayout setPercentInsetAnchorVertical(Component cmp, float anchor) {
+        getOrCreateConstraint(cmp).setPercentInsetAnchorVertical(anchor);
+        return this;
+    }
+    
+    /**
+     * See {@link LayeredLayoutConstraint#getPercentInsetAnchorHorizontal() }
+     * @param cmp
+     * @return 
+     */
+    public float getPercentInsetAnchorHorizontal(Component cmp) {
+        return getOrCreateConstraint(cmp).getPercentInsetAnchorHorizontal();
+    }
+    
+    /**
+     * See {@link LayeredLayoutConstraint#getPercentInsetAnchorVertical() }
+     * @param cmp
+     * @return 
+     */
+    public float getPercentInsetAnchorVertical(Component cmp) {
+        return getOrCreateConstraint(cmp).getPercentInsetAnchorVertical();
+    }
+
+    
     /**
      * {@inheritDoc}
      */
@@ -2014,6 +2056,50 @@ public class LayeredLayout extends Layout {
         }
         
         /**
+         * Sets the anchor used for left and right percentage insets. An anchor 
+         * of {@literal 0} points to the component's edge which is on that side 
+         * the inset refers to (e.g. in case of the left inset the left edge). 
+         * An anchor of {@literal 1} points to the edge on the opposite side.
+         * By default {@literal 0} is used as anchor.
+         * 
+         * @param anchor
+         * @return Self for chaining
+         */
+        public LayeredLayoutConstraint setPercentInsetAnchorHorizontal(float anchor) {
+            this.percAnchorH = anchor;
+            return this;
+        }
+        
+        /**
+         * Sets the anchor used for top and bottom percentage insets. An anchor 
+         * of {@literal 0} points to the component's edge which is on that side 
+         * the inset refers to (e.g. in case of the top inset the top edge). 
+         * An anchor of {@literal 1} points to the edge on the opposite side.
+         * By default {@literal 0} is used as anchor.
+         * 
+         * @param anchor
+         * @return Self for chaining
+         */
+        public LayeredLayoutConstraint setPercentInsetAnchorVertical(float anchor) {
+            this.percAnchorV = anchor;
+            return this;
+        }
+        
+        /**
+         * @return anchor used for left and right percentage insets 
+         */
+        public float getPercentInsetAnchorHorizontal() {
+            return this.percAnchorH;
+        }
+        
+        /**
+         * @return anchor used for top and bottom percentage insets
+         */
+        public float getPercentInsetAnchorVertical() {
+            return this.percAnchorV;
+        }
+        
+        /**
          * Gets the constraint itself.
          * @return 
          */
@@ -2031,6 +2117,12 @@ public class LayeredLayout extends Layout {
             new Inset(Component.RIGHT)
         };
 
+        /**
+         * Anchors used for percentage insets
+         */
+        private float percAnchorH = 0f;
+        private float percAnchorV = 0f;
+        
         //private Rectangle preferredBounds;
 
         /**
@@ -2062,6 +2154,7 @@ public class LayeredLayout extends Layout {
         public boolean dependsOn(Component cmp) {
             return getDependencies().contains(cmp);
         }
+
 
         /**
          * Encapsulates an inset.
@@ -2630,9 +2723,13 @@ public class LayeredLayout extends Layout {
                         
                         int oppositeBaseValue = oppositeInset.calcBaseValue(top, left, bottom, right);
                         if (isVerticalInset()) {
-                            calculatedValue = (int)(baseValue + (h - oppositeBaseValue - baseValue) * value / 100f);
+                            float anchorV = LayeredLayoutConstraint.this.getPercentInsetAnchorVertical(); 
+                            calculatedValue = (int)(baseValue + (h - oppositeBaseValue - baseValue) * value / 100f
+                                    - (anchorV!=0? (getOuterPreferredH(cmp) * anchorV):0));
                         } else {
-                            calculatedValue = (int)(baseValue + (w - oppositeBaseValue - baseValue) * value / 100f);
+                            float anchorH = LayeredLayoutConstraint.this.getPercentInsetAnchorHorizontal();
+                            calculatedValue = (int)(baseValue + (w - oppositeBaseValue - baseValue) * value / 100f  
+                                    - (anchorH != 0 ? (getOuterPreferredW(cmp) * anchorH) : 0));
                         }
                         break;
                     }

@@ -2277,8 +2277,17 @@ public abstract class CodenameOneImplementation {
      * @param y the position of the event
      */
     protected void pointerDragged(final int[] x, final int[] y) {
-        
-        if (dragStarted || hasDragStarted(x, y)) {
+        boolean hasDragStartedXY = false;
+        if (!dragStarted) {
+            try {
+                hasDragStartedXY = hasDragStarted(x, y);
+            } catch ( Throwable t) {
+                // Since this method may be running off the EDT
+                // It is possible that hasDragStarted will throw an NPE
+                // as the UI may be in an inconsistent state.
+            }
+        }
+        if (dragStarted || hasDragStartedXY) {
             dragStarted = true;
             Display.getInstance().pointerDragged(x, y);
         }
@@ -3615,6 +3624,29 @@ public abstract class CodenameOneImplementation {
         return Display.DENSITY_HD;
     }
 
+    /**
+     * This method returns a rectangle defining the "safe" area of the display, which excludes
+     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
+     * 
+     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
+     * is displayed on the screen near the bottom edge, and can interfere with components
+     * that are laid out at the bottom of the screen.</p>
+     * 
+     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+     * will return a rectangle that excludes the notch, and task bar regions.</p>
+     * @param rect Out parameter where safe bounds are set.
+     * @return The same rectangle that was passed as a parameter.
+     * @since 7.0
+     * @see Form#getSafeArea() 
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        rect.setBounds(0, 0, getDisplayWidth(), getDisplayHeight());
+        return rect;
+    }
+    
     /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
@@ -6373,6 +6405,8 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
+    // END TRANSFORMATION METHODS-------------------------------------------------------------------- 
+    
     public boolean isScrollWheeling() {
         return false;
     }
@@ -6593,17 +6627,169 @@ public abstract class CodenameOneImplementation {
         
     }
 
-    
+    /**
+     * Sets the read timeout of a connection.
+     * @param connection
+     * @param readTimeout 
+     * @since 7.0
+     */
+    public void setReadTimeout(Object connection, int readTimeout) {
+        
+    }
 
     
 
-    
+    /**
+     * Checks if this platform supports read timeout in network connections.
+     * @since 7.0
+     * @return True if the platform supports read timeouts.
+     */
+    public boolean isReadTimeoutSupported() {
+        return false;
+    }
 
+    // START NATIVE BROWSER WINDOW METHODS----------------------------------------
+    // These are useed by the com.codename1.ui.BrowserWindow class
+    // to provide a native implementation for a BrowserWindow.  The JavaSE port
+    // overrides these methods to provide a JavaFX implementation of a browser window.
+    // The AppleSignIn.cn1lib bundles its own implementation of a WebBrowser that it
+    // uses for logging in because JavaFX's webview doesn't seem to support Apple login.
     
+    /**
+     * Creates a native web browser window object.  Default implementation returns null.
+     * Platform may override this to return its own browser window.
+     * @param startURL The Start URL to open in the browser window.
+     * @return The browser window object, or null.
+     * @see com.codename1.ui.BrowserWindow
+     * @see #addNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #removeNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #nativeBrowserWindowAddCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #nativeBrowserWindowRemoveCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener) 
+     * @see #nativeBrowserWindowCleanup(java.lang.Object) 
+     * @see #nativeBrowserWindowHide(java.lang.Object) 
+     * @see #nativeBrowserWindowShow(java.lang.Object) 
+     * @see #nativeBrowserWindowSetTitle(java.lang.Object, java.lang.String) 
+     * @see #nativeBrowserWindowSetSize(java.lang.Object, int, int) 
+     * @see #nativeBrowserWindowEval(java.lang.Object, com.codename1.ui.BrowserWindow.EvalRequest) 
+     * @since 7.0
+     */
+    public Object createNativeBrowserWindow(String startURL) {
+        return null;
+    }
+    
+    /**
+     * Adds a load listener to a native browser window.
+     * @param window The window to add the listener to.
+     * @param l The listener
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void addNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
+        
+    }
+    
+    /**
+     * Removes a load listener from a native browser window.
+     * @param window The window from which to remove the listener.
+     * @param l The listener
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void removeNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
+        
+    }
   
-
+    /**
+     * Sets the size of a native browser window.
+     * @param window The window
+     * @param width The width in pixels.
+     * @param height The height in pixels.
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowSetSize(Object window, int width, int height) {
+        
+    }
     
-    // END TRANSFORMATION METHODS--------------------------------------------------------------------    
+    /**
+     * Sets the window title of a native browser window.
+     * @param window The window
+     * @param title The title
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowSetTitle(Object window, String title) {
+        
+    }
+    
+    /**
+     * Shows a native browser window.
+     * @param window The window
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowShow(Object window) {
+        
+    }
+    
+    /**
+     * Hides a native browser window.
+     * @param window The window
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowHide(Object window) {
+        
+    }
+    
+    /**
+     * Cleans up and disposes of a native browser window.
+     * @param window The window
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowCleanup(Object window) {
+        
+    }
+    
+    /**
+     * Evaluates javascript on native browser window.
+     * @param window The window
+     * @param req The javascript eval request.
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowEval(Object window, BrowserWindow.EvalRequest req) {
+        if (!req.isDone()) {
+            req.error(new RuntimeException("Not implemented"));
+        }
+    }
+
+    /**
+     * Adds close listener to native browser window.
+     * @param window The window.
+     * @param l The listener
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowAddCloseListener(Object window, ActionListener l) {
+        
+    }
+
+    /**
+     * Removes close listener from native browser window.
+     * @param window The window.
+     * @param l The listener
+     * @see #createNativeBrowserWindow(java.lang.String) 
+     * @since 7.0
+     */
+    public void nativeBrowserWindowRemoveCloseListener(Object window, ActionListener l) {
+        
+    }
+    
+    // END NATIVE BROWSER WINDOW METHODS--------------------------------------------------
+    
+       
     
     class RPush implements Runnable {
         public void run() {

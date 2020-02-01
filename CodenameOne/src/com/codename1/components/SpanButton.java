@@ -23,6 +23,8 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import static com.codename1.ui.CN.EAST;
+import static com.codename1.ui.CN.WEST;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
@@ -434,26 +436,24 @@ public class SpanButton extends Container {
     }
 
     @Override
-    protected Dimension calcPreferredSize() {
-        
+    public void setWidth(int width) {
         int w = getWidth();
-        int h = getHeight();
-        Dimension d = getLayout().getPreferredSize(this);
-        setWidth(d.getWidth());
-        setHeight(d.getHeight());
-        d = getLayout().getPreferredSize(this);
-        Style style = getStyle();
-        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
-            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
-            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
+        if (w != width) {
+            // We need to update the textarea width whenever we set the width
+            // so that preferred height will be calculated correctly.
+            int newTextW = width;
+            String iconPos = getIconPosition();
+            if (getIcon() != null && EAST.equals(iconPos) || WEST.equals(iconPos)) {
+                newTextW -= actualButton.getOuterWidth();
+            }
+            newTextW -= getStyle().getHorizontalPadding();
+            newTextW -= text.getStyle().getHorizontalMargins();
+            text.setWidth(newTextW);
+            super.setWidth(width);
+            setShouldCalcPreferredSize(true);
+            
         }
-        if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
-            d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
-            d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
-        }
-        setWidth(w);
-        setHeight(h);
-        return d;
+        
     }
     
     

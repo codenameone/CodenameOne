@@ -54,6 +54,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -462,6 +463,7 @@ public final class Display extends CN1Constants {
     private EventDispatcher virtualKeyboardListeners;
     
     private int lastSizeChangeEventWH = -1;
+    
 
     /**
      * Private constructor to prevent instanciation
@@ -1274,7 +1276,6 @@ public final class Display extends CN1Constants {
      * Used by the EDT to process all the calls submitted via call serially
      */
     void processSerialCalls() {
-        disableInvokeAndBlock = false;
         processingSerialCalls = true;
         int size = pendingSerialCalls.size();
         if(size > 0) {
@@ -1339,6 +1340,29 @@ public final class Display extends CN1Constants {
             disableInvokeAndBlock = true;
             try {
                 r.run();
+            } finally {
+                disableInvokeAndBlock = false;
+            }
+        }
+    }
+    
+    /**
+     * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
+     * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
+     * it will result in a {@link BlockingDisallowedException} being thrown.
+     * @param r RunnableWithResultSync to be run immediately.
+     * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
+     * anywhere in the Runnable.
+     * 
+     * @since 7.0
+     */
+    public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
+        if (disableInvokeAndBlock || !isEdt()) {
+            return r.run();
+        } else {
+            disableInvokeAndBlock = true;
+            try {
+                return r.run();
             } finally {
                 disableInvokeAndBlock = false;
             }
@@ -1479,7 +1503,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidate();
+            current.revalidateWithAnimationSafety();
             current.repaint();
             current.onShowCompletedImpl();
             return;
@@ -1527,9 +1551,12 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
+            
         }
 
         boolean transitionExists = false;
@@ -2108,6 +2135,8 @@ public final class Display extends CN1Constants {
         }        
     }
     
+    private Rectangle tmpRect = new Rectangle();
+    private Rectangle lastSizeChangedSafeArea = new Rectangle();
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2120,12 +2149,18 @@ public final class Display extends CN1Constants {
         if(current == null) {
             return;
         }
+        impl.getDisplaySafeArea(tmpRect);
         if(w == current.getWidth() && h == current.getHeight()) {
             // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == current.getWidth() + current.getHeight()) {
-                return;            
+            if (lastSizeChangedSafeArea.equals(tmpRect)) {
+                if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
+                    return;            
+                }
             }
         }
+        
+        
+        lastSizeChangedSafeArea.setBounds(tmpRect);
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
