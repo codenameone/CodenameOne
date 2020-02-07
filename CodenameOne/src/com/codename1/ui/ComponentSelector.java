@@ -284,6 +284,7 @@ import java.util.Set;
  *     <li>{@code $(".my-tag").getComponentAt(4)} - The set of 5th child components of containers with tag ".my-tag".</li>
  * </ul>
  * 
+ * @see <a href="https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html">jQuery/CSS Style Selectors for Codename One</a>
  * @author shannah
  */
 public class ComponentSelector implements Iterable<Component>, Set<Component> {
