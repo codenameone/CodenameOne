@@ -30,6 +30,7 @@ import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -58,7 +59,7 @@ import java.util.ArrayList;
  *
  * @author Chen Fishbein
  */
-public class TextArea extends Component {
+public class TextArea extends Component implements ActionSource {
     private static int defaultValign = TOP;
 
     /**

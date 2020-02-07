@@ -30,6 +30,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -47,7 +48,7 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container {
+public class SpanButton extends Container implements ActionSource {
 
     private Button actualButton;
     private TextArea text;

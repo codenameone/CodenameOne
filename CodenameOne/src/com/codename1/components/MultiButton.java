@@ -31,6 +31,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -49,7 +50,7 @@ import java.util.Vector;
  * @see SpanButton
  * @author Shai Almog
  */
-public class MultiButton extends Container {
+public class MultiButton extends Container implements ActionSource {
     private Label firstRow = new Label("MultiButton");
     private Label secondRow = new Label();
     private Label thirdRow = new Label();

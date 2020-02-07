@@ -28,6 +28,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ import java.util.Vector;
  * 
  * @author Chen Fishbein
  */
-public class Button extends Label implements ReleasableComponent {
+public class Button extends Label implements ReleasableComponent, ActionSource {
     /**
      * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
      */

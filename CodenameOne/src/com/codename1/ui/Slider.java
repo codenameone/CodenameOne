@@ -26,6 +26,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -55,7 +56,7 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * @author Shai Almog
  */
-public class Slider extends Label {
+public class Slider extends Label implements ActionSource {
     private int value;
     private int maxValue = 100;
     private int minValue = 0;

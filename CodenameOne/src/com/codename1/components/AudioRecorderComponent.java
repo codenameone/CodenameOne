@@ -36,6 +36,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -50,7 +51,7 @@ import java.io.IOException;
  * @author shannah
  * @since 7.0
  */
-public class AudioRecorderComponent extends Container {
+public class AudioRecorderComponent extends Container implements ActionSource {
     private Media media;
     private Button record, pause, done;
     private Label recordingInProgress, recordingOff;
