@@ -2092,6 +2092,10 @@ public class TextArea extends Component {
     public void stopEditing(Runnable onFinish) {
         if(isEditing()) {
             Display.getInstance().stopEditing(this, onFinish);
+        } else {
+            if (onFinish != null) {
+                onFinish.run();
+            }
         }
     }
 

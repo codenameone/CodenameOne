@@ -5070,7 +5070,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public void keyReleased(KeyEvent e) {
                 if(e.getKeyCode() == KeyEvent.VK_TAB) {
-                    TextEditUtil.editNextTextArea();
+                    if (e.isShiftDown()) {
+                        TextEditUtil.editPrevTextArea();
+                    } else {
+                        TextEditUtil.editNextTextArea();
+                    }
                 }
             }
         });
