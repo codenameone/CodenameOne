@@ -1887,6 +1887,27 @@ public class Container extends Component implements Iterable<Component>{
         int absY = getAbsoluteY();
         int h = getHeight();
         int absY2 = absY + h;
+        
+        // Check for negative coordinates.  If the any of the bounds
+        // of the component are off screen, then we'll assume that their position
+        // is intentional, and we don't want to kludge it into the safe area.
+        // This is an heuristic in search of a perfect solution.  
+        // https://github.com/codenameone/CodenameOne/issues/3023
+        if (absY < 0) {
+            return false;
+        }
+        
+        if (absX < 0) {
+            return false;
+        }
+        
+        if (absX2 > CN.getDisplayWidth()) {
+            return false;
+        }
+        
+        if (absY2 > CN.getDisplayHeight()) {
+            return false;
+        }
 
         if (absY + paddingTop < safeY1) {
             newPaddingTop = safeY1 - absY;
@@ -1897,19 +1918,15 @@ public class Container extends Component implements Iterable<Component>{
         boolean changed = false;
         if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
             if (!hasScrollableYParentInternal()) {
-                //setY(getY() + newPaddingTop - paddingTop);
-                //setHeight(getHeight() - (newPaddingTop + newPaddingBottom - paddingTop - paddingBottom));
                 changed = true;
                 
                 if (newPaddingTop != paddingTop) {
                     style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingTop(newPaddingTop);
-                    System.out.println("Changing top padding "+newPaddingTop);
                 }
                 if (newPaddingBottom != paddingBottom) {
                     style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingBottom(newPaddingBottom);
-                    System.out.println("Changing bottom padding "+newPaddingBottom);
                 }
                
             }   
@@ -1917,8 +1934,6 @@ public class Container extends Component implements Iterable<Component>{
         
         if (newPaddingLeft != paddingLeft || newPaddingRight != paddingRight) {
             if (!hasScrollableXParentInternal()) {
-                //setX(getX() + newPaddingLeft - paddingLeft);
-                //setWidth(getWidth() - (newPaddingLeft + newPaddingRight - paddingLeft - paddingRight));
                 changed = true;
                 
                 if (newPaddingLeft != paddingLeft) {
