@@ -341,7 +341,17 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                             } else {
                                 List l = (List)val;
                                 if(!l.isEmpty()) {
-                                    if(l.get(0) instanceof PropertyBusinessObject || p.getGenericType() == null) {
+                                    if(l.get(0) instanceof PropertyBusinessObject 
+                                            || l.get(0) instanceof String 
+                                            || l.get(0) instanceof Character 
+                                            || l.get(0) instanceof Boolean 
+                                            || l.get(0) instanceof Integer
+                                            || l.get(0) instanceof Long
+                                            || l.get(0) instanceof Float
+                                            || l.get(0) instanceof Double
+                                            || l.get(0) instanceof Byte
+                                            || l.get(0) instanceof Short
+                                            || p.getGenericType() == null) {
                                         ((CollectionProperty)p).set((Collection)val);
                                     } else {
                                         Class eType = p.getGenericType();
