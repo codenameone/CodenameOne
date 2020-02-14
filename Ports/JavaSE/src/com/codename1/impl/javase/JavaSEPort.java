@@ -2608,7 +2608,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
         }
-        System.out.println("Getting safe area "+rect);
         return rect;
     }
     
@@ -5022,7 +5021,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             textCmp = swingT;
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()); 
+            JTextArea t = new JTextArea(); 
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
@@ -5040,6 +5039,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             };
+            if (ta.isGrowByContent()) {
+                pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            }
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
@@ -5048,6 +5050,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             // Commenting these out for better usability - at least on OS X.
             //pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             //pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            
+            
             textCmp = pane;
         }
         if (cmp.isRTL()) {
@@ -5181,10 +5185,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             private final JTextComponent textCmp;
             private final JComponent swingComponentToRemove;
             private boolean performed;
+            private boolean fireDone;
             
             Listener(JTextComponent textCmp, JComponent swingComponentToRemove) {
                 this.textCmp = textCmp;
                 this.swingComponentToRemove = swingComponentToRemove;
+                if (textCmp instanceof JTextArea) {
+                    if (((com.codename1.ui.TextArea)cmp).getDoneListener() != null) {
+                        InputMap input = textCmp.getInputMap();
+                        KeyStroke enter = KeyStroke.getKeyStroke("ENTER");
+                        KeyStroke shiftEnter = KeyStroke.getKeyStroke("shift ENTER");
+                        input.put(shiftEnter, "insert-break");  // input.get(enter)) = "insert-break"
+                        input.put(enter, "text-submit");
+
+                        ActionMap actions = textCmp.getActionMap();
+                        actions.put("text-submit", new AbstractAction() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                fireDone = true;
+                                Listener.this.actionPerformed(null);
+                            }
+                        });
+                    }
+                }
+                
             }
             public void run() {
                 while (swingComponentToRemove.getParent() != null) {
@@ -5212,8 +5236,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     testRecorder.editTextFieldCompleted(cmp, txt);
                 }
                 Display.getInstance().onEditingComplete(cmp, txt);
-                if (e != null && cmp instanceof com.codename1.ui.TextField) {
-                    final com.codename1.ui.TextField cn1Tf = (com.codename1.ui.TextField)cmp;
+                if (e != null && cmp instanceof com.codename1.ui.TextField || fireDone) {
+                    final com.codename1.ui.TextArea cn1Tf = (com.codename1.ui.TextArea)cmp;
                     if (cmp != null && cn1Tf.getDoneListener() != null) {
                         cn1Tf.fireDoneEvent();
                     }
@@ -5254,7 +5278,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 if (t.length() >= ((TextArea) cmp).getMaxSize()) {
                     e.consume();
-                }
+                } 
             }
 
             public void keyPressed(KeyEvent e) {
@@ -5280,7 +5304,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                     return;
-                }
+                }  
             }
 
             public void textValueChanged(TextEvent e) {

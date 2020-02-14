@@ -658,11 +658,11 @@ public class Container extends Component implements Iterable<Component>{
      * @return the layout width
      */
     public int getLayoutWidth() {
-        if (isScrollableX()) {
+        if (scrollableX) {
             return Math.max(getWidth(), getPreferredW());
         } else {
-            Container parent = getScrollableParent();
-            if (parent != null && parent.isScrollableX()) {
+            Container parent = getScrollableParentX();
+            if (parent != null && parent.scrollableX) {
                 return Math.max(getWidth(), getPreferredW());
             }
             int width = getWidth();
@@ -683,7 +683,7 @@ public class Container extends Component implements Iterable<Component>{
         if (scrollableY) {
             return Math.max(getHeight(), getPreferredH());
         } else {
-            Container parent = getScrollableParent();
+            Container parent = getScrollableParentY();
             if (parent != null && parent.scrollableY) {
                 return Math.max(getHeight(), getPreferredH());
             }
@@ -716,21 +716,81 @@ public class Container extends Component implements Iterable<Component>{
 
 
     /**
-     * Returns a parent container that is scrollable or null if no parent is 
+     * Returns a parent container that is scrollableX or null if no parent is 
      * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutWidth()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
      * 
      * @return a parent container that is scrollable or null if no parent is 
      * scrollable.
      */
-    private Container getScrollableParent() {
+    private Container getScrollableParentX() {
         Container parent = getParent();
         while (parent != null) {
-            if (parent.isScrollable()) {
+            if (parent.scrollableX && !parent.constrainWidthWhenScrollable()) {
                 return parent;
             }
             parent = parent.getParent();
         }
         return null;
+    }
+    
+    /**
+     * Returns a parent container that is scrollableY or null if no parent is 
+     * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutHeight()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
+     * 
+     * @return a parent container that is scrollable or null if no parent is 
+     * scrollable.
+     */
+    private Container getScrollableParentY() {
+        Container parent = getParent();
+        while (parent != null) {
+            if (parent.scrollableY && !parent.constrainHeightWhenScrollable()) {
+                return parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+    
+    
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable X.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainWidthWhenScrollable() {
+        return false;
+    }
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable Y.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainHeightWhenScrollable() {
+        return false;
     }
 
     /**

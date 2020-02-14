@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.compat.java.util.Objects;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.Span;
@@ -31,6 +32,7 @@ import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -60,6 +62,9 @@ import java.util.ArrayList;
  * @author Chen Fishbein
  */
 public class TextArea extends Component implements ActionSource {
+    private EventDispatcher listeners = new EventDispatcher();
+    private ActionListener doneListener;
+    
     private static int defaultValign = TOP;
 
     /**
@@ -502,7 +507,9 @@ public class TextArea extends Component implements ActionSource {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
         }
-        
+        if (!Objects.equals(text, old)) {
+            fireDataChanged(DataChangedListener.CHANGED, -1);
+        }
         // while native editing we don't need the cursor animations
         if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
             if (!text.equals(old)) {
@@ -2111,6 +2118,97 @@ public class TextArea extends Component implements ActionSource {
             return getSelectedStyle();
         }
         return super.getStyle(); 
+    }
+    
+    /**
+     * Adds a listener for data change events it will be invoked for every change
+     * made to the text field, notice most platforms will invoke only the 
+     * DataChangedListener.CHANGED event
+     * 
+     * @param d the listener
+     */
+    public void addDataChangedListener(DataChangedListener d) {
+        listeners.addListener(d);
+    }
+
+    /**
+     * Removes the listener for data change events 
+     * 
+     * @param d the listener
+     */
+    public void removeDataChangedListener(DataChangedListener d) {
+        listeners.removeListener(d);
+    }
+    
+    /**
+     * Adds a listener for data change events it will be invoked for every change
+     * made to the text field, notice most platforms will invoke only the 
+     * DataChangedListener.CHANGED event
+     * 
+     * @param d the listener
+     * @deprecated use #addDataChangedListener(DataChangedListener) instead
+     */
+    public void addDataChangeListener(DataChangedListener d) {
+        listeners.addListener(d);
+    }
+
+    /**
+     * Removes the listener for data change events 
+     * 
+     * @param d the listener
+     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
+     */
+    public void removeDataChangeListener(DataChangedListener d) {
+        listeners.removeListener(d);
+    }
+    
+    /**
+     * Alert the TextField listeners the text has been changed on the TextField
+     * @param type the event type: Added, Removed or Change
+     * @param index cursor location of the event
+     */
+    public void fireDataChanged(int type, int index) {
+        if(listeners != null) {
+            listeners.fireDataChangeEvent(index, type);
+        }
+    }
+    
+
+    /**
+     * Sets a Done listener on the TextField - notice this listener will be called
+     * only on supported platforms that supports done action on the keyboard
+     * 
+     * @param l the listener
+     */
+    public void setDoneListener(ActionListener l) {
+        doneListener = l;
+    }
+
+    /**
+     * Gets the done listener of this TextField.
+     * 
+     * @return the done listener or null if not exists
+     */ 
+    public ActionListener getDoneListener() {
+        return doneListener;
+    }
+    
+    /**
+     * Fire the done event to done listener
+     */ 
+    public void fireDoneEvent() {
+        if (doneListener != null) {
+            if (!Display.getInstance().isEdt()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    
+                    public void run() {
+                        fireDoneEvent();
+                    }
+                });
+                return;
+            }
+            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
+        }
     }
 
     /**

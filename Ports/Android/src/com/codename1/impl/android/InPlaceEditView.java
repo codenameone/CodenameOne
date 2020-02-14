@@ -1144,10 +1144,9 @@ public class InPlaceEditView extends FrameLayout{
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
         if (reason == REASON_IME_ACTION
-                && mEditText.mTextArea instanceof TextField
                 && ((TextField) mEditText.mTextArea).getDoneListener() != null
                 && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
-            ((TextField) mEditText.mTextArea).fireDoneEvent();
+            ((TextArea) mEditText.mTextArea).fireDoneEvent();
 
         }
         
