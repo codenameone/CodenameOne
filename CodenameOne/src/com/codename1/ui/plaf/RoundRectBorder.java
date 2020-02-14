@@ -64,6 +64,32 @@ public class RoundRectBorder extends Border {
 
     
     /**
+     * Var to explicitly set the position of the arrow when tracking a component. Values
+     * between 0 and 1, with zero being the Top, and 1 being the bottom.  Default negative
+     * value indicates that it should just calculate the position as normal, suing the
+     * the provided tracking component bounds.
+     * @since 7.0
+     */
+    private float trackComponentVerticalPosition = -1;
+    
+    /**
+     * Var to explicitly set the position of the arrow when tracking a component. Values
+     * between 0 and 1, with zero being the left, and 1 being the right.  Default negative
+     * value indicates that it should just calculate the position as normal, suing the
+     * the provided tracking component bounds.
+     * @since 7.0
+     */
+    private float trackComponentHorizontalPosition = -1;
+    
+    /**
+     * Var to explicitly set the position of the arrow when tracking a component. Acceptable
+     * values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, {@link Component#RIGHT}.
+     * @since 7.0
+     */
+    private int trackComponentSide = -1;
+    
+    
+    /**
      * The thickness of the edge of the border if applicable, 0 if no stroke is needed
      */
     private float strokeThickness;
@@ -121,7 +147,9 @@ public class RoundRectBorder extends Border {
 
     private int arrowPosition = -1;
     private int arrowDirection = -1;
-    private float arrowSize = 3;
+    
+    
+    private float arrowSize = 1.5f;
     
     private RoundRectBorder() {
         shadowSpread = Display.getInstance().convertToPixels(0.2f);
@@ -138,6 +166,15 @@ public class RoundRectBorder extends Border {
     }
     
     /**
+     * Change the size of the arrow used for component tracking.
+     * @param size Size of arrow in millimeters.
+     * @since 7.0
+     */
+    public void setArrowSize(float size) {
+        this.arrowSize = size;
+    }
+    
+    /**
      * Sets the opacity of the stroke line around the border
      * @param strokeOpacity the opacity from 0-255 where 255 is completely opaque 
      * @return border instance so these calls can be chained
@@ -149,6 +186,76 @@ public class RoundRectBorder extends Border {
         }
         return this;
     }
+    
+    /**
+     * Explicitly positions the arrow used for component tracking to a particular
+     * side of the border. This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * Use in conjunction with {@link #trackComponentHorizontalPosition(float) }, and {@link #trackComponentHorizontalPosition}.
+     * @param side The side to place the tracking arrow on.  Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT},
+     * or {@link Component#BOTTOM}.  Set negative value for default behaviour, which is to just calculate the arrow position
+     * based on the tracking component bounds.
+     * @return Self for chaining.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentSide(int side) {
+        this.trackComponentSide = side;
+        return this;
+    }
+    
+    /**
+     * Gets the side that the tracking component should be displayed on if using explicit placement. 
+     * @return The side that the arrow should be rendered on. Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, or a negative number to indicate that the position will be calculated based on the position of the tracking component.
+     * or {@link Component#BOTTOM}. 
+     * @since 7.0
+     */
+    public int getTrackComponentSide() {
+        return trackComponentSide;
+    }
+    
+    /**
+     * Explicitly sets the vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @return Self for chainging.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentVerticalPosition(float pos) {
+        this.trackComponentVerticalPosition = pos;
+        return this;
+    }
+    
+    /**
+     * Gets the explicitly set vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @since 7.0
+     */
+    public float getTrackComponentVerticalPosition() {
+        return trackComponentVerticalPosition;
+    }
+    
+    /**
+     * Explicitly sets the horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @return Self for chainging.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentHorizontalPosition(float pos) {
+        this.trackComponentHorizontalPosition = pos;
+        return this;
+    }
+    
+    /**
+     * Gets the explicitly set horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @since 7.0
+     */
+    public float getTrackComponentHorizontalPosition() {
+        return trackComponentHorizontalPosition;
+    }
+    
     
     /**
      * Sets the stroke color of the border
@@ -497,7 +604,7 @@ public class RoundRectBorder extends Border {
                 arrowDirection = CN.TOP;
                 arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
             } else {    
-                if(cabsY + c.getHeight() <= trackY) {
+                if(trackComponentSide == CN.BOTTOM || cabsY + c.getHeight() <= trackY) {
                     // we are above the component
                     arrowDirection = CN.BOTTOM;
                     arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
@@ -514,6 +621,35 @@ public class RoundRectBorder extends Border {
                         }
                     }
                 }
+            }
+        } else if (trackComponentSide >= 0) {
+            switch (trackComponentSide) {
+                case CN.TOP:
+                    arrowDirection = CN.TOP;
+                    arrowPosition = 0;
+                    if (trackComponentHorizontalPosition >= 0) {
+                        arrowPosition = (int)(c.getWidth() * trackComponentHorizontalPosition);
+                    }   break;
+                case CN.BOTTOM:
+                    arrowDirection = CN.BOTTOM;
+                    arrowPosition = 0;
+                    if (trackComponentHorizontalPosition >= 0) {
+                        arrowPosition = (int)(c.getWidth() * trackComponentHorizontalPosition);
+                    }   break;
+                case CN.LEFT:
+                    arrowDirection = CN.LEFT;
+                    arrowPosition = 0;
+                    if (trackComponentVerticalPosition >= 0) {
+                        arrowPosition = (int)(c.getHeight() * trackComponentVerticalPosition);
+                    }   break;
+                case CN.RIGHT:
+                    arrowDirection = CN.RIGHT;
+                    arrowPosition = 0;
+                    if (trackComponentVerticalPosition >= 0) {
+                        arrowPosition = (int)(c.getHeight() * trackComponentVerticalPosition);
+                    }   break;
+                default:
+                    break;
             }
         }
         
@@ -595,7 +731,7 @@ public class RoundRectBorder extends Border {
         float widthF = shapeW;
         float heightF = shapeH;
         
-        if(getTrackComponent() != null) {
+        if(getTrackComponent() != null || trackComponentSide >= 0) {
             int ah = CN.convertToPixels(arrowSize);
             switch(arrowDirection) {
                 case CN.TOP:
@@ -634,7 +770,7 @@ public class RoundRectBorder extends Border {
         } else {
             gp.moveTo(x, y);            
         }
-        if(getTrackComponent() != null && arrowDirection == CN.TOP) {
+        if((trackComponentSide >= 0 || getTrackComponent() != null) && arrowDirection == CN.TOP) {
             int actualArrowPosition = (int)
                 Math.min(x + widthF,
                     Math.max(arrowPosition, x + radius));
@@ -655,30 +791,16 @@ public class RoundRectBorder extends Border {
             }
         }
         
-        if(getTrackComponent() != null && arrowDirection == CN.RIGHT) {
-            int actualArrowPosition = (int)
-                Math.min(y,
-                    Math.max(arrowPosition, y + heightF - radius));
-
-            gp.lineTo(x + widthF, actualArrowPosition);
-            
-            int ah = CN.convertToPixels(arrowSize);
-            gp.lineTo(x + widthF + ah - 4, actualArrowPosition + ah / 2 - 4);
-            gp.quadTo(x + widthF + ah - 4, actualArrowPosition + ah / 2, x + widthF + ah - 4, actualArrowPosition + ah / 2 + 4);
-            gp.lineTo(x + widthF, actualArrowPosition + ah);            
-            
-            gp.lineTo(x + widthF, y + heightF - radius);            
+        if(bottomRight) {
+            gp.lineTo(x + widthF, y + heightF - radius);
             gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
         } else {
-            if(bottomRight) {
-                gp.lineTo(x + widthF, y + heightF - radius);
-                gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
-            } else {
-                gp.lineTo(x + widthF, y + heightF);
-            }
+            gp.lineTo(x + widthF, y + heightF);
         }
         
-        if(getTrackComponent() != null && arrowDirection == CN.BOTTOM) {
+        
+        
+        if((trackComponentSide >= 0 || getTrackComponent() != null) && arrowDirection == CN.BOTTOM) {
             int actualArrowPosition = (int)
                 Math.min(x + widthF,
                     Math.max(arrowPosition, x + radius));
@@ -699,30 +821,42 @@ public class RoundRectBorder extends Border {
             }
         }
         
-        if(getTrackComponent() != null && arrowDirection == CN.LEFT) {
-            int actualArrowPosition = (int)
-                Math.min(y,
-                    Math.max(arrowPosition, y + heightF - radius));
-
-            gp.lineTo(x, actualArrowPosition);
-            
-            int ah = CN.convertToPixels(arrowSize);
-            gp.lineTo(4, actualArrowPosition + ah / 2 - 4);
-            gp.quadTo(4, actualArrowPosition + ah / 2, 4, actualArrowPosition + ah / 2 + 4);
-            gp.lineTo(x + widthF, actualArrowPosition + ah);            
-            
+        
+        if(topLeft) {
             gp.lineTo(x, y + radius);
             gp.quadTo(x, y, x + radius, y);
         } else {
-            if(topLeft) {
-                gp.lineTo(x, y + radius);
-                gp.quadTo(x, y, x + radius, y);
-            } else {
-                gp.lineTo(x, y);            
-            }
+            gp.lineTo(x, y);            
         }
         
-        gp.closePath();            
+        
+        gp.closePath();  
+        
+        if((trackComponentSide >= 0 || getTrackComponent() != null) && arrowDirection == CN.LEFT) {
+            int ah = CN.convertToPixels(arrowSize);
+            int actualArrowPosition = (int)
+                Math.max(y,
+                    Math.min(arrowPosition, y + heightF - radius - 4));
+
+            gp.moveTo(0, actualArrowPosition);
+            gp.lineTo(x, actualArrowPosition - ah / 2);
+            gp.lineTo(x, actualArrowPosition + ah/2); 
+            gp.lineTo(0, actualArrowPosition);
+            gp.closePath();
+        }
+        if((trackComponentSide >= 0 || getTrackComponent() != null) && arrowDirection == CN.RIGHT) {
+            int ah = CN.convertToPixels(arrowSize);
+            int actualArrowPosition = (int)
+                Math.max(y,
+                    Math.min(arrowPosition, y + heightF - radius - 4));
+
+            gp.moveTo(x + widthF + ah, actualArrowPosition);
+            gp.lineTo(x + widthF, actualArrowPosition + ah/2);
+            gp.lineTo(x + widthF, actualArrowPosition - ah/2);
+            gp.lineTo(x + widthF + ah, actualArrowPosition);
+            gp.closePath();
+            
+        } 
         return gp;
     }
 
@@ -933,6 +1067,16 @@ public class RoundRectBorder extends Border {
         if (this.cornerRadius != other.cornerRadius) {
             return false;
         }
+        if (this.trackComponentHorizontalPosition != other.trackComponentHorizontalPosition) {
+            return false;
+        }
+        if (this.trackComponentVerticalPosition != other.trackComponentVerticalPosition) {
+            return false;
+        }
+        
+        if (this.trackComponentSide != other.trackComponentSide) {
+            return false;
+        }
         return true;
     }
 
@@ -956,6 +1100,9 @@ public class RoundRectBorder extends Border {
         hash = 79 * hash + (this.bottomLeft ? 1 : 0);
         hash = 79 * hash + (this.bottomRight ? 1 : 0);
         hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
+        hash = 79 * hash + trackComponentSide;
+        hash = 79 * hash + Float.floatToIntBits(this.trackComponentVerticalPosition);
+        hash = 79 * hash + Float.floatToIntBits(this.trackComponentHorizontalPosition);
         return hash;
     }
 
