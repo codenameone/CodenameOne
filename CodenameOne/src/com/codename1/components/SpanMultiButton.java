@@ -1139,6 +1139,46 @@ public class SpanMultiButton extends Container implements ActionSource {
     public void setGroup(ButtonGroup bg) {
         bg.add((RadioButton)emblem);
     }
+
+    /**
+     * Removes the content of the row
+     * 
+     * @param t text to set
+     */
+    public void removeTextLine1() {
+        firstRow.setText("");
+        firstRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     * 
+     * @param t text to set
+     */
+    public void removeTextLine2() {
+        secondRow.setText("");
+        secondRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     * 
+     * @param t text to set
+     */
+    public void removeTextLine3() {
+        thirdRow.setText("");
+        thirdRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     * 
+     * @param t text to set
+     */
+    public void removeTextLine4() {
+        forthRow.setText("");
+        forthRow.setHidden(true);
+    }
     
     
 }
