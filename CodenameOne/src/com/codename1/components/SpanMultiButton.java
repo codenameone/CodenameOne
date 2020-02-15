@@ -1142,8 +1142,6 @@ public class SpanMultiButton extends Container implements ActionSource {
 
     /**
      * Removes the content of the row
-     * 
-     * @param t text to set
      */
     public void removeTextLine1() {
         firstRow.setText("");
@@ -1152,8 +1150,6 @@ public class SpanMultiButton extends Container implements ActionSource {
     
     /**
      * Removes the content of the row
-     * 
-     * @param t text to set
      */
     public void removeTextLine2() {
         secondRow.setText("");
@@ -1162,8 +1158,6 @@ public class SpanMultiButton extends Container implements ActionSource {
     
     /**
      * Removes the content of the row
-     * 
-     * @param t text to set
      */
     public void removeTextLine3() {
         thirdRow.setText("");
@@ -1172,8 +1166,6 @@ public class SpanMultiButton extends Container implements ActionSource {
     
     /**
      * Removes the content of the row
-     * 
-     * @param t text to set
      */
     public void removeTextLine4() {
         forthRow.setText("");
