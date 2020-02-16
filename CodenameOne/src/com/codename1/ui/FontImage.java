@@ -6876,6 +6876,31 @@ public class FontImage extends Image {
         }
         return false;
     }
+    
+    /**
+     * Helper method that generalizes icon setting code for various component types
+     * @param cmp the component, currently supports Labels, MultiButton &amp; SpanButton. If the type isn't supported 
+     * this method return false
+     * @param icons icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon.
+     * @param size the size of the icon
+     * @return false if the type isn't supported
+     * @since 7.0
+     */
+    public static boolean setMaterialIcon(Component cmp, char[] icons, float size) {
+        if(cmp instanceof Label) {
+            setMaterialIcon((Label)cmp, icons, size);
+            return true;
+        }
+        if(cmp instanceof MultiButton) {
+            setMaterialIcon((MultiButton)cmp, icons, size);
+            return true;
+        }
+        if(cmp instanceof SpanButton) {
+            setMaterialIcon((SpanButton)cmp, icons, size);
+            return true;
+        }
+        return false;
+    }
 
         /**
      * <p>Applies an icon from the font to the given label using the 
@@ -6922,6 +6947,49 @@ public class FontImage extends Image {
         }
     }
     
+    /**
+     * <p>Applies icon font from the font to the given label using the styling of the label.</p>
+     * @param l The label or subclass(e.g. Button etc.)
+     * @param font The font with icons.
+     * @param icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon,
+     * in the list for the remaining expected icons.
+     * @param size The font size.
+     * @since 7.0
+     */
+    public static void setFontIcon(Label l, Font font, char[] icons, float size) {
+        Style s = new Style(l.getUnselectedStyle());
+        s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
+        l.setIcon(FontImage.create("" + icons[0], s));
+        if (l instanceof Button) {
+            Button b = (Button) l;
+            Style sel = b.getSelectedStyle();
+            Style pre = b.getPressedStyle();
+            Style dis = b.getDisabledStyle();
+            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                b.setRolloverIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
+            } else {
+                b.setRolloverIcon(null);
+            }
+            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
+                b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(3, icons.length-1)], pre));
+            } else {
+                b.setPressedIcon(null);
+            }
+            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                b.setDisabledIcon(FontImage.create("" + icons[Math.min(4, icons.length-1)], dis));
+            } else {
+                b.setDisabledIcon(null);
+            }
+        }
+    }
+    
     public static void setFontIcon(Label l, Font font, char icon) {
         setFontIcon(l, font, icon, -1);
     }
@@ -6933,12 +7001,26 @@ public class FontImage extends Image {
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * 
      * @param l a label or subclass (e.g. Button etc.)
-     * @param font a font with icons
      * @param icon an icon in the font
      * @param size the size of the icon in millimeters, or -1 to use the default height of the font
     */
     public static void setMaterialIcon(Label l, char icon, float size) {
         setFontIcon(l, getMaterialDesignFont(), icon, size);
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * 
+     * @param l a label or subclass (e.g. Button etc.)
+     * @param icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon.
+     * @param size the size of the icon in millimeters, or -1 to use the default height of the font
+     * @since 7.0
+    */
+    public static void setMaterialIcon(Label l, char[] icons, float size) {
+        setFontIcon(l, getMaterialDesignFont(), icons, size);
     }
 
 
