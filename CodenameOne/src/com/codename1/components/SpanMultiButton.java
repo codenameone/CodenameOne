@@ -30,6 +30,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
@@ -51,14 +52,15 @@ import com.codename1.ui.plaf.UIManager;
  * @author Francesco Galgani
  */
 public class SpanMultiButton extends Container implements ActionSource {
-    private SpanLabel firstRow = new SpanLabel();
-    private SpanLabel secondRow = new SpanLabel();
-    private SpanLabel thirdRow = new SpanLabel();
-    private SpanLabel forthRow = new SpanLabel();
-    private Label icon = new Label();
+    private final TextArea firstRow = new TextArea();
+    private final TextArea secondRow = new TextArea();
+    private final TextArea thirdRow = new TextArea();
+    private final TextArea forthRow = new TextArea();
+    private final Label icon = new Label();
     private Button emblem = new Button();
     private boolean invert;
     private String group;  
+    private boolean shouldLocalize;
     
     /**
      * Initializes a multibutton with the first line of text
@@ -73,9 +75,36 @@ public class SpanMultiButton extends Container implements ActionSource {
      * Default constructor allowing the designer to create an instance of this class
      */
     public SpanMultiButton() {
+        setUIID("MultiButton");
+        
+        firstRow.setActAsLabel(true);
+        firstRow.setGrowByContent(true);
+        firstRow.setUIID("MultiLine1");
+        firstRow.setEditable(false);
+        firstRow.setFocusable(false);
+        
+        secondRow.setActAsLabel(true);
+        secondRow.setGrowByContent(true);
+        secondRow.setUIID("MultiLine2");
+        secondRow.setEditable(false);
+        secondRow.setFocusable(false);
+        
+        thirdRow.setActAsLabel(true);
+        thirdRow.setGrowByContent(true);
+        thirdRow.setUIID("MultiLine3");
+        thirdRow.setEditable(false);
+        thirdRow.setFocusable(false);
+        
+        forthRow.setActAsLabel(true);
+        forthRow.setGrowByContent(true);
+        forthRow.setUIID("MultiLine4");
+        forthRow.setEditable(false);
+        forthRow.setFocusable(false);
+        
         secondRow.setHidden(true);
         thirdRow.setHidden(true);
         forthRow.setHidden(true);
+        
         setLayout(new BorderLayout());
         setFocusable(true);
         BorderLayout bl = new BorderLayout();
@@ -96,10 +125,6 @@ public class SpanMultiButton extends Container implements ActionSource {
         labels.addComponent(secondRow);
         labels.addComponent(thirdRow);
         labels.addComponent(forthRow);
-        firstRow.setTextUIID("MultiLine1");
-        secondRow.setTextUIID("MultiLine2");
-        thirdRow.setTextUIID("MultiLine3");
-        forthRow.setTextUIID("MultiLine4");
         firstRow.setName("Line1");
         secondRow.setName("Line2");
         thirdRow.setName("Line3");
@@ -108,7 +133,6 @@ public class SpanMultiButton extends Container implements ActionSource {
         emblem.setName("emblem");
         emblem.setUIID("Emblem");
         setLeadComponent(emblem);
-        setUIID("MultiButton");
         Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
         if(i != null) {
             emblem.setIcon(i);
@@ -429,7 +453,9 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t text to set
      */
     public void setTextLine1(String t) {
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
         firstRow.setText(t);
+        firstRow.setColumns(t.length() + 1);
         firstRow.setHidden(false);
     }
     
@@ -466,7 +492,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t UIID to set
      */
     public void setUIIDLine1(String t) {
-        firstRow.setTextUIID(t);
+        firstRow.setUIID(t);
     }
     
     /**
@@ -475,7 +501,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @return the UIID 
      */
     public String getUIIDLine1() {
-        return firstRow.getTextUIID();
+        return firstRow.getUIID();
     }
 
     /**
@@ -484,7 +510,9 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t text to set
      */
     public void setTextLine2(String t) {
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
         secondRow.setText(t);
+        secondRow.setColumns(t.length() + 1);
         secondRow.setHidden(false);
     }
     
@@ -521,7 +549,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t UIID to set
      */
     public void setUIIDLine2(String t) {
-        secondRow.setTextUIID(t);
+        secondRow.setUIID(t);
     }
     
     /**
@@ -530,7 +558,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @return the UIID 
      */
     public String getUIIDLine2() {
-        return secondRow.getTextUIID();
+        return secondRow.getUIID();
     }
 
     /**
@@ -539,8 +567,42 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t text to set
      */
     public void setTextLine3(String t) {
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
         thirdRow.setText(t);
+        thirdRow.setColumns(t.length() + 1);
         thirdRow.setHidden(false);
+    }
+    
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine1() {
+        firstRow.setText("");
+        firstRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine2() {
+        secondRow.setText("");
+        secondRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine3() {
+        thirdRow.setText("");
+        thirdRow.setHidden(true);
+    }
+    
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine4() {
+        forthRow.setText("");
+        forthRow.setHidden(true);
     }
     
     /**
@@ -576,7 +638,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t UIID to set
      */
     public void setUIIDLine3(String t) {
-        thirdRow.setTextUIID(t);
+        thirdRow.setUIID(t);
     }
     
     /**
@@ -585,7 +647,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @return the UIID 
      */
     public String getUIIDLine3() {
-        return thirdRow.getTextUIID();
+        return thirdRow.getUIID();
     }
 
     /**
@@ -594,7 +656,9 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t text to set
      */
     public void setTextLine4(String t) {
+        t = shouldLocalize ? getUIManager().localize(t, t) : t;
         forthRow.setText(t);
+        forthRow.setColumns(t.length() + 1);
         forthRow.setHidden(false);
     }
     
@@ -631,7 +695,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param t UIID to set
      */
     public void setUIIDLine4(String t) {
-        forthRow.setTextUIID(t);
+        forthRow.setUIID(t);
     }
     
     /**
@@ -640,7 +704,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @return the UIID 
      */
     public String getUIIDLine4() {
-        return forthRow.getTextUIID();
+        return forthRow.getUIID();
     }
 
 
@@ -1116,7 +1180,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @return the shouldLocalize value
      */
     public boolean isShouldLocalize() {
-        return firstRow.isShouldLocalize();
+        return shouldLocalize;
     }
 
     /**
@@ -1126,10 +1190,7 @@ public class SpanMultiButton extends Container implements ActionSource {
      * @param shouldLocalize the shouldLocalize to set
      */
     public void setShouldLocalize(boolean shouldLocalize) {
-        firstRow.setShouldLocalize(shouldLocalize);
-        secondRow.setShouldLocalize(shouldLocalize);
-        thirdRow.setShouldLocalize(shouldLocalize);
-        forthRow.setShouldLocalize(shouldLocalize);
+        this.shouldLocalize = shouldLocalize;
     }
     
     /**
@@ -1138,38 +1199,6 @@ public class SpanMultiButton extends Container implements ActionSource {
      */
     public void setGroup(ButtonGroup bg) {
         bg.add((RadioButton)emblem);
-    }
-
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine1() {
-        firstRow.setText("");
-        firstRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine2() {
-        secondRow.setText("");
-        secondRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine3() {
-        thirdRow.setText("");
-        thirdRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine4() {
-        forthRow.setText("");
-        forthRow.setHidden(true);
     }
     
     
