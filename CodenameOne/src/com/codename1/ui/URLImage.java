@@ -36,6 +36,8 @@ import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded 
@@ -66,6 +68,9 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public class URLImage extends EncodedImage {
+    
+    private static final Map<String,URLImage> pendingToStorage = new HashMap<String,URLImage>();
+    private static final Map<String,URLImage> pendingToFile = new HashMap<String,URLImage>();
     
     /**
      * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.
@@ -231,6 +236,15 @@ public class URLImage extends EncodedImage {
         };
     }
     
+    public static ImageAdapter createMaskAdapter(final Object mask) {
+        return new ScaleToFill() {
+            @Override
+            Image postProcess(Image i) {
+                return i.applyMask(mask);
+            }
+        };
+    }
+    
     class DownloadCompleted implements ActionListener, Runnable {
         private EncodedImage adapt;
         private EncodedImage adaptedIns;
@@ -283,11 +297,13 @@ public class URLImage extends EncodedImage {
                         o.write(adapted.getImageData());
                         o.close();
                         Storage.getInstance().deleteStorageFile(storageFile + IMAGE_SUFFIX);
+                        pendingToStorage.remove(storageFile);
                     } else if (fileSystemFile != null) {
                         OutputStream o = FileSystemStorage.getInstance().openOutputStream(fileSystemFile);
                         o.write(adapted.getImageData());
                         o.close();
                         FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);
+                        pendingToFile.remove(fileSystemFile);
                     }
                 } catch (IOException ex) {
                     if(exceptionHandler != null) {
@@ -335,6 +351,7 @@ public class URLImage extends EncodedImage {
                     resetCache();
                     fetching = false;
                     repaintImage = true;
+                    fireChangedEvent();
                     return;
                 }
                 if (adapter != null) {
@@ -366,6 +383,7 @@ public class URLImage extends EncodedImage {
                     resetCache();
                     fetching = false;
                     repaintImage = true;
+                    fireChangedEvent();
                     return;
                 }
                 if(adapter != null) {
@@ -488,7 +506,13 @@ public class URLImage extends EncodedImage {
      */
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
-        return new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
+        URLImage out = pendingToStorage.get(storageFile);
+        if (out != null) {
+            return out;
+        }
+        out = new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
+        pendingToStorage.put(storageFile, out);
+        return out;
     }
     
     /**
@@ -504,7 +528,13 @@ public class URLImage extends EncodedImage {
      */
     public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
-        return new URLImage(placeholder, url.intern(), adapter, null, file.intern());
+        URLImage out = pendingToFile.get(file);
+        if (out != null) {
+            return out;
+        }
+        out = new URLImage(placeholder, url.intern(), adapter, null, file.intern());
+        pendingToFile.put(file, out);
+        return out;
     }
     
     /**
@@ -683,6 +713,7 @@ public class URLImage extends EncodedImage {
                         
                         image = downloadedImage.getImage();
                         repaintImage = true;
+                        fireChangedEvent();
                     }
                     
                 }, new FailureCallback<Image>() {

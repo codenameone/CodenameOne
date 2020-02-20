@@ -29,6 +29,8 @@ import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -50,6 +52,17 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Chen Fishbein
  */
 public class Label extends Component {
+    
+    private final ActionListener iconChangeListener = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (isInitialized() && evt.getSource() == getIcon()) {
+                repaint();
+            }
+        }
+        
+    };
+    
     /**
      * Fallback to the old default look and feel renderer for cases where compatibility is essential
      */
@@ -442,6 +455,9 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
+        if (this.icon != null) {
+            this.icon.removeActionListener(iconChangeListener);
+        }
         widthAtLastCheck = -1;
         if(icon != null) {
             if(icon.requiresDrawImage()) {
@@ -453,6 +469,9 @@ public class Label extends Component {
             }
         }
         this.icon = icon;
+        if (this.icon != null) {
+            this.icon.addActionListener(iconChangeListener);
+        }
         setShouldCalcPreferredSize(true);
         checkAnimation();
         repaint();
