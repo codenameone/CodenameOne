@@ -301,7 +301,9 @@ public class RoundRectBorder extends Border {
         if(mm) {
             stroke = Display.getInstance().convertToPixels(stroke);
         }
-        return stroke(new Stroke(stroke, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1));
+        this.stroke = new Stroke(stroke, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1);
+        dirty = true;
+        return this;
     }
     
     /**
