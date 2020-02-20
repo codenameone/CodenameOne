@@ -85,6 +85,7 @@ public class SpanButton extends Container implements ActionSource {
         text.setEditable(false);
         text.setFocusable(false);
         text.setActAsLabel(true);
+        setFocusable(true);
         removeBackground(text.getUnselectedStyle());
         removeBackground(text.getSelectedStyle());
         removeBackground(text.getPressedStyle());
@@ -208,6 +209,24 @@ public class SpanButton extends Container implements ActionSource {
         return actualButton.getIcon();
     }
 
+    /**
+     * Binds long press listener to button events.
+     * @param l 
+     * @since 7.0
+     */
+    public void addLongPressListener(ActionListener l) {
+        actualButton.addLongPressListener(l);
+    }
+    
+    /**
+     * Unbinds long press listener to button events.
+     * @param l 
+     * @since 7.0
+     */
+    public void removeLongPressListener(ActionListener l) {
+        actualButton.removeLongPressListener(l);
+    }
+    
     /**
      * Binds an action listener to button events
      *

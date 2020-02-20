@@ -84,7 +84,7 @@ public class Form extends Container {
     
     private TextSelection textSelection;
     
-    private ArrayList<Component> componentsAwatingRelease;
+    private ArrayList<Component> componentsAwaitingRelease;
     
     private VirtualInputDevice currentInputDevice;
     
@@ -2221,7 +2221,7 @@ public class Form extends Container {
         }
         super.deinitializeImpl();
         animMananger.flush();
-        componentsAwatingRelease = null;
+        componentsAwaitingRelease = null;
         dragged = null;
     }
 
@@ -3270,9 +3270,24 @@ public class Form extends Container {
                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                     cmp = cmp.getParent();
                 }
-                if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                    setPressedCmp(cmp);
-                    cmp.pointerPressed(x, y);
+                if (cmp != null) {
+                    if (cmp.hasLead) {
+                        Container leadParent;
+                        if (cmp instanceof Container) {
+                            leadParent = ((Container) cmp).getLeadParent();
+                        } else {
+                            leadParent = cmp.getParent().getLeadParent();
+                        }
+                        leadParent.repaint();
+                        if (!isScrollWheeling) {
+                            setFocused(leadParent);
+                        }
+                        setPressedCmp(cmp.getLeadComponent());
+                        cmp.getLeadComponent().pointerPressed(x, y);
+                    } else {
+                        setPressedCmp(cmp);
+                        cmp.pointerPressed(x, y);
+                    }
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
                 }   
@@ -3324,33 +3339,33 @@ public class Form extends Container {
     
     
     public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
-      if(componentsAwatingRelease == null) {
-	      componentsAwatingRelease = new ArrayList<Component>();
+      if(componentsAwaitingRelease == null) {
+	      componentsAwaitingRelease = new ArrayList<Component>();
 	  }
-	  componentsAwatingRelease.add(c);
+	  componentsAwaitingRelease.add(c);
     }
 
     public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
-    	 if(componentsAwatingRelease != null) {
-             componentsAwatingRelease.remove(c);
+    	 if(componentsAwaitingRelease != null) {
+             componentsAwaitingRelease.remove(c);
          }
     }
 
     public void clearComponentsAwaitingRelease() {
-    	if (componentsAwatingRelease != null) {
-    		componentsAwatingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
+    	if (componentsAwaitingRelease != null) {
+    		componentsAwaitingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
     	}
     }
    
     
     private void autoRelease(int x, int y) {
-        if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
+        if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
             if (atXY instanceof Container) {
                 atXY = atXY.getLeadComponent();
             }
-            Component pendingC = componentsAwatingRelease.get(0);
+            Component pendingC = componentsAwaitingRelease.get(0);
             if (atXY != pendingC) {
                 if (pendingC instanceof ReleasableComponent) {
                 	ReleasableComponent rc = (ReleasableComponent) pendingC;
@@ -3358,16 +3373,16 @@ public class Form extends Container {
                     if (relRadius > 0) {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                         if (!r.contains(x, y)) {
-                        	componentsAwatingRelease = null;
+                        	componentsAwaitingRelease = null;
                         	pendingC.dragInitiated();
                         }
                         return;
                     }
-                    componentsAwatingRelease = null;
+                    componentsAwaitingRelease = null;
                     pendingC.dragInitiated();
                 }
             } else if (pendingC instanceof ReleasableComponent && ((ReleasableComponent) pendingC).isAutoRelease()) {
-            	componentsAwatingRelease = null;
+            	componentsAwaitingRelease = null;
             	pendingC.dragInitiated();
             }
         }
@@ -3633,13 +3648,13 @@ public class Form extends Container {
             setPressedCmp(null);
             boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
-            if(componentsAwatingRelease != null && componentsAwatingRelease.size() == 1) {
+            if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
                 Component atXY = actual.getComponentAt(x, y);
 
-                Component pendingC = componentsAwatingRelease.get(0);
+                Component pendingC = componentsAwaitingRelease.get(0);
                 if(atXY == pendingC) {
-                    componentsAwatingRelease = null;
+                    componentsAwaitingRelease = null;
                     if (dragged == pendingC) {
                         if (pendingC.isDragAndDropInitialized()) {
                             pendingC.dragFinishedImpl(x, y);
@@ -3668,7 +3683,7 @@ public class Form extends Container {
                     if(relRadius > 0 || pendingC.contains(x, y)) {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                         if(r.contains(x, y)) {
-                            componentsAwatingRelease = null;
+                            componentsAwaitingRelease = null;
                             pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
                             return;
                         }
@@ -3718,8 +3733,28 @@ public class Form extends Container {
                 }
                 if (menuBar.contains(x, y)) {
                     Component cmp = menuBar.getComponentAt(x, y);
-                    if (cmp != null && cmp.isEnabled()) {
-                        cmp.pointerReleased(x, y);
+                    while (cmp != null && cmp.isIgnorePointerEvents()) {
+                        cmp = cmp.getParent();
+                    }
+                     if (cmp.hasLead) {
+                        Container leadParent;
+                        if (cmp instanceof Container) {
+                            leadParent = ((Container) cmp).getLeadParent();
+                        } else {
+                            leadParent = cmp.getParent().getLeadParent();
+                        }
+                        leadParent.repaint();
+                        if (!isScrollWheeling) {
+                            setFocused(leadParent);
+                        }
+                        cmp.getLeadComponent().pointerReleased(x, y);
+                    } else {
+                        if (cmp.isEnabled()) {
+                            if (!isScrollWheeling && cmp.isFocusable()) {
+                                setFocused(cmp);
+                            }
+                            cmp.pointerReleased(x, y);
+                        }
                     }
                     return;
                 }
@@ -3763,7 +3798,25 @@ public class Form extends Container {
                                 cmp = cmp.getParent();
                             }
                             if (cmp != null && cmp.isEnabled()) {
-                                cmp.pointerReleased(x, y);
+                                
+                                if (cmp.hasLead && cmp.getLeadComponent() != null) {
+                                    Container leadParent;
+                                    if (cmp instanceof Container) {
+                                        leadParent = ((Container) cmp).getLeadParent();
+                                    } else {
+                                        leadParent = cmp.getParent().getLeadParent();
+                                    }
+                                    leadParent.repaint();
+                                    if (!isScrollWheeling) {
+                                        setFocused(leadParent);
+                                    }
+                                    cmp.getLeadComponent().pointerReleased(x, y);
+                                } else {
+                                    if (!isScrollWheeling && cmp.isFocusable()) {
+                                        setFocused(cmp);
+                                    }
+                                    cmp.pointerReleased(x, y);
+                                }
                             }
                         } else {
                             Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3804,15 +3857,15 @@ public class Form extends Container {
                 }
             }
             stickyDrag = null;
-            if (componentsAwatingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-                for (int iter = 0; iter < componentsAwatingRelease.size(); iter++) {
-                    Component c = componentsAwatingRelease.get(iter);
+            if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
+                for (int iter = 0; iter < componentsAwaitingRelease.size(); iter++) {
+                    Component c = componentsAwaitingRelease.get(iter);
                     if (c instanceof ReleasableComponent) {
                             ReleasableComponent rc = (ReleasableComponent) c;
                             rc.setReleased();
                     }
                 }
-                componentsAwatingRelease = null;
+                componentsAwaitingRelease = null;
             }
         } finally {
             currentPointerPress = null;
