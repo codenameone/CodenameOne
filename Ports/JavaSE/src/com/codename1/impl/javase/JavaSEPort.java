@@ -8829,7 +8829,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Thread.sleep(1000);
                     } catch(Exception e) {}
                 }
-                nr.setTimeServerResponse(System.currentTimeMillis());
+                if (nr != null) {
+                    nr.setTimeServerResponse(System.currentTimeMillis());
+                }
                 if(disconnectedMode) {
                     throw new IOException("Unreachable");
                 }
