@@ -34,6 +34,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
@@ -69,7 +70,7 @@ import com.codename1.ui.util.EventDispatcher;
  * @author shannah
  * @since 3.4
  */
-public class SignatureComponent extends Container {
+public class SignatureComponent extends Container implements ActionSource {
     
     private Image signatureImage;
     private final Button lead;

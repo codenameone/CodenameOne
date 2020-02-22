@@ -28,6 +28,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.layouts.Layout;
@@ -88,7 +89,7 @@ switchList.setLayout(new TableLayout(switchList.getComponentCount()/3+1, 3));
  * @author Steve Hannah
  * @since 6.0
  */
-public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener {
+public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener, ActionSource {
     private ButtonGroup group;
     private ListModel model;
     private EventDispatcher actionListeners = new EventDispatcher();

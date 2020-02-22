@@ -29,6 +29,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.DefaultListCellRenderer;
@@ -87,7 +88,7 @@ import java.util.Vector;
  * @see com.codename1.ui.list.MultiList
  * @author Chen Fishbein
  */
-public class List<T> extends Component {
+public class List<T> extends Component implements ActionSource {
     /**
      * Indicates the list isn't fixed and that selection is movable
      */

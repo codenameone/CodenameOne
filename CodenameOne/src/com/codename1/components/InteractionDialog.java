@@ -262,7 +262,7 @@ public class InteractionDialog extends Container {
         if(formMode) {
             c = (Container)f.getFormLayeredPane(InteractionDialog.class, true);
         } else {
-            c = (Container)f.getLayeredPane(InteractionDialog.class, false);
+            c = (Container)f.getLayeredPane(InteractionDialog.class, true);
         }
         if (!(c.getLayout() instanceof LayeredLayout)) {
             c.setLayout(new LayeredLayout());
@@ -623,12 +623,18 @@ public class InteractionDialog extends Container {
      * @param c the context component which is used to position the dialog and can also be pointed at
      */
     public void showPopupDialog(Component c) {
+        Form f = c== null ? null : c.getComponentForm();
+        if (f != null) {
+            if (!formMode && !f.getContentPane().contains(c)) {
+                setFormMode(true);
+            }
+        }
         disposed = false;
         getUnselectedStyle().setOpacity(255);
         Rectangle componentPos = c.getSelectedRect();
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
-        
+        setOwner(c);
         showPopupDialog(componentPos);
     }
     

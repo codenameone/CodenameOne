@@ -71,7 +71,11 @@ public class LoadingTextAnimationSample {
         f.add(BorderLayout.CENTER, profileText);
         // Replace the label by a CircleProgress to indicate that it is loading.
         LoadingTextAnimation.markComponentLoading(profileText);
-
+        Button next = new Button("Next");
+        next.addActionListener(e->{
+            showLabelTest();
+        });
+        f.add(BorderLayout.SOUTH, next);
         AsyncResource<MyData> request = fetchDataAsync();
         request.ready(data -> {
             profileText.setText(data.getProfileText());
@@ -84,6 +88,23 @@ public class LoadingTextAnimationSample {
         f.show();
 
     }
+     
+     
+     private void showLabelTest() {
+         Form f = new Form("Hello", BoxLayout.y());
+         Label l = new Label("placeholder");
+         f.add(l);
+         LoadingTextAnimation.markComponentLoading(l);
+         f.show();
+         Timer t = new Timer();
+         t.schedule(new TimerTask() {
+             public void run(){
+                CN.callSerially(()->{
+                    LoadingTextAnimation.markComponentReady(l);
+                });
+             }
+         }, 2000);
+     }
      
      private class MyData {
         String getProfileText() {

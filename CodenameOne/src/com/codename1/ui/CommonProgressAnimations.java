@@ -41,6 +41,7 @@ public class CommonProgressAnimations {
      */
     public static abstract class ProgressAnimation extends Component {
         private static final String PROGRESS_KEY = "$$ProgressAnimation";
+        protected Component cmp;
         
         /**
          * Marks a component as "loading", replacing it in its parent conatiner with
@@ -83,6 +84,7 @@ public class CommonProgressAnimations {
             }
             cmp.putClientProperty(PROGRESS_KEY, progress);
             cmp.getParent().replace(cmp, progress, null);
+            progress.cmp = cmp;
            
         }
         
@@ -242,6 +244,7 @@ public class CommonProgressAnimations {
         private int strlen = loremIpsum.length();
         private int strpos = 0;
         
+        
         public LoadingTextAnimation() {
             getStyle().setFgColor(0x666666);
             getStyle().setOpacity(0x66);
@@ -285,13 +288,14 @@ public class CommonProgressAnimations {
                 pauseRatio = pauseCounter / (float)pauseLength;
             }
             g.setAlpha((int)(getStyle().getOpacity()/255f * alpha * pauseRatio));
-            Font f = getStyle().getFont();
+            Font f = cmp == null ? getStyle().getFont() : cmp.getStyle().getFont();
             if (f == null) {
                 f = Font.getDefaultFont();
             }
             int h = f.getHeight();
             int w = f.charWidth('M');
-            Style s = getStyle();
+            Style s = cmp == null ? getStyle() : cmp.getStyle();
+            
             int paddingTop = s.getPaddingTop();
             int paddingLeft = s.getPaddingLeftNoRTL();
             int paddingRight = s.getPaddingRightNoRTL();

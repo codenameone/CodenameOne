@@ -1764,6 +1764,10 @@ public final class Display extends CN1Constants {
     public void stopEditing(Component cmp, Runnable onFinish) {
         if(isTextEditing(cmp)) {
             impl.stopTextEditing(onFinish);
+        } else {
+            if (onFinish != null) {
+                onFinish.run();
+            }
         }
     }
 

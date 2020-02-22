@@ -27,6 +27,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.layouts.BorderLayout;
@@ -65,7 +66,7 @@ import java.util.Vector;
  *
  * @author Iddo Ari, Shai Almog
  */
-public class Calendar extends Container {
+public class Calendar extends Container implements ActionSource {
 
     /**
      * When set to true days will be rendered as 2 digits with 0 preceding

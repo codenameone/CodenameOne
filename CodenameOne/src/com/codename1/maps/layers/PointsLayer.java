@@ -30,6 +30,7 @@ import com.codename1.maps.Projection;
 import com.codename1.maps.Tile;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
@@ -37,7 +38,7 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class PointsLayer extends AbstractLayer {
+public class PointsLayer extends AbstractLayer implements ActionSource {
 
     private Vector points = new Vector();
     private Image icon;

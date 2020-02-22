@@ -27,6 +27,10 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -39,7 +43,8 @@ import java.util.HashMap;
  * 
  * @author Chen Fishbein
  */
-public class Image {
+public class Image implements ActionSource {
+    private EventDispatcher listeners;
     private Object rgbCache;
     private Object image;   
     int transform;
@@ -1178,5 +1183,28 @@ public class Image {
      */
     public boolean requiresDrawImage() {
         return getImage() == null;
+    }
+
+    @Override
+    public synchronized void addActionListener(ActionListener l) {
+        if (listeners == null) {
+            listeners = new EventDispatcher();
+        }
+        listeners.addListener(l);
+    }
+
+    @Override
+    public synchronized void removeActionListener(ActionListener l) {
+        if (listeners != null) {
+            listeners.removeListener(l);
+        }
+    }
+    
+    public void fireChangedEvent() {
+        if (listeners == null) {
+            return;
+        }
+        listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
+        
     }
 }

@@ -30,6 +30,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -47,7 +48,7 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container {
+public class SpanButton extends Container implements ActionSource {
 
     private Button actualButton;
     private TextArea text;
@@ -84,6 +85,7 @@ public class SpanButton extends Container {
         text.setEditable(false);
         text.setFocusable(false);
         text.setActAsLabel(true);
+        setFocusable(true);
         removeBackground(text.getUnselectedStyle());
         removeBackground(text.getSelectedStyle());
         removeBackground(text.getPressedStyle());
@@ -207,6 +209,24 @@ public class SpanButton extends Container {
         return actualButton.getIcon();
     }
 
+    /**
+     * Binds long press listener to button events.
+     * @param l 
+     * @since 7.0
+     */
+    public void addLongPressListener(ActionListener l) {
+        actualButton.addLongPressListener(l);
+    }
+    
+    /**
+     * Unbinds long press listener to button events.
+     * @param l 
+     * @since 7.0
+     */
+    public void removeLongPressListener(ActionListener l) {
+        actualButton.removeLongPressListener(l);
+    }
+    
     /**
      * Binds an action listener to button events
      *

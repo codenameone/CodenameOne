@@ -658,11 +658,11 @@ public class Container extends Component implements Iterable<Component>{
      * @return the layout width
      */
     public int getLayoutWidth() {
-        if (isScrollableX()) {
+        if (scrollableX) {
             return Math.max(getWidth(), getPreferredW());
         } else {
-            Container parent = getScrollableParent();
-            if (parent != null && parent.isScrollableX()) {
+            Container parent = getScrollableParentX();
+            if (parent != null && parent.scrollableX) {
                 return Math.max(getWidth(), getPreferredW());
             }
             int width = getWidth();
@@ -683,7 +683,7 @@ public class Container extends Component implements Iterable<Component>{
         if (scrollableY) {
             return Math.max(getHeight(), getPreferredH());
         } else {
-            Container parent = getScrollableParent();
+            Container parent = getScrollableParentY();
             if (parent != null && parent.scrollableY) {
                 return Math.max(getHeight(), getPreferredH());
             }
@@ -716,21 +716,81 @@ public class Container extends Component implements Iterable<Component>{
 
 
     /**
-     * Returns a parent container that is scrollable or null if no parent is 
+     * Returns a parent container that is scrollableX or null if no parent is 
      * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutWidth()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
      * 
      * @return a parent container that is scrollable or null if no parent is 
      * scrollable.
      */
-    private Container getScrollableParent() {
+    private Container getScrollableParentX() {
         Container parent = getParent();
         while (parent != null) {
-            if (parent.isScrollable()) {
+            if (parent.scrollableX && !parent.constrainWidthWhenScrollable()) {
                 return parent;
             }
             parent = parent.getParent();
         }
         return null;
+    }
+    
+    /**
+     * Returns a parent container that is scrollableY or null if no parent is 
+     * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutHeight()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
+     * 
+     * @return a parent container that is scrollable or null if no parent is 
+     * scrollable.
+     */
+    private Container getScrollableParentY() {
+        Container parent = getParent();
+        while (parent != null) {
+            if (parent.scrollableY && !parent.constrainHeightWhenScrollable()) {
+                return parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+    
+    
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable X.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainWidthWhenScrollable() {
+        return false;
+    }
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable Y.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainHeightWhenScrollable() {
+        return false;
     }
 
     /**
@@ -1887,6 +1947,27 @@ public class Container extends Component implements Iterable<Component>{
         int absY = getAbsoluteY();
         int h = getHeight();
         int absY2 = absY + h;
+        
+        // Check for negative coordinates.  If the any of the bounds
+        // of the component are off screen, then we'll assume that their position
+        // is intentional, and we don't want to kludge it into the safe area.
+        // This is an heuristic in search of a perfect solution.  
+        // https://github.com/codenameone/CodenameOne/issues/3023
+        if (absY < 0) {
+            return false;
+        }
+        
+        if (absX < 0) {
+            return false;
+        }
+        
+        if (absX2 > CN.getDisplayWidth()) {
+            return false;
+        }
+        
+        if (absY2 > CN.getDisplayHeight()) {
+            return false;
+        }
 
         if (absY + paddingTop < safeY1) {
             newPaddingTop = safeY1 - absY;
@@ -1897,19 +1978,15 @@ public class Container extends Component implements Iterable<Component>{
         boolean changed = false;
         if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
             if (!hasScrollableYParentInternal()) {
-                //setY(getY() + newPaddingTop - paddingTop);
-                //setHeight(getHeight() - (newPaddingTop + newPaddingBottom - paddingTop - paddingBottom));
                 changed = true;
                 
                 if (newPaddingTop != paddingTop) {
                     style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingTop(newPaddingTop);
-                    System.out.println("Changing top padding "+newPaddingTop);
                 }
                 if (newPaddingBottom != paddingBottom) {
                     style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
                     style.setPaddingBottom(newPaddingBottom);
-                    System.out.println("Changing bottom padding "+newPaddingBottom);
                 }
                
             }   
@@ -1917,8 +1994,6 @@ public class Container extends Component implements Iterable<Component>{
         
         if (newPaddingLeft != paddingLeft || newPaddingRight != paddingRight) {
             if (!hasScrollableXParentInternal()) {
-                //setX(getX() + newPaddingLeft - paddingLeft);
-                //setWidth(getWidth() - (newPaddingLeft + newPaddingRight - paddingLeft - paddingRight));
                 changed = true;
                 
                 if (newPaddingLeft != paddingLeft) {

@@ -23,8 +23,6 @@
 package com.codename1.ui;
 
 
-import com.codename1.components.MultiButton;
-import com.codename1.components.OnOffSwitch;
 import com.codename1.components.SpanButton;
 import com.codename1.components.SpanLabel;
 import com.codename1.io.Util;
@@ -33,6 +31,7 @@ import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.ScrollListener;
@@ -284,6 +283,7 @@ import java.util.Set;
  *     <li>{@code $(".my-tag").getComponentAt(4)} - The set of 5th child components of containers with tag ".my-tag".</li>
  * </ul>
  * 
+ * @see <a href="https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html">jQuery/CSS Style Selectors for Codename One</a>
  * @author shannah
  */
 public class ComponentSelector implements Iterable<Component>, Set<Component> {
@@ -4077,21 +4077,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector addActionListener(ActionListener l) {
         for (Component c : this) {
-            if (c instanceof Button) {
-                ((Button)c).addActionListener(l);
-            } else if (c instanceof com.codename1.ui.List) {
-                ((com.codename1.ui.List)c).addActionListener(l);
-            } else if (c instanceof Slider) {
-                ((Slider)c).addActionListener(l);
-            } else if (c instanceof TextArea) {
-                ((TextArea)c).addActionListener(l);
-            } else if (c instanceof OnOffSwitch) {
-                ((OnOffSwitch)c).addActionListener(l);
-            } else if (c instanceof SpanButton) {
-                ((SpanButton)c).addActionListener(l);
-            } else if (c instanceof MultiButton) {
-                ((MultiButton)c).addActionListener(l);
-            }
+            if (c instanceof ActionSource) {
+                ((ActionSource)c).addActionListener(l);
+            } 
         }
         return this;
     }
@@ -4103,20 +4091,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */ 
     public ComponentSelector removeActionListener(ActionListener l) {
         for (Component c : this) {
-            if (c instanceof Button) {
-                ((Button)c).removeActionListener(l);
-            } else if (c instanceof com.codename1.ui.List) {
-                ((com.codename1.ui.List)c).addActionListener(l);
-            } else if (c instanceof Slider) {
-                ((Slider)c).removeActionListener(l);
-            } else if (c instanceof TextArea) {
-                ((TextArea)c).removeActionListener(l);
-            } else if (c instanceof OnOffSwitch) {
-                ((OnOffSwitch)c).removeActionListener(l);
-            } else if (c instanceof SpanButton) {
-                ((SpanButton)c).removeActionListener(l);
-            } else if (c instanceof MultiButton) {
-                ((MultiButton)c).removeActionListener(l);
+            if (c instanceof ActionSource) {
+                ((ActionSource)c).removeActionListener(l);
             }
         }
         return this;

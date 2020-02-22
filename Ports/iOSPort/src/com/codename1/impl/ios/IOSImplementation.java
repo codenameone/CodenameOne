@@ -957,8 +957,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                         synchronized(EDITING_LOCK) {
                             instance.currentEditing.setText(s);
                             Display.getInstance().onEditingComplete(instance.currentEditing, s);
-                            if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
-                                ((TextField)instance.currentEditing).fireDoneEvent();
+                            if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextArea) {
+                                ((TextArea)instance.currentEditing).fireDoneEvent();
                             }
                             Component cmp = instance.currentEditing;
                             instance.currentEditing = null;

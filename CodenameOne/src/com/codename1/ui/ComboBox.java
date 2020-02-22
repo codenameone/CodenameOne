@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
@@ -81,7 +82,7 @@ import java.util.Vector;
  * @see List
  * @author Chen Fishbein
  */
-public class ComboBox<T> extends List<T> {
+public class ComboBox<T> extends List<T> implements ActionSource {
     private static boolean defaultActAsSpinnerDialog;
 
     /**

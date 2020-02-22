@@ -44,6 +44,9 @@ import com.codename1.ui.plaf.Style;
  */
 public class ScaleImageLabel extends Label {
 
+    private int preferredH = -1;
+    private int preferredW = -1;
+    
     /**
      * Default constructor
      */
@@ -223,5 +226,55 @@ public class ScaleImageLabel extends Label {
         }
         return super.setPropertyValue(name, value);
     }
+
+    @Override
+    public void setPreferredH(int preferredH) {
+        this.preferredH = preferredH;
+    }
+
+    @Override
+    public void setPreferredW(int preferredW) {
+        this.preferredW = preferredW;
+    }
+
+    @Override
+    public int getPreferredH() {
+        if (preferredH > 0) {
+            return preferredH;
+        }
+        if (preferredW > 0) {
+            Image i = getIcon();
+            if (i != null) {
+                if (preferredW < i.getWidth()) {
+                    return (int)(i.getHeight() * preferredW / (double)i.getWidth());
+                }
+            }
+        }
+        return super.getPreferredH();
+    }
+
+    @Override
+    public int getPreferredW() {
+        if (preferredW > 0) {
+            return preferredW;
+        }
+        if (preferredW > 0) {
+            Image i = getIcon();
+            if (i != null) {
+                if (preferredH < i.getHeight()) {
+                    return (int)(i.getWidth() * preferredH / (double)i.getHeight());
+                }
+            }
+        }
+        return super.getPreferredW();
+    }
+    
+    
+    
+    
+    
+    
+    
+    
     
 }

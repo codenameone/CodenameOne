@@ -33,6 +33,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -137,7 +138,7 @@ Switch.selected {
 *   <li>{@literal switchDisabledTrackImage}</li>
 * </ul>
  */
-public class Switch extends Component {
+public class Switch extends Component implements ActionSource {
 
     private boolean value;
     private Image thumbOnImage;
