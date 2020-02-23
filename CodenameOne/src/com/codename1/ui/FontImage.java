@@ -6965,14 +6965,14 @@ public class FontImage extends Image {
             Style sel = b.getSelectedStyle();
             Style pre = b.getPressedStyle();
             Style dis = b.getDisabledStyle();
-            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
             } else {
                 b.setRolloverIcon(null);
             }
-            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
@@ -6980,7 +6980,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icons[Math.min(4, icons.length-1)], dis));
