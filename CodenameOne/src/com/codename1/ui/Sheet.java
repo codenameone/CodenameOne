@@ -291,6 +291,7 @@ public class Sheet extends Container {
     private void initUI() {
         setLayout(new BorderLayout());
         contentPane.setSafeArea(true);
+        titleBar.setSafeArea(true);
         add(BorderLayout.NORTH, titleBar);
         if (parentSheet != null) {
             FontImage.setMaterialIcon(backButton, FontImage.MATERIAL_ARROW_BACK);
