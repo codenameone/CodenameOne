@@ -57,8 +57,10 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
 import android.view.View;
+import com.codename1.ui.CN;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -1458,7 +1460,13 @@ class AndroidGraphics {
         canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);
     }
 
+    private int maxBitmapSize, maxBitmapHeight;
+    
     public void drawPath(Path p, Stroke stroke) {
+        if (maxBitmapSize == 0) {
+            maxBitmapSize = Integer.parseInt(Display.getInstance().getProperty("android.maxBitmapSize", Math.max(CN.getDisplayWidth(), CN.getDisplayHeight())*2+""));
+        }
+        
         paint.setStyle(Paint.Style.STROKE);
         Stroke old = setStroke(stroke);
         //canvas.save();
@@ -1479,7 +1487,7 @@ class AndroidGraphics {
             float bw2 = Math.max(1, b2w) / Math.max(1, bw);
             float bh2 = Math.max(1, bounds2.height())/Math.max(1, bounds.height());
             float ratio = Math.max(bw2, bh2);
-            if (ratio > 2 && !isMutableImageGraphics) {
+            if (ratio > 2 && !isMutableImageGraphics && bounds2.width() <= maxBitmapSize && bounds2.height() <= maxBitmapSize) {
                 // If the canvas is hardware accelerated, then it will rasterize the path
                 // first, then apply the transform which leads to blurry paths if the transform does
                 // significant scaling.
