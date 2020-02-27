@@ -704,6 +704,15 @@ public class Form extends Container {
     }
 
     /**
+     * Causes the display safe area to be recalculated the next time the form list laid out.
+     * @since 7.0
+     * @see #getSafeArea() 
+     */
+    public void setSafeAreaChanged() {
+        safeAreaDirty = true;
+    }
+    
+    /**
      * This method is only invoked when the underlying canvas for the form gets
      * a size changed event.
      * This method will trigger a relayout of the Form.

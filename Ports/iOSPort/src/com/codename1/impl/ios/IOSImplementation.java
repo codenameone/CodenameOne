@@ -231,6 +231,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.getDisplayHeight();
     }
     
+    public static void displaySafeAreaChanged(final boolean revalidate) {
+        if (!CN.isEdt()) {
+            CN.callSerially(new Runnable() {
+                public void run() {
+                    displaySafeAreaChanged(revalidate);
+                }
+            });
+            return;
+        }
+        Form f = CN.getCurrentForm();
+        if (f != null) {
+            f.setSafeAreaChanged();
+            f.revalidateWithAnimationSafety();
+        }
+    }
+    
     @Override
     public Rectangle getDisplaySafeArea(Rectangle rect) {
         if (rect == null) {

@@ -2140,7 +2140,7 @@ public final class Display extends CN1Constants {
     }
     
     private Rectangle tmpRect = new Rectangle();
-    private Rectangle lastSizeChangedSafeArea = new Rectangle();
+    
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2153,18 +2153,13 @@ public final class Display extends CN1Constants {
         if(current == null) {
             return;
         }
-        impl.getDisplaySafeArea(tmpRect);
         if(w == current.getWidth() && h == current.getHeight()) {
-            // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if (lastSizeChangedSafeArea.equals(tmpRect)) {
-                if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
-                    return;            
-                }
+        // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
+            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
+                return;            
             }
         }
         
-        
-        lastSizeChangedSafeArea.setBounds(tmpRect);
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
