@@ -1825,6 +1825,15 @@ public class Component implements Animation, StyleListener, Editable {
     }
     
     /**
+     * Gets the "owner" of this component as set by {@link #setOwner(com.codename1.ui.Component) }.
+     * @return The owner component or null.
+     * @since 7.0
+     */
+    public Component getOwner() {
+        return owner;
+    }
+    
+    /**
      * Checks to see if this component is owned by the given other component.  A component {@literal A} is
      * deemed to be owned by another component {@literal B} if any of the following conditions are true:
      * <ul>
