@@ -440,12 +440,24 @@ public class Container extends Component implements Iterable<Component>{
      * @param lead component that takes over the hierarchy
      */
     public void setLeadComponent(Component lead) {
+        if (lead == leadComponent) {
+            return;
+        }
         leadComponent = lead;
         if(lead == null) {
             // clear the lead component from the hierarchy
-            setFocusable(false);
-            hasLead = false;
-            enableFocusAndDeinitLead(this);
+            
+            if (!isBlockLead() && getParent() != null && getParent().hasLead) {
+                // hasLead should still be true because of parent lead
+                
+            } else {
+                setFocusable(false);
+                hasLead = false;
+                if (isInitialized()) {
+                    enableFocusAndDeinitLead(this);
+                }
+            }
+            
         } else {
             if(isInitialized()) {
                 initLead();
@@ -473,11 +485,12 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Component getLeadComponent() {
-        if(isBlockLead()) {
-            return null;
-        }
+        
         if(leadComponent != null) {
             return leadComponent;
+        }
+        if(isBlockLead()) {
+            return null;
         }
         if(hasLead) {
             return super.getLeadComponent();
@@ -492,11 +505,12 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Container getLeadParent() {
-        if(isBlockLead()) {
-            return null;
-        }
+        
         if(leadComponent != null) {
             return this;
+        }
+        if(isBlockLead()) {
+            return null;
         }
         if(hasLead) {
             return getParent().getLeadParent();
@@ -507,7 +521,7 @@ public class Container extends Component implements Iterable<Component>{
     private void initLead() {
         disableFocusAndInitLead(this);
         setFocusable(true);
-        hasLead = !isBlockLead();
+        hasLead = leadComponent != null || !isBlockLead();
     }
 
     /**
@@ -533,25 +547,42 @@ public class Container extends Component implements Iterable<Component>{
     private void disableFocusAndInitLead(Container c) {
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
-            if(cu instanceof Container) {
-                disableFocusAndInitLead((Container)cu);
-            }
+            boolean isContainer = (cu instanceof Container);
             cu.setFocusable(false);
-            cu.hasLead = !cu.isBlockLead();
+            if (isContainer) {
+                cu.hasLead = ((Container)cu).leadComponent != null || !cu.isBlockLead();
+            } else {
+                cu.hasLead = !cu.isBlockLead();
+            }
+            if(isContainer && cu.hasLead) {
+                disableFocusAndInitLead((Container)cu);
+                if (((Container)cu).leadComponent != null) {
+                    ((Container)cu).setFocusable(true);
+                }
+                
+            }
+            
         }
     }
 
     private void enableFocusAndDeinitLead(Container c) {
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
-            if(cu instanceof Container) {
+            boolean isContainer = (cu instanceof Container);
+            if (isContainer) {
+                cu.hasLead = ((Container)cu).leadComponent != null;
+            } else {
+                cu.hasLead = false;
+            }
+            if(isContainer && !cu.hasLead) {
                 enableFocusAndDeinitLead((Container)cu);
             }
-            cu.resetFocusable();
-            cu.hasLead = false;
+            if (!cu.hasLead) {
+                cu.resetFocusable();
+            }
         }
     }
-
+    
     /**
      * Returns the layout manager responsible for arranging this container. 
      * 
