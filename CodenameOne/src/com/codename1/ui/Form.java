@@ -1476,7 +1476,7 @@ public class Form extends Container {
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
-            revalidate();
+            revalidateWithAnimationSafety();
         }
         return layeredPane;
     }
@@ -1591,7 +1591,7 @@ public class Form extends Container {
                 int b = Display.getInstance().getCommandBehavior();
                 if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
                         || b == Display.COMMAND_BEHAVIOR_ICS || b == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
-                    titleArea.revalidate();
+                    titleArea.revalidateWithAnimationSafety();
                 }
                 if (this.title.shouldTickerStart()) {
                     this.title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
@@ -1982,7 +1982,7 @@ public class Form extends Container {
             }
         }
 
-        revalidate();
+        revalidateWithAnimationSafety();
     }
 
     /**
@@ -2593,7 +2593,7 @@ public class Form extends Container {
             }
         }
         if (triggerRevalidate) {
-            revalidate();
+            revalidateWithAnimationSafety();
         }
     }
 
