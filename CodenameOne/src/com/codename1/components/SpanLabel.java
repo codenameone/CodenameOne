@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import static com.codename1.ui.CN.EAST;
 import static com.codename1.ui.CN.WEST;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -32,6 +33,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
@@ -82,6 +84,7 @@ public class SpanLabel extends Container {
         icon = new Label();
         icon.setUIID("icon");
         iconWrapper = new Container(new FlowLayout(CENTER, CENTER));
+        $(iconWrapper).setPadding(0).setMargin(0).setBorder(Border.createEmpty());
         iconWrapper.getStyle().setMargin(0, 0, 0, 0);
         iconWrapper.getStyle().setPadding(0, 0, 0, 0);
         iconWrapper.add(icon);
@@ -283,12 +286,14 @@ public class SpanLabel extends Container {
         if(parent == this) {
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
+            $(parent).setPadding(0).setMargin(0).setBorder(Border.createEmpty());
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
         } else if (parent.getLayout() instanceof BoxLayout) {
             removeComponent(parent);
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
+            $(parent).setPadding(0).setMargin(0).setBorder(Border.createEmpty());
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
         } else {
