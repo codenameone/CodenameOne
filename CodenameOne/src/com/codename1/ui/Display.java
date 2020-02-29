@@ -365,7 +365,7 @@ public final class Display extends CN1Constants {
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;
-    private int longPressInterval = 800;
+    private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
     private int keyRepeatInitialIntervalTime = 800;
