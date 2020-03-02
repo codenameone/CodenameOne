@@ -11583,6 +11583,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
     }
 
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        setBrowserURL(browserPeer, url);
+    }
+
+    
+    
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             try {

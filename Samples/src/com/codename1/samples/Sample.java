@@ -74,6 +74,14 @@ public class Sample {
         return new File(getJavaFile(context).getParentFile(), "css");
     }
     
+    private File getIndexHtml(SamplesContext context) {
+        return new File(getJavaFile(context).getParentFile(), "index.html");
+    }
+    
+    private File getIndexHtmlInBuildDir(SamplesContext context) {
+        return new File(getBuildSrcDir(context), "index.html");
+    }
+    
     private File getHtmlDir(SamplesContext context) {
         return new File(getJavaFile(context).getParentFile(), "html");
     }
@@ -81,6 +89,8 @@ public class Sample {
     private File getHtmlDirInBuildDir(SamplesContext context) {
         return new File(getBuildSrcDir(context), "html");
     }
+    
+    
     
     private File getCSSDirInBuildDir(SamplesContext context) {
         return new File(getBuildProjectDir(context), "css");
@@ -198,6 +208,10 @@ public class Sample {
         copyDir(getHtmlDir(context), getHtmlDirInBuildDir(context));
     }
     
+    private void copyIndexHtmlToBuildDir(SamplesContext context) throws IOException {
+        copyFile(getIndexHtml(context), getIndexHtmlInBuildDir(context));
+    }
+    
     private void copyCodenameOneBuildClient(SamplesContext context) throws IOException {
         copyFile(context.getCodenameOneBuildClientJar(), new File(getBuildProjectDir(context), "CodeNameOneBuildClient.jar"));
     }
@@ -239,6 +253,11 @@ public class Sample {
         if (getHtmlDir(context).exists()) {
             if (!getHtmlDirInBuildDir(context).exists() || lastModifiedRecursive(getHtmlDirInBuildDir(context)) < lastModifiedRecursive(getHtmlDir(context))) {
                 copyHtmlToBuildDir(context);
+            }
+        }
+        if (getIndexHtml(context).exists()) {
+            if (!getIndexHtmlInBuildDir(context).exists() || lastModifiedRecursive(getIndexHtmlInBuildDir(context)) < lastModifiedRecursive(getIndexHtml(context))) {
+                copyIndexHtmlToBuildDir(context);
             }
         }
         
