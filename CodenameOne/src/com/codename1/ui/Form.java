@@ -184,6 +184,7 @@ public class Form extends Container {
      */
     public Form(Layout contentPaneLayout) {
         super(new BorderLayout());
+        setSafeAreaRoot(true);
         contentPane = new Container(contentPaneLayout);
         setUIID("Form");
         // forms/dialogs are not visible by default

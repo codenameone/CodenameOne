@@ -538,6 +538,11 @@ public class UIFragment {
         if (name != null && name.length() > 0) {
             cmp.setName(name);
         }
+        String flags = el.getAttribute("flags");
+        
+        if (flags != null && flags.indexOf("safeArea") >= 0 && (cmp instanceof Container)) {
+            ((Container)cmp).setSafeArea(true);
+        }
     }
     
     private List<Element> getChildren(Element el) {
@@ -582,6 +587,7 @@ public class UIFragment {
                     throw new IllegalArgumentException("Missing parameter "+pname);
                 }
                 cmp = parameters.get(pname);
+                decorate(child, cmp);
             } else {
                 cmp = getFactory().newComponent(child);
                 decorate(child, cmp);

@@ -1873,14 +1873,28 @@ public class Container extends Component implements Iterable<Component>{
     private boolean safeArea;
     
     /**
+     * Indicates that this container is a "safe area" root.
+     */
+    private boolean safeAreaRoot;
+    
+    /**
      * Marks this container as a "safe area", meaning that it will automatically supply
      * sufficient padding as necessary for its children to be laid out inside the 
      * safe area of the screen.
      * 
      * <p>This was primarily added for the iPhone X which covers portions of the screen
      * and may interfere with components that are rendered there.</p>
+     * 
+     * <p>The "safe" area is calculated against a "safe area root"'s bounds, which is 
+     * the parent form by default.  In some cases it may be helpful to make the root
+     * a sub-container, such as if you need to lay a component out off-screen.  See 
+     * {@link #setSafeAreaRoot(boolean)} for more details.</p>
+     * 
      * @param safeArea True to make this container a safe area.
      * @since 7.0
+     * @see Form#getSafeArea() 
+     * @see #isSafeArea() 
+     * @see #setSafeAreaRoot(boolean) 
      */
     public void setSafeArea(boolean safeArea) {
         this.safeArea = safeArea;
@@ -1901,9 +1915,77 @@ public class Container extends Component implements Iterable<Component>{
      * 
      * @return True if this container is a safe area.
      * @since 7.0
+     * @see #setSafeArea(boolean) 
+     * @see Form#getSafeArea() 
      */
     public boolean isSafeArea() {
         return this.safeArea;
+    }
+    
+    /**
+     * Set whether this container is a safe area root.   A safe area root is a container
+     * against whose bounds, safe area margins are calculated for child components.
+     * 
+     * <p><strong>Safe Area root vs Safe Area</strong></p>
+     * 
+     * <p>A Safe Area root is not actually a safe area.  It will lay out its children
+     * normally, without any adjustments to padding to accommodate the display safe area.  They
+     * are rather <em>used</em> by safe area child containers to calculate safe area margins,
+     * according to if the safe area root container spanned the entire screen</p>
+     * 
+     * <p>In most cases you don't need to explicitly set a safe area root, since Forms are 
+     * marked as roots by default.  However, there are edge cases where components may be 
+     * initially laid out off-screen (in which safe areas are not applied), but are transitioned
+     * in.  Once on the screen, the safe margins would be applied which may cause an abrupt
+     * re-layout at the moment that the safe margins are applied.  This edge case occurs in,
+     * for example, a side menu bar which is rendered off-screen.  By making the side menu bar
+     * container a "root" itself, the safe areas will be applied to the layout, even when
+     * the menu is off-screen.  Then there is no "jerk" when it transitions in.</p>
+     * 
+     * @param root True to make this a root.  False to make it "not" a root.
+     * 
+     * @since 7.0
+     * @see #isSafeAreaRoot() 
+     */
+    public void setSafeAreaRoot(boolean root) {
+        this.safeAreaRoot = root;
+    }
+    
+    /**
+     * Checks if this container is a safe area root.  A safe area root is a container
+     * against whose bounds, safe area margins are calculated for child components.
+     * 
+     * <p>Forms are safe area roots by default.</p>
+     * @return 
+     * @since 7.0
+     * @see #setSafeAreaRoot(boolean) 
+     */
+    public boolean isSafeAreaRoot() {
+        return safeAreaRoot;
+    }
+    
+    /**
+     * Gets the Safe area "root" container for this container.  This method will walk 
+     * up the component hierarchy until is finds a Container with {@link #isSafeAreaRoot() } true.
+     * 
+     * <p>Forms are safe area roots by default, but it is possible to mark other containers 
+     * as safe area roots.</p>
+     * 
+     * <p>A safe area root is a container from which safe area margins are applied when 
+     * calculating the safe areas of child components.  Setting a root can facilitate the 
+     * layout of a container's children before it appears on the screen.</p>
+     * @return 
+     * @since 7.0
+     */
+    public Container getSafeAreaRoot() {
+        if (safeAreaRoot) {
+            return this;
+        }
+        Container parent = getParent();
+        if (parent != null) {
+            return parent.getSafeAreaRoot();
+        }
+        return null;
     }
     
     /**
@@ -1911,7 +1993,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param checkParents True to check parents too.  False to just check this container.
      * @return 
      */
-    private boolean isSafeAreaInternal(boolean checkParents) {
+    private boolean isSafeAreaInternal(boolean checkParents) {        
         if (safeArea) {
             return true;
         }
@@ -1933,15 +2015,34 @@ public class Container extends Component implements Iterable<Component>{
         if (!isInitialized()) {
             return false;
         }
-        Form f = getComponentForm();
-        if (f == null) {
+        Container safeAreaRoot = getSafeAreaRoot();
+        if (safeAreaRoot == null) {
             return false;
         }
-        Rectangle safeArea = f.getSafeArea();
+        Rectangle rect = Display.impl.getDisplaySafeArea(new Rectangle());
+        int safeLeftMargin = rect.getX();
+        int safeRightMargin = CN.getDisplayWidth() - rect.getWidth() - rect.getX();
+        int safeTopMargin = rect.getY();
+        int safeBottomMargin = CN.getDisplayHeight() - rect.getHeight() - rect.getY();
+        if (safeLeftMargin == 0 && safeRightMargin == 0 && safeBottomMargin == 0 && safeTopMargin == 0) {
+            return false;
+        }
+        rect.setWidth(Math.max(0, safeAreaRoot.getWidth() - safeLeftMargin - safeRightMargin));
+        rect.setHeight(Math.max(0, safeAreaRoot.getHeight() - safeTopMargin - safeBottomMargin));
+        if (rect.getWidth() == 0 || rect.getHeight() == 0) {
+            return false;
+        }
+        Rectangle safeArea = rect;
+        //Form f = getComponentForm();
+        //if (f == null) {
+        //    return false;
+        //}
         
-        if (safeArea.getX() == 0 && safeArea.getY() == 0 && safeArea.getWidth() == CN.getDisplayWidth() && safeArea.getHeight() == CN.getDisplayHeight()) {
-            return false;
-        }
+        //Rectangle safeArea = f.getSafeArea();
+        
+        //if (safeArea.getX() == 0 && safeArea.getY() == 0 && safeArea.getWidth() == CN.getDisplayWidth() && safeArea.getHeight() == CN.getDisplayHeight()) {
+        //    return false;
+        //}
         Style style = getStyle();
         int safeX1 = safeArea.getX();
         int safeX2 = safeArea.getWidth() + safeX1;
@@ -1964,7 +2065,7 @@ public class Container extends Component implements Iterable<Component>{
         
             
         
-        int absX = getAbsoluteX();
+        int absX = getAbsoluteX() - safeAreaRoot.getAbsoluteX();
         int w = getWidth();
         int absX2 = absX + w;
 
@@ -1975,7 +2076,7 @@ public class Container extends Component implements Iterable<Component>{
             newPaddingRight = absX2 - safeX2;
         }
             
-        int absY = getAbsoluteY();
+        int absY = getAbsoluteY() - safeAreaRoot.getAbsoluteY();
         int h = getHeight();
         int absY2 = absY + h;
         
@@ -1992,11 +2093,11 @@ public class Container extends Component implements Iterable<Component>{
             return false;
         }
         
-        if (absX2 > CN.getDisplayWidth()) {
+        if (absX2 > safeAreaRoot.getWidth()) {
             return false;
         }
         
-        if (absY2 > CN.getDisplayHeight()) {
+        if (absY2 > safeAreaRoot.getHeight()) {
             return false;
         }
 
