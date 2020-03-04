@@ -343,7 +343,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                     if (e.getSource() instanceof Button) {
                         Button b = (Button)e.getSource();
                         if (state != b.getState()) {
-                            System.out.println("Binding state change "+b.getState());
                             setState(b.getState());
                             repaint();
                         }
