@@ -1,0 +1,9 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+GrayIcon {
+	color: #ff0000;
+	font-size: 6mm;
+	font-family: 'native:MainRegular';
+}

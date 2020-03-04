@@ -26,10 +26,15 @@ import com.codename1.ui.Button;
 import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.SelectableIconHolder;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
@@ -50,15 +55,16 @@ import java.util.Vector;
  * @see SpanButton
  * @author Shai Almog
  */
-public class MultiButton extends Container implements ActionSource {
+public class MultiButton extends Container implements ActionSource, SelectableIconHolder {
     private Label firstRow = new Label("MultiButton");
     private Label secondRow = new Label();
     private Label thirdRow = new Label();
     private Label forthRow = new Label();
-    private Label icon = new Label();
+    private Button icon = new Button();
     private Button emblem = new Button();
     private boolean invert;
-    private String group;  
+    private String group; 
+    private int gap;
     
     /**
      * Initializes a multibutton with the first line of text
@@ -104,12 +110,14 @@ public class MultiButton extends Container implements ActionSource {
         icon.setName("icon");
         emblem.setName("emblem");
         emblem.setUIID("Emblem");
+        icon.setUIID("Label");
         setLeadComponent(emblem);
         setUIID("MultiButton");
         Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
         if(i != null) {
             emblem.setIcon(i);
         }
+        icon.bindStateTo(emblem);
     }
     
     /**
@@ -644,6 +652,7 @@ public class MultiButton extends Container implements ActionSource {
      */
     public void setIcon(Image i) {
         icon.setIcon(i);
+        updateGap();
     }
     
     /**
@@ -688,7 +697,8 @@ public class MultiButton extends Container implements ActionSource {
             removeComponent(icon.getParent());
         }
         addComponent(t, icon.getParent());
-        revalidate();
+        updateGap();
+        revalidateWithAnimationSafety();
     }
     
     /**
@@ -716,7 +726,7 @@ public class MultiButton extends Container implements ActionSource {
             removeComponent(emblem.getParent());
         }
         addComponent(t, emblem.getParent());
-        revalidate();
+        revalidateWithAnimationSafety();
     }
     
     /**
@@ -1131,5 +1141,186 @@ public class MultiButton extends Container implements ActionSource {
      */
     public void setGroup(ButtonGroup bg) {
         bg.add((RadioButton)emblem);
+    }
+
+   /**
+     * {@inheritDoc }
+     * @since 7.0
+     * 
+     */
+    @Override
+    public void setGap(int gap) {
+        if (gap != this.gap) {
+            this.gap = gap;
+            updateGap();
+        }
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public int getGap() {
+        return gap;
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setTextPosition(int textPosition) {
+        switch (textPosition) {
+            case Component.TOP:
+                setIconPosition(BorderLayout.SOUTH);
+                break;
+            case Component.BOTTOM:
+                setIconPosition(BorderLayout.NORTH);
+                break;
+            case Component.LEFT:
+                setIconPosition(BorderLayout.EAST);
+                break;
+            case Component.RIGHT:
+                setIconPosition(BorderLayout.WEST);
+                break;
+            default:
+                setIconPosition(BorderLayout.EAST);
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public int getTextPosition() {
+        String iconPosition = getIconPosition();
+        if (BorderLayout.NORTH.equals(iconPosition)) {
+            return Component.BOTTOM;
+        }
+        if (BorderLayout.SOUTH.equals(iconPosition)) {
+            return Component.TOP;
+        }
+        if (BorderLayout.EAST.equals(iconPosition)) {
+            return Component.LEFT;
+        }
+        if (BorderLayout.WEST.equals(iconPosition)) {
+            return Component.RIGHT;
+        }
+        return Component.LEFT;
+        
+    }
+    
+    
+    private void updateGap() {
+        if (getIcon() == null) {
+            $(icon).setMargin(0);
+        } else if (BorderLayout.NORTH.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, 0, gap, 0);
+        } else if (BorderLayout.SOUTH.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(gap, 0, 0, 0);
+        } else if (BorderLayout.EAST.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, 0, 0, gap);
+        } else if (BorderLayout.WEST.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, gap, 0, 0);
+        }
+    }
+    
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Component getIconStyleComponent() {
+        return icon;
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverIcon(Image arg0) {
+        icon.setRolloverIcon(arg0);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getRolloverIcon() {
+        return icon.getRolloverIcon();
+    }
+
+    
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setPressedIcon(Image arg0) {
+        icon.setPressedIcon(arg0);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getPressedIcon() {
+        return icon.getPressedIcon();
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setDisabledIcon(Image arg0) {
+        icon.setDisabledIcon(arg0);
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getDisabledIcon() {
+        return icon.getDisabledIcon();
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverPressedIcon(Image icn) {
+        icon.setRolloverPressedIcon(icn);
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getRolloverPressedIcon() {
+        return icon.getRolloverPressedIcon();
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getIconFromState() {
+        return icon.getIconFromState();
     }
 }

@@ -3678,12 +3678,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setIcon(Image icon) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setIcon(icon);
-            } else if (c instanceof SpanLabel) {
-                ((SpanLabel)c).setIcon(icon);
-            } else if (c instanceof SpanButton) {
-                ((SpanButton)c).setIcon(icon);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setIcon(icon);
             }
         }
         return this;
@@ -3806,8 +3802,24 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setTextPosition(int pos) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setTextPosition(pos);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setTextPosition(pos);
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Sets the Icon UIID of elements in found set.
+     * @param uiid The UIID for icons.
+     * @return Self for chaining.
+     * @see IconHolder#setIconUIID(java.lang.String) 
+     * @since 7.0
+     */
+    public ComponentSelector setIconUIID(String uiid) {
+        for (Component c : this) {
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setIconUIID(uiid);
             }
         }
         return this;
@@ -3822,8 +3834,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setGap(int gap) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setGap(gap);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setGap(gap);
             }
         }
         return this;
@@ -4170,6 +4182,20 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return setPadding(padding, padding, padding, padding);
     }
     
+    
+    /**
+     * Strips margin and padding from components in found set.
+     * 
+     * @return Self for chaining.
+     * @see Style#stripMarginAndPadding() 
+     * 
+     * @since 7.0
+     */
+    public ComponentSelector stripMarginAndPadding() {
+        Style s = currentStyle();
+        s.stripMarginAndPadding();
+        return this;
+    }
     
     /**
      * Sets padding to all components in found set.

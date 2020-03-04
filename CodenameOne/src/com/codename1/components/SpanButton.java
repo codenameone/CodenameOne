@@ -26,8 +26,13 @@ import com.codename1.ui.Button;
 import static com.codename1.ui.CN.EAST;
 import static com.codename1.ui.CN.WEST;
 import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.SelectableIconHolder;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
@@ -48,8 +53,9 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container implements ActionSource {
+public class SpanButton extends Container implements ActionSource, SelectableIconHolder {
 
+    private int gap = Label.getDefaultGap();
     private Button actualButton;
     private TextArea text;
     private boolean shouldLocalize = true;
@@ -98,6 +104,21 @@ public class SpanButton extends Container implements ActionSource {
         center.getStyle().setPadding(0, 0, 0, 0);
         addComponent(BorderLayout.CENTER, center);
         setLeadComponent(actualButton);
+        updateGap();
+    }
+    
+    private void updateGap() {
+        if (getIcon() == null) {
+            $(actualButton).setMargin(0);
+        } else if (BorderLayout.NORTH.equals(getIconPosition())) {
+            $(actualButton).selectAllStyles().setMargin(0, 0, gap, 0);
+        } else if (BorderLayout.SOUTH.equals(getIconPosition())) {
+            $(actualButton).selectAllStyles().setMargin(gap, 0, 0, 0);
+        } else if (BorderLayout.EAST.equals(getIconPosition())) {
+            $(actualButton).selectAllStyles().setMargin(0, 0, 0, gap);
+        } else if (BorderLayout.WEST.equals(getIconPosition())) {
+            $(actualButton).selectAllStyles().setMargin(0, gap, 0, 0);
+        }
     }
 
     /**
@@ -125,6 +146,15 @@ public class SpanButton extends Container implements ActionSource {
     public String getTextUIID() {
         return text.getUIID();
     }
+    
+    /**
+     * Gets the component used for styling font icons on this SpanLabel.
+     * @return The component used for styling font icons on this SpanLabel.
+     * @since 7.0
+     */
+    public Component getIconStyleComponent() {
+        return actualButton.getIconStyleComponent();
+    }
 
     /**
      * Returns the Style proxy object for the text of this span button.
@@ -151,6 +181,7 @@ public class SpanButton extends Container implements ActionSource {
      */
     public void setIconUIID(String uiid) {
         actualButton.setUIID(uiid);
+        updateGap();
     }
 
     /**
@@ -189,6 +220,7 @@ public class SpanButton extends Container implements ActionSource {
      */
     public void setIcon(Image i) {
         actualButton.setIcon(i);
+        updateGap();
     }
 
     /**
@@ -253,7 +285,8 @@ public class SpanButton extends Container implements ActionSource {
     public void setIconPosition(String t) {
         removeComponent(actualButton);
         addComponent(t, actualButton);
-        revalidate();
+        updateGap();
+        revalidateWithAnimationSafety();
     }
 
     /**
@@ -474,6 +507,94 @@ public class SpanButton extends Container implements ActionSource {
             
         }
         
+    }
+
+    @Override
+    public void setGap(int gap) {
+        if (gap != this.gap) {
+            this.gap = gap;
+            updateGap();
+        }
+    }
+
+    @Override
+    public int getGap() {
+        return gap;
+    }
+
+    /**
+     * {@inheritDoc }
+     * 
+     */
+    @Override
+    public void setTextPosition(int textPosition) {
+        switch (textPosition) {
+            case Component.TOP:
+                setIconPosition(BorderLayout.SOUTH);
+                break;
+            case Component.BOTTOM:
+                setIconPosition(BorderLayout.NORTH);
+                break;
+            case Component.LEFT:
+                setIconPosition(BorderLayout.EAST);
+                break;
+            case Component.RIGHT:
+                setIconPosition(BorderLayout.WEST);
+                break;
+            default:
+                setIconPosition(BorderLayout.EAST);
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc }
+     * 
+     */
+    @Override
+    public int getTextPosition() {
+        String iconPosition = getIconPosition();
+        if (BorderLayout.NORTH.equals(iconPosition)) {
+            return Component.BOTTOM;
+        }
+        if (BorderLayout.SOUTH.equals(iconPosition)) {
+            return Component.TOP;
+        }
+        if (BorderLayout.EAST.equals(iconPosition)) {
+            return Component.LEFT;
+        }
+        if (BorderLayout.WEST.equals(iconPosition)) {
+            return Component.RIGHT;
+        }
+        return Component.LEFT;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverPressedIcon(Image arg0) {
+        actualButton.setRolloverPressedIcon(arg0);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getRolloverPressedIcon() {
+        return actualButton.getRolloverIcon();
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public Image getIconFromState() {
+        return actualButton.getIconFromState();
     }
     
     

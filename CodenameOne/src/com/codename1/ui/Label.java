@@ -51,7 +51,7 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * @author Chen Fishbein
  */
-public class Label extends Component {
+public class Label extends Component implements IconHolder {
     
     private final ActionListener iconChangeListener = new ActionListener() {
         @Override
@@ -75,6 +75,8 @@ public class Label extends Component {
     
     private Image icon;
     private Image maskedIcon;
+
+    private Component iconStyleComponent;
     
     private int valign = BOTTOM;
 
@@ -237,6 +239,30 @@ public class Label extends Component {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /**
+     * Sets a UIID to be used for the material icon style.
+     * @param uiid The uiid to use for the material icon style. 
+     * @since 7.0
+     */
+    public void setIconUIID(String uiid) {
+        iconStyleComponent = new Component(){};
+        iconStyleComponent.setUIID(uiid);
+    }
+    
+    /**
+     * Gets the component that should be used for styling material the material icon.  If {@link #setIconUIID(java.lang.String) } has been used
+     * to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
+     * itself.
+     * @return The component to use for styling the material icon.
+     * @since 7.0
+     */
+    public Component getIconStyleComponent() {
+        if (iconStyleComponent != null) {
+            return iconStyleComponent;
+        }
+        return this;
     }
     
     /**
@@ -451,6 +477,7 @@ public class Label extends Component {
      * 
      * @param icon the image that the label presents.
      */
+    @Override
     public void setIcon(Image icon){
         if(this.icon == icon) {
             return;
@@ -494,6 +521,7 @@ public class Label extends Component {
      * 
      * @return the labels icon
      */
+    @Override
     public Image getIcon(){
         return icon;
     }
@@ -566,6 +594,7 @@ public class Label extends Component {
      * @see #BOTTOM
      * @see #TOP
      */
+    @Override
     public void setTextPosition(int textPosition) {
         if (textPosition != LEFT && textPosition != RIGHT && textPosition != BOTTOM && textPosition != TOP) {
             throw new IllegalArgumentException("Text position can't be set to " + textPosition);
@@ -583,6 +612,7 @@ public class Label extends Component {
      * @see #BOTTOM
      * @see #TOP
      */
+    @Override
     public int getTextPosition(){
         return textPosition;
     }
@@ -601,6 +631,7 @@ public class Label extends Component {
      * 
      * @return the gap in pixels between the icon/text to the Label boundaries
      */
+    @Override
     public int getGap() {
         return gap;
     }
@@ -1378,5 +1409,13 @@ public class Label extends Component {
         }
         return textSelectionSupport;
     };
+
+    @Override
+    public String getIconUIID() {
+        if (iconStyleComponent != null) {
+            return iconStyleComponent.getUIID();
+        }
+        return getUIID();
+    }
             
 }
