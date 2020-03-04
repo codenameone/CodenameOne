@@ -1229,6 +1229,17 @@ public class Style {
     }
 
     /**
+     * Strips all margin and padding from this style.
+     * 
+     * @since 7.0
+     */
+    public void stripMarginAndPadding() {
+        setPadding(0, 0, 0, 0);
+        setMargin(0, 0, 0, 0);
+        setBorder(Border.createEmpty());
+    }
+    
+    /**
      * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      *  
      * @param top number of units to pad the top
