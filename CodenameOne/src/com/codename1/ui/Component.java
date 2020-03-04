@@ -6605,6 +6605,19 @@ public class Component implements Animation, StyleListener, Editable {
     protected boolean shouldBlockSideSwipe() {
         return isScrollableX() || (parent != null && parent.shouldBlockSideSwipe());
     }
+    
+    /**
+     * A component that might need side swipe such as the slider
+     * could block it from being used for some other purpose when
+     * on top of said component.
+     * 
+     * This method is merely a public accessor for {@link #shouldBlockSideSwipe() }.
+     * 
+     * @since 7.0
+     */
+    public final boolean blocksSideSwipe() {
+        return shouldBlockSideSwipe();
+    }
 
     /**
      * Makes the component effectively opaque by blending the backgrounds into an image in memory so the layer of underlying components
