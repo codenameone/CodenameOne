@@ -333,6 +333,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     /**
      * A listener used to bind the state with another button.  When that button's state
      * changes, then this button state will also change.
+     * @since 7.0
      */
     private ActionListener bindListener;
     private ActionListener bindListener() {
@@ -358,6 +359,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * button's state changes, this button will change its state to match.
      * @param button The button whose state to bind to.
      * @see #unbindStateFrom(com.codename1.ui.Button) 
+     * @since 7.0
      */
     public void bindStateTo(Button button) {
         button.addStateChangeListener(bindListener());
@@ -544,6 +546,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
     }
     
+    /**
+     * Adds a listener to be notified when the button state changes. 
+     * @param l Listener to be notified when state changes
+     * @see #getState() 
+     * @see #setState(int) 
+     * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
     public void addStateChangeListener(ActionListener l) {
         if (stateChangeListeners == null) {
             stateChangeListeners = new EventDispatcher();
@@ -551,6 +561,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         stateChangeListeners.addListener(l);
     }
     
+    /**
+     * Removes state change listener.
+     * @param l State change listener to remove.
+     * @see #addStateChangeListener(com.codename1.ui.events.ActionListener) 
+     * @see #getState() 
+     * @see #setState(int) 
+     * @since 7.0
+     */
     public void removeStateChangeListener(ActionListener l) {
         if (stateChangeListeners != null) {
             stateChangeListeners.removeListener(l);
