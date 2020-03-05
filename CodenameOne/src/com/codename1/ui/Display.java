@@ -3349,6 +3349,18 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Gets the display safe area as a rectangle.  
+     * @param rect Out parameter that will store the display safe area.
+     * @return The display safe area.
+     * @see Form#getSafeArea() 
+     * @since 7.0
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        return impl.getDisplaySafeArea(rect);
+    }
+    
+    
+    /**
      * Installs a replacement sound as the builtin sound responsible for the given
      * sound identifier (this will override the system sound if such a sound exists).
      *
