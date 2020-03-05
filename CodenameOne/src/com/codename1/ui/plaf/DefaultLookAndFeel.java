@@ -1487,10 +1487,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
                         g.drawImage(icon, x + strWidth + gap, y);
                     } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
                         strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
-
-                        g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
+                        drawLabelImageValign(g, l, icon, x + strWidth + gap, y, fontHeight, iconHeight);
                     }
                     break;
                 case Label.RIGHT:
@@ -1499,8 +1497,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         g.drawImage(icon, x, y);
                         drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);
                     } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
-                        g.drawImage(icon, x, y + iconStringHGap);
+                        drawLabelImageValign(g, l, icon, x, y, fontHeight, iconHeight);
                         drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceX, textSpaceW);
                     }
                     break;
@@ -1533,17 +1530,60 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
+    private void drawLabelImageValign(Graphics g, Label l, Image icon, int x, int y, int fontHeight, int iconHeight) {
+        int iconStringHGap = (fontHeight - iconHeight) / 2;
+        //int strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
+        switch (l.getVerticalAlignment()) {
+            case Component.TOP:
+                g.drawImage(icon, x, y + iconStringHGap);
+                break;
+            case Component.BOTTOM:
+                g.drawImage(icon, x, y + fontHeight - iconHeight);
+                break;
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                iconStringHGap = textFont.getAscent() - iconFont.getAscent();
+                g.drawImage(icon, x, y + iconStringHGap);
+                break;
+            default:
+                g.drawImage(icon, x, y + iconStringHGap);
+
+        }
+    }
+    
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
      */
     private int drawLabelStringValign(Graphics g, Label l, String str, int x, int y,
             int iconStringHGap, int iconHeight, int textSpaceX, int textSpaceW, int fontHeight) {
+        if (str.length() == 0) {
+            return 0;
+        }
         switch (l.getVerticalAlignment()) {
             case Component.TOP:
                 return drawLabelString(g, l, str, x, y, textSpaceX, textSpaceW);
             case Component.CENTER:
                 return drawLabelString(g, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceX, textSpaceW);
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                int ascentDiff = iconFont.getAscent() - textFont.getAscent();
+                return drawLabelString(g, l, str, x, y + ascentDiff, textSpaceX, textSpaceW);
+                
             default:
                 return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceX, textSpaceW);
         }
@@ -1556,6 +1596,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 return calculateSpanForLabelString(sel, l, str, x, y, textSpaceW);
             case Component.CENTER:
                 return calculateSpanForLabelString(sel, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW);
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                int ascentDiff = iconFont.getAscent() - textFont.getAscent();
+                return calculateSpanForLabelString(sel, l, str, x, y + ascentDiff, textSpaceW);
             default:
                 return calculateSpanForLabelString(sel, l, str, x, y + iconStringHGap, textSpaceW);
         }
@@ -1566,6 +1617,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * assuming the icon is in one of the sides
      */
     private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceX, int textSpaceW) {
+        if (text.length() == 0) {
+            return 0;
+        }
         Style style = l.getStyle();
 
         int cx = g.getClipX();

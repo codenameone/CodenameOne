@@ -541,7 +541,7 @@ public class Label extends Component implements IconHolder {
     }
     
     /**
-     * Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM
+     * Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM, BASELINE
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
@@ -549,9 +549,10 @@ public class Label extends Component implements IconHolder {
      * @see #CENTER
      * @see #TOP
      * @see #BOTTOM
+     * @see #BASELINE
      */
     public void setVerticalAlignment(int valign) {
-        if(valign != CENTER && valign != TOP && valign != BOTTOM){
+        if(valign != CENTER && valign != TOP && valign != BOTTOM && valign != BASELINE){
             throw new IllegalArgumentException("Alignment can't be set to " + valign);
         }
         this.valign = valign;
@@ -563,10 +564,11 @@ public class Label extends Component implements IconHolder {
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
-     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM
+     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM, BASELINE
      * @see #CENTER
      * @see #TOP
      * @see #BOTTOM
+     * @see #BASELINE
      */
     public int getVerticalAlignment(){
         return valign;
