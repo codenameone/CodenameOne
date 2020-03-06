@@ -716,8 +716,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                 state=STATE_ROLLOVER;
                 fireStateChange();
             }
-            fireActionEvent(x, y);
-        
+            if (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1)) {
+                fireActionEvent(x, y);
+            }
+            
             repaint();
         }
     }
@@ -727,6 +729,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     public void keyPressed(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
+            pressedX = -1;
+            pressedY = -1;
             pressed();
         }
     }
@@ -779,6 +783,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
     }
 
+    private int pressedX, pressedY;
+    
     /**
      * {@inheritDoc}
      */
@@ -788,6 +794,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
+        pressedX = x;
+        pressedY = y;
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
