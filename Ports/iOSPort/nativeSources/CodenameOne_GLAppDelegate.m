@@ -172,8 +172,20 @@ static void installSignalHandlers() {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
-    NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
-    [self cn1RoutePush:userInfo];
+    // On iOS 10+, push messages received while in the background are handled
+    // by userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:
+    // If we additionally handle it here, then the push callback will be called twice,
+    // so make sure that we skip this for iOS 10+
+    BOOL handlePushHere = YES;
+    if (@available(iOS 10, *)) {
+        if (isIOS10()) {
+            handlePushHere = NO;
+        }
+    }
+    if (handlePushHere) {
+        NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
+        [self cn1RoutePush:userInfo];
+    }
     
     
 #endif
