@@ -119,6 +119,8 @@ public class Label extends Component implements IconHolder {
     private Font font;
     private char fontIcon;
     private float fontIconSize = -1;
+    private String badgeText;
+    private Component badgeStyleComponent;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -241,6 +243,64 @@ public class Label extends Component implements IconHolder {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
+    /**
+     * Sets the badge text to be used on this label.  Badges are rendered in the 
+     * upper right corner of the label inside round border.  The style of the badge can be 
+     * configured using {@link #setBadgeUIID(java.lang.String) }, but the default style uses
+     * the "Badge" UIID, which, by default, uses white text on a red round border background.
+     * 
+     * @param badgeText The text to include in the badge.   null or empty strings will result in the 
+     * badge not being rendered.
+     * @since 7.0
+     * @see #getBadgeText() 
+     * @see #getBadgeStyleComponent() 
+     * @see #setBadgeUIID(java.lang.String) 
+     */
+    public void setBadgeText(String badgeText) {
+        this.badgeText = badgeText;
+    }
+    
+    /**
+     * Gets the text to be used in a badge on this label.
+     * @return the badge text to be used on this label.  May return if no text is set.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #setBadgeUIID(java.lang.String) 
+     * @see #getBadgeStyleComponent() 
+     */
+    public String getBadgeText() {
+        return badgeText;
+    }
+    
+    /**
+     * Sets the style that should be used for rendering badges.  By default it will use
+     * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
+     * 
+     * @param badgeUIID The UIID to use for the badge.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #getBadgeStyleComponent() 
+     */
+    public void setBadgeUIID(String badgeUIID) {
+        if (badgeStyleComponent == null) {
+            badgeStyleComponent = new Label();
+            
+        }
+        badgeStyleComponent.setUIID(badgeUIID);
+    }
+    
+    /**
+     * Gets a component that can be used for the style of the badge.  
+     * @return The component whose style can be used to style the badge.  May return null if none set.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #setBadgeUIID(java.lang.String) 
+     * @see #getBadgeText() 
+     */
+    public Component getBadgeStyleComponent() {
+        return badgeStyleComponent;
+    }
+
     /**
      * Sets a UIID to be used for the material icon style.
      * @param uiid The uiid to use for the material icon style. 
@@ -663,11 +723,13 @@ public class Label extends Component implements IconHolder {
         return super.paramString() + ", text = " +getText() + ", gap = " + gap;
     }
     
+    
+    
     /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(legacyRenderer) {
+        if(legacyRenderer || (badgeText != null && badgeText.length() > 0)) {
             initAutoResize();
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;

@@ -2690,17 +2690,10 @@ public class Form extends Container {
         }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
-                if (focused.hasLead) {
-                    Container leadParent;
-                    if (focused instanceof Container) {
-                        leadParent = ((Container) focused).getLeadParent();
-                    } else {
-                        leadParent = focused.getParent().getLeadParent();
-                    }
-                    leadParent.getLeadComponent().longPointerPress(x, y);
-                } else {
-                    focused.longPointerPress(x, y);
-                }
+                
+                Component leadComponent = leadComponent(focused);
+                leadComponent.longPointerPress(x, y);
+                
             }
         }
     }
@@ -3153,11 +3146,15 @@ public class Form extends Container {
         while (cmp != null && cmp.isIgnorePointerEvents()) {
             cmp = cmp.getParent();
         }
-        if (cmp != null && isCurrentlyScrolling(cmp)) {
-        	cancelScrolling(cmp);
-        	cmp.initDragAndDrop(x, y);
-            Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
-            return true;
+        if (cmp != null) {
+            Component leadComponent = leadComponent(cmp);
+            Component leadParent = leadParent(cmp);
+            if (isCurrentlyScrolling(leadComponent)) {
+                cancelScrolling(leadComponent);
+                leadComponent.initDragAndDrop(x, y);
+                Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
+                return true;
+            }
         }
         return false;
     }
@@ -3167,10 +3164,12 @@ public class Form extends Container {
     
     private void setPressedCmp(Component cmp) {
         pressedCmp = cmp;
+        Component leadParent = leadParent(cmp);
+        Component leadComponent = leadComponent(cmp);
         if (cmp == null) {
             pressedCmpAbsBounds.setBounds(0,0,0,0);
         } else {
-            pressedCmpAbsBounds.setBounds(pressedCmp.getAbsoluteX(), pressedCmp.getAbsoluteY(), pressedCmp.getWidth(), pressedCmp.getHeight());
+            pressedCmpAbsBounds.setBounds(leadParent.getAbsoluteX(), leadParent.getAbsoluteY(), leadParent.getWidth(), leadParent.getHeight());
         }
         
     }
@@ -3233,46 +3232,30 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                cmp.initDragAndDrop(x, y);
+                
+                
+                Component leadComponent = leadComponent(cmp);
+                Component leadParent = leadParent(cmp);
+                leadComponent.initDragAndDrop(x, y);
+                if (isCurrentlyScrolling(leadComponent)) {
+                    dragStopFlag = true;
+                    leadComponent.clearDrag();
+                    return;
+                }
                 if (cmp.hasLead) {
-
-                    if (isCurrentlyScrolling(cmp)) {
-                        dragStopFlag = true;
-                        cmp.clearDrag();
-                        return;
-                    }
-
-                    Container leadParent;
-                    if (cmp instanceof Container) {
-                        leadParent = ((Container) cmp).getLeadParent();
-                    } else {
-                        leadParent = cmp.getParent().getLeadParent();
-                    }
                     leadParent.repaint();
-                    if (!isScrollWheeling) {
+                }
+                if (leadParent.isEnabled()) {
+                    if (!isScrollWheeling && leadParent.isFocusable()) {
                         setFocused(leadParent);
                     }
-                    setPressedCmp(cmp.getLeadComponent());
-                    cmp.getLeadComponent().pointerPressed(x, y);
-                } else {
-                    
-                    if (isCurrentlyScrolling(cmp)) {
-                        dragStopFlag = true;
-                        cmp.clearDrag();
-                        return;
-                    }
-                    
-                    if (cmp.isEnabled()) {
-                        if (!isScrollWheeling && cmp.isFocusable()) {
-                            setFocused(cmp);
-                        }
-                        setPressedCmp(cmp);
-                        
-                        cmp.pointerPressed(x, y);
-                        tactileTouchVibe(x, y, cmp);
-                        initRippleEffect(x, y, cmp);
-                    }
+                    setPressedCmp(leadComponent);
+
+                    leadComponent.pointerPressed(x, y);
+                    tactileTouchVibe(x, y, leadParent);
+                    initRippleEffect(x, y, leadParent);
                 }
+                
             }
         } else {
             if(y < actual.getY()) {
@@ -3281,25 +3264,18 @@ public class Form extends Container {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null) {
+                    
+                    Component leadComponent = leadComponent(cmp);
+                    Component leadParent = leadParent(cmp);
+                    setPressedCmp(leadComponent);
+                    leadComponent.pointerPressed(x, y);
                     if (cmp.hasLead) {
-                        Container leadParent;
-                        if (cmp instanceof Container) {
-                            leadParent = ((Container) cmp).getLeadParent();
-                        } else {
-                            leadParent = cmp.getParent().getLeadParent();
-                        }
-                        leadParent.repaint();
-                        if (!isScrollWheeling) {
+                        if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled()) {
                             setFocused(leadParent);
                         }
-                        setPressedCmp(cmp.getLeadComponent());
-                        cmp.getLeadComponent().pointerPressed(x, y);
-                    } else {
-                        setPressedCmp(cmp);
-                        cmp.pointerPressed(x, y);
                     }
-                    tactileTouchVibe(x, y, cmp);
-                    initRippleEffect(x, y, cmp);
+                    tactileTouchVibe(x, y, leadParent);
+                    initRippleEffect(x, y, leadParent);
                 }   
             } else {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3308,24 +3284,21 @@ public class Form extends Container {
                     while (cmp != null && cmp.isIgnorePointerEvents()) {
                         cmp = cmp.getParent();
                     }
-                    if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                        if(cmp.hasLead) {
-                            Container leadParent;
-                            if (cmp instanceof Container) {
-                                leadParent = ((Container) cmp).getLeadParent();
-                            } else {
-                                leadParent = cmp.getParent().getLeadParent();
-                            }
+                    if (cmp != null ) {
+                        Component leadComponent = leadComponent(cmp);
+                        Component leadParent = leadParent(cmp);
+                        if(cmp.hasLead && leadParent.isFocusable() && leadParent.isEnabled()) {
+                            
                             if (!isScrollWheeling) {
                                 setFocused(leadParent);
                             }
-                            cmp = cmp.getLeadComponent();
+                            
                         }
-                        cmp.initDragAndDrop(x, y);
-                        setPressedCmp(cmp);
-                        cmp.pointerPressed(x, y);
-                        tactileTouchVibe(x, y, cmp);
-                        initRippleEffect(x, y, cmp);
+                        leadComponent.initDragAndDrop(x, y);
+                        setPressedCmp(leadComponent);
+                        leadComponent.pointerPressed(x, y);
+                        tactileTouchVibe(x, y, leadParent);
+                        initRippleEffect(x, y, leadParent);
                     }   
                 }
             }
@@ -3459,10 +3432,15 @@ public class Form extends Container {
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
-            cmp.pointerDragged(x, y);
-            cmp.repaint();
-            if(cmp == pressedCmp && cmp.isStickyDrag()) {
-                stickyDrag = cmp;
+            Component leadParent = leadParent(cmp);
+            Component leadComponent = leadComponent(cmp);
+            
+            leadComponent.pointerDragged(x, y);
+            if (cmp.hasLead) {
+                leadParent.repaint();
+            }
+            if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
+                stickyDrag = leadComponent;
             }
         }
     }
@@ -3521,13 +3499,18 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
+            Component leadComponent = leadComponent(cmp);
+            Component leadParent = leadParent(cmp);
+            
+            if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled()) {
+                setFocused(leadParent);
             }
-            cmp.pointerDragged(x, y);
-            cmp.repaint();
-            if(cmp == pressedCmp && cmp.isStickyDrag()) {
-                stickyDrag = cmp;
+            leadComponent.pointerDragged(x, y);
+            if (cmp.hasLead) {
+                leadParent.repaint();
+            }
+            if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
+                stickyDrag = leadComponent;
             }
         }
     }
@@ -3551,7 +3534,10 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            cmp.pointerHoverReleased(x, y);
+            Component leadComponent = leadComponent(cmp);
+            //Component leadParent = leadComponent(cmp);
+            
+            leadComponent.pointerHoverReleased(x, y);
         }
     }
 
@@ -3567,10 +3553,14 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
-                setFocused(cmp);
+            Component leadComponent = leadComponent(cmp);
+            Component leadParent = leadParent(cmp);
+            
+            
+            if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled() && !Display.getInstance().isDesktop()) {
+                setFocused(leadParent);
             }
-            cmp.pointerHoverPressed(x, y);
+            leadComponent.pointerHoverPressed(x, y);
         }
     }
 
@@ -3591,10 +3581,13 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
-                    setFocused(cmp);
+                Component leadComponent = leadComponent(cmp);
+                Component leadParent = leadParent(cmp);
+                
+                if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled() && !Display.getInstance().isDesktop()) {
+                    setFocused(leadParent);
                 }
-                cmp.pointerHover(x, y);
+                leadComponent.pointerHover(x, y);
             }
         }
     }
@@ -3645,6 +3638,30 @@ public class Form extends Container {
             }
         }
         return b;
+    }
+    
+    private Component leadParent(Component cmp) {
+        if (cmp == null) {
+            return null;
+        }
+        if (cmp.hasLead) {
+            if (cmp instanceof Container) {
+                return ((Container)cmp).getLeadParent();
+            } else {
+                return cmp.getParent().getLeadParent();
+            }
+        }
+        return cmp;
+    }
+    
+    private Component leadComponent(Component cmp) {
+        if (cmp == null) {
+            return null;
+        }
+        if (cmp.hasLead) {
+            return cmp.getLeadComponent();
+        }
+        return cmp;
     }
 
     /**
@@ -3746,25 +3763,13 @@ public class Form extends Container {
                     while (cmp != null && cmp.isIgnorePointerEvents()) {
                         cmp = cmp.getParent();
                     }
-                     if (cmp.hasLead) {
-                        Container leadParent;
-                        if (cmp instanceof Container) {
-                            leadParent = ((Container) cmp).getLeadParent();
-                        } else {
-                            leadParent = cmp.getParent().getLeadParent();
-                        }
-                        leadParent.repaint();
-                        if (!isScrollWheeling) {
+                    Component leadParent = leadParent(cmp);
+                    Component leadComponent = leadComponent(cmp);
+                    if (leadParent.isEnabled()) {
+                        if (!isScrollWheeling && leadParent.isFocusable()) {
                             setFocused(leadParent);
                         }
-                        cmp.getLeadComponent().pointerReleased(x, y);
-                    } else {
-                        if (cmp.isEnabled()) {
-                            if (!isScrollWheeling && cmp.isFocusable()) {
-                                setFocused(cmp);
-                            }
-                            cmp.pointerReleased(x, y);
-                        }
+                        leadComponent.pointerReleased(x, y);
                     }
                     return;
                 }
@@ -3780,25 +3785,13 @@ public class Form extends Container {
                             cmp = cmp.getParent();
                         }
                         if (cmp != null && cmp.isEnabled()) {
-                            if (cmp.hasLead) {
-                                Container leadParent;
-                                if (cmp instanceof Container) {
-                                    leadParent = ((Container) cmp).getLeadParent();
-                                } else {
-                                    leadParent = cmp.getParent().getLeadParent();
-                                }
-                                leadParent.repaint();
-                                if (!isScrollWheeling) {
+                            Component leadParent = leadParent(cmp);
+                            Component leadComponent = leadComponent(cmp);
+                            if (leadParent.isEnabled()) {
+                                if (!isScrollWheeling && leadParent.isFocusable()) {
                                     setFocused(leadParent);
                                 }
-                                cmp.getLeadComponent().pointerReleased(x, y);
-                            } else {
-                                if (cmp.isEnabled()) {
-                                    if (!isScrollWheeling && cmp.isFocusable()) {
-                                        setFocused(cmp);
-                                    }
-                                    cmp.pointerReleased(x, y);
-                                }
+                                leadComponent.pointerReleased(x, y);
                             }
                         }
                     } else {
@@ -3807,26 +3800,15 @@ public class Form extends Container {
                             while (cmp != null && cmp.isIgnorePointerEvents()) {
                                 cmp = cmp.getParent();
                             }
-                            if (cmp != null && cmp.isEnabled()) {
+                            
+                            if (cmp != null) {
+                                Component leadComponent = leadComponent(cmp);
+                                Component leadParent = leadParent(cmp);
                                 
-                                if (cmp.hasLead && cmp.getLeadComponent() != null) {
-                                    Container leadParent;
-                                    if (cmp instanceof Container) {
-                                        leadParent = ((Container) cmp).getLeadParent();
-                                    } else {
-                                        leadParent = cmp.getParent().getLeadParent();
-                                    }
-                                    leadParent.repaint();
-                                    if (!isScrollWheeling) {
-                                        setFocused(leadParent);
-                                    }
-                                    cmp.getLeadComponent().pointerReleased(x, y);
-                                } else {
-                                    if (!isScrollWheeling && cmp.isFocusable()) {
-                                        setFocused(cmp);
-                                    }
-                                    cmp.pointerReleased(x, y);
+                                if (leadParent.isEnabled() && !isScrollWheeling && leadParent.isFocusable()) {
+                                    setFocused(leadParent);
                                 }
+                                leadComponent.pointerReleased(x, y);
                             }
                         } else {
                             Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3835,23 +3817,18 @@ public class Form extends Container {
                                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                                     cmp = cmp.getParent();
                                 }
-                                if (cmp != null && cmp.isEnabled()) {                                
-                                    if(cmp.hasLead) {
-                                        Container leadParent;
-                                        if (cmp instanceof Container) {
-                                            leadParent = ((Container) cmp).getLeadParent();
-                                        } else {
-                                            leadParent = cmp.getParent().getLeadParent();
-                                        }
+                                if (cmp != null) {                                
+                                    
+                                    Component leadComponent = leadComponent(cmp);
+                                    Component leadParent = leadParent(cmp);
+                                    if (cmp.hasLead) {
                                         leadParent.repaint();
-                                        if (!isScrollWheeling) {
-                                            setFocused(leadParent);
-                                        }
-                                        cmp = cmp.getLeadComponent();
-                                        cmp.pointerReleased(x, y);
-                                    } else {
-                                        cmp.pointerReleased(x, y);
                                     }
+                                    if (!isScrollWheeling && leadParent.isEnabled() && leadParent.isFocusable()) {
+                                        setFocused(leadParent);
+                                    }
+                                    leadComponent.pointerReleased(x, y);
+                                    
                                 }
                             }
                         }
