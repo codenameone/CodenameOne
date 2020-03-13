@@ -311,7 +311,6 @@ public class UIFragment {
                         l.setCenterBehavior(centerBehaviour(el.getAttribute("behavior")));
                     }
                 }
-                System.out.println("Border behaviour is "+l.getCenterBehavior());
                 return new Container(l);
             }
             if (name.startsWith("y")) {
