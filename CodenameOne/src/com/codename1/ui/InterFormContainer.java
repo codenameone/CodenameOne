@@ -155,13 +155,11 @@ public class InterFormContainer extends Container {
         } 
         
         g.translate(getX() - content.getX(), getY() - content.getY());
+        content.paintComponentBackground(g);
         content.paint(g);
         g.translate(content.getX() - getX(), content.getY() - getY());
     }
-    
-    
-    
-   
+
     /**
      * {@inheritDoc}
      */
@@ -170,6 +168,30 @@ public class InterFormContainer extends Container {
         return new Dimension(content.getPreferredW() + content.getStyle().getHorizontalMargins(), content.getPreferredH() + content.getStyle().getVerticalMargins());
     }
     
-    
+    /**
+     * Injects the given "content" as an InterFormContainer inside the component hierarchy
+     * rooted at "root"
+     * @param selector A selector to identify the component to add the container to.  See {@link ComponentSelector}.
+     * @param root The root container serving as a starting point for the selector search.
+     * @param content The content to inject.
+     * @return The InterFormContainer that was injected, or null if the selector didn't match any containers.
+     */
+    public static InterFormContainer inject(String selector, Container root, Component content) {
+        for (Component c : $(selector, root)) {
+            if (c instanceof Container) {
+                Container slotCnt = (Container)c;
+                if (!(slotCnt.getLayout() instanceof BorderLayout)) {
+                    slotCnt.setLayout(new BorderLayout());
+                }
+                slotCnt.getStyle().stripMarginAndPadding();
+                slotCnt.removeAll();
+
+                InterFormContainer ifc = new InterFormContainer(content);
+                slotCnt.add(BorderLayout.CENTER, ifc);
+                return ifc;
+            }
+        }
+        return null;
+    }
     
 }
