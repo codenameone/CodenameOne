@@ -762,6 +762,9 @@ public class Container extends Component implements Iterable<Component>{
             if (parent.scrollableX && !parent.constrainWidthWhenScrollable()) {
                 return parent;
             }
+            if (parent.hasFixedPreferredSize()) {
+                return parent;
+            }
             parent = parent.getParent();
         }
         return null;
@@ -781,6 +784,9 @@ public class Container extends Component implements Iterable<Component>{
         Container parent = getParent();
         while (parent != null) {
             if (parent.scrollableY && !parent.constrainHeightWhenScrollable()) {
+                return parent;
+            }
+            if (parent.hasFixedPreferredSize()) {
                 return parent;
             }
             parent = parent.getParent();

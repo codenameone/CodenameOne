@@ -2987,6 +2987,17 @@ public class Component implements Animation, StyleListener, Editable {
         Dimension d = new Dimension(0, 0);
         return d;
     }
+    
+    /**
+     * Checks if this component has a fixed preferred size either via an explicit call to
+     * {@link #setPreferredH(int) } and {@link #setPreferredW(int) }, or via a preferred
+     * size style string.
+     * @return True if this component has a fixed preferred size.
+     * @since 7.0
+     */
+    public boolean hasFixedPreferredSize() {
+        return sizeRequestedByUser || preferredSizeStr != null;
+    }
 
     private Dimension preferredSizeImpl() {
         if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
