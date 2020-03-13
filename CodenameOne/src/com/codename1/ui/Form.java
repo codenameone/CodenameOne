@@ -3711,8 +3711,10 @@ public class Form extends Container {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                         if(r.contains(x, y)) {
                             componentsAwaitingRelease = null;
-                            pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
-                            return;
+                            if (!pendingC.contains(x, y)) {
+                                pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
+                                return;
+                            }
                         }
                     }
                 }

@@ -716,7 +716,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                 state=STATE_ROLLOVER;
                 fireStateChange();
             }
-            if (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1)) {
+            if (releaseRadius > 0 || (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1))) {
                 fireActionEvent(x, y);
             }
             
