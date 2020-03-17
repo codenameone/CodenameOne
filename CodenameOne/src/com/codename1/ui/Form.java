@@ -3242,7 +3242,7 @@ public class Form extends Container {
                     leadComponent.clearDrag();
                     return;
                 }
-                if (cmp.hasLead) {
+                if (cmp.hasLead && leadParent != null) {
                     leadParent.repaint();
                 }
                 if (leadParent.isEnabled()) {
@@ -3254,6 +3254,9 @@ public class Form extends Container {
                     leadComponent.pointerPressed(x, y);
                     tactileTouchVibe(x, y, leadParent);
                     initRippleEffect(x, y, leadParent);
+                    if (cmp.hasLead && leadParent != null) {
+                        leadParent.repaint();
+                    }
                 }
                 
             }
@@ -3276,6 +3279,9 @@ public class Form extends Container {
                     }
                     tactileTouchVibe(x, y, leadParent);
                     initRippleEffect(x, y, leadParent);
+                    if (cmp.hasLead && leadParent != null) {
+                        leadParent.repaint();
+                    }
                 }   
             } else {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3300,6 +3306,9 @@ public class Form extends Container {
                         leadComponent.pointerPressed(x, y);
                         tactileTouchVibe(x, y, leadParent);
                         initRippleEffect(x, y, leadParent);
+                        if (cmp.hasLead && leadParent != null) {
+                            leadParent.repaint();
+                        }
                     }   
                 }
             }
@@ -3437,7 +3446,7 @@ public class Form extends Container {
             Component leadComponent = leadComponent(cmp);
             
             leadComponent.pointerDragged(x, y);
-            if (cmp.hasLead) {
+            if (cmp.hasLead && leadParent != null) {
                 leadParent.repaint();
             }
             if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
@@ -3507,7 +3516,7 @@ public class Form extends Container {
                 setFocused(leadParent);
             }
             leadComponent.pointerDragged(x, y);
-            if (cmp.hasLead) {
+            if (cmp.hasLead && leadParent != null) {
                 leadParent.repaint();
             }
             if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
@@ -3562,6 +3571,9 @@ public class Form extends Container {
                 setFocused(leadParent);
             }
             leadComponent.pointerHoverPressed(x, y);
+            if (cmp.hasLead && leadParent != null) {
+                leadParent.repaint();
+            }
         }
     }
 
@@ -3589,6 +3601,9 @@ public class Form extends Container {
                     setFocused(leadParent);
                 }
                 leadComponent.pointerHover(x, y);
+                if (cmp.hasLead && leadParent != null) {
+                    leadParent.repaint();
+                }
             }
         }
     }
@@ -3764,6 +3779,12 @@ public class Form extends Container {
                     // We solve this by tracking the original location of the pressed component.
                     if (origPressedCmp.isEnabled()) {
                         origPressedCmp.pointerReleased(x, y);
+                        if (origPressedCmp.hasLead) {
+                            Component leadParent = leadParent(origPressedCmp);
+                            if (leadParent != null && leadParent != null) {
+                                leadParent.repaint();
+                            }
+                        }
                     }
                     return;
                 }
@@ -3779,6 +3800,9 @@ public class Form extends Container {
                             setFocused(leadParent);
                         }
                         leadComponent.pointerReleased(x, y);
+                        if (cmp.hasLead && leadParent != null) {
+                            leadParent.repaint();
+                        }
                     }
                     return;
                 }
@@ -3801,6 +3825,9 @@ public class Form extends Container {
                                     setFocused(leadParent);
                                 }
                                 leadComponent.pointerReleased(x, y);
+                                if (cmp.hasLead && leadParent != null) {
+                                    leadParent.repaint();
+                                }
                             }
                         }
                     } else {
@@ -3818,6 +3845,9 @@ public class Form extends Container {
                                     setFocused(leadParent);
                                 }
                                 leadComponent.pointerReleased(x, y);
+                                if (cmp.hasLead && leadParent != null) {
+                                    leadParent.repaint();
+                                }
                             }
                         } else {
                             Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3830,13 +3860,14 @@ public class Form extends Container {
                                     
                                     Component leadComponent = leadComponent(cmp);
                                     Component leadParent = leadParent(cmp);
-                                    if (cmp.hasLead) {
-                                        leadParent.repaint();
-                                    }
+                                    
                                     if (!isScrollWheeling && leadParent.isEnabled() && leadParent.isFocusable()) {
                                         setFocused(leadParent);
                                     }
                                     leadComponent.pointerReleased(x, y);
+                                    if (cmp.hasLead && leadParent != null) {
+                                        leadParent.repaint();
+                                    }
                                     
                                 }
                             }
