@@ -3295,6 +3295,7 @@ public class Form extends Container {
                             
                         }
                         leadComponent.initDragAndDrop(x, y);
+                        
                         setPressedCmp(leadComponent);
                         leadComponent.pointerPressed(x, y);
                         tactileTouchVibe(x, y, leadParent);
@@ -3644,6 +3645,9 @@ public class Form extends Container {
         if (cmp == null) {
             return null;
         }
+        if (cmp.isDraggable()) {
+            return cmp;
+        }
         if (cmp.hasLead) {
             if (cmp instanceof Container) {
                 return ((Container)cmp).getLeadParent();
@@ -3657,6 +3661,9 @@ public class Form extends Container {
     private Component leadComponent(Component cmp) {
         if (cmp == null) {
             return null;
+        }
+        if (cmp.isDraggable()) {
+            return cmp;
         }
         if (cmp.hasLead) {
             return cmp.getLeadComponent();
