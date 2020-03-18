@@ -432,7 +432,7 @@ public class Container extends Component implements Iterable<Component>{
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
     }
-    
+
     /**
      * Sets the lead component for this container, a lead component takes over the entire
      * component hierarchy and receives all the events for the container hierarchy.
@@ -2705,8 +2705,9 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        clearDrag();
-        setDragActivated(false);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.clearDrag();
+        leadParent.setDragActivated(false);
         Component cmp = getComponentAt(x, y);
         if (cmp == this) {
             super.pointerPressed(x, y);
