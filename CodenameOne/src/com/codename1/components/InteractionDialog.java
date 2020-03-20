@@ -727,7 +727,13 @@ public class InteractionDialog extends Container {
         
         
         int availableHeight = getLayeredPane(f).getParent().getHeight();
+        if (availableHeight == 0) {
+            availableHeight = CN.getDisplayHeight();
+        }
         int availableWidth =getLayeredPane(f).getParent().getWidth();
+        if (availableWidth == 0) {
+            availableWidth = CN.getDisplayWidth();
+        }
         int width = Math.min(availableWidth, prefWidth);
         int x = 0;
         int y = 0;
