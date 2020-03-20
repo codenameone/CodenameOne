@@ -46,6 +46,9 @@ public class Border {
     private Float thickness;
 
     @XmlAttribute
+    private String css;
+    
+    @XmlAttribute
     private boolean millimeters;
 
     @XmlAttribute
@@ -179,6 +182,10 @@ public class Border {
         return colorB;
     }
 
+    public String getCSS() {
+        return css;
+    }
+    
     /**
      * @return the colorC
      */
