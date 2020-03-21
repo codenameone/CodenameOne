@@ -735,6 +735,11 @@ public class InteractionDialog extends Container {
             availableWidth = CN.getDisplayWidth();
         }
         int width = Math.min(availableWidth, prefWidth);
+        setWidth(width);
+        setShouldCalcPreferredSize(true);
+        revalidate();
+        prefHeight = getPreferredH();
+        
         int x = 0;
         int y = 0;
 
