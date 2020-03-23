@@ -585,6 +585,9 @@ public class InteractionDialog extends Container {
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())
                                 ;
+                        if (pressedOutOfBounds && disposeWhenPointerOutOfBounds) {
+                            evt.consume();
+                        }
                     }
                 };
             }
@@ -601,6 +604,7 @@ public class InteractionDialog extends Container {
                                 pressedOutOfBounds && 
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {
+                            evt.consume();
                             f.removePointerPressedListener(pressedListener);
                             f.removePointerReleasedListener(releasedListener);
                             dispose();
