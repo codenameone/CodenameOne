@@ -2674,7 +2674,7 @@ public class Container extends Component implements Iterable<Component>{
             return component;
         }
         return this;
-    }    
+    }
     /**
      * Recursively searches the container hierarchy for a drop target
      * 
@@ -2731,6 +2731,24 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
+        boolean restoreBounds = false;
+        if (safeArea && getWidth() > 0 && getHeight() > 0) {
+            // If this container is marked as a safe area
+            // then we may need to add padding to make it *safe*
+            Container parent = getParent();
+            if (parent == null || !parent.isSafeAreaInternal(true)) {
+                // For efficiency, we check if the parent is a safe area.
+                // If so, we don't need to worry because it has already
+                // added appropriate padding.
+                if (tmpInsets == null) {
+                    tmpInsets = new TmpInsets();
+                }
+                Style s = getStyle();
+                tmpInsets.set(s);
+                restoreBounds = snapToSafeAreaInternal();
+            }
+        }
+        
         Dimension d = layout.getPreferredSize(this);
         Style style = getStyle();
         if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
@@ -2740,6 +2758,9 @@ public class Container extends Component implements Iterable<Component>{
         if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
             d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
+        if (restoreBounds && tmpInsets != null) {
+            tmpInsets.restore(getStyle());
         }
         return d;
     }
