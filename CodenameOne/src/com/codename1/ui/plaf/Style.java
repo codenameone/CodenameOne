@@ -1229,6 +1229,17 @@ public class Style {
     }
 
     /**
+     * Strips all margin and padding from this style.
+     * 
+     * @since 7.0
+     */
+    public void stripMarginAndPadding() {
+        setPadding(0, 0, 0, 0);
+        setMargin(0, 0, 0, 0);
+        setBorder(Border.createEmpty());
+    }
+    
+    /**
      * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      *  
      * @param top number of units to pad the top
@@ -2605,4 +2616,51 @@ public class Style {
             this.marginUnit = marginUnit;
         }
     }
+    
+    private void initMarginUnits() {
+        if (marginUnit == null) {
+            marginUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};
+        }
+    }
+    
+    /**
+     * Sets left margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitLeft(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.LEFT] = unit;
+    }
+    
+    /**
+     * Sets right margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitRight(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.RIGHT] = unit;
+    }
+    
+    /**
+     * Sets top margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitTop(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.TOP] = unit;
+    }
+    
+    /**
+     * Sets bottom margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitBottom(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.BOTTOM] = unit;
+    }
+    
 }

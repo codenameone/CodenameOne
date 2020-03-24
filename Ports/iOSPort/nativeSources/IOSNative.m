@@ -2486,6 +2486,9 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
                 NSURLRequest* r = [NSURLRequest requestWithURL:nu];
                 [w loadRequest:r];
             } else {
+                if ([str hasPrefix:@"file://localhost"]) {
+                    str = [str substringFromIndex:16];
+                }
                 NSURL* nu = [NSURL fileURLWithPath:str];           
                 [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
             }
@@ -6871,7 +6874,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             
             pickerView.frame = CGRectMake(0, 22, preferredWidth/scaleValue, preferredHeight/scaleValue);
             popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
-
+            toolbar.frame = CGRectMake(0,0, preferredWidth/scaleValue, toolbar.intrinsicContentSize.height);
             
         } else {
             if(isIOS7()) {
@@ -7053,7 +7056,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
-            
+            toolbar.frame = CGRectMake(0,0, preferredWidth/scaleValue, toolbar.intrinsicContentSize.height);
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {

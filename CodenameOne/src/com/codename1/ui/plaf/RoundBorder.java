@@ -355,6 +355,16 @@ public class RoundBorder extends Border {
         this.onlyLeftRounded = onlyLeftRounded;
         return this;
     }
+    
+    
+    /**
+     * Checks if only left side is rounded.
+     * @return True if only left side is rounded.
+     * @since 7.0
+     */
+    public boolean isOnlyLeftRounded() {
+        return onlyLeftRounded;
+    }
 
     /**
      * Forces a special case of the rectangle mode that renders the left side as 
@@ -365,6 +375,15 @@ public class RoundBorder extends Border {
     public RoundBorder onlyRightRounded(boolean onlyRightRounded) {
         this.onlyRightRounded = onlyRightRounded;
         return this;
+    }
+    
+    /**
+     * Checks if only right side is rounded.
+     * @return True if only right side is rounded.
+     * @since 7.0
+     */
+    public boolean isOnlyRightRounded() {
+        return onlyRightRounded;
     }
     
     

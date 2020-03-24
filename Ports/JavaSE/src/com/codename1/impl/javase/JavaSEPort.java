@@ -6076,6 +6076,30 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    //@Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        
+        Color c1 = new Color(startColor);
+        int alphaStart = ColorUtil.alpha(startColor);
+        int alphaEnd = ColorUtil.alpha(endColor);
+        c1 = new Color(c1.getRed(), c1.getGreen(), c1.getBlue(), alphaStart);
+        Color c2 = new Color(endColor);
+        c2 = new Color(c2.getRed(), c2.getGreen(), c2.getBlue(), alphaEnd);
+        Paint oldPaint = nativeGraphics.getPaint();
+        GradientPaint paint = horizontal ?
+                new GradientPaint(x, y + height/2, c1, x + width, y + height/2, c2) :
+                new GradientPaint(x + width/2, y, c1, x + width/2, y + height, c2);
+        nativeGraphics.setPaint(paint);
+        nativeGraphics.fillRect(x, y, width, height);
+        nativeGraphics.setPaint(oldPaint);
+        
+        
+    }
+    
+    
+
     /**
      * @inheritDoc
      */
@@ -11583,6 +11607,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
     }
 
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        setBrowserURL(browserPeer, url);
+    }
+
+    
+    
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             try {

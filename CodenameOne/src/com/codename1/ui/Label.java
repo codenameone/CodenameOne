@@ -51,7 +51,7 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * @author Chen Fishbein
  */
-public class Label extends Component {
+public class Label extends Component implements IconHolder {
     
     private final ActionListener iconChangeListener = new ActionListener() {
         @Override
@@ -75,6 +75,8 @@ public class Label extends Component {
     
     private Image icon;
     private Image maskedIcon;
+
+    private Component iconStyleComponent;
     
     private int valign = BOTTOM;
 
@@ -117,6 +119,8 @@ public class Label extends Component {
     private Font font;
     private char fontIcon;
     private float fontIconSize = -1;
+    private String badgeText;
+    private Component badgeStyleComponent;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -237,6 +241,88 @@ public class Label extends Component {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /**
+     * Sets the badge text to be used on this label.  Badges are rendered in the 
+     * upper right corner of the label inside round border.  The style of the badge can be 
+     * configured using {@link #setBadgeUIID(java.lang.String) }, but the default style uses
+     * the "Badge" UIID, which, by default, uses white text on a red round border background.
+     * 
+     * @param badgeText The text to include in the badge.   null or empty strings will result in the 
+     * badge not being rendered.
+     * @since 7.0
+     * @see #getBadgeText() 
+     * @see #getBadgeStyleComponent() 
+     * @see #setBadgeUIID(java.lang.String) 
+     */
+    public void setBadgeText(String badgeText) {
+        this.badgeText = badgeText;
+    }
+    
+    /**
+     * Gets the text to be used in a badge on this label.
+     * @return the badge text to be used on this label.  May return if no text is set.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #setBadgeUIID(java.lang.String) 
+     * @see #getBadgeStyleComponent() 
+     */
+    public String getBadgeText() {
+        return badgeText;
+    }
+    
+    /**
+     * Sets the style that should be used for rendering badges.  By default it will use
+     * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
+     * 
+     * @param badgeUIID The UIID to use for the badge.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #getBadgeStyleComponent() 
+     */
+    public void setBadgeUIID(String badgeUIID) {
+        if (badgeStyleComponent == null) {
+            badgeStyleComponent = new Label();
+            
+        }
+        badgeStyleComponent.setUIID(badgeUIID);
+    }
+    
+    /**
+     * Gets a component that can be used for the style of the badge.  
+     * @return The component whose style can be used to style the badge.  May return null if none set.
+     * @since 7.0
+     * @see #setBadgeText(java.lang.String) 
+     * @see #setBadgeUIID(java.lang.String) 
+     * @see #getBadgeText() 
+     */
+    public Component getBadgeStyleComponent() {
+        return badgeStyleComponent;
+    }
+
+    /**
+     * Sets a UIID to be used for the material icon style.
+     * @param uiid The uiid to use for the material icon style. 
+     * @since 7.0
+     */
+    public void setIconUIID(String uiid) {
+        iconStyleComponent = new Component(){};
+        iconStyleComponent.setUIID(uiid);
+    }
+    
+    /**
+     * Gets the component that should be used for styling material the material icon.  If {@link #setIconUIID(java.lang.String) } has been used
+     * to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
+     * itself.
+     * @return The component to use for styling the material icon.
+     * @since 7.0
+     */
+    public Component getIconStyleComponent() {
+        if (iconStyleComponent != null) {
+            return iconStyleComponent;
+        }
+        return this;
     }
     
     /**
@@ -451,6 +537,7 @@ public class Label extends Component {
      * 
      * @param icon the image that the label presents.
      */
+    @Override
     public void setIcon(Image icon){
         if(this.icon == icon) {
             return;
@@ -494,6 +581,7 @@ public class Label extends Component {
      * 
      * @return the labels icon
      */
+    @Override
     public Image getIcon(){
         return icon;
     }
@@ -513,7 +601,7 @@ public class Label extends Component {
     }
     
     /**
-     * Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM
+     * Sets the vertical alignment of the Label to one of: CENTER, TOP, BOTTOM, BASELINE
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
@@ -521,9 +609,10 @@ public class Label extends Component {
      * @see #CENTER
      * @see #TOP
      * @see #BOTTOM
+     * @see #BASELINE
      */
     public void setVerticalAlignment(int valign) {
-        if(valign != CENTER && valign != TOP && valign != BOTTOM){
+        if(valign != CENTER && valign != TOP && valign != BOTTOM && valign != BASELINE){
             throw new IllegalArgumentException("Alignment can't be set to " + valign);
         }
         this.valign = valign;
@@ -535,10 +624,11 @@ public class Label extends Component {
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
-     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM
+     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM, BASELINE
      * @see #CENTER
      * @see #TOP
      * @see #BOTTOM
+     * @see #BASELINE
      */
     public int getVerticalAlignment(){
         return valign;
@@ -566,6 +656,7 @@ public class Label extends Component {
      * @see #BOTTOM
      * @see #TOP
      */
+    @Override
     public void setTextPosition(int textPosition) {
         if (textPosition != LEFT && textPosition != RIGHT && textPosition != BOTTOM && textPosition != TOP) {
             throw new IllegalArgumentException("Text position can't be set to " + textPosition);
@@ -583,6 +674,7 @@ public class Label extends Component {
      * @see #BOTTOM
      * @see #TOP
      */
+    @Override
     public int getTextPosition(){
         return textPosition;
     }
@@ -601,6 +693,7 @@ public class Label extends Component {
      * 
      * @return the gap in pixels between the icon/text to the Label boundaries
      */
+    @Override
     public int getGap() {
         return gap;
     }
@@ -630,11 +723,13 @@ public class Label extends Component {
         return super.paramString() + ", text = " +getText() + ", gap = " + gap;
     }
     
+    
+    
     /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(legacyRenderer) {
+        if(legacyRenderer || (badgeText != null && badgeText.length() > 0)) {
             initAutoResize();
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
@@ -1378,5 +1473,13 @@ public class Label extends Component {
         }
         return textSelectionSupport;
     };
+
+    @Override
+    public String getIconUIID() {
+        if (iconStyleComponent != null) {
+            return iconStyleComponent.getUIID();
+        }
+        return getUIID();
+    }
             
 }

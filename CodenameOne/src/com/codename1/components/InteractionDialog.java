@@ -23,6 +23,7 @@
 
 package com.codename1.components;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.Component.BOTTOM;
@@ -584,6 +585,9 @@ public class InteractionDialog extends Container {
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())
                                 ;
+                        if (pressedOutOfBounds && disposeWhenPointerOutOfBounds) {
+                            evt.consume();
+                        }
                     }
                 };
             }
@@ -600,6 +604,7 @@ public class InteractionDialog extends Container {
                                 pressedOutOfBounds && 
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {
+                            evt.consume();
                             f.removePointerPressedListener(pressedListener);
                             f.removePointerReleasedListener(releasedListener);
                             dispose();
@@ -646,6 +651,11 @@ public class InteractionDialog extends Container {
      * @param rect the screen rectangle to which the popup should point
      */
     public void showPopupDialog(Rectangle rect) {
+        Form f = Display.getInstance().getCurrent();
+        Rectangle origRect = rect;
+        rect = new Rectangle(rect);
+        rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
+        rect.setY(rect.getY() - getLayeredPane(f).getAbsoluteY());
         disposed = false;
         getUnselectedStyle().setOpacity(255);
         if(getUIID().equals("Dialog")) {
@@ -708,7 +718,7 @@ public class InteractionDialog extends Container {
         } else {
             Border border = contentPaneStyle.getBorder();
             if(border != null) {
-                border.setTrackComponent(rect);
+                border.setTrackComponent(origRect);
             }
         }
         calcPreferredSize();
@@ -719,10 +729,21 @@ public class InteractionDialog extends Container {
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
         
-        Form f = Display.getInstance().getCurrent();
+        
         int availableHeight = getLayeredPane(f).getParent().getHeight();
+        if (availableHeight == 0) {
+            availableHeight = CN.getDisplayHeight();
+        }
         int availableWidth =getLayeredPane(f).getParent().getWidth();
+        if (availableWidth == 0) {
+            availableWidth = CN.getDisplayWidth();
+        }
         int width = Math.min(availableWidth, prefWidth);
+        setWidth(width);
+        setShouldCalcPreferredSize(true);
+        revalidate();
+        prefHeight = getPreferredH();
+        
         int x = 0;
         int y = 0;
 
@@ -739,6 +760,7 @@ public class InteractionDialog extends Container {
             }
         }
         if(showPortrait) {
+            
             if(width < availableWidth) {
                 int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
 
@@ -752,16 +774,28 @@ public class InteractionDialog extends Container {
                     }
                 }
             }
-            if(rect.getY() < availableHeight / 2) {
+            if(rect.getY() + rect.getHeight() < availableHeight / 2) {
                 // popup downwards
-                y = rect.getY();
+                y = rect.getY() + rect.getHeight();
+                int height = Math.min(prefHeight, availableHeight - y);
+                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+            } else if (rect.getY() > availableHeight / 2){
+                // popup upwards
+                int height = Math.min(prefHeight, rect.getY());
+                y = rect.getY() - height;
+                show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
+            } else if (rect.getY() < availableHeight / 2) {
+                // popup over aligned with top of rect, but inset a few mm
+                y = rect.getY() + CN.convertToPixels(3);
+                
                 int height = Math.min(prefHeight, availableHeight - y);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
             } else {
-                // popup upwards
-                int height = Math.min(prefHeight, rect.getY() - getLayeredPane(f).getAbsoluteY());
-                y = rect.getY() - height - getLayeredPane(f).getAbsoluteY();
-                show(y, Math.max(0, getLayeredPane(f).getComponentForm().getHeight() - rect.getY()), x, Math.max(0, availableWidth - width - x));
+                // popup over aligned with bottom of rect but inset a few mm
+                y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
+                int height = prefHeight;
+                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
@@ -780,14 +814,16 @@ public class InteractionDialog extends Container {
             }
             
             
-            if(prefWidth > rect.getX()) {
+            if(prefWidth <  availableWidth - rect.getX() - rect.getWidth()) {
                 // popup right
-                x = rect.getX() + rect.getSize().getWidth();
-                if(x + prefWidth > availableWidth){
-                    x = availableWidth - prefWidth;
-                }
+                x = rect.getX() + rect.getWidth();
+                
                 
                 width = Math.min(prefWidth, availableWidth - x);
+                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
+            } else if (prefWidth < rect.getX()) {
+                x = rect.getX() - prefWidth;
+                width = prefWidth;
                 show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
             } else {
                 // popup left

@@ -365,7 +365,7 @@ public final class Display extends CN1Constants {
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;
-    private int longPressInterval = 800;
+    private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
     private int keyRepeatInitialIntervalTime = 800;
@@ -2140,7 +2140,7 @@ public final class Display extends CN1Constants {
     }
     
     private Rectangle tmpRect = new Rectangle();
-    private Rectangle lastSizeChangedSafeArea = new Rectangle();
+    
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2153,18 +2153,13 @@ public final class Display extends CN1Constants {
         if(current == null) {
             return;
         }
-        impl.getDisplaySafeArea(tmpRect);
         if(w == current.getWidth() && h == current.getHeight()) {
-            // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if (lastSizeChangedSafeArea.equals(tmpRect)) {
-                if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
-                    return;            
-                }
+        // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
+            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
+                return;            
             }
         }
         
-        
-        lastSizeChangedSafeArea.setBounds(tmpRect);
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
@@ -3353,6 +3348,18 @@ public final class Display extends CN1Constants {
         impl.playBuiltinSound(soundIdentifier);
     }
 
+    /**
+     * Gets the display safe area as a rectangle.  
+     * @param rect Out parameter that will store the display safe area.
+     * @return The display safe area.
+     * @see Form#getSafeArea() 
+     * @since 7.0
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        return impl.getDisplaySafeArea(rect);
+    }
+    
+    
     /**
      * Installs a replacement sound as the builtin sound responsible for the given
      * sound identifier (this will override the system sound if such a sound exists).

@@ -493,6 +493,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
+     * Filters the current found set against the given selector.
+     * @param selector The selector to filter the found set on.
+     * @return A new set of elements matching the selector.
+     */
+    public ComponentSelector filter(String selector) {
+        ComponentSelector matcher = new ComponentSelector(selector, new Label());
+        LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
+        for (Component c : this) {
+            if (matcher.match(c)) {
+                matches.add(c);
+            }
+        }
+        return matcher.addAll(matches, true);
+    }
+    
+    /**
      * Creates a new set of components consisting of all of the parents of components in this set.
      * Only parent components matching the provided selector will be included in the set.
      * @param selector Selector to filter the parent components.
@@ -3678,12 +3694,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setIcon(Image icon) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setIcon(icon);
-            } else if (c instanceof SpanLabel) {
-                ((SpanLabel)c).setIcon(icon);
-            } else if (c instanceof SpanButton) {
-                ((SpanButton)c).setIcon(icon);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setIcon(icon);
             }
         }
         return this;
@@ -3806,8 +3818,24 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setTextPosition(int pos) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setTextPosition(pos);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setTextPosition(pos);
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Sets the Icon UIID of elements in found set.
+     * @param uiid The UIID for icons.
+     * @return Self for chaining.
+     * @see IconHolder#setIconUIID(java.lang.String) 
+     * @since 7.0
+     */
+    public ComponentSelector setIconUIID(String uiid) {
+        for (Component c : this) {
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setIconUIID(uiid);
             }
         }
         return this;
@@ -3822,8 +3850,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector setGap(int gap) {
         for (Component c : this) {
-            if (c instanceof Label) {
-                ((Label)c).setGap(gap);
+            if (c instanceof IconHolder) {
+                ((IconHolder)c).setGap(gap);
             }
         }
         return this;
@@ -4170,6 +4198,20 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return setPadding(padding, padding, padding, padding);
     }
     
+    
+    /**
+     * Strips margin and padding from components in found set.
+     * 
+     * @return Self for chaining.
+     * @see Style#stripMarginAndPadding() 
+     * 
+     * @since 7.0
+     */
+    public ComponentSelector stripMarginAndPadding() {
+        Style s = currentStyle();
+        s.stripMarginAndPadding();
+        return this;
+    }
     
     /**
      * Sets padding to all components in found set.
@@ -4818,7 +4860,19 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
     
-    
+    /**
+     * Returns a set with the first element of the current set, or an empty set if the
+     * current set is empty.
+     * @return A ComponentSelector with 0 or 1 element.
+     * @since 7.0
+     */
+    public ComponentSelector first() {
+        if (!isEmpty()) {
+            return new ComponentSelector(results.iterator().next());
+        } else {
+            return new ComponentSelector();
+        }
+    }
     
     
     

@@ -172,8 +172,20 @@ static void installSignalHandlers() {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
-    NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
-    [self cn1RoutePush:userInfo];
+    // On iOS 10+, push messages received while in the background are handled
+    // by userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:
+    // If we additionally handle it here, then the push callback will be called twice,
+    // so make sure that we skip this for iOS 10+
+    BOOL handlePushHere = YES;
+    if (@available(iOS 10, *)) {
+        if (isIOS10()) {
+            handlePushHere = NO;
+        }
+    }
+    if (handlePushHere) {
+        NSDictionary* userInfo = [launchOptions valueForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
+        [self cn1RoutePush:userInfo];
+    }
     
     
 #endif
@@ -362,8 +374,15 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 #ifdef INCLUDE_CN1_PUSH
 UNNotificationResponse* currentNotificationResponse = nil;
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
-    NSString * tokenAsString = [[[deviceToken description] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]] 
-                stringByReplacingOccurrencesOfString:@" " withString:@""];
+    const unsigned *tokenBytes = [deviceToken bytes];
+    NSString *tokenAsString = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
+
+    ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+
+    ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+
+    ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+    
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG tokenAsString);
     com_codename1_impl_ios_IOSImplementation_pushRegistered___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str);
 }

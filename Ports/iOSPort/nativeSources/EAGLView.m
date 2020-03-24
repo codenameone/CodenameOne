@@ -61,7 +61,8 @@ extern int displayHeight;
 
 - (void)safeAreaInsetsDidChange {
     [super safeAreaInsetsDidChange];
-    screenSizeChanged(displayWidth, displayHeight);
+    com_codename1_impl_ios_IOSImplementation_displaySafeAreaChanged___boolean(CN1_THREAD_GET_STATE_PASS_ARG
+                                                                              YES);
 }
 
 -(BOOL)isPaintPeersBehindEnabled {

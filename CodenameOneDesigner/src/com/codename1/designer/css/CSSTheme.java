@@ -15,6 +15,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -1368,6 +1369,37 @@ public class CSSTheme {
         return out;
     }
     
+    private static String str(LexicalUnit lu) {
+        ScaledUnit su = (ScaledUnit)lu;
+        double numVal = su.getNumericValue();
+        String num = numVal+"";
+        if (Math.ceil(numVal) == Math.floor(numVal)) {
+            num = ((int)numVal)+"";
+        }
+        switch (lu.getLexicalUnitType()) {
+                case LexicalUnit.SAC_MILLIMETER:
+                    return num+"mm";
+
+                case LexicalUnit.SAC_INTEGER:
+                case LexicalUnit.SAC_REAL:
+                    return num+"";
+                case LexicalUnit.SAC_POINT:
+                    return num+"pt";
+
+                case LexicalUnit.SAC_PIXEL:
+                    return ((int)Math.round(su.getNumericValue()))+"px";
+
+
+                case LexicalUnit.SAC_INCH:
+                    return num+"in";
+                case LexicalUnit.SAC_EM:
+                    return num+"em";
+
+
+            }
+        return "0";
+    }
+    
     public Map<String, CacheStatus> calculateSelectorCacheStatus(File cachedFile) throws IOException {
         try {
             Map<String,String> current = calculateSelectorChecksums();
@@ -2459,6 +2491,22 @@ public class CSSTheme {
             return false;
         }
         
+        
+       
+        /**
+         * Eventually we hope to support all borders with the CSSBorder class, but for now,
+         * we are introducing its usage gradually to just cover the common cases.  One common
+         * case is where there is a bottom border.
+         * @param styles
+         * @return 
+         */
+        public boolean canBeAchievedWithCSSBorder(Map<String,LexicalUnit> styles) {
+            if (this.hasGradient() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
+                return false;
+            }
+            return true;
+        }
+        
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
             if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
                 return false;
@@ -3504,7 +3552,7 @@ public class CSSTheme {
             ScaledUnit background  = (ScaledUnit) style.get("background");
             boolean isCN1Gradient = background != null && background.isCN1Gradient();
             Border b = createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style) || b.canBeAchievedWithCSSBorder(style)) {
                 // If we can do this with a roundrect border
                 // then we don't need background image
                 return false;
@@ -3584,7 +3632,7 @@ public class CSSTheme {
             }
             
             Border b = this.createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style) || b.canBeAchievedWithCSSBorder(style)) {
                 // If we can do it with a RoundRectBorder, then we don't need to generate an imageborder
                 return false;
             }
@@ -4506,6 +4554,102 @@ public class CSSTheme {
             }
         }
         
+        
+        
+        private com.codename1.ui.plaf.Border createCSSBorder(Map<String,LexicalUnit> styles) {
+            CSSBorder out = new CSSBorder();
+            ScaledUnit topLeftRadius = getBorderRadius(styles, "top-left");
+            ScaledUnit topRightRadius = getBorderRadius(styles, "top-right");
+            ScaledUnit bottomLeftRadius = getBorderRadius(styles, "bottom-left");
+            ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
+            StringBuilder radiusString = new StringBuilder();
+            if (topLeftRadius != null) {
+                radiusString.append(str(topLeftRadius)).append(" ")
+                        .append(str(topRightRadius)).append(" ")
+                        .append(str(bottomRightRadius)).append(" ")
+                        .append(str(bottomLeftRadius));
+                out.borderRadius(radiusString.toString());
+            }
+            String[] borderColors = new String[]{
+                "border-top-color",
+                "border-right-color",
+                "border-bottom-color",
+                "border-left-color",
+            };
+            StringBuilder colorString = new StringBuilder();
+            for (String colorKey : borderColors) {
+                LexicalUnit borderColor = styles.get(colorKey);
+                if (borderColor != null) {
+                    colorString.append(getARGBHexString(borderColor)).append(" ");
+                } else {
+                    colorString.append("transparent ");
+                }
+                
+            }
+            
+            if (colorString.length() > 0) {
+                String str = colorString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderColor(str);
+                }
+            }
+            String[] borderWidths = new String[]{
+                "border-top-width",
+                "border-right-width",
+                "border-bottom-width",
+                "border-left-width",
+            };
+            StringBuilder widthString = new StringBuilder();
+            for (String widthKey: borderWidths) {
+                LexicalUnit borderWidth = styles.get(widthKey);
+                if (borderWidth != null) {
+                    widthString.append(str(borderWidth)).append(" ");
+                } else {
+                    widthString.append("0 ");
+                }
+                
+            }
+            
+            if (widthString.length() > 0) {
+                String str = widthString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderWidth(str);
+                }
+            }
+            String[] borderStyles = new String[]{
+                "border-top-style",
+                "border-right-style",
+                "border-bottom-style",
+                "border-left-style",
+            };
+            LexicalUnit borderStyle = styles.get("border-top-style");
+            StringBuilder styleString = new StringBuilder();
+            for (String styleKey : borderStyles) {
+                borderStyle = styles.get(styleKey);
+                if (borderStyle != null) {
+                    styleString.append(borderStyle.getStringValue()).append(" ");
+                } else {
+                    styleString.append("none").append(" ");
+                }
+                
+            }
+            
+            if (styleString.length() > 0) {
+                String str = styleString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderStyle(str);
+                }
+            }
+            
+            LexicalUnit bgColor = styles.get("background-color");
+            if (bgColor != null) {
+                out.backgroundColor(getARGBHexString(bgColor));
+            }
+            
+            return out;
+                
+        }
+        
         private com.codename1.ui.plaf.Border createRoundRectBorder(Map<String,LexicalUnit> styles) {
             // We create a round border
             //LexicalUnit backgroundColor = styles.get("background-color");
@@ -4671,7 +4815,10 @@ public class CSSTheme {
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
-            if (b.hasBorderRadius()) {
+            if (b.canBeAchievedWithCSSBorder(styles)) {
+                return createCSSBorder(styles);
+            }
+            if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()) {
                 return createRoundRectBorder(styles);
             }
             if (b.canBeAchievedWithUnderlineBorder(styles)) {
@@ -6085,6 +6232,17 @@ public class CSSTheme {
         }
 
         return null;
+    }
+    
+    static String leftPad(String str, int len) {
+        while (str.length() < len) {
+            str = "0" + str;
+        }
+        return str;
+    }
+    
+    static String getARGBHexString(LexicalUnit color) {
+        return "#" + leftPad(Integer.toHexString(getColorInt(color)), 6) + leftPad(Integer.toHexString(getColorAlphaInt(color)), 2);
     }
     
     static String getColorString(LexicalUnit color) {
