@@ -2582,7 +2582,12 @@ public class Style {
         if(paddingUnit != null && paddingUnit.length < 4) {
             this.paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
         } else {
-            this.paddingUnit = paddingUnit;
+            if (paddingUnit == null) {
+                this.paddingUnit = null;
+            } else {
+                this.paddingUnit = new byte[4];
+                System.arraycopy(paddingUnit, 0, this.paddingUnit, 0, 4);
+            }
         }
     }
 
@@ -2613,7 +2618,12 @@ public class Style {
         if(marginUnit != null && marginUnit.length < 4) {
             this.marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
         } else {
-            this.marginUnit = marginUnit;
+            if (marginUnit == null) {
+                this.marginUnit = null;
+            } else {
+                this.marginUnit = new byte[4];
+                System.arraycopy(marginUnit, 0, this.marginUnit, 0, 4);
+            }
         }
     }
     
