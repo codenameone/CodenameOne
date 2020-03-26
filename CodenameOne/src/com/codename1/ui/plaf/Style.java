@@ -2585,7 +2585,9 @@ public class Style {
             if (paddingUnit == null) {
                 this.paddingUnit = null;
             } else {
-                this.paddingUnit = new byte[4];
+                if (this.paddingUnit == null) {
+                    this.paddingUnit = new byte[4];
+                }
                 System.arraycopy(paddingUnit, 0, this.paddingUnit, 0, 4);
             }
         }
@@ -2621,7 +2623,9 @@ public class Style {
             if (marginUnit == null) {
                 this.marginUnit = null;
             } else {
-                this.marginUnit = new byte[4];
+                if (this.marginUnit == null) {
+                    this.marginUnit = new byte[4];
+                }
                 System.arraycopy(marginUnit, 0, this.marginUnit, 0, 4);
             }
         }
