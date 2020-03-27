@@ -1841,7 +1841,6 @@ public class CSSBorder extends Border {
     
     
     private CSSBorder borderImage(String cssProperty) {
-        System.out.println("border-image:"+cssProperty);
         String[] parts = Util.split(cssProperty, " ");
         parts[0] = Util.decode(parts[0], "UTF-8", false);
         

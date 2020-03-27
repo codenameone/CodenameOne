@@ -106,7 +106,13 @@ public class CSSBorderTest {
         
         Container cnt = new Container();
         cnt.getStyle().setBorder(new CSSBorder(theme).borderImage(theme.getImage("dashbg_landscape.png"), 0.4));
-        cnt.add(new Label("Some label"));
+        cnt.add(new Label("Setting CSS 9-Piece border manually"));
+        hi.add(cnt);
+        
+        
+        cnt = new Container();
+        cnt.setUIID("NinePiece");
+        cnt.add(new Label("9-piece border with UIID"));
         hi.add(cnt);
         hi.show();
     }

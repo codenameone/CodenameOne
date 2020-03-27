@@ -87,7 +87,7 @@ import org.w3c.flute.parser.ParseException;
  * @author shannah
  */
 public class CSSTheme {
-    
+    private boolean refreshImages;
     URL baseURL;
     File cssFile = new File("test.css");
     File resourceFile = new File("test.css.res");
@@ -2096,15 +2096,29 @@ public class CSSTheme {
             if (imageId != null) {
                 imageIdStr = imageId.getStringValue();
             } else {
+                /*
                 int i=1;
                 while (res.getImage(imageIdStr) != null) {
+                    
                     if (i == 1) {
                         imageIdStr += "_"+(++i);
                     } else {
                         imageIdStr = imageIdStr.substring(0, imageIdStr.lastIndexOf("_")) + "_"+(++i);
                     }
                 }
+                */
             }
+            
+            if (res.getImage(imageIdStr) != null) {
+                if (refreshImages) {
+                    //
+                    res.remove(imageIdStr);
+                } else {
+                    loadedImages.put(imageIdStr, res.getImage(imageIdStr));
+                    return res.getImage(imageIdStr);
+                }
+            }
+            
             
             URL imgURL = null;
             if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -2168,6 +2182,8 @@ public class CSSTheme {
                     
                 }
             }
+            
+            
             
             //System.out.println("Target density for image is "+resm.targetDensity);
             
@@ -5029,7 +5045,10 @@ public class CSSTheme {
     public void apply(Element style, String property, LexicalUnit value) {
         //System.out.println("Applying property "+property);
         switch (property) {
-            
+            case "refresh-images":
+                refreshImages = true;
+                break;
+                
             case "opacity" : {
                 style.put("opacity", value);
                 break;
@@ -6510,7 +6529,7 @@ public class CSSTheme {
                 }
                 private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
                     if (string.startsWith("cn1--")) {
-                        System.out.println("Registering variable "+string+" with value "+lu);
+                        //System.out.println("Registering variable "+string+" with value "+lu);
                         variables.put(string, lu);
                         return;
                     }
@@ -6518,7 +6537,7 @@ public class CSSTheme {
                         
                         LexicalUnit parameters = lu.getParameters();
                         String varname = parameters.getStringValue();
-                        System.out.println("Found variable property: "+varname);
+                        //System.out.println("Found variable property: "+varname);
                         if (variables.containsKey(varname)) {
                             property(string, variables.get(varname), bln);
                             return;
