@@ -604,7 +604,7 @@ public class EditableResources extends Resources implements TreeModel {
                                             continue;
                                         }
                                         if("css".equals(b.getType())) {
-                                            CSSBorder cb = new CSSBorder(b.getCSS());
+                                            CSSBorder cb = new CSSBorder(this, b.getCSS());
                                             theme.put(b.getKey(), cb);
                                             continue;
                                         }

@@ -1652,7 +1652,14 @@ public class Resources {
                     
             case 0xff16:
                 // CSS border
-                return new CSSBorder(input.readUTF());
+                String cssStyles = input.readUTF();
+                try {
+                    return new CSSBorder(this, cssStyles);
+                } catch (Throwable t) {
+                    Log.p("Failed to load CSS border: "+cssStyles);
+                    Log.e(t);
+                    return Border.createEmpty();
+                }
                             
         }
         return null;
