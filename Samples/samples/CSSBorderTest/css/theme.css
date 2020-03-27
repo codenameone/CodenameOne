@@ -1,0 +1,7 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+NinePiece {
+	border-image:url('dashbg_landscape.png');
+}

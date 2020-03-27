@@ -13,6 +13,7 @@ import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Container;
 import com.codename1.ui.plaf.CSSBorder;
 
 /**
@@ -102,6 +103,11 @@ public class CSSBorderTest {
                 
         
         hi.add(lineTest);
+        
+        Container cnt = new Container();
+        cnt.getStyle().setBorder(new CSSBorder(theme).borderImage(theme.getImage("dashbg_landscape.png"), 0.4));
+        cnt.add(new Label("Some label"));
+        hi.add(cnt);
         hi.show();
     }
 
