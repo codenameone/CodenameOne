@@ -15,6 +15,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -86,7 +87,7 @@ import org.w3c.flute.parser.ParseException;
  * @author shannah
  */
 public class CSSTheme {
-    
+    private boolean refreshImages;
     URL baseURL;
     File cssFile = new File("test.css");
     File resourceFile = new File("test.css.res");
@@ -1368,6 +1369,37 @@ public class CSSTheme {
         return out;
     }
     
+    private static String str(LexicalUnit lu) {
+        ScaledUnit su = (ScaledUnit)lu;
+        double numVal = su.getNumericValue();
+        String num = numVal+"";
+        if (Math.ceil(numVal) == Math.floor(numVal)) {
+            num = ((int)numVal)+"";
+        }
+        switch (lu.getLexicalUnitType()) {
+                case LexicalUnit.SAC_MILLIMETER:
+                    return num+"mm";
+
+                case LexicalUnit.SAC_INTEGER:
+                case LexicalUnit.SAC_REAL:
+                    return num+"";
+                case LexicalUnit.SAC_POINT:
+                    return num+"pt";
+
+                case LexicalUnit.SAC_PIXEL:
+                    return ((int)Math.round(su.getNumericValue()))+"px";
+
+
+                case LexicalUnit.SAC_INCH:
+                    return num+"in";
+                case LexicalUnit.SAC_EM:
+                    return num+"em";
+
+
+            }
+        return "0";
+    }
+    
     public Map<String, CacheStatus> calculateSelectorCacheStatus(File cachedFile) throws IOException {
         try {
             Map<String,String> current = calculateSelectorChecksums();
@@ -2038,6 +2070,10 @@ public class CSSTheme {
         return "file".equals(url.getProtocol()) && (url.getHost() == null || "".equals(url.getHost()));
     }
     
+    public Image getBorderImage(Map<String,LexicalUnit> styles) {
+        return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
+    }
+    
     public Image getBackgroundImage(Map<String,LexicalUnit> styles, ScaledUnit bgImage)  {
         try {
             //ScaledUnit bgImage = (ScaledUnit)styles.get("background-image");
@@ -2060,15 +2096,29 @@ public class CSSTheme {
             if (imageId != null) {
                 imageIdStr = imageId.getStringValue();
             } else {
+                /*
                 int i=1;
                 while (res.getImage(imageIdStr) != null) {
+                    
                     if (i == 1) {
                         imageIdStr += "_"+(++i);
                     } else {
                         imageIdStr = imageIdStr.substring(0, imageIdStr.lastIndexOf("_")) + "_"+(++i);
                     }
                 }
+                */
             }
+            
+            if (res.getImage(imageIdStr) != null) {
+                if (refreshImages) {
+                    //
+                    res.remove(imageIdStr);
+                } else {
+                    loadedImages.put(imageIdStr, res.getImage(imageIdStr));
+                    return res.getImage(imageIdStr);
+                }
+            }
+            
             
             URL imgURL = null;
             if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -2133,10 +2183,13 @@ public class CSSTheme {
                 }
             }
             
+            
+            
             //System.out.println("Target density for image is "+resm.targetDensity);
             
             //System.out.println("Loading image from "+url+" with density "+resm.targetDensity);
             Image im = resm.storeImage(encImg, imageIdStr, false);
+            im.setImageName(imageIdStr);
             //System.out.println("Finished storing image "+url);
             //System.out.println("Storing image "+url+" at id "+imageIdStr);
             loadedImages.put(url, im);
@@ -2420,6 +2473,9 @@ public class CSSTheme {
                 borderColorRight,
                 borderColorBottom,
                 borderColorLeft;
+        
+        String borderImage,
+                borderImageSlice;
                
         
         boolean isStyleNativelySupported() {
@@ -2431,7 +2487,7 @@ public class CSSTheme {
         }
         
         public boolean canBeAchievedWithUnderlineBorder(Map<String,LexicalUnit> styles) {
-            if (this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
+            if (this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow() || hasBorderImage()) {
                 return false;
             }
             ScaledUnit topThickness = (ScaledUnit)styles.get("border-top-width");
@@ -2459,8 +2515,24 @@ public class CSSTheme {
             return false;
         }
         
+        
+       
+        /**
+         * Eventually we hope to support all borders with the CSSBorder class, but for now,
+         * we are introducing its usage gradually to just cover the common cases.  One common
+         * case is where there is a bottom border.
+         * @param styles
+         * @return 
+         */
+        public boolean canBeAchievedWithCSSBorder(Map<String,LexicalUnit> styles) {
+            if (this.hasGradient() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
+                return false;
+            }
+            return true;
+        }
+        
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
-            if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow()) {
+            if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow() || hasBorderImage()) {
                 return false;
             }
             
@@ -2563,7 +2635,9 @@ public class CSSTheme {
                     && eq(borderColorTop, b.borderColorTop)
                     && eq(borderColorRight, b.borderColorRight)
                     && eq(borderColorBottom, b.borderColorBottom)
-                    && eq(borderColorLeft, b.borderColorLeft);
+                    && eq(borderColorLeft, b.borderColorLeft)
+                    && eq(borderImage, b.borderImage)
+                    && eq(borderImageSlice, b.borderImageSlice);
             
         }
         /*
@@ -2610,6 +2684,10 @@ public class CSSTheme {
         
         public boolean hasBoxShadow() {
             return !isNone(boxShadow);
+        }
+        
+        public boolean hasBorderImage() {
+            return !isNone(borderImage);
         }
     }
     
@@ -3262,6 +3340,8 @@ public class CSSTheme {
             b.backgroundRepeat = renderAsCSSString("background-repeat", styles);
             b.borderRadius = renderCSSProperty("cn1-border-bottom-left-radius-x", styles);
             b.boxShadow = renderCSSProperty("cn1-box-shadow-h", styles);
+            b.borderImage = renderCSSProperty("border-image", styles);
+            b.borderImageSlice = renderCSSProperty("border-image-slice", styles);
             
             LexicalUnit background = styles.get("background");
             while (background != null) {
@@ -3504,7 +3584,7 @@ public class CSSTheme {
             ScaledUnit background  = (ScaledUnit) style.get("background");
             boolean isCN1Gradient = background != null && background.isCN1Gradient();
             Border b = createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style) || b.canBeAchievedWithCSSBorder(style)) {
                 // If we can do this with a roundrect border
                 // then we don't need background image
                 return false;
@@ -3584,7 +3664,7 @@ public class CSSTheme {
             }
             
             Border b = this.createBorder(style);
-            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style)) {
+            if (b.canBeAchievedWithRoundRectBorder(style) || b.canBeAchievedWithUnderlineBorder(style) || b.canBeAchievedWithCSSBorder(style)) {
                 // If we can do it with a RoundRectBorder, then we don't need to generate an imageborder
                 return false;
             }
@@ -3612,6 +3692,8 @@ public class CSSTheme {
             LexicalUnit bgImage = style.get("background-image");
             return bgImage != null && bgImage.getLexicalUnitType() == LexicalUnit.SAC_URI;
         }
+        
+        
         
         public Byte getThemeBgType(Map<String,LexicalUnit> style) {
             LexicalUnit value = style.get("cn1-background-type");
@@ -4506,6 +4588,127 @@ public class CSSTheme {
             }
         }
         
+        
+        
+        private com.codename1.ui.plaf.Border createCSSBorder(Map<String,LexicalUnit> styles) {
+            CSSBorder out = new CSSBorder(res);
+            ScaledUnit topLeftRadius = getBorderRadius(styles, "top-left");
+            ScaledUnit topRightRadius = getBorderRadius(styles, "top-right");
+            ScaledUnit bottomLeftRadius = getBorderRadius(styles, "bottom-left");
+            ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
+            StringBuilder radiusString = new StringBuilder();
+            if (topLeftRadius != null) {
+                radiusString.append(str(topLeftRadius)).append(" ")
+                        .append(str(topRightRadius)).append(" ")
+                        .append(str(bottomRightRadius)).append(" ")
+                        .append(str(bottomLeftRadius));
+                out.borderRadius(radiusString.toString());
+            }
+            String[] borderColors = new String[]{
+                "border-top-color",
+                "border-right-color",
+                "border-bottom-color",
+                "border-left-color",
+            };
+            StringBuilder colorString = new StringBuilder();
+            for (String colorKey : borderColors) {
+                LexicalUnit borderColor = styles.get(colorKey);
+                if (borderColor != null) {
+                    colorString.append(getARGBHexString(borderColor)).append(" ");
+                } else {
+                    colorString.append("transparent ");
+                }
+                
+            }
+            
+            if (colorString.length() > 0) {
+                String str = colorString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderColor(str);
+                }
+            }
+            String[] borderWidths = new String[]{
+                "border-top-width",
+                "border-right-width",
+                "border-bottom-width",
+                "border-left-width",
+            };
+            StringBuilder widthString = new StringBuilder();
+            for (String widthKey: borderWidths) {
+                LexicalUnit borderWidth = styles.get(widthKey);
+                if (borderWidth != null) {
+                    widthString.append(str(borderWidth)).append(" ");
+                } else {
+                    widthString.append("0 ");
+                }
+                
+            }
+            
+            if (widthString.length() > 0) {
+                String str = widthString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderWidth(str);
+                }
+            }
+            String[] borderStyles = new String[]{
+                "border-top-style",
+                "border-right-style",
+                "border-bottom-style",
+                "border-left-style",
+            };
+            LexicalUnit borderStyle = styles.get("border-top-style");
+            StringBuilder styleString = new StringBuilder();
+            for (String styleKey : borderStyles) {
+                borderStyle = styles.get(styleKey);
+                if (borderStyle != null) {
+                    styleString.append(borderStyle.getStringValue()).append(" ");
+                } else {
+                    styleString.append("none").append(" ");
+                }
+                
+            }
+            
+            if (styleString.length() > 0) {
+                String str = styleString.toString().trim();
+                if (str.length() > 0) {
+                    out.borderStyle(str);
+                }
+            }
+            
+            LexicalUnit bgColor = styles.get("background-color");
+            if (bgColor != null) {
+                out.backgroundColor(getARGBHexString(bgColor));
+            }
+            
+            ScaledUnit borderImage = (ScaledUnit)styles.get("border-image");
+            if (!isNone(borderImage)) {
+                Image img = getBorderImage(styles);
+                ScaledUnit sliceUnit = (ScaledUnit)styles.get("border-image-slice");
+                List<Double> slices = new ArrayList<>();
+                while (!isNone(sliceUnit)) {
+                    if (sliceUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                        slices.add(sliceUnit.getNumericValue() / 100.0);
+                    } else {
+                        
+                    }
+                    sliceUnit = (ScaledUnit)sliceUnit.getNextNumericUnit();
+                    
+                }
+                if (slices.isEmpty()) {
+                    slices.add(0.4);
+                }
+                double[] slicesArr = new double[slices.size()];
+                for (int i=0; i<slices.size(); i++) {
+                    slicesArr[i] = slices.get(i).doubleValue();
+                }
+                out.borderImageWithName(img.getImageName(), slicesArr);
+                
+            }
+            
+            return out;
+                
+        }
+        
         private com.codename1.ui.plaf.Border createRoundRectBorder(Map<String,LexicalUnit> styles) {
             // We create a round border
             //LexicalUnit backgroundColor = styles.get("background-color");
@@ -4671,7 +4874,10 @@ public class CSSTheme {
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
-            if (b.hasBorderRadius()) {
+            if (b.canBeAchievedWithCSSBorder(styles)) {
+                return createCSSBorder(styles);
+            }
+            if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()) {
                 return createRoundRectBorder(styles);
             }
             if (b.canBeAchievedWithUnderlineBorder(styles)) {
@@ -4839,7 +5045,10 @@ public class CSSTheme {
     public void apply(Element style, String property, LexicalUnit value) {
         //System.out.println("Applying property "+property);
         switch (property) {
-            
+            case "refresh-images":
+                refreshImages = true;
+                break;
+                
             case "opacity" : {
                 style.put("opacity", value);
                 break;
@@ -5081,6 +5290,16 @@ public class CSSTheme {
                 break;
                 */
                 style.put("color", value);
+                break;
+            }
+            
+            case "border-image" : {
+                style.put("border-image", value);
+                break;
+            }
+            
+            case "border-image-slice" : {
+                style.put("border-image-slice" , value);
                 break;
             }
             
@@ -6087,6 +6306,17 @@ public class CSSTheme {
         return null;
     }
     
+    static String leftPad(String str, int len) {
+        while (str.length() < len) {
+            str = "0" + str;
+        }
+        return str;
+    }
+    
+    static String getARGBHexString(LexicalUnit color) {
+        return "#" + leftPad(Integer.toHexString(getColorInt(color)), 6) + leftPad(Integer.toHexString(getColorAlphaInt(color)), 2);
+    }
+    
     static String getColorString(LexicalUnit color) {
         
         if (color == null) {
@@ -6299,7 +6529,7 @@ public class CSSTheme {
                 }
                 private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
                     if (string.startsWith("cn1--")) {
-                        System.out.println("Registering variable "+string+" with value "+lu);
+                        //System.out.println("Registering variable "+string+" with value "+lu);
                         variables.put(string, lu);
                         return;
                     }
@@ -6307,7 +6537,7 @@ public class CSSTheme {
                         
                         LexicalUnit parameters = lu.getParameters();
                         String varname = parameters.getStringValue();
-                        System.out.println("Found variable property: "+varname);
+                        //System.out.println("Found variable property: "+varname);
                         if (variables.containsKey(varname)) {
                             property(string, variables.get(varname), bln);
                             return;

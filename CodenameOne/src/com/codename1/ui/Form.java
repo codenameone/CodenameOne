@@ -1097,7 +1097,7 @@ public class Form extends Container {
      * Sets the current dragged Component
      */
     void setDraggedComponent(Component dragged) {
-        this.dragged = dragged;
+        this.dragged = LeadUtil.leadParentImpl(dragged);
     }
     
     /**
@@ -2690,9 +2690,7 @@ public class Form extends Container {
         }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
-                
-                Component leadComponent = leadComponent(focused);
-                leadComponent.longPointerPress(x, y);
+                LeadUtil.longPointerPress(focused, x, y);
                 
             }
         }
@@ -3147,11 +3145,11 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            Component leadComponent = leadComponent(cmp);
-            Component leadParent = leadParent(cmp);
-            if (isCurrentlyScrolling(leadComponent)) {
-                cancelScrolling(leadComponent);
-                leadComponent.initDragAndDrop(x, y);
+            cmp = LeadUtil.leadParentImpl(cmp);
+            
+            if (isCurrentlyScrolling(cmp)) {
+                cancelScrolling(cmp);
+                cmp.initDragAndDrop(x, y);
                 Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
                 return true;
             }
@@ -3163,13 +3161,12 @@ public class Form extends Container {
     private Rectangle pressedCmpAbsBounds=new Rectangle();
     
     private void setPressedCmp(Component cmp) {
+        cmp = LeadUtil.leadParentImpl(cmp);
         pressedCmp = cmp;
-        Component leadParent = leadParent(cmp);
-        Component leadComponent = leadComponent(cmp);
         if (cmp == null) {
             pressedCmpAbsBounds.setBounds(0,0,0,0);
         } else {
-            pressedCmpAbsBounds.setBounds(leadParent.getAbsoluteX(), leadParent.getAbsoluteY(), leadParent.getWidth(), leadParent.getHeight());
+            pressedCmpAbsBounds.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
         }
         
     }
@@ -3234,26 +3231,23 @@ public class Form extends Container {
             if (cmp != null) {
                 
                 
-                Component leadComponent = leadComponent(cmp);
-                Component leadParent = leadParent(cmp);
-                leadComponent.initDragAndDrop(x, y);
-                if (isCurrentlyScrolling(leadComponent)) {
+                cmp = LeadUtil.leadParentImpl(cmp);
+                cmp.initDragAndDrop(x, y);
+                if (isCurrentlyScrolling(cmp)) {
                     dragStopFlag = true;
-                    leadComponent.clearDrag();
+                    cmp.clearDrag();
                     return;
                 }
-                if (cmp.hasLead) {
-                    leadParent.repaint();
-                }
-                if (leadParent.isEnabled()) {
-                    if (!isScrollWheeling && leadParent.isFocusable()) {
-                        setFocused(leadParent);
+                
+                if (cmp.isEnabled()) {
+                    if (!isScrollWheeling && cmp.isFocusable()) {
+                        setFocused(cmp);
                     }
-                    setPressedCmp(leadComponent);
+                    setPressedCmp(cmp);
 
-                    leadComponent.pointerPressed(x, y);
-                    tactileTouchVibe(x, y, leadParent);
-                    initRippleEffect(x, y, leadParent);
+                    LeadUtil.pointerPressed(cmp, x, y);
+                    tactileTouchVibe(x, y, cmp);
+                    initRippleEffect(x, y, cmp);
                 }
                 
             }
@@ -3265,17 +3259,12 @@ public class Form extends Container {
                 }
                 if (cmp != null) {
                     
-                    Component leadComponent = leadComponent(cmp);
-                    Component leadParent = leadParent(cmp);
-                    setPressedCmp(leadComponent);
-                    leadComponent.pointerPressed(x, y);
-                    if (cmp.hasLead) {
-                        if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled()) {
-                            setFocused(leadParent);
-                        }
-                    }
-                    tactileTouchVibe(x, y, leadParent);
-                    initRippleEffect(x, y, leadParent);
+                    cmp = LeadUtil.leadParentImpl(cmp);
+                    setPressedCmp(cmp);
+                    LeadUtil.pointerPressed(cmp, x, y);
+                    
+                    tactileTouchVibe(x, y, cmp);
+                    initRippleEffect(x, y, cmp);
                 }   
             } else {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3285,20 +3274,13 @@ public class Form extends Container {
                         cmp = cmp.getParent();
                     }
                     if (cmp != null ) {
-                        Component leadComponent = leadComponent(cmp);
-                        Component leadParent = leadParent(cmp);
-                        if(cmp.hasLead && leadParent.isFocusable() && leadParent.isEnabled()) {
-                            
-                            if (!isScrollWheeling) {
-                                setFocused(leadParent);
-                            }
-                            
-                        }
-                        leadComponent.initDragAndDrop(x, y);
-                        setPressedCmp(leadComponent);
-                        leadComponent.pointerPressed(x, y);
-                        tactileTouchVibe(x, y, leadParent);
-                        initRippleEffect(x, y, leadParent);
+                        cmp = LeadUtil.leadParentImpl(cmp);
+                        cmp.initDragAndDrop(x, y);
+                        
+                        setPressedCmp(cmp);
+                        LeadUtil.pointerPressed(cmp, x, y);
+                        tactileTouchVibe(x, y, cmp);
+                        initRippleEffect(x, y, cmp);
                     }   
                 }
             }
@@ -3345,28 +3327,37 @@ public class Form extends Container {
         if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
-            if (atXY instanceof Container) {
-                atXY = atXY.getLeadComponent();
+            if (atXY != null) {
+                atXY = LeadUtil.leadParentImpl(atXY);
             }
             Component pendingC = componentsAwaitingRelease.get(0);
+            if (pendingC != null) {
+                pendingC = LeadUtil.leadParentImpl(pendingC);
+            }
+            Component pendingCLead = LeadUtil.leadComponentImpl(pendingC);
             if (atXY != pendingC) {
-                if (pendingC instanceof ReleasableComponent) {
-                	ReleasableComponent rc = (ReleasableComponent) pendingC;
+                if (pendingCLead instanceof ReleasableComponent) {
+                    ReleasableComponent rc = (ReleasableComponent)pendingCLead;
                     int relRadius = rc.getReleaseRadius();
                     if (relRadius > 0) {
-                        Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
+                        Rectangle r = new Rectangle(
+                                pendingC.getAbsoluteX() - relRadius, 
+                                pendingC.getAbsoluteY() - relRadius, 
+                                pendingC.getWidth() + relRadius * 2, 
+                                pendingC.getHeight() + relRadius * 2
+                        );
                         if (!r.contains(x, y)) {
-                        	componentsAwaitingRelease = null;
-                        	pendingC.dragInitiated();
+                             componentsAwaitingRelease = null;
+                             LeadUtil.dragInitiated(pendingC);
                         }
                         return;
                     }
                     componentsAwaitingRelease = null;
-                    pendingC.dragInitiated();
+                    LeadUtil.dragInitiated(pendingC);
                 }
-            } else if (pendingC instanceof ReleasableComponent && ((ReleasableComponent) pendingC).isAutoRelease()) {
+            } else if (pendingCLead instanceof ReleasableComponent && ((ReleasableComponent) pendingCLead).isAutoRelease()) {
             	componentsAwaitingRelease = null;
-            	pendingC.dragInitiated();
+            	LeadUtil.dragInitiated(pendingC);
             }
         }
     }
@@ -3392,7 +3383,7 @@ public class Form extends Container {
         rippleMotion = null;
         
         if (dragged != null) {
-            dragged.pointerDragged(x, y);
+            LeadUtil.pointerDragged(dragged, x, y);
             return;
         }
 
@@ -3401,7 +3392,7 @@ public class Form extends Container {
         }
         
         if(stickyDrag != null) {
-            stickyDrag.pointerDragged(x, y);
+            LeadUtil.pointerDragged(stickyDrag, x, y);
             repaint();
             return;
         }
@@ -3414,6 +3405,7 @@ public class Form extends Container {
                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                     cmp = cmp.getParent();
                 }
+                
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
@@ -3432,15 +3424,12 @@ public class Form extends Container {
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
-            Component leadParent = leadParent(cmp);
-            Component leadComponent = leadComponent(cmp);
+            cmp = LeadUtil.leadParentImpl(cmp);
             
-            leadComponent.pointerDragged(x, y);
-            if (cmp.hasLead) {
-                leadParent.repaint();
-            }
-            if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
-                stickyDrag = leadComponent;
+            LeadUtil.pointerDragged(cmp, x, y);
+            
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
+                stickyDrag = cmp;
             }
         }
     }
@@ -3464,14 +3453,14 @@ public class Form extends Container {
         rippleMotion = null;
 
         if (dragged != null) {
-            dragged.pointerDragged(x, y);
+            LeadUtil.pointerDragged(dragged, x, y);
             return;
         }
         if (pressedCmp != null && pressedCmp.isStickyDrag()) {
             stickyDrag = pressedCmp;
         }
         if(stickyDrag != null) {
-            stickyDrag.pointerDragged(x, y);
+            LeadUtil.pointerDragged(stickyDrag, x, y);
             repaint();
             return;
         }
@@ -3499,18 +3488,16 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            Component leadComponent = leadComponent(cmp);
-            Component leadParent = leadParent(cmp);
+            cmp = LeadUtil.leadParentImpl(cmp);
             
-            if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled()) {
-                setFocused(leadParent);
+            
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+                setFocused(cmp);
             }
-            leadComponent.pointerDragged(x, y);
-            if (cmp.hasLead) {
-                leadParent.repaint();
-            }
-            if(leadComponent == pressedCmp && leadComponent.isStickyDrag()) {
-                stickyDrag = leadComponent;
+            LeadUtil.pointerDragged(cmp, x, y);
+
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
+                stickyDrag = cmp;
             }
         }
     }
@@ -3523,7 +3510,7 @@ public class Form extends Container {
     public void pointerHoverReleased(int[] x, int[] y) {
 
         if (dragged != null) {
-            dragged.pointerHoverReleased(x, y);
+            LeadUtil.pointerHoverReleased(dragged, x, y);
             dragged = null;
             return;
         }
@@ -3534,10 +3521,8 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            Component leadComponent = leadComponent(cmp);
-            //Component leadParent = leadComponent(cmp);
-            
-            leadComponent.pointerHoverReleased(x, y);
+            cmp = LeadUtil.leadParentImpl(cmp);
+            LeadUtil.pointerHoverReleased(cmp, x, y);
         }
     }
 
@@ -3553,14 +3538,13 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            Component leadComponent = leadComponent(cmp);
-            Component leadParent = leadParent(cmp);
+            cmp = LeadUtil.leadParentImpl(cmp);
             
             
-            if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled() && !Display.getInstance().isDesktop()) {
-                setFocused(leadParent);
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
+                setFocused(cmp);
             }
-            leadComponent.pointerHoverPressed(x, y);
+            LeadUtil.pointerHoverPressed(cmp, x, y);
         }
     }
 
@@ -3570,7 +3554,7 @@ public class Form extends Container {
     public void pointerHover(int[] x, int[] y) {
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (dragged != null) {
-            dragged.pointerHover(x, y);
+            LeadUtil.pointerHover(dragged, x, y);
             return;
         }
 
@@ -3581,13 +3565,12 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                Component leadComponent = leadComponent(cmp);
-                Component leadParent = leadParent(cmp);
+                cmp = LeadUtil.leadParentImpl(cmp);
                 
-                if (!isScrollWheeling && leadParent.isFocusable() && leadParent.isEnabled() && !Display.getInstance().isDesktop()) {
-                    setFocused(leadParent);
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
+                    setFocused(cmp);
                 }
-                leadComponent.pointerHover(x, y);
+                LeadUtil.pointerHover(cmp, x, y);
             }
         }
     }
@@ -3640,29 +3623,8 @@ public class Form extends Container {
         return b;
     }
     
-    private Component leadParent(Component cmp) {
-        if (cmp == null) {
-            return null;
-        }
-        if (cmp.hasLead) {
-            if (cmp instanceof Container) {
-                return ((Container)cmp).getLeadParent();
-            } else {
-                return cmp.getParent().getLeadParent();
-            }
-        }
-        return cmp;
-    }
     
-    private Component leadComponent(Component cmp) {
-        if (cmp == null) {
-            return null;
-        }
-        if (cmp.hasLead) {
-            return cmp.getLeadComponent();
-        }
-        return cmp;
-    }
+    
 
     /**
      * {@inheritDoc}
@@ -3678,25 +3640,31 @@ public class Form extends Container {
             if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
                 Component atXY = actual.getComponentAt(x, y);
+                if (atXY != null) {
+                    atXY = LeadUtil.leadParentImpl(atXY);
+                }
 
                 Component pendingC = componentsAwaitingRelease.get(0);
+                if (pendingC != null) {
+                    pendingC = LeadUtil.leadParentImpl(pendingC);
+                }
                 if(atXY == pendingC) {
                     componentsAwaitingRelease = null;
                     if (dragged == pendingC) {
                         if (pendingC.isDragAndDropInitialized()) {
-                            pendingC.dragFinishedImpl(x, y);
+                            LeadUtil.dragFinished(pendingC, x, y);
                         } else {
-                            pendingC.pointerReleased(x, y);
+                            LeadUtil.pointerReleased(pendingC, x, y);
                         }
                         dragged = null;
                     } else {
-                            pendingC.pointerReleased(x, y);
+                        LeadUtil.pointerReleased(pendingC, x, y);
                         if (dragged != null) {
                             if (dragged.isDragAndDropInitialized()) {
-                                dragged.dragFinishedImpl(x, y);
+                                LeadUtil.dragFinished(dragged, x, y);
                                 dragged = null;
                             } else {
-                                dragged.pointerReleased(x, y);
+                                LeadUtil.pointerReleased(dragged, x, y);
                                 dragged = null;
                             }
                         }
@@ -3704,15 +3672,17 @@ public class Form extends Container {
                     return;
                 }
 
-                if(pendingC instanceof ReleasableComponent) {
-                    ReleasableComponent rc = (ReleasableComponent) pendingC;
+                if(LeadUtil.leadComponentImpl(pendingC) instanceof ReleasableComponent) {
+                    ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(pendingC);
                     int relRadius = rc.getReleaseRadius();
                     if(relRadius > 0 || pendingC.contains(x, y)) {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
                         if(r.contains(x, y)) {
                             componentsAwaitingRelease = null;
-                            pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
-                            return;
+                            if (!pendingC.contains(x, y)) {
+                                pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
+                                return;
+                            }
                         }
                     }
                 }
@@ -3723,7 +3693,7 @@ public class Form extends Container {
                 if(ev.isConsumed()) {
                     if (dragged != null) {
                         if (dragged.isDragAndDropInitialized()) {
-                            dragged.dragFinishedImpl(x, y);
+                            LeadUtil.dragFinished(dragged, x, y);
 
                         }
                         dragged = null;
@@ -3734,7 +3704,7 @@ public class Form extends Container {
             if(dragStopFlag) {
                 if (dragged != null) {
                     if (dragged.isDragAndDropInitialized()) {
-                        dragged.dragFinishedImpl(x, y);
+                        LeadUtil.dragFinished(dragged, x, y);
 
                     }
                     dragged = null;
@@ -3754,7 +3724,7 @@ public class Form extends Container {
                     // the button is no longer under the pointer release event.
                     // We solve this by tracking the original location of the pressed component.
                     if (origPressedCmp.isEnabled()) {
-                        origPressedCmp.pointerReleased(x, y);
+                        LeadUtil.pointerReleased(origPressedCmp, x, y);
                     }
                     return;
                 }
@@ -3763,19 +3733,22 @@ public class Form extends Container {
                     while (cmp != null && cmp.isIgnorePointerEvents()) {
                         cmp = cmp.getParent();
                     }
-                    Component leadParent = leadParent(cmp);
-                    Component leadComponent = leadComponent(cmp);
-                    if (leadParent.isEnabled()) {
-                        if (!isScrollWheeling && leadParent.isFocusable()) {
-                            setFocused(leadParent);
+                    cmp = LeadUtil.leadParentImpl(cmp);
+                    if (cmp.isEnabled()) {
+                        if (!isScrollWheeling && cmp.isFocusable()) {
+                            setFocused(cmp);
                         }
-                        leadComponent.pointerReleased(x, y);
+                        LeadUtil.pointerReleased(cmp, x, y);
                     }
                     return;
                 }
 
                 if(stickyDrag != null) {
-                    stickyDrag.pointerReleased(x, y);
+                    if (stickyDrag.isDragAndDropInitialized()) {
+                        LeadUtil.dragFinished(stickyDrag, x, y);
+                    } else {
+                        LeadUtil.pointerReleased(stickyDrag, x, y);
+                    }
                     repaint();
                 } else {
                     //Container actual = getActualPane();
@@ -3785,13 +3758,13 @@ public class Form extends Container {
                             cmp = cmp.getParent();
                         }
                         if (cmp != null && cmp.isEnabled()) {
-                            Component leadParent = leadParent(cmp);
-                            Component leadComponent = leadComponent(cmp);
-                            if (leadParent.isEnabled()) {
-                                if (!isScrollWheeling && leadParent.isFocusable()) {
-                                    setFocused(leadParent);
+                            cmp = LeadUtil.leadParentImpl(cmp);
+                            
+                            if (cmp.isEnabled()) {
+                                if (!isScrollWheeling && cmp.isFocusable()) {
+                                    setFocused(cmp);
                                 }
-                                leadComponent.pointerReleased(x, y);
+                                LeadUtil.pointerReleased(cmp, x, y);
                             }
                         }
                     } else {
@@ -3802,13 +3775,12 @@ public class Form extends Container {
                             }
                             
                             if (cmp != null) {
-                                Component leadComponent = leadComponent(cmp);
-                                Component leadParent = leadParent(cmp);
+                                cmp = LeadUtil.leadParentImpl(cmp);
                                 
-                                if (leadParent.isEnabled() && !isScrollWheeling && leadParent.isFocusable()) {
-                                    setFocused(leadParent);
+                                if (cmp.isEnabled() && !isScrollWheeling && cmp.isFocusable()) {
+                                    setFocused(cmp);
                                 }
-                                leadComponent.pointerReleased(x, y);
+                                LeadUtil.pointerReleased(cmp, x, y);
                             }
                         } else {
                             Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -3819,15 +3791,12 @@ public class Form extends Container {
                                 }
                                 if (cmp != null) {                                
                                     
-                                    Component leadComponent = leadComponent(cmp);
-                                    Component leadParent = leadParent(cmp);
-                                    if (cmp.hasLead) {
-                                        leadParent.repaint();
+                                    cmp = LeadUtil.leadParentImpl(cmp);
+                                    
+                                    if (!isScrollWheeling && cmp.isEnabled() && cmp.isFocusable()) {
+                                        setFocused(cmp);
                                     }
-                                    if (!isScrollWheeling && leadParent.isEnabled() && leadParent.isFocusable()) {
-                                        setFocused(leadParent);
-                                    }
-                                    leadComponent.pointerReleased(x, y);
+                                    LeadUtil.pointerReleased(cmp, x, y);
                                     
                                 }
                             }
@@ -3836,10 +3805,10 @@ public class Form extends Container {
                 }
             } else {
                 if (dragged.isDragAndDropInitialized()) {
-                    dragged.dragFinishedImpl(x, y);
+                    LeadUtil.dragFinished(dragged, x, y);
                     dragged = null;
                 } else {
-                    dragged.pointerReleased(x, y);
+                    LeadUtil.pointerReleased(dragged, x, y);
                     dragged = null;
                 }
             }
@@ -3847,9 +3816,9 @@ public class Form extends Container {
             if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
                 for (int iter = 0; iter < componentsAwaitingRelease.size(); iter++) {
                     Component c = componentsAwaitingRelease.get(iter);
-                    if (c instanceof ReleasableComponent) {
-                            ReleasableComponent rc = (ReleasableComponent) c;
-                            rc.setReleased();
+                    if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
+                        ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
+                        rc.setReleased();
                     }
                 }
                 componentsAwaitingRelease = null;
@@ -4609,4 +4578,9 @@ public class Form extends Container {
     public void setEditOnShow(TextArea editOnShow) {
         this.editOnShow = editOnShow;
     }
+    
+    
+        
+        
+    
 }

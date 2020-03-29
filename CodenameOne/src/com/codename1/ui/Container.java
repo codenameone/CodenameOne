@@ -432,7 +432,7 @@ public class Container extends Component implements Iterable<Component>{
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
     }
-    
+
     /**
      * Sets the lead component for this container, a lead component takes over the entire
      * component hierarchy and receives all the events for the container hierarchy.
@@ -762,6 +762,9 @@ public class Container extends Component implements Iterable<Component>{
             if (parent.scrollableX && !parent.constrainWidthWhenScrollable()) {
                 return parent;
             }
+            if (parent.hasFixedPreferredSize()) {
+                return parent;
+            }
             parent = parent.getParent();
         }
         return null;
@@ -781,6 +784,9 @@ public class Container extends Component implements Iterable<Component>{
         Container parent = getParent();
         while (parent != null) {
             if (parent.scrollableY && !parent.constrainHeightWhenScrollable()) {
+                return parent;
+            }
+            if (parent.hasFixedPreferredSize()) {
                 return parent;
             }
             parent = parent.getParent();
@@ -2012,7 +2018,7 @@ public class Container extends Component implements Iterable<Component>{
      * safe area.  If so, it will add padding to make the contents fit the safe area.
      */
     private boolean snapToSafeAreaInternal() {
-        if (!isInitialized()) {
+        if (!isInitialized() || isHidden()) {
             return false;
         }
         Container safeAreaRoot = getSafeAreaRoot();
@@ -2668,7 +2674,7 @@ public class Container extends Component implements Iterable<Component>{
             return component;
         }
         return this;
-    }    
+    }
     /**
      * Recursively searches the container hierarchy for a drop target
      * 
@@ -2699,8 +2705,9 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        clearDrag();
-        setDragActivated(false);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.clearDrag();
+        leadParent.setDragActivated(false);
         Component cmp = getComponentAt(x, y);
         if (cmp == this) {
             super.pointerPressed(x, y);
@@ -2719,11 +2726,29 @@ public class Container extends Component implements Iterable<Component>{
             cmp.pointerPressed(x, y);            
         }
     }
-
+    
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
+        boolean restoreBounds = false;
+        if (safeArea && getWidth() > 0 && getHeight() > 0) {
+            // If this container is marked as a safe area
+            // then we may need to add padding to make it *safe*
+            Container parent = getParent();
+            if (parent == null || !parent.isSafeAreaInternal(true)) {
+                // For efficiency, we check if the parent is a safe area.
+                // If so, we don't need to worry because it has already
+                // added appropriate padding.
+                if (tmpInsets == null) {
+                    tmpInsets = new TmpInsets();
+                }
+                Style s = getStyle();
+                tmpInsets.set(s);
+                restoreBounds = snapToSafeAreaInternal();
+            }
+        }
+        
         Dimension d = layout.getPreferredSize(this);
         Style style = getStyle();
         if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
@@ -2733,6 +2758,9 @@ public class Container extends Component implements Iterable<Component>{
         if(UIManager.getInstance().getLookAndFeel().isBackgroundImageDetermineSize() && style.getBgImage() != null) {
             d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
+        }
+        if (restoreBounds && tmpInsets != null) {
+            tmpInsets.restore(getStyle());
         }
         return d;
     }

@@ -716,9 +716,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                 state=STATE_ROLLOVER;
                 fireStateChange();
             }
-            if (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1)) {
-                fireActionEvent(x, y);
-            }
+            //if (releaseRadius > 0 || (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1))) {
+            fireActionEvent(x, y);
+            //}
             
             repaint();
         }
@@ -789,8 +789,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        clearDrag();
-        setDragActivated(false);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.clearDrag();
+        leadParent.setDragActivated(false);
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
@@ -818,7 +819,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
-        	f.removeComponentAwaitingRelease(this);
+            f.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it

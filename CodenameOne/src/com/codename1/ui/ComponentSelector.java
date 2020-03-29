@@ -493,6 +493,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
+     * Filters the current found set against the given selector.
+     * @param selector The selector to filter the found set on.
+     * @return A new set of elements matching the selector.
+     */
+    public ComponentSelector filter(String selector) {
+        ComponentSelector matcher = new ComponentSelector(selector, new Label());
+        LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
+        for (Component c : this) {
+            if (matcher.match(c)) {
+                matches.add(c);
+            }
+        }
+        return matcher.addAll(matches, true);
+    }
+    
+    /**
      * Creates a new set of components consisting of all of the parents of components in this set.
      * Only parent components matching the provided selector will be included in the set.
      * @param selector Selector to filter the parent components.
@@ -4844,7 +4860,19 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
     
-    
+    /**
+     * Returns a set with the first element of the current set, or an empty set if the
+     * current set is empty.
+     * @return A ComponentSelector with 0 or 1 element.
+     * @since 7.0
+     */
+    public ComponentSelector first() {
+        if (!isEmpty()) {
+            return new ComponentSelector(results.iterator().next());
+        } else {
+            return new ComponentSelector();
+        }
+    }
     
     
     

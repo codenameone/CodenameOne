@@ -1021,6 +1021,23 @@ public class Component implements Animation, StyleListener, Editable {
         return clientProperties.get(key);
     }
 
+    /**
+     * Convenience method that strips margin and padding from the component, and
+     * returns itself for chaining.
+     * @return Self for chaining.
+     * @see Style#stripMarginAndPadding() 
+     * @since 7.0
+     */
+    public Component stripMarginAndPadding() {
+        getAllStyles().stripMarginAndPadding();
+        return this;
+        
+    }
+    
+    /**
+     * Gets the lead component for this component.  
+     * @return The lead component or null if none is found.
+     */
     Component getLeadComponent() {
         if(isBlockLead()) {
             return null;
@@ -2987,6 +3004,17 @@ public class Component implements Animation, StyleListener, Editable {
         Dimension d = new Dimension(0, 0);
         return d;
     }
+    
+    /**
+     * Checks if this component has a fixed preferred size either via an explicit call to
+     * {@link #setPreferredH(int) } and {@link #setPreferredW(int) }, or via a preferred
+     * size style string.
+     * @return True if this component has a fixed preferred size.
+     * @since 7.0
+     */
+    public boolean hasFixedPreferredSize() {
+        return sizeRequestedByUser || preferredSizeStr != null;
+    }
 
     private Dimension preferredSizeImpl() {
         if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
@@ -4003,6 +4031,11 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void clearDrag() {
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent != null && leadParent != this) {
+            leadParent.clearDrag();
+            return;
+        }
         //if we are in the middle of a tensile animation reset the scrolling location
         //before killing the scrolling
         if (draggedMotionX != null) {
@@ -4407,7 +4440,11 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
     
-    
+    private void pointerDragged(final int x, final int y, final Object currentPointerPress) {
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.pointerDragged(this, x, y, currentPointerPress);
+
+    }
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
@@ -4418,7 +4455,7 @@ public class Component implements Animation, StyleListener, Editable {
      * the pointer is pressed, a new Object is generated, and is passed to pointerDragged.
      * This is to help prevent infinite loops of pointerDragged after a pointer press has been released.
      */
-    private void pointerDragged(final int x, final int y, final Object currentPointerPress) {
+    private void pointerDragged(final Component lead, final int x, final int y, final Object currentPointerPress) {
         Form p = getComponentForm();
         if(p == null){
             return;
@@ -4427,8 +4464,8 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         
-        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
+        if (lead.pointerDraggedListeners != null && lead.pointerDraggedListeners.hasListeners()) {
+            lead.pointerDraggedListeners.fireActionEvent(new ActionEvent(lead, ActionEvent.Type.PointerDrag, x, y));
         }
 
         if(dragAndDropInitialized) {
@@ -4438,7 +4475,7 @@ public class Component implements Animation, StyleListener, Editable {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (dragActivated) {
-                            pointerDragged(x, y, currentPointerPress);
+                            lead.pointerDragged(x, y, currentPointerPress);
                         }
                         dragCallbacks--;
                     }
@@ -4455,9 +4492,9 @@ public class Component implements Animation, StyleListener, Editable {
                 draggedy = getAbsoluteY();
             }
             Component dropTo = findDropTarget(this, x, y);
-            if(dropTo != null && dragOverListener != null) {
-                ActionEvent ev = new ActionEvent(this, dropTo, x, y);
-                dragOverListener.fireActionEvent(ev);
+            if(dropTo != null && lead.dragOverListener != null) {
+                ActionEvent ev = new ActionEvent(lead, dropTo, x, y);
+                lead.dragOverListener.fireActionEvent(ev);
                 if(ev.isConsumed()) {
                     return;
                 }
@@ -4633,10 +4670,11 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerPressed(int[] x, int[] y) {
-        inPinch = false;
-        dragActivated = false;
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.inPinch = false;
+        leadParent.dragActivated = false;
         pointerPressed(x[0], y[0]);
-        scrollOpacity = 0xff;
+        leadParent.scrollOpacity = 0xff;
     }
 
     /**
@@ -4648,9 +4686,10 @@ public class Component implements Animation, StyleListener, Editable {
      * @return true if a press in this point might indicate the desire to begin a drag operation
      */
     protected boolean isDragAndDropOperation(int x, int y) {
-        return draggable;
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        return leadParent.draggable;
     }
-
+    
     /**
      * If this Component is focused, the pointer pressed event
      * will call this method
@@ -4659,22 +4698,24 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerPressed(int x, int y) {
-        dragActivated = false;
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.dragActivated = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
-        clearDrag();
-        if(isDragAndDropOperation(x, y)) {
+        leadParent.clearDrag();
+        if(leadParent.isDragAndDropOperation(x, y)) {
             int restore = Display.getInstance().getDragStartPercentage();
             if(restore > 1){
-                restoreDragPercentage = restore;
+                leadParent.restoreDragPercentage = restore;
             }
             Display.getInstance().setDragStartPercentage(1);
         }
     }
 
     void initDragAndDrop(int x, int y) {
-        dragAndDropInitialized = isDragAndDropOperation(x, y);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.dragAndDropInitialized = leadParent.isDragAndDropOperation(x, y);
     }
 
     /**
@@ -4711,8 +4752,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @param y the pointer y coordinate
      */
     public void pointerReleased(int x, int y) {
-        if (inPinch) {
-            inPinch = false;
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.inPinch) {
+            leadParent.inPinch = false;
         }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
@@ -4722,7 +4764,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         pointerReleaseImpl(x, y);
-        scrollOpacity = 0xff;
+        leadParent.scrollOpacity = 0xff;
     }
 
     /**
@@ -4871,6 +4913,10 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void dragFinishedImpl(int x, int y) {
+        LeadUtil.leadParentImpl(this).dragFinishedImpl(this, x, y);
+    }
+    
+    private void dragFinishedImpl(Component lead, int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
             if (p == null) {
@@ -4896,9 +4942,9 @@ public class Component implements Animation, StyleListener, Editable {
             if(dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
                 getParent().scrollRectToVisible(getX(), getY(), getWidth(), getHeight(), getParent());
-                if(dropListener != null) {
-                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
-                    dropListener.fireActionEvent(ev);
+                if(lead.dropListener != null) {
+                    ActionEvent ev = new ActionEvent(lead, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
+                    lead.dropListener.fireActionEvent(ev);
                     if(!ev.isConsumed()) {
                         dropTargetComponent.drop(this, x, y);
                     }
@@ -4906,9 +4952,9 @@ public class Component implements Animation, StyleListener, Editable {
                     dropTargetComponent.drop(this, x, y);
                 }
             } else {
-                if(dragOverListener != null) {
-                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag,null, x, y);
-                    dragOverListener.fireActionEvent(ev);
+                if(lead.dragOverListener != null) {
+                    ActionEvent ev = new ActionEvent(lead, ActionEvent.Type.PointerDrag,null, x, y);
+                    lead.dragOverListener.fireActionEvent(ev);
                 }
                 p.repaint();
             }
@@ -4924,14 +4970,14 @@ public class Component implements Animation, StyleListener, Editable {
         }
         dragActivated = false;
         dragAndDropInitialized = false;
-        if (dragFinishedListeners != null && dragFinishedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.DragFinished, x, y);
-            dragFinishedListeners.fireActionEvent(ev);
+        if (lead.dragFinishedListeners != null && lead.dragFinishedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(lead, ActionEvent.Type.DragFinished, x, y);
+            lead.dragFinishedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
                 return;
             }
         }
-        dragFinished(x, y);
+        lead.dragFinished(x, y);
     }
 
     /**
@@ -5104,6 +5150,11 @@ public class Component implements Animation, StyleListener, Editable {
     }
     
     private void pointerReleaseImpl(int x, int y) {
+        LeadUtil.leadParentImpl(this).pointerReleaseImpl(this, x, y);
+    }
+    
+    private void pointerReleaseImpl(Component lead, int x, int y) {
+        
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
@@ -7034,11 +7085,32 @@ public class Component implements Animation, StyleListener, Editable {
     }    
     
     /**
-     * Returns true if the component was explicitly hidden by the user
+     * Returns true if the component was explicitly hidden by the user.  This method doesn't check 
+     * if the parent component is hidden, so it is possible that the component would be hidden from
+     * the UI, but that this would still return true.  Use {@link #isHidden(boolean) } with {@literal true}
+     * to check also if the parent is hidden.
      * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
      */
     public boolean isHidden() {
         return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
+    }
+    
+    /**
+     * Checks if the component is hidden. If {@literal checkParent} is {@literal true}, this 
+     * also checks to see if the parent is hidden, and will return true if either this component
+     * is hidden, or the parent is hidden.
+     * @param checkParent True to check if parent is hidden also.
+     * @return Returns true if the component is hidden.
+     * @since 7.0
+     */
+    public boolean isHidden(boolean checkParent) {
+        if (isHidden()) {
+            return true;
+        }
+        if (checkParent && parent != null) {
+            return parent.isHidden(true);
+        }
+        return false;
     }
     
     /**

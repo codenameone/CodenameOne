@@ -186,6 +186,9 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
         }
     }
     
+    
+    private boolean firstSetSelectedIndex = true;
+    
     /**
      * {@inheritDoc}
      */
@@ -193,9 +196,12 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
         if (isMultiSelectionMode()) {
             setSelectedIndices(index);
         } else {
-            int oldIndex = selectedIndex;
-            this.selectedIndex = index;
-            selectionListener.fireSelectionEvent(oldIndex, selectedIndex);
+            if (index != selectedIndex || firstSetSelectedIndex) {
+                firstSetSelectedIndex = false;
+                int oldIndex = selectedIndex;
+                this.selectedIndex = index;
+                selectionListener.fireSelectionEvent(oldIndex, selectedIndex);
+            }
         }
     }
 

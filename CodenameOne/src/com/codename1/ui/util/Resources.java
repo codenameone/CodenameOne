@@ -32,6 +32,7 @@ import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -1648,6 +1649,17 @@ public class Resources {
                             topRightMode(input.readBoolean()).
                             bottomRightMode(input.readBoolean()).
                             bottomLeftMode(input.readBoolean());
+                    
+            case 0xff16:
+                // CSS border
+                String cssStyles = input.readUTF();
+                try {
+                    return new CSSBorder(this, cssStyles);
+                } catch (Throwable t) {
+                    Log.p("Failed to load CSS border: "+cssStyles);
+                    Log.e(t);
+                    return Border.createEmpty();
+                }
                             
         }
         return null;

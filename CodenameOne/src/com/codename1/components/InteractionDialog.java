@@ -585,6 +585,9 @@ public class InteractionDialog extends Container {
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())
                                 ;
+                        if (pressedOutOfBounds && disposeWhenPointerOutOfBounds) {
+                            evt.consume();
+                        }
                     }
                 };
             }
@@ -601,6 +604,7 @@ public class InteractionDialog extends Container {
                                 pressedOutOfBounds && 
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {
+                            evt.consume();
                             f.removePointerPressedListener(pressedListener);
                             f.removePointerReleasedListener(releasedListener);
                             dispose();
@@ -727,8 +731,19 @@ public class InteractionDialog extends Container {
         
         
         int availableHeight = getLayeredPane(f).getParent().getHeight();
+        if (availableHeight == 0) {
+            availableHeight = CN.getDisplayHeight();
+        }
         int availableWidth =getLayeredPane(f).getParent().getWidth();
+        if (availableWidth == 0) {
+            availableWidth = CN.getDisplayWidth();
+        }
         int width = Math.min(availableWidth, prefWidth);
+        setWidth(width);
+        setShouldCalcPreferredSize(true);
+        revalidate();
+        prefHeight = getPreferredH();
+        
         int x = 0;
         int y = 0;
 
