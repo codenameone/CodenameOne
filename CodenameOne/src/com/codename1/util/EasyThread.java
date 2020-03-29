@@ -26,6 +26,7 @@ package com.codename1.util;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * An easy API for working with threads similar to call serially/and wait that allows us to 
@@ -34,6 +35,8 @@ import java.util.ArrayList;
  * @author Shai Almog
  */
 public class EasyThread {
+    private List<ErrorListener> errorListenenrs;
+    private static List<ErrorListener> globalErrorListenenrs;
     private Thread t;
     private boolean running = true;
     private ArrayList<Object> queue = new ArrayList<Object>();
@@ -44,24 +47,29 @@ public class EasyThread {
                 Object current = null;
                 Object resultCallback = null;
                 while(running) {
-                    synchronized(LOCK) {
-                        if(queue.size() > 0) {
-                            current = queue.get(0);
-                            if(current instanceof RunnableWithResult) {
-                                resultCallback = queue.get(1);
+                    try {
+                        synchronized(LOCK) {
+                            if(queue.size() > 0) {
+                                current = queue.get(0);
+                                if(current instanceof RunnableWithResult) {
+                                    resultCallback = queue.get(1);
+                                    queue.remove(0);
+                                }
                                 queue.remove(0);
+                            } else {
+                                Util.wait(LOCK);
                             }
-                            queue.remove(0);
-                        } else {
-                            Util.wait(LOCK);
                         }
-                    }
-                    if(current != null) {
-                        if(current instanceof Runnable) {
-                            ((Runnable)current).run();
-                        } else {
-                            ((RunnableWithResult)current).run((SuccessCallback)resultCallback);
+                        if(current != null) {
+                            if(current instanceof Runnable) {
+                                ((Runnable)current).run();
+                            } else {
+                                ((RunnableWithResult)current).run((SuccessCallback)resultCallback);
+                            }
                         }
+                    } catch(Throwable t) {
+                        fireEvent(errorListenenrs, current, t);
+                        fireEvent(globalErrorListenenrs, current, t);
                     }
                     current = null;
                     resultCallback = null;
@@ -69,6 +77,14 @@ public class EasyThread {
             }
         }, name);
         t.start();
+    }
+    
+    private void fireEvent(List<ErrorListener> lst, Object current, Throwable t) {
+        if(lst != null) {
+            for(ErrorListener e : lst) {
+                e.onError(this, current, t);
+            }
+        }
     }
     
     /**
@@ -195,5 +211,80 @@ public class EasyThread {
      */
     public boolean isThisIt() {
         return t == Thread.currentThread();
+    }
+    
+    /**
+     * Adds a callback for error events, notice that this code isn't thread 
+     * safe and should be invoked synchronously. This method must never be 
+     * invoked from within the resulting callback code!
+     * @param err the error callback
+     */
+    public void addErrorListener(ErrorListener err) {
+        if(errorListenenrs == null) {
+            errorListenenrs = new ArrayList<ErrorListener>();
+        }
+        errorListenenrs.add(err);
+    }
+    
+    /**
+     * Removes a callback for error events, notice that this code isn't thread 
+     * safe and should be invoked synchronously. This method must never be 
+     * invoked from within the resulting callback code!
+     * @param err the error callback
+     */
+    public void removeErrorListener(ErrorListener err) {
+        if(errorListenenrs == null) {
+            return;
+        }
+        List<ErrorListener> l = new ArrayList<ErrorListener>();
+        l.addAll(errorListenenrs);
+        l.remove(err);
+        errorListenenrs = l;
+    }
+    
+    
+    /**
+     * Adds a callback for error events, notice that this code isn't thread 
+     * safe and should be invoked synchronously. This method must never be 
+     * invoked from within the resulting callback code!
+     * @param err the error callback
+     */
+    public static void addGlobalErrorListener(ErrorListener err) {
+        if(globalErrorListenenrs == null) {
+            globalErrorListenenrs = new ArrayList<ErrorListener>();
+        }
+        globalErrorListenenrs.add(err);
+    }
+    
+    /**
+     * Removes a callback for error events, notice that this code isn't thread 
+     * safe and should be invoked synchronously. This method must never be 
+     * invoked from within the resulting callback code!
+     * @param err the error callback
+     */
+    public static void removeGlobalErrorListener(ErrorListener err) {
+        if(globalErrorListenenrs == null) {
+            return;
+        }
+        List<ErrorListener> l = new ArrayList<ErrorListener>();
+        l.addAll(globalErrorListenenrs);
+        l.remove(err);
+        globalErrorListenenrs = l;
+    }
+    
+    
+    /**
+     * Callback listener for errors on easy thread
+     */
+    public static interface ErrorListener<T> {
+        /**
+         * Invoked when an exception is thrown on an easy thread. Notice
+         * this callback occurs within the thread and not on the EDT. This
+         * method blocks the current easy thread until it completes.
+         * @param t the thread
+         * @param callback the callback that triggered the exception
+         * @param error the exception that occurred
+         */
+        void onError(EasyThread t, T callback, Throwable error);
     }
 }
