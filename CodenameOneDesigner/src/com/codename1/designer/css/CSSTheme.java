@@ -4174,11 +4174,14 @@ public class CSSTheme {
                 }
                 fontFamily = fontFamily.getNextLexicalUnit();
             }
-           
-            if (ttfFontFile != null) {
-                return new EditorTTFFont(ttfFontFile, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
+            if (iFontFace == Font.FACE_MONOSPACE) {
+                return Font.createSystemFont(iFontFace, iFontStyle, sysSize);
             } else {
-                return new EditorTTFFont(ttfFontName, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
+                if (ttfFontFile != null) {
+                    return new EditorTTFFont(ttfFontFile, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
+                } else {
+                    return new EditorTTFFont(ttfFontName, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
+                }
             }
             /*
             if (ttfFont != null) {
