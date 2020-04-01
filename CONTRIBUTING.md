@@ -1,3 +1,5 @@
+![Conbributing](https://i.imgur.com/UrW2kEH.jpg)
+
 # Contributing
 
 Thank you for your interest in Codename One! We have always been community driven and contibuting a pull request is the highest form of that.

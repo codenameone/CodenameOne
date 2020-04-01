@@ -2018,7 +2018,7 @@ public class Container extends Component implements Iterable<Component>{
      * safe area.  If so, it will add padding to make the contents fit the safe area.
      */
     private boolean snapToSafeAreaInternal() {
-        if (!isInitialized()) {
+        if (!isInitialized() || isHidden()) {
             return false;
         }
         Container safeAreaRoot = getSafeAreaRoot();
@@ -2726,7 +2726,7 @@ public class Container extends Component implements Iterable<Component>{
             cmp.pointerPressed(x, y);            
         }
     }
-
+    
     /**
      * {@inheritDoc}
      */

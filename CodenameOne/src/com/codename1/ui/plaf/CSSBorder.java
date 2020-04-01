@@ -22,6 +22,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.util.Resources;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -189,6 +190,11 @@ public class CSSBorder extends Border {
                return border.borderWidth(cssPropertyValue);
            }
         });
+        decorators.put("border-image", new Decorator() {
+           public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
+               return border.borderImage(cssPropertyValue);
+           }
+        });
     }
     
     
@@ -197,9 +203,11 @@ public class CSSBorder extends Border {
     
     private Color backgroundColor;
     private BackgroundImage[] backgroundImages;
+    private BorderImage borderImage;
     private BorderStroke[] stroke;
     private BoxShadow boxShadow;
     private BorderRadius borderRadius;
+    private Resources res;
     
     /**
      * Constant for unit px
@@ -229,7 +237,15 @@ public class CSSBorder extends Border {
      * Creates a new empty CSS border.
      */
     public CSSBorder() {
-        
+        res = Resources.getGlobalResources();
+    }
+    
+    /**
+     * Creates an empty border.
+     * @param res Theme resource file from which images can be referenced.
+     */
+    public CSSBorder(Resources res) {
+        this.res = res;
     }
     
     
@@ -248,12 +264,41 @@ public class CSSBorder extends Border {
      * <li>border-stroke</li>
      * <li>border-style</li>
      * <li>border-width</li>
+     * <li>border-image</li>
      * </ul>
      * </p>
-     * @param css 
+     * @param css CSS to parse.
      * @throws IllegalArgumentException If it fails to parse the style.
      */
     public CSSBorder(String css) {
+        this(Resources.getGlobalResources(), css);
+        
+    }
+    
+    /**
+     * Creates a new CSS border with the provided CSS styles.  This currenlty only supports a subset of CSS.  The following
+     * properties are currently supported:
+     * 
+     * <p>
+     * <ul>
+     * <li>background-color</li>
+     * <li>background-image</li>
+     * <li>background-position</li>
+     * <li>background-repeat</li>
+     * <li>border-color</li>
+     * <li>border-radius</li>
+     * <li>border-stroke</li>
+     * <li>border-style</li>
+     * <li>border-width</li>
+     * <li>border-image</li>
+     * </ul>
+     * </p>
+     * @param res Theme resource file from which images can be loaded.
+     * @param css CSS to parse.
+     * @throws IllegalArgumentException If it fails to parse the style.
+     */
+    public CSSBorder(Resources res, String css) {
+        this.res = res;
         String[] parts = Util.split(css, ";");
         for (String part : parts) {
             int colonPos = part.indexOf(":");
@@ -333,6 +378,9 @@ public class CSSBorder extends Border {
         if (boxShadow != null) {
             sb.append("box-shadow:").append(boxShadow.toCSSString()).append(";");
                     
+        }
+        if (borderImage != null) {
+            sb.append("border-image:").append(borderImage.toCSSString()).append(";");
         }
         
         return sb.toString();
@@ -1126,7 +1174,85 @@ public class CSSBorder extends Border {
         
     }
     
-    
+    private class BorderImage {
+        Image image;
+        double[] slices;
+        Border internal;
+        String imageName;
+        
+        BorderImage(String imageName, double... slces) {
+            this.imageName = imageName;
+            slices = new double[4];
+            if (slces.length == 4) {
+                System.arraycopy(slces, 0, slices, 0, 4);
+            } else if (slces.length == 3) {
+                slices[0] = slces[0];
+                slices[1] = slices[3] = slces[1];
+                slices[2] = slces[2];
+            } else if (slces.length == 2) {
+                slices[0] = slices[2] = slces[0];
+                slices[1] = slices[3] = slces[1];
+            } else if (slces.length == 1) {
+                slices[0] = slices[1] = slices[2] = slices[3] = slces[0];
+            } else {
+                throw new IllegalArgumentException("Slices expected to be length 1 to 4, but found size "+slces.length+": "+Arrays.toString(slces));
+            }
+        }
+        
+        BorderImage(Image img, double... slces) {
+            image = img;
+            slices = new double[4];
+            if (slces.length == 4) {
+                System.arraycopy(slces, 0, slices, 0, 4);
+            } else if (slces.length == 3) {
+                slices[0] = slces[0];
+                slices[1] = slices[3] = slces[1];
+                slices[2] = slces[2];
+            } else if (slces.length == 2) {
+                slices[0] = slices[2] = slces[0];
+                slices[1] = slices[3] = slces[1];
+            } else if (slces.length == 1) {
+                slices[0] = slices[1] = slices[2] = slices[3] = slces[0];
+            } else {
+                throw new IllegalArgumentException("Slices expected to be length 1 to 4, but found size "+slces.length+": "+Arrays.toString(slces));
+            }
+            internal = Border.createImageSplicedBorder(img, slices[0], slices[1], slices[2], slices[3]);
+        }
+        
+        void paint(Graphics g, Component c, Rectangle2D contentRect) {
+            internal().paint(g, (int)contentRect.getX(), (int)contentRect.getY(), (int)contentRect.getWidth(), (int)contentRect.getHeight(), c);
+        }
+        
+        Image image() {
+            if (image == null) {
+                image = res.getImage(imageName);
+                if (image == null) {
+                    try {
+                        image = EncodedImage.create("/"+imageName);
+                    } catch (IOException ex) {
+                        Log.p("Failed to load image named "+imageName+" for CSSBorder");
+                        throw new IllegalStateException("Failed to load image "+imageName);
+                    }
+                }
+            }
+            return image;
+        }
+        
+        Border internal() {
+            if (internal == null) {
+                internal = Border.createImageSplicedBorder(image(), slices[0], slices[1], slices[2], slices[3]);
+            }
+            return internal;
+        }
+        
+        String toCSSString() {
+            String imgName = imageName;
+            if (imgName == null && image != null) {
+                imgName = image.getImageName();
+            }
+            return Util.encodeUrl(imgName)+" "+slices[0]+" "+slices[1]+" "+slices[2]+" "+slices[3];
+        }
+    }
     
     private class BackgroundImage {
         LinearGradient linearGradient;
@@ -1486,6 +1612,9 @@ public class CSSBorder extends Border {
         return stroke[TOP].equals(stroke[BOTTOM]) && stroke[LEFT].equals(stroke[RIGHT]) && stroke[TOP].equals(stroke[LEFT]);
     }
 
+    /**
+     * {@inheritDoc }
+     */
     @Override
     public boolean isBackgroundPainter() {
         return true;
@@ -1493,10 +1622,16 @@ public class CSSBorder extends Border {
     
     
     
-    
+    /**
+     * {@inheritDoc }
+     */
     @Override
     public void paintBorderBackground(Graphics g, Component c) {
-        
+        if (borderImage != null) {
+            // A border image overrides everything!
+            borderImage.internal().paintBorderBackground(g, c);
+            return;
+        }
         int alpha = g.getAlpha();
         int color = g.getColor();
         boolean antialias = g.isAntiAliased();
@@ -1630,7 +1765,93 @@ public class CSSBorder extends Border {
                        
        
     }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getMinimumHeight() {
+        if (borderImage != null) {
+            return borderImage.internal().getMinimumHeight();
+        }
+        
+        return super.getMinimumHeight(); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getMinimumWidth() {
+        if (borderImage != null) {
+            return borderImage.internal().getMinimumWidth();
+        }
+        return super.getMinimumWidth();
+    }
     
+    
+    
+    
+    /**
+     * Creates a 9-piece image border.
+     * 
+     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
+     * <p>If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
+     * border being rendered.</p>
+     * 
+     * @param borderImage The border image.
+     * @param slicePoints The slice points.  Accepts 1 - 4 values:
+     * <ul>
+     *    <li>1 value = all sides</li>
+     *    <li>2 values = vertical horizontal</li>
+     *    <li>3 values = top horizontal bottom</li>
+     *    <li>4 values = top right bottom left</li>
+     * </ul>
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #borderImageWithName(java.lang.String, double...) 
+     */
+    public CSSBorder borderImage(Image borderImage, double... slicePoints) {
+        this.borderImage = new BorderImage(borderImage, slicePoints);
+        return this;
+    }
+    
+    /**
+     * Adds a 9-piece image border using the provided image name, which should exist in the
+     * theme resource file.
+     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
+     * <p>If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
+     * border being rendered.</p>
+     * @param borderImageName The image name.
+     * @param slicePoints The slice points.  Accepts 1 - 4 values:
+     * <ul>
+     *    <li>1 value = all sides</li>
+     *    <li>2 values = vertical horizontal</li>
+     *    <li>3 values = top horizontal bottom</li>
+     *    <li>4 values = top right bottom left</li>
+     * </ul>
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #borderImage(com.codename1.ui.Image, double...) 
+     */
+    public CSSBorder borderImageWithName(String borderImageName, double... slicePoints) {
+        this.borderImage = new BorderImage(borderImageName, slicePoints);
+        return this;
+    }
+    
+    
+    private CSSBorder borderImage(String cssProperty) {
+        String[] parts = Util.split(cssProperty, " ");
+        parts[0] = Util.decode(parts[0], "UTF-8", false);
+        
+        int len = parts.length;
+        double[] splices = new double[len-1];
+        for (int i=1; i<len; i++) {
+            splices[i-1] = Double.parseDouble(parts[i]);
+        }
+        
+        return borderImageWithName(parts[0], splices);
+    }
     
     /**
      * Sets the border radius for rounded corners.
@@ -1829,14 +2050,22 @@ public class CSSBorder extends Border {
             if (part.charAt(0) == '"' || part.charAt(0) == '"') {
                 part = part.substring(1, part.length()-1);
             }
-            try {
-                EncodedImage im = EncodedImage.create(part);
-                im.setImageName(part);
-                imgs.add(im);
-            } catch (IOException ex) {
-                Log.e(ex);
-                throw new IllegalArgumentException("Failed to parse image: "+part);
+            if (part.indexOf("/") != -1) {
+                part = part.substring(part.lastIndexOf("/")+1);
             }
+            Image im = res.getImage(part);
+            if (im == null) {
+                try {
+                    im = EncodedImage.create("/"+part);
+                    im.setImageName(part);
+                    
+                } catch (IOException ex) {
+                    Log.e(ex);
+                    throw new IllegalArgumentException("Failed to parse image: "+part);
+                }
+            }
+            imgs.add(im);
+            
         }
         return backgroundImage(imgs.toArray(new Image[imgs.size()]));
         

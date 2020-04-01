@@ -7085,11 +7085,32 @@ public class Component implements Animation, StyleListener, Editable {
     }    
     
     /**
-     * Returns true if the component was explicitly hidden by the user
+     * Returns true if the component was explicitly hidden by the user.  This method doesn't check 
+     * if the parent component is hidden, so it is possible that the component would be hidden from
+     * the UI, but that this would still return true.  Use {@link #isHidden(boolean) } with {@literal true}
+     * to check also if the parent is hidden.
      * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
      */
     public boolean isHidden() {
         return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
+    }
+    
+    /**
+     * Checks if the component is hidden. If {@literal checkParent} is {@literal true}, this 
+     * also checks to see if the parent is hidden, and will return true if either this component
+     * is hidden, or the parent is hidden.
+     * @param checkParent True to check if parent is hidden also.
+     * @return Returns true if the component is hidden.
+     * @since 7.0
+     */
+    public boolean isHidden(boolean checkParent) {
+        if (isHidden()) {
+            return true;
+        }
+        if (checkParent && parent != null) {
+            return parent.isHidden(true);
+        }
+        return false;
     }
     
     /**

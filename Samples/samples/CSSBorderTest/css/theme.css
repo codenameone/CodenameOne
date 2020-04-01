@@ -1,0 +1,12 @@
+#Constants {
+    includeNativeBool: true; 
+
+}
+
+
+
+NinePiece {
+	refresh-images:true;
+	border-image:url('dashbg_landscape.png');
+	border-image-slice: 40%;
+}

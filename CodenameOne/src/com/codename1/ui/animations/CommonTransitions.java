@@ -31,14 +31,10 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.InterFormContainer;
-import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.LazyValue;
-import java.util.Map;
 
 /**
  * <p>Contains common transition animations that can be applied to forms &amp; components 
@@ -737,8 +733,19 @@ public final class CommonTransitions extends Transition {
                     paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
+                    
                     Form sourceForm = (Form)getSource();
                     Form destForm = (Form)getDestination();
+                    Container titleArea = sourceForm.getTitleArea();
+                    Container destTitleArea = destForm.getTitleArea();
+                    if (titleArea == null || titleArea.isHidden(true)  || destTitleArea == null || destTitleArea.isHidden(true) ) {
+                        hideInterformContainers();
+                        paintSlideAtPosition(g, motion2.getValue(), 0);
+                        
+                        paintInterformContainers(g);
+                        return;
+                    }
+                    
                     int alpha = position;
                     int slidePos = motion2.getValue();
                     int clipX = g.getClipX();
@@ -749,6 +756,7 @@ public final class CommonTransitions extends Transition {
                         return;
                     }
                     g.translate(0, sourceForm.getTitleArea().getHeight());
+                    
                     Container sourcePane = ((Form)getSource()).getContentPane();
                     Container destPane = ((Form)getDestination()).getContentPane();
                     boolean dir = forward;
@@ -769,15 +777,16 @@ public final class CommonTransitions extends Transition {
                         paint(g, destPane, -destPane.getAbsoluteX() -destPane.getScrollX(), -destPane.getAbsoluteY() -destPane.getScrollY(), true);
                         g.translate(slidePos - destPane.getWidth(), 0);
                     }
-                    
                     g.translate(0, -sourceForm.getTitleArea().getHeight());
+                    
                     g.setClip(clipX, clipY, clipW, clipH);
                     paintInterformContainers(g);
 
                     
-                    sourceForm.getTitleArea().paintComponentBackground(g);
-                    paintShiftFadeHierarchy(sourceForm.getTitleArea(), 255 - alpha, g, false);
-                    paintShiftFadeHierarchy(destForm.getTitleArea(), alpha, g, true);
+                    titleArea.paintComponentBackground(g);
+                    paintShiftFadeHierarchy(titleArea, 255 - alpha, g, false);
+                    paintShiftFadeHierarchy(destTitleArea, alpha, g, true);
+                    
                     return;
                 }
                 case TYPE_PULSATE_DIALOG:
