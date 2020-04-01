@@ -36,8 +36,6 @@ JAVA_BOOLEAN publishPermission = 0;
 #include "com_codename1_social_FacebookImpl.h"
 #ifdef USE_FACEBOOK_CONNECT_PODS
 #import <FBSDKLoginKit/FBSDKLoginKit.h>
-#import <FBSDKShareKit/FBSDKAppInviteContent.h>
-#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
 #else
 #import "FBSDKLoginKit.h"
 #import "FBSDKAppInviteContent.h"
@@ -62,7 +60,7 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREA
         
         // Don't change the @["basic-info"] permission here.  It will be replaced by the build server
         // to the contents of the ios.facebook_permissions build hint.]
-        [login logInWithReadPermissions:@[@"basic_info"]  handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+        [login logInWithPermissions:@[@"basic_info"]  fromViewController: [CodenameOne_GLViewController instance] handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
             if (result.isCancelled) {
                 // Handle cancellations
 #ifdef NEW_CODENAME_ONE_VM
@@ -119,7 +117,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_askPublishPermissions___com_codena
             publishPermission = 1;
         } else {
             FBSDKLoginManager *mgr = [[FBSDKLoginManager alloc] init];
-            [mgr logInWithPublishPermissions:@[@"publish_actions"] handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+            [mgr logInWithPermissions:@[@"publish_actions"] fromViewController: [CodenameOne_GLViewController instance] handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
                 if(callback != JAVA_NULL) {
 #ifdef NEW_CODENAME_ONE_VM
                     if(error == nil) {
@@ -151,18 +149,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasPublishPermissions__(JAVA_OBJEC
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_inviteFriends___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appLinkUrl, JAVA_OBJECT previewImageUrl) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        FBSDKAppInviteContent *content =[[FBSDKAppInviteContent alloc] init];
-        content.appLinkURL = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG appLinkUrl)];
-        //optionally set previewImageURL
-        content.appInvitePreviewImageURL = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG previewImageUrl)];
-        
-        // present the dialog. Assumes self implements protocol `FBSDKAppInviteDialogDelegate`
-        [FBSDKAppInviteDialog showWithContent:content
-                                     delegate:[CodenameOne_GLViewController instance]];
-        POOL_END();
-    });
+    NSLog(@"App Invites are no longer supported: https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/");
 }
 
 

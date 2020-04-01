@@ -77,7 +77,6 @@
 #ifdef INCLUDE_FACEBOOK_CONNECT
 #ifdef USE_FACEBOOK_CONNECT_PODS
 #import <FBSDKCoreKit/FBSDKCoreKit.h>
-#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
 #else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
@@ -167,9 +166,6 @@
 #else
         ,GIDSignInDelegate,GIDSignInUIDelegate
 #endif
-#endif
-#ifdef INCLUDE_FACEBOOK_CONNECT
-        ,FBSDKAppInviteDialogDelegate
 #endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT

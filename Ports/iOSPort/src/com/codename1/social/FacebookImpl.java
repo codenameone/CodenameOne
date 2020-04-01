@@ -25,6 +25,7 @@ package com.codename1.social;
 
 import com.codename1.facebook.FaceBookAccess;
 import com.codename1.impl.ios.IOSNative;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.Callback;
 
@@ -36,7 +37,6 @@ public class FacebookImpl extends FacebookConnect {
     boolean loginCompleted;
     boolean loginCancelled;
     private static IOSNative nativeInterface;
-    static Callback inviteCallback;
     public static void init(Object n) {
         FacebookConnect.implClass = FacebookImpl.class;
         nativeInterface = (IOSNative)n;
@@ -119,66 +119,28 @@ public class FacebookImpl extends FacebookConnect {
      */ 
     @Override
     public void inviteFriends(String appLinkUrl, String previewImageUrl){
-        inviteFriends(appLinkUrl, previewImageUrl, null);
+        //inviteFriends(appLinkUrl, previewImageUrl, null);
+        Log.p("The facebook SDK no longer supports app invites.  https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/");
     }
 
     @Override
     public void inviteFriends(String appLinkUrl, String previewImageUrl, Callback cb) {
-        inviteCallback = cb;
-        nativeInterface.inviteFriends(appLinkUrl, previewImageUrl);
+        Log.p("The facebook SDK no longer supports app invites.  https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/");
         
     }
     
-    /**
-     * Callback called from native code
-     * See - (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didCompleteWithResults:(NSDictionary *)results {
-     * in CodenameOne_GLViewController.m
-     */
-    static void inviteDidCompleteSuccessfully() {
-        if (inviteCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    if (inviteCallback != null) {
-                        inviteCallback.onSucess(null);
-                        inviteCallback = null;
-                    }
-                }
-            });
-            
-        }
-                
-    }
     
     /**
-     * Callback called from native code
-     * See - (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didFailWithError:(NSError *)error
-     * In CodenameOne_GLViewController.m
-     * @param error 
-     */
-    static void inviteDidFailWithError(final int code, final String error) {
-        if (inviteCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    if (inviteCallback != null) {
-                        inviteCallback.onError(null, new RuntimeException(error), code, error);
-                        inviteCallback = null;
-                    }
-                }
-            });
-            
-        }
-                
-    }
-    
-    /**
-     * Returns true if inviteFriends is implemented, it is supported on iOS and 
-     * Android
+     * Always returns false.  Facebook SDK no longer supports app invites.
+     * 
+     *  https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
      * 
      * @return true if inviteFriends is implemented
+     * 
      */ 
     @Override
     public boolean isInviteFriendsSupported(){
-        return true;
+        return false;
     }
     
 }
