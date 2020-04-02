@@ -8736,8 +8736,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public Object connectSocket(String host, int port) {
-        long i = nativeInstance.connectSocket(host, port);
+    public Object connectSocket(String host, int port, int connectTimeout) {
+        long i = nativeInstance.connectSocket(host, port, connectTimeout);
         if(i != 0) {
             return new Long(i);
         }

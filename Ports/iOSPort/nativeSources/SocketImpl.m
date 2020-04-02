@@ -6,7 +6,19 @@
 
 @implementation SocketImpl
 
--(BOOL)connect:(NSString*)host port:(int)port {
+static void _yield() {
+#ifdef NEW_CODENAME_ONE_VM
+    CN1_YIELD_THREAD;
+#endif
+}
+
+static void _resume() {
+#ifdef NEW_CODENAME_ONE_VM
+    CN1_RESUME_THREAD;
+#endif
+}
+
+-(BOOL)connect:(NSString*)host port:(int)port timeout:(int)timeout{
     CFReadStreamRef readStream;
     CFWriteStreamRef writeStream;
     CFStreamCreatePairWithSocketToHost(NULL, (BRIDGE_CAST CFStringRef)host, port, &readStream, &writeStream);
@@ -16,10 +28,54 @@
     [outputStream setDelegate:self];
     [inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     [outputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    SocketImpl* _self = self;
+    if (timeout > 0) {
+         dispatch_async(dispatch_get_main_queue(), ^{
+            NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:timeout/1000.0
+                    target:[NSBlockOperation blockOperationWithBlock:^{
+                        if (!connected && inputStream != NULL) {
+                            [_self disconnect];
+                            errorMessage = @"Connect timeout";
+                            errorCode = -1;
+                        }
+                    }]
+                    selector:@selector(main)
+                    userInfo:nil
+                    repeats:NO
+            ];
+         });
+        
+    }
     [inputStream open];
     [outputStream open];
-    connected = YES;
-    return YES;
+    while ([outputStream streamStatus] == NSStreamStatusOpening) {
+        _yield();
+        usleep(100000);
+        _resume();
+    }
+    while ([inputStream streamStatus] == NSStreamStatusOpening) {
+        _yield();
+        usleep(100000);
+        _resume();
+    }
+    if ([self isInputShutdown] || [self isOutputShutdown]) {
+        connected = NO;
+    } else {
+        connected = YES;
+    }
+    return connected;
+}
+
+-(BOOL)isInputShutdown{
+    errorMessage = NULL;
+    NSStreamStatus status = [inputStream streamStatus];
+    return (status == NSStreamStatusOpening || status == NSStreamStatusNotOpen || NSStreamStatusClosed == status );
+}
+
+-(BOOL)isOutputShutdown{
+    errorMessage = NULL;
+    NSStreamStatus status = [outputStream streamStatus];
+    return (status == NSStreamStatusOpening ||  status == NSStreamStatusNotOpen || NSStreamStatusClosed == status );
 }
 
 -(int)getAvailableInput{

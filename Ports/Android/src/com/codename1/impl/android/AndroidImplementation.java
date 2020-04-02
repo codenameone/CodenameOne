@@ -195,6 +195,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.CookieHandler;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.security.MessageDigest;
@@ -9398,6 +9399,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
+    private ServerSockets serverSockets;
+    private synchronized ServerSockets getServerSockets() {
+        if (serverSockets == null) {
+            serverSockets = new ServerSockets();
+        }
+        return serverSockets;
+    }
+    
+    class ServerSockets {
+        Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
+        
+        public synchronized ServerSocket get(int port) throws IOException {
+            if (socks.containsKey(port)) {
+                ServerSocket sock = socks.get(port);
+                if (sock.isClosed()) {
+                    sock = new ServerSocket(port);
+                    socks.put(port, sock);
+                }
+                return sock;
+            } else {
+                ServerSocket sock = new ServerSocket(port);
+                socks.put(port, sock);
+                return sock;
+            }
+        }
+        
+        
+    }
 
     class SocketImpl {
         java.net.Socket socketInstance;
@@ -9406,9 +9436,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         InputStream is;
         OutputStream os;
 
-        public boolean connect(String param, int param1) {
+        public boolean connect(String param, int param1, int connectTimeout) {
             try {
-                socketInstance = new java.net.Socket(param, param1);
+                socketInstance = new java.net.Socket();
+                socketInstance.connect(new InetSocketAddress(param, param1), connectTimeout);
                 return true;
             } catch(Exception err) {
                 err.printStackTrace();
@@ -9517,7 +9548,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public Object listen(int param) {
             try {
-                ServerSocket serverSocketInstance = new ServerSocket(param);
+                ServerSocket serverSocketInstance = getServerSockets().get(param);
                 socketInstance = serverSocketInstance.accept();
                 SocketImpl si = new SocketImpl();
                 si.socketInstance = socketInstance;
@@ -9540,8 +9571,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object connectSocket(String host, int port) {
+        return connectSocket(host, port, 0);
+    }
+
+    
+    
+    @Override
+    public Object connectSocket(String host, int port, int connectTimeout) {
         SocketImpl i = new SocketImpl();
-        if(i.connect(host, port)) {
+        if(i.connect(host, port, connectTimeout)) {
             return i;
         }
         return null;
@@ -9587,6 +9625,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isSocketConnected(Object socket) {
         return ((SocketImpl)socket).isConnected();
     }
+
+    
 
     @Override
     public boolean isServerSocketAvailable() {

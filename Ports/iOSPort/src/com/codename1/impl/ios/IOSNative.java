@@ -465,7 +465,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port);    
+    public native long connectSocket(String host, int port, int connectTimeout);    
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);

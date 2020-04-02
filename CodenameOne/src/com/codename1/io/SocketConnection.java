@@ -33,7 +33,21 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public abstract class SocketConnection {
+    private int connectTimeout;
     private boolean connected;
+    
+    public SocketConnection() {
+        
+    }
+    
+    /**
+     * Creates a socket connection, setting the connect timeout.  Timeout of 0 is infinite.
+     * @param connectTimeout The connect timeout.  0 for infinite.
+     * @since 7.0
+     */
+    public SocketConnection(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
     
     /**
      * Invoked in case of an error in the socket connection, this method is invoked off the EDT
@@ -59,5 +73,22 @@ public abstract class SocketConnection {
     
     void setConnected(boolean b) {
         connected = b;
+    }
+    
+    /**
+     * Sets the connect timeout.
+     * @param connectTimeout The connect timeout.  0 for infinite timeout.
+     * @since 7.0
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+    
+    /**
+     * Gets the connect timeout.
+     * @return The connect timeout.  0 for infinite.
+     */
+    public int getConnectTimeout() {
+        return this.connectTimeout;
     }
 }
