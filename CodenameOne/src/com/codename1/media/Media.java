@@ -42,7 +42,7 @@ import com.codename1.ui.Component;
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  *
  * <p>
- *     The code below demonstrates capturing audio and playing back audio files using the Media, MediaManager and MediaRecorderBuilder APIs,
+ *     The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
  *     as alternative and more customizable approach than using the Capture API:
  * </p>
  * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
