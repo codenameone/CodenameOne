@@ -52,10 +52,18 @@ import java.util.TimerTask;
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
  * 
  * <p>
- *     The code below demonstrates capturing and playing back audio files using this API:
+ *     The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
  * </p>
  * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
+ *
+ * <p>
+ *     The code below demonstrates capturing audio and playing back audio files using the Media, MediaManager and MediaRecorderBuilder APIs,
+ *     as alternative and more customizable approach than using the Capture API:
+ * </p>
+ * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
+ * <img src="https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png" alt="Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder" />
+ * 
  */
 public class MediaManager {
     
