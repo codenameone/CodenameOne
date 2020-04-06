@@ -258,7 +258,7 @@ public class ScaleImageLabel extends Label {
         if (preferredW > 0) {
             return preferredW;
         }
-        if (preferredW > 0) {
+        if (preferredH > 0) {
             Image i = getIcon();
             if (i != null) {
                 if (preferredH < i.getHeight()) {
