@@ -1731,9 +1731,6 @@ static CodenameOne_GLViewController *sharedSingleton;
 
   // Optional: declare signIn.actions, see "app activities"
   signIn.delegate = self;
-#ifdef GOOGLE_SIGNIN
-    signIn.uiDelegate = self;
-#endif
 #endif
     
 }

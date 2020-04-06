@@ -164,7 +164,7 @@
 #ifndef GOOGLE_SIGNIN
         ,GPPSignInDelegate
 #else
-        ,GIDSignInDelegate,GIDSignInUIDelegate
+        ,GIDSignInDelegate
 #endif
 #endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
