@@ -36,10 +36,17 @@ import com.codename1.ui.Component;
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
  * 
  * <p>
- *     The code below demonstrates capturing and playing back audio files using this API:
+ *     The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
  * </p>
  * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
+ *
+ * <p>
+ *     The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
+ *     as alternative and more customizable approach than using the Capture API:
+ * </p>
+ * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
+ * <img src="https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png" alt="Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder" />
  * 
  * @see MediaManager
  */
@@ -93,12 +100,12 @@ public interface Media {
     public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
             
     /**
-     * Starts playing the media file
+     * Starts playing or recording the media file
      */
     public void play();
 
     /**
-     * Pauses the playback of the media file
+     * Pauses (actually stops) the playback or the recording of the media file
      */
     public void pause();
     
@@ -152,7 +159,7 @@ public interface Media {
     public int getVolume();
     
     /**
-     * Returns true if the media is currently playing
+     * Returns true if the media is currently playing or recording
      * @return true if playing
      */
     public boolean isPlaying();
