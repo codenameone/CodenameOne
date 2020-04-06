@@ -3624,7 +3624,23 @@ public class Form extends Container {
     }
     
     
-    
+    private boolean fireReleaseListeners(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                if (dragged != null) {
+                    if (dragged.isDragAndDropInitialized()) {
+                        LeadUtil.dragFinished(dragged, x, y);
+
+                    }
+                    dragged = null;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * {@inheritDoc}
@@ -3669,6 +3685,7 @@ public class Form extends Container {
                             }
                         }
                     }
+                    fireReleaseListeners(x, y);
                     return;
                 }
 
@@ -3687,19 +3704,8 @@ public class Form extends Container {
                     }
                 }
             }
-            if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-                ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-                pointerReleasedListeners.fireActionEvent(ev);
-                if(ev.isConsumed()) {
-                    if (dragged != null) {
-                        if (dragged.isDragAndDropInitialized()) {
-                            LeadUtil.dragFinished(dragged, x, y);
-
-                        }
-                        dragged = null;
-                    }
-                    return;
-                }
+            if (fireReleaseListeners(x, y)) {
+                return;
             }
             if(dragStopFlag) {
                 if (dragged != null) {

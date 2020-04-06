@@ -322,7 +322,6 @@ public class SwipeableContainer extends Container {
         }
         
         public void actionPerformed(ActionEvent evt) {
-
             if (getComponentCount() == 0 || !swipeActivated || animate()) {
                 return;
             }
@@ -416,7 +415,7 @@ public class SwipeableContainer extends Container {
                             int topX = topWrapper.getX();
                             //it's opened to the right
                             if (topX > 0) {
-                                if (topX > bottomLeftW / 2) {
+                                if (Display.getInstance().getDragSpeed(false) < 0) {
                                     open = false;
                                     openedToRight = false;
                                     openToRight();
@@ -425,7 +424,7 @@ public class SwipeableContainer extends Container {
                                     close();
                                 }
                             } else {
-                                if (topX + topWrapper.getWidth() < bottomRightX + bottomRightW / 2) {
+                                if (Display.getInstance().getDragSpeed(false) > 0) {
                                     open = false;
                                     openedToLeft = false;
                                     openToLeft();
