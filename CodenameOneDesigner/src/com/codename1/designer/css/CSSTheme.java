@@ -2689,6 +2689,8 @@ public class CSSTheme {
         public boolean hasBorderImage() {
             return !isNone(borderImage);
         }
+
+        
     }
     
     
@@ -3338,10 +3340,10 @@ public class CSSTheme {
             b.backgroundColor = renderAsCSSString("background-color", styles);
             b.backgroundImageUrl = renderAsCSSString("background-image", styles);
             b.backgroundRepeat = renderAsCSSString("background-repeat", styles);
-            b.borderRadius = renderCSSProperty("cn1-border-bottom-left-radius-x", styles);
-            b.boxShadow = renderCSSProperty("cn1-box-shadow-h", styles);
-            b.borderImage = renderCSSProperty("border-image", styles);
-            b.borderImageSlice = renderCSSProperty("border-image-slice", styles);
+            b.borderRadius = renderAsCSSString("cn1-border-bottom-left-radius-x", styles);
+            b.boxShadow = renderAsCSSString("cn1-box-shadow-h", styles);
+            b.borderImage = renderAsCSSString("border-image", styles);
+            b.borderImageSlice = renderAsCSSString("border-image-slice", styles);
             
             LexicalUnit background = styles.get("background");
             while (background != null) {
@@ -4874,18 +4876,19 @@ public class CSSTheme {
             Border b = this.createBorder(styles);
             LexicalUnit cn1BackgroundType = styles.get("cn1-background-type");
             
+            
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
-            if (b.canBeAchievedWithCSSBorder(styles)) {
+            if (b.canBeAchievedWithCSSBorder(styles) && (b.hasBorderImage() || b.hasUnequalBorders() || b.hasBorderRadius()) ) {
                 return createCSSBorder(styles);
             }
             if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()) {
                 return createRoundRectBorder(styles);
             }
-            if (b.canBeAchievedWithUnderlineBorder(styles)) {
-                return createUnderlineBorder(styles);
-            }
+            //if (b.canBeAchievedWithUnderlineBorder(styles)) {
+            //    return createUnderlineBorder(styles);
+            //}
             if (b.hasUnequalBorders()) {
                 //System.out.println("We have unequal borders");
                 return com.codename1.ui.plaf.Border.createCompoundBorder(
@@ -4912,6 +4915,7 @@ public class CSSTheme {
             }
             return null;
         }
+               
         
         public com.codename1.ui.plaf.Border getThemeBorder(Map<String,LexicalUnit> styles, String side) {
             
