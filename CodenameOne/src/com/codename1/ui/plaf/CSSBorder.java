@@ -1636,6 +1636,7 @@ public class CSSBorder extends Border {
         int color = g.getColor();
         boolean antialias = g.isAntiAliased();
         g.setAntiAliased(true);
+        Style s = c.getStyle();
         try {
             if (contentRect == null) contentRect = new Rectangle2D();
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
@@ -1649,10 +1650,18 @@ public class CSSBorder extends Border {
                 if (boxShadow != null) {
                     boxShadow.paint(g, c, contentRect);
                 }
-                
                 if (!isTransparent(backgroundColor)) {
                     setColor(g, backgroundColor);
                     g.fillShape(p);
+                } else if (s.getBgTransparency() != 0) {
+                    g.setColor(s.getBgColor());
+                    int tp = s.getBgTransparency() & 0xff;
+                    int al = (int)Math.round(alpha * tp/255.0);
+                    g.setAlpha(al);
+                    g.fillShape(p);
+                    g.setColor(color);
+                    g.setAlpha(alpha);
+                    
                 }
 
                 if (hasBackgroundImages()) {
