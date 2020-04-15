@@ -1014,99 +1014,10 @@ public class RoundRectBorder extends Border {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final RoundRectBorder other = (RoundRectBorder) obj;
-        if (this.strokeColor != other.strokeColor) {
-            return false;
-        }
-        if (this.strokeOpacity != other.strokeOpacity) {
-            return false;
-        }
-        if (this.strokeThickness != other.strokeThickness) {
-            return false;
-        }
-        if (this.strokeMM != other.strokeMM) {
-            return false;
-        }
-        if (this.shadowSpread != other.shadowSpread) {
-            return false;
-        }
-        if (this.shadowOpacity != other.shadowOpacity) {
-            return false;
-        }
-        if (this.shadowColor != other.shadowColor) {
-            return false;
-        }
-        if (this.shadowX != other.shadowX) {
-            return false;
-        }
-        if (this.shadowY != other.shadowY) {
-            return false;
-        }
-        if (this.shadowBlur != other.shadowBlur) {
-            return false;
-        }
-        if (this.bezierCorners != other.bezierCorners) {
-            return false;
-        }
-        if (this.topLeft != other.topLeft) {
-            return false;
-        }
-        if (this.topRight != other.topRight) {
-            return false;
-        }
-        if (this.bottomLeft != other.bottomLeft) {
-            return false;
-        }
-        if (this.bottomRight != other.bottomRight) {
-            return false;
-        }
-        if (this.cornerRadius != other.cornerRadius) {
-            return false;
-        }
-        if (this.trackComponentHorizontalPosition != other.trackComponentHorizontalPosition) {
-            return false;
-        }
-        if (this.trackComponentVerticalPosition != other.trackComponentVerticalPosition) {
-            return false;
-        }
-        
-        if (this.trackComponentSide != other.trackComponentSide) {
-            return false;
-        }
-        return true;
+        return obj == this;
     }
 
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 79 * hash + this.strokeColor;
-        hash = 79 * hash + this.strokeOpacity;
-        hash = 79 * hash + Float.floatToIntBits(this.strokeThickness);
-        hash = 79 * hash + (this.strokeMM ? 1 : 0);
-        hash = 79 * hash + Float.floatToIntBits(this.shadowSpread);
-        hash = 79 * hash + this.shadowOpacity;
-        hash = 79 * hash + this.shadowColor;
-        hash = 79 * hash + Float.floatToIntBits(this.shadowX);
-        hash = 79 * hash + Float.floatToIntBits(this.shadowY);
-        hash = 79 * hash + Float.floatToIntBits(this.shadowBlur);
-        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
-        hash = 79 * hash + (this.bezierCorners ? 1 : 0);
-        hash = 79 * hash + (this.topLeft ? 1 : 0);
-        hash = 79 * hash + (this.topRight ? 1 : 0);
-        hash = 79 * hash + (this.bottomLeft ? 1 : 0);
-        hash = 79 * hash + (this.bottomRight ? 1 : 0);
-        hash = 79 * hash + Float.floatToIntBits(this.cornerRadius);
-        hash = 79 * hash + trackComponentSide;
-        hash = 79 * hash + Float.floatToIntBits(this.trackComponentVerticalPosition);
-        hash = 79 * hash + Float.floatToIntBits(this.trackComponentHorizontalPosition);
-        return hash;
-    }
+    
 
     /**
      * Returns true if this border corner is round and false if it's square

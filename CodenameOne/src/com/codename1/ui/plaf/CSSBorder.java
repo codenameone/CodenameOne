@@ -54,7 +54,6 @@ import com.codename1.compat.java.util.Objects;
  * @author shannah
  */
 public class CSSBorder extends Border {
-    
     /**
      * Constant indicating no-repeat for background images.
      */
@@ -319,27 +318,9 @@ public class CSSBorder extends Border {
 
     @Override
     public boolean equals(Object obj) {
-        
-        if (obj instanceof CSSBorder) {
-            return ((CSSBorder)obj).toCSSString().equalsIgnoreCase(toCSSString());
-        }
-        return false;
+        return obj == this;
     }
 
-    @Override
-    public int hashCode() {
-        int hash = 3;
-        hash = 97 * hash + Objects.hashCode(this.backgroundColor);
-        hash = 97 * hash + Arrays.deepHashCode(this.backgroundImages);
-        hash = 97 * hash + Objects.hashCode(this.borderImage);
-        hash = 97 * hash + Arrays.deepHashCode(this.stroke);
-        hash = 97 * hash + Objects.hashCode(this.boxShadow);
-        hash = 97 * hash + Objects.hashCode(this.borderRadius);
-        hash = 97 * hash + Objects.hashCode(this.res);
-        return hash;
-    }
-    
-    
     
     /**
      * Converts this border to a CSS string.

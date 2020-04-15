@@ -703,83 +703,8 @@ public class RoundBorder extends Border {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final RoundBorder other = (RoundBorder) obj;
-        if (this.color != other.color) {
-            return false;
-        }
-        if (this.opacity != other.opacity) {
-            return false;
-        }
-        if (this.strokeColor != other.strokeColor) {
-            return false;
-        }
-        if (this.strokeOpacity != other.strokeOpacity) {
-            return false;
-        }
-        if (this.strokeThickness != other.strokeThickness) {
-            return false;
-        }
-        if (this.strokeMM != other.strokeMM) {
-            return false;
-        }
-        if (this.shadowSpread != other.shadowSpread) {
-            return false;
-        }
-        if (this.shadowOpacity != other.shadowOpacity) {
-            return false;
-        }
-        if (this.shadowX != other.shadowX) {
-            return false;
-        }
-        if (this.shadowY != other.shadowY) {
-            return false;
-        }
-        if (this.shadowBlur != other.shadowBlur) {
-            return false;
-        }
-        if (this.shadowMM != other.shadowMM) {
-            return false;
-        }
-        if (this.rectangle != other.rectangle) {
-            return false;
-        }
-        if (this.onlyLeftRounded != other.onlyLeftRounded) {
-            return false;
-        }
-        if (this.onlyRightRounded != other.onlyRightRounded) {
-            return false;
-        }
-        return true;
+        return obj == this;
     }
-
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 41 * hash + this.color;
-        hash = 41 * hash + this.opacity;
-        hash = 41 * hash + this.strokeColor;
-        hash = 41 * hash + this.strokeOpacity;
-        hash = 41 * hash + Float.floatToIntBits(this.strokeThickness);
-        hash = 41 * hash + (this.strokeMM ? 1 : 0);
-        hash = 41 * hash + this.shadowSpread;
-        hash = 41 * hash + this.shadowOpacity;
-        hash = 41 * hash + Float.floatToIntBits(this.shadowX);
-        hash = 41 * hash + Float.floatToIntBits(this.shadowY);
-        hash = 41 * hash + Float.floatToIntBits(this.shadowBlur);
-        hash = 41 * hash + (this.shadowMM ? 1 : 0);
-        hash = 41 * hash + (this.rectangle ? 1 : 0);
-        hash = 41 * hash + (this.onlyLeftRounded ? 1 : 0);
-        hash = 41 * hash + (this.onlyRightRounded ? 1 : 0);
-        hash = 41 * hash + this.strokeAngle;
-        return hash;
-    }
-    
 
     static class CacheValue {
         public CacheValue() {}
