@@ -265,8 +265,7 @@ static void installSignalHandlers() {
         return res;
     }
 #else
-    BOOL res = [[GIDSignIn sharedInstance] handleURL:url sourceApplication:sourceApplication
-                                           annotation:annotation];
+    BOOL res = [[GIDSignIn sharedInstance] handleURL:url];
     if (res) {
         return res;
     }
