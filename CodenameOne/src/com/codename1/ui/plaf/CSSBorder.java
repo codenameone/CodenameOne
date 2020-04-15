@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.codename1.compat.java.util.Objects;
 
 /**
  * <p>A border that can be configured using a limited subset of CSS directives.  This 
@@ -315,6 +316,30 @@ public class CSSBorder extends Border {
             
         }
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        
+        if (obj instanceof CSSBorder) {
+            return ((CSSBorder)obj).toCSSString().equalsIgnoreCase(toCSSString());
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 97 * hash + Objects.hashCode(this.backgroundColor);
+        hash = 97 * hash + Arrays.deepHashCode(this.backgroundImages);
+        hash = 97 * hash + Objects.hashCode(this.borderImage);
+        hash = 97 * hash + Arrays.deepHashCode(this.stroke);
+        hash = 97 * hash + Objects.hashCode(this.boxShadow);
+        hash = 97 * hash + Objects.hashCode(this.borderRadius);
+        hash = 97 * hash + Objects.hashCode(this.res);
+        return hash;
+    }
+    
+    
     
     /**
      * Converts this border to a CSS string.
@@ -1650,10 +1675,7 @@ public class CSSBorder extends Border {
                 if (boxShadow != null) {
                     boxShadow.paint(g, c, contentRect);
                 }
-                if (!isTransparent(backgroundColor)) {
-                    setColor(g, backgroundColor);
-                    g.fillShape(p);
-                } else if (s.getBgTransparency() != 0) {
+                if (s.getBgTransparency() != 0) {
                     g.setColor(s.getBgColor());
                     int tp = s.getBgTransparency() & 0xff;
                     int al = (int)Math.round(alpha * tp/255.0);
@@ -1733,9 +1755,7 @@ public class CSSBorder extends Border {
                                 setColor(g, stroke[TOP].color);
                                
                                 Stroke st = stroke[TOP].getStroke(c, contentRect, true);
-                                if (stroke[TOP].thickness.type == UNIT_PIXELS && stroke[TOP].thickness.value == 10f) {
-                                    int foo = 1;
-                                }
+
                                 g.drawShape(p, st);
                             }
                             if (stroke[BOTTOM].isVisible()) {

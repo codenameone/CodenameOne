@@ -1,0 +1,24 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+TextField{
+border-bottom: 5px solid blue;
+}
+TextField.selected{
+border-bottom: 5px solid red;
+
+}
+
+Button{
+color: white;
+background-color: #16D173;
+border-radius: 1mm;
+}
+LinkButton{
+cn1-derive: Button;
+border: none;
+padding-left: 1mm;
+color: #16D173;
+background: transparent;
+}
