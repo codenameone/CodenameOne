@@ -1121,6 +1121,8 @@ public class CSSTheme {
         return ((ScaledUnit)lu).renderAsCSSValue(160, 640, 960);
     }
     
+    
+    
     String renderCSSProperty(String property, Map<String, LexicalUnit> styles) {
         if (property.contains("padding") || property.contains("margin")) {
             return "";
@@ -1179,6 +1181,32 @@ public class CSSTheme {
                         case LexicalUnit.SAC_PERCENTAGE:
                             return property + ":"+ (int)(value.getFloatValue() / 100f * 960f) + "px";
                     }
+                }
+                
+                case "border-image-slice": {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("border-image-slice: ");
+                    LexicalUnit value = styles.get(property);
+                    boolean first = true;
+                    while (value != null) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            sb.append(" ");
+                        }
+                        switch (value.getLexicalUnitType()) {
+                            case LexicalUnit.SAC_PERCENTAGE:
+                                sb.append(value.getFloatValue()+"%");
+                                break;
+                            case LexicalUnit.SAC_PIXEL:
+                                sb.append(value.getFloatValue()+"px");
+                        }
+                        value = value.getNextLexicalUnit();
+                    }
+                    if (first) {
+                        sb.append("none");
+                    }
+                    return sb.toString();
                 }
             }
             
@@ -2659,7 +2687,7 @@ public class CSSTheme {
         public String toString() {
             return borderColorTop + " " +borderColorRight + borderColorBottom + borderColorLeft +
                     gradient + boxShadow + borderRadius + thicknessTop + thicknessRight + thicknessBottom + thicknessLeft
-                    + styleTop + styleRight + styleBottom + styleLeft;
+                    + styleTop + styleRight + styleBottom + styleLeft + borderImage + borderImageSlice;
         }
         
         public boolean hasBorderRadius() {
@@ -3340,10 +3368,10 @@ public class CSSTheme {
             b.backgroundColor = renderAsCSSString("background-color", styles);
             b.backgroundImageUrl = renderAsCSSString("background-image", styles);
             b.backgroundRepeat = renderAsCSSString("background-repeat", styles);
-            b.borderRadius = renderAsCSSString("cn1-border-bottom-left-radius-x", styles);
+            b.borderRadius = renderCSSProperty("cn1-border-bottom-left-radius-x", styles);
             b.boxShadow = renderAsCSSString("cn1-box-shadow-h", styles);
-            b.borderImage = renderAsCSSString("border-image", styles);
-            b.borderImageSlice = renderAsCSSString("border-image-slice", styles);
+            b.borderImage = renderCSSProperty("border-image", styles);
+            b.borderImageSlice = renderCSSProperty("border-image-slice", styles);
             
             LexicalUnit background = styles.get("background");
             while (background != null) {
@@ -4686,19 +4714,23 @@ public class CSSTheme {
             }
             
             ScaledUnit borderImage = (ScaledUnit)styles.get("border-image");
+            //System.out.println("Border image "+borderImage);
             if (!isNone(borderImage)) {
                 Image img = getBorderImage(styles);
                 ScaledUnit sliceUnit = (ScaledUnit)styles.get("border-image-slice");
                 List<Double> slices = new ArrayList<>();
                 while (!isNone(sliceUnit)) {
+                    //System.out.println("Found next unit "+sliceUnit);
+                    
                     if (sliceUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                         slices.add(sliceUnit.getNumericValue() / 100.0);
                     } else {
                         
                     }
-                    sliceUnit = (ScaledUnit)sliceUnit.getNextNumericUnit();
+                    sliceUnit = (ScaledUnit)sliceUnit.getNextLexicalUnit();
                     
                 }
+                //System.out.println("Slices: "+slices);
                 if (slices.isEmpty()) {
                     slices.add(0.4);
                 }
@@ -5509,7 +5541,7 @@ public class CSSTheme {
                         if (units.get(0).getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
                             if ("cn1-round-border".equals(units.get(0).getStringValue())
                                     || "cn1-pill-border".equals(units.get(0).getStringValue())) {
-                                apply(style, "cn1-border-type", units.get(0));
+                                apply(style, "cn1-background-type", units.get(0));
                                 break;
                             }
                         }
