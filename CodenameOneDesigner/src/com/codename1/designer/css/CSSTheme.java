@@ -2765,7 +2765,18 @@ public class CSSTheme {
         }
         
         public boolean hasBorderRadius() {
-            return !isZero(borderRadius);
+            String br = borderRadius;
+            if (br != null) {
+                if (br.indexOf(":") > 0) {
+                    br = br.substring(br.indexOf(":")+1).trim();
+                }
+                
+            }
+            if (br == null || br.isEmpty()) {
+                return false;
+            }
+            
+            return !isZero(br);
         }
         
         public boolean hasGradient() {
@@ -2785,11 +2796,23 @@ public class CSSTheme {
         }
         
         public boolean hasBoxShadow() {
-            return !isNone(boxShadow);
+            String bs = boxShadow;
+            if (bs != null) {
+                if (bs.indexOf(":") > 0) {
+                    bs = bs.substring(bs.indexOf(":")+1).trim();
+                }
+            }
+            return !isNone(bs);
         }
         
         public boolean hasBorderImage() {
-            return !isNone(borderImage);
+            String bs = borderImage;
+            if (bs != null) {
+                if (bs.indexOf(":") > 0) {
+                    bs = bs.substring(bs.indexOf(":")+1).trim();
+                }
+            }
+            return !isNone(bs);
         }
 
         
@@ -2802,6 +2825,7 @@ public class CSSTheme {
     }
     
     private static boolean isNone(Object o) {
+        
         return o == null || "".equals(o) || "none".equals(o);
     }
     
