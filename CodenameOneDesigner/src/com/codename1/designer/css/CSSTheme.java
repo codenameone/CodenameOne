@@ -3369,7 +3369,7 @@ public class CSSTheme {
             b.backgroundImageUrl = renderAsCSSString("background-image", styles);
             b.backgroundRepeat = renderAsCSSString("background-repeat", styles);
             b.borderRadius = renderCSSProperty("cn1-border-bottom-left-radius-x", styles);
-            b.boxShadow = renderAsCSSString("cn1-box-shadow-h", styles);
+            b.boxShadow = renderCSSProperty("cn1-box-shadow-h", styles);
             b.borderImage = renderCSSProperty("border-image", styles);
             b.borderImageSlice = renderCSSProperty("border-image-slice", styles);
             
