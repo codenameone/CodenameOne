@@ -14,6 +14,7 @@ import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Button;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.SwipeableContainer;
 import com.codename1.ui.layouts.FlowLayout;
@@ -60,7 +61,8 @@ public class LeadComponentScrollingTest3079 {
         int len = 100;
         for (int i=0; i<len; i++) {
             Container cnt = new Container(new FlowLayout());
-            SwipeableContainer sc = new SwipeableContainer(new Container(), new Container(), cnt);
+            $(cnt).selectAllStyles().setBgTransparency(0xff).setBgColor(0xffffff);
+            SwipeableContainer sc = new SwipeableContainer(BoxLayout.encloseX(new Button("This is a button")),BoxLayout.encloseX(new Button("This is another button")), cnt);
             Button b = new Button("Button "+i);
             b.addActionListener(evt->{
                 System.out.println("button pressed");
