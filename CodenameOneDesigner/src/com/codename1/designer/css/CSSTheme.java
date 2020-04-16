@@ -5,7 +5,9 @@
  */
 package com.codename1.designer.css;
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.Util;
+import com.codename1.processing.Result;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.EditorTTFFont;
@@ -21,6 +23,7 @@ import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EditableResourcesForCSS;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
 import java.io.CharArrayReader;
 import java.io.DataOutputStream;
@@ -34,6 +37,7 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -96,6 +100,8 @@ public class CSSTheme {
     Map<String,LexicalUnit> constants = new HashMap<String,LexicalUnit>();
     EditableResources res;
     private String themeName = "Theme";
+    private ImagesMetadata imagesMetadata = new ImagesMetadata();
+    
     private List<FontFace> fontFaces = new ArrayList<FontFace>();
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_HD;
     public static final String[] supportedNativeBorderTypes = new String[]{
@@ -138,6 +144,59 @@ public class CSSTheme {
         }
         return false;
         
+    }
+    
+    class ImageMetadata {
+        private String imageName;
+        int sourceDpi;
+
+        public ImageMetadata(String imageName, int sourceDpi) {
+            this.imageName = imageName;
+            this.sourceDpi = sourceDpi;
+        }
+        
+        
+        
+    }
+    
+    
+    class ImagesMetadata {
+        private Map<String,ImageMetadata> images = new HashMap<>();
+        
+        public void addImageMetadata(ImageMetadata data) {
+            images.put(data.imageName, data);
+        }
+        
+        public ImageMetadata get(String name) {
+            return images.get(name);
+        }
+        
+         void load(Resources res) throws IOException {
+            images.clear();
+            String metadataStr = (String)res.getTheme(themeName).getOrDefault("@imageMetadata", "{}");
+            JSONParser parser = new JSONParser();
+            Map metadataMap = parser.parseJSON(new StringReader(metadataStr));
+            for (String key : (Set<String>)metadataMap.keySet()) {
+                Map data = (Map)metadataMap.get(key);
+                int sourceDpi = (int)Math.round((data.containsKey("sourceDpi") ? ((Number)data.get("sourceDpi")).intValue() : 
+                        currentDpi));
+                String name = (String)data.get("imageName");
+                ImageMetadata md = new ImageMetadata(name, sourceDpi);
+                addImageMetadata(md);
+            }
+        }
+         
+        void store(EditableResources res) {
+            Map map = new HashMap();
+            for (String key : images.keySet()) {
+                ImageMetadata md = images.get(key);
+                Map data = new HashMap();
+                data.put("imageName", md.imageName);
+                data.put("sourceDpi", md.sourceDpi);
+                map.put(md.imageName, data);
+            }
+            res.setThemeProperty(themeName, "@imageMetadata", Result.fromContent(map).toString());
+        }
     }
     
     static class CN1Gradient {
@@ -1695,6 +1754,7 @@ public class CSSTheme {
             }
         }
 
+        imagesMetadata.store(res);
 
         Map<String,Object> theme = res.getTheme(themeName);
         HashSet<String> keys = new HashSet<String>();
@@ -2081,8 +2141,6 @@ public class CSSTheme {
                     
                     res.setMultiImage(imageName, multi);
                     loadedImages.put(imageFolder.toURL().toString(), multi.getBest());
-            
-            
                     return multi.getBest();
                     
                 }
@@ -2101,6 +2159,8 @@ public class CSSTheme {
     public Image getBorderImage(Map<String,LexicalUnit> styles) {
         return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
     }
+    
+    
     
     public Image getBackgroundImage(Map<String,LexicalUnit> styles, ScaledUnit bgImage)  {
         try {
@@ -2136,13 +2196,20 @@ public class CSSTheme {
                 }
                 */
             }
-            
-            if (res.getImage(imageIdStr) != null) {
-                if (refreshImages) {
+            Image resimg = res.getImage(imageIdStr);
+            if (resimg != null) {
+                ImageMetadata md = imagesMetadata.get(imageIdStr);
+                int srcDpi = (int)currentDpi;
+                if (styles.containsKey("cn1-source-dpi")) {
+                
+                    srcDpi  = (int)((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
+                }
+                if (refreshImages || (md != null && md.sourceDpi != srcDpi)) {
                     //
                     res.remove(imageIdStr);
                 } else {
-                    loadedImages.put(imageIdStr, res.getImage(imageIdStr));
+                    
+                    loadedImages.put(imageIdStr, resimg);
                     return res.getImage(imageIdStr);
                 }
             }
@@ -2187,9 +2254,13 @@ public class CSSTheme {
             
             ResourcesMutator resm = new ResourcesMutator(res, com.codename1.ui.Display.DENSITY_VERY_HIGH, minDpi, maxDpi);
             int[] dpis = getDpi(encImg);
+            int sourceDpi = (int)Math.round(currentDpi);
+            
+            
             if (styles.containsKey("cn1-source-dpi")) {
                 //System.out.println("Using cn1-source-dpi "+styles.get("cn1-source-dpi").getFloatValue());
                 double densityVal = ((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
+                sourceDpi = (int)Math.round(densityVal);
                 if (Math.abs(densityVal) < 0.5) {
                     resm.targetDensity = 0;
                 } else {
@@ -2221,6 +2292,8 @@ public class CSSTheme {
             //System.out.println("Finished storing image "+url);
             //System.out.println("Storing image "+url+" at id "+imageIdStr);
             loadedImages.put(url, im);
+            ImageMetadata md = new ImageMetadata(imageIdStr, sourceDpi);
+            imagesMetadata.addImageMetadata(md);
             
             
             return im;
@@ -2243,6 +2316,7 @@ public class CSSTheme {
                 res = new EditableResourcesForCSS(resourceFile);
             }
             res.openFile(new FileInputStream(resourceFile));
+            imagesMetadata.load(res);
         }
     }
     
