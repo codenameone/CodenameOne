@@ -9,4 +9,10 @@ NinePiece {
 	refresh-images:true;
 	border-image:url('dashbg_landscape.png');
 	border-image-slice: 40%;
+	padding: 3mm;
+}
+
+BorderRadiusTopLeft {
+	background-color: red;
+	border-top-left-radius: 4mm; 
 }

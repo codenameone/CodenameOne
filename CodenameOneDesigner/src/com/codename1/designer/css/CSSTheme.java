@@ -1457,6 +1457,13 @@ public class CSSTheme {
     }
     
     private static String str(LexicalUnit lu) {
+        return str(lu, null);
+    }
+    
+    private static String str(LexicalUnit lu, String defaultVal) {
+        if (lu == null) {
+            return defaultVal;
+        }
         ScaledUnit su = (ScaledUnit)lu;
         double numVal = su.getNumericValue();
         String num = numVal+"";
@@ -4729,10 +4736,10 @@ public class CSSTheme {
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             StringBuilder radiusString = new StringBuilder();
             if (topLeftRadius != null) {
-                radiusString.append(str(topLeftRadius)).append(" ")
-                        .append(str(topRightRadius)).append(" ")
-                        .append(str(bottomRightRadius)).append(" ")
-                        .append(str(bottomLeftRadius));
+                radiusString.append(str(topLeftRadius, "0")).append(" ")
+                        .append(str(topRightRadius, "0")).append(" ")
+                        .append(str(bottomRightRadius, "0")).append(" ")
+                        .append(str(bottomLeftRadius, "0"));
                 out.borderRadius(radiusString.toString());
             }
             String[] borderColors = new String[]{
@@ -4767,11 +4774,7 @@ public class CSSTheme {
             StringBuilder widthString = new StringBuilder();
             for (String widthKey: borderWidths) {
                 LexicalUnit borderWidth = styles.get(widthKey);
-                if (borderWidth != null) {
-                    widthString.append(str(borderWidth)).append(" ");
-                } else {
-                    widthString.append("0 ");
-                }
+                widthString.append(str(borderWidth, "0")).append(" ");
                 
             }
             
