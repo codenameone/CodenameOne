@@ -7899,6 +7899,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return nativeInstance.formatInt(number);
                 }
 
+                @Override
+                public String getLongMonthName(Date date) {
+                    return nativeInstance.getLongMonthName(date.getTime());
+                }
+
+                @Override
+                public String getShortMonthName(Date date) {
+                    return nativeInstance.getShortMonthName(date.getTime());
+                }
+                
                 public String format(double number) {
                     return nativeInstance.formatDouble(number);
                 }

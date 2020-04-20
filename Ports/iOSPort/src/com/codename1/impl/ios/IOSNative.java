@@ -429,6 +429,8 @@ public final class IOSNative {
     native double parseDouble(String localeFormattedDecimal);
     native String formatDateTimeMedium(long date);
     native String formatDateTimeShort(long date);
+    native String getLongMonthName(long time);
+    native String getShortMonthName(long time);
     native String getCurrencySymbol();
     
     native void scanQRCode();
@@ -712,6 +714,8 @@ public final class IOSNative {
     native int getDisplaySafeInsetRight();
 
     native int getDisplaySafeInsetBottom();
+
+    
 
     
 

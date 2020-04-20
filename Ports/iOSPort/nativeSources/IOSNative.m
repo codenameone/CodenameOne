@@ -6161,6 +6161,44 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_
     return o;
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getLongMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getShortMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC

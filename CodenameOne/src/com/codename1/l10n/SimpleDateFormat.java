@@ -357,9 +357,9 @@ public class SimpleDateFormat extends DateFormat {
                 case MONTH_LETTER:
                     v = calendar.get(Calendar.MONTH) - Calendar.JANUARY;
                     if (len > 3) {
-                        toAppendTo.append(getDateFormatSymbols().getMonths()[v]);
+                        toAppendTo.append(L10NManager.getInstance().getLongMonthName(source));
                     } else if (len == 3) {
-                        toAppendTo.append(getDateFormatSymbols().getShortMonths()[v]);
+                        toAppendTo.append(L10NManager.getInstance().getShortMonthName(source));
                     } else {
                         toAppendTo.append(leftPad(v + 1, len));
                     }

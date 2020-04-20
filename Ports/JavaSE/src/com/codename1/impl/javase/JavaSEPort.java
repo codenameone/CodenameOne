@@ -10920,7 +10920,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public L10NManager getLocalizationManager() {
         if (l10n == null) {
-            Locale l = Locale.getDefault();
+            final Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
 
                 public double parseDouble(String localeFormattedDecimal) {
@@ -10929,6 +10929,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     } catch (ParseException err) {
                         return Double.parseDouble(localeFormattedDecimal);
                     }
+                }
+                
+                @Override
+                public String getLongMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMMM", l);
+                    return fmt.format(date);
+                }
+
+                @Override
+                public String getShortMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM", l);
+                    return fmt.format(date);
                 }
                 
                 public String format(int number) {
