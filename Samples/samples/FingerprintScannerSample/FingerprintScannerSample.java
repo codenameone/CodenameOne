@@ -17,6 +17,8 @@ import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Container;
 import com.codename1.ui.TextField;
 
 /**
@@ -63,6 +65,14 @@ public class FingerprintScannerSample {
         Button addItem = new Button("Add Item");
         Button getItem = new Button("Get Item");
         Button deleteItem = new Button("Delete Item");
+        Button checkAvailable = new Button("Check Available");
+        checkAvailable.addActionListener(evt->{
+            Container cnt = BoxLayout.encloseY(
+                    new Label("TouchID: "+Fingerprint.isTouchIDAvailable()),
+                    new Label("FaceID: "+Fingerprint.isFaceIDAvailable())
+            );
+            Dialog.show("Capabilities", cnt, new Command("OK"));
+        });
         addItem.addActionListener(evt->{
             if (!Fingerprint.isAvailable()) {
                 ToastBar.showErrorMessage("Fingerprint not avaiable on this platform");
@@ -100,7 +110,9 @@ public class FingerprintScannerSample {
             });
         });
         
-        hi.addAll(new Label("Key:"), keyName, new Label("Value: "), keyValue, addItem, getItem, deleteItem);
+        
+        
+        hi.addAll(new Label("Key:"), keyName, new Label("Value: "), keyValue, addItem, getItem, deleteItem, checkAvailable);
         hi.show();
     }
 
