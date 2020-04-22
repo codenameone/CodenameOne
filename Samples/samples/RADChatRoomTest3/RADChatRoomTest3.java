@@ -25,11 +25,14 @@ import com.codename1.rad.nodes.ActionNode;
 import com.codename1.rad.nodes.ViewNode;
 import com.codename1.rad.schemas.ChatMessage;
 import com.codename1.rad.schemas.ChatRoom;
+import com.codename1.rad.schemas.Person;
+import com.codename1.rad.schemas.Thing;
 import static com.codename1.rad.ui.UI.action;
 import static com.codename1.rad.ui.UI.actions;
 import static com.codename1.rad.ui.UI.enabledCondition;
 import static com.codename1.rad.ui.UI.icon;
 import com.codename1.rad.ui.chatroom.ChatRoomView;
+import com.codename1.rad.ui.entityviews.ProfileAvatarView;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -44,6 +47,10 @@ public class RADChatRoomTest3 extends ApplicationController {
         }),
         icon(FontImage.MATERIAL_SEND)
     );
+    
+    public static final ActionNode videoConference = action(
+        icon(FontImage.MATERIAL_VIDEOCAM)
+    );
 
     @Override
     public void start() {
@@ -57,10 +64,16 @@ public class RADChatRoomTest3 extends ApplicationController {
         public static final EntityType TYPE = new EntityType(){{
             string(ChatRoom.inputBuffer);
             list(EntityList.class, ChatRoom.messages);
+            list(EntityList.class, ChatRoom.participants);
         }};
         {
             setEntityType(TYPE);
             set(ChatRoom.messages, new EntityList(MessageModel.TYPE, -1));
+            set(ChatRoom.participants, new EntityList(ParticipantModel.TYPE, -1));
+        }
+        
+        void addParticipant(ParticipantModel participant) {
+            getEntityList(ChatRoom.participants).add(participant);
         }
     }
     
@@ -70,10 +83,23 @@ public class RADChatRoomTest3 extends ApplicationController {
         }};
         {
             setEntityType(TYPE);
+        }      
+    }
+    
+    static class ParticipantModel extends Entity {
+        public static final EntityType TYPE = new EntityType(){{
+            string(Thing.name);
+            string(Thing.thumbnailUrl);
+            
+        }};
+        {
+            setEntityType(TYPE);
         }
-                
-              
         
+        public ParticipantModel(String name, String imageUrl) {
+            set(Thing.name, name);
+            set(Thing.thumbnailUrl, imageUrl);
+        }
     }
     
     static class ChatFormController extends FormController {
@@ -81,7 +107,10 @@ public class RADChatRoomTest3 extends ApplicationController {
         public ChatFormController(Controller parent) {
             super(parent);
             Form f = new Form("Chat Room", new BorderLayout());
-            ChatRoomView chatView = new ChatRoomView(new ViewModel(), createViewNode(), f);
+            ViewModel model = new ViewModel();
+            model.addParticipant(new ParticipantModel("George", "https://weblite.ca/cn1tests/radchat/george.jpg"));
+            model.addParticipant(new ParticipantModel("Kramer", "https://weblite.ca/cn1tests/radchat/kramer.jpg"));
+            ChatRoomView chatView = new ChatRoomView(model, createViewNode(), f);
             f.add(CENTER, chatView);
             setView(f);
             
@@ -95,7 +124,10 @@ public class RADChatRoomTest3 extends ApplicationController {
 
         @Override
         protected ViewNode createViewNode() {
-            return new ViewNode(actions(ChatRoomView.SEND_ACTION, send));
+            return new ViewNode(
+                    actions(ChatRoomView.SEND_ACTION, send),
+                    actions(ProfileAvatarView.PROFILE_AVATAR_CLICKED_MENU, videoConference) 
+            );
         }
         
         
