@@ -306,9 +306,13 @@ static void installSignalHandlers() {
     com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     //[self.viewController stopAnimation];
 }
-
+static BOOL cn1IsHiddenInBackground = NO;
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
+ #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
+    [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
+    cn1IsHiddenInBackground = YES;
+#endif
     if(editingComponent != nil) {
         [editingComponent resignFirstResponder];
         [editingComponent removeFromSuperview];
@@ -331,7 +335,9 @@ static void installSignalHandlers() {
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
-{
+{   if (cn1IsHiddenInBackground) {
+          [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
+    }
     
     /*
      Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.

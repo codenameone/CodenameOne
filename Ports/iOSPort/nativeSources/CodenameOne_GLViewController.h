@@ -38,6 +38,7 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
 //#define ENABLE_WKWEBVIEW
 //#define NO_UIWEBVIEW
 //#define GOOGLE_SIGNIN
