@@ -114,7 +114,7 @@ public class AutoCompleteTextField extends TextField {
                     popup.setEnabled(false);
                     Form f = getComponentForm();
                     if (f != null) {
-                        f.repaint();
+                        f.revalidateWithAnimationSafety();
                     }
                 }
             }
@@ -209,7 +209,7 @@ public class AutoCompleteTextField extends TextField {
             if(popup.getComponentCount() > 0) {popup.getComponentAt(0).setScrollY(0);}
             popup.setVisible(v);
             popup.setEnabled(v);
-            f.repaint();
+            f.revalidate();
         }
         if(f != null) {
             dontCalcSize = false;
@@ -251,7 +251,7 @@ public class AutoCompleteTextField extends TextField {
                 dontCalcSize = true;
             }
             if (f != null) {
-                f.repaint();
+                f.revalidate();
             }
         }
         return res;
@@ -372,7 +372,7 @@ public class AutoCompleteTextField extends TextField {
                     }
                     popup.setVisible(false);
                     popup.setEnabled(false);
-                    f.repaint();
+                    f.revalidate();
                 }
             }
         });
@@ -529,7 +529,7 @@ public class AutoCompleteTextField extends TextField {
                     if(!pressInBounds && !pop.contains(evt.getX(), evt.getY())){
                         pop.setVisible(false);
                         pop.setEnabled(false);      
-                        f.repaint();
+                        f.revalidateWithAnimationSafety();
                         evt.consume();
                     }else{
                         canOpenPopup = false;
@@ -543,6 +543,9 @@ public class AutoCompleteTextField extends TextField {
             
             if (contains(evt.getX(), evt.getY())) {
                 //if the suggestions are empty don't show the no need to show the popup
+                if (popup.getComponentCount() == 0) {
+                    return;
+                }
                 if(((List)popup.getComponentAt(0)).getModel().getSize() == 0){
                     return;
                 }
@@ -555,7 +558,7 @@ public class AutoCompleteTextField extends TextField {
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(true);
                 popup.setEnabled(true);
-                popup.repaint();
+                popup.revalidate();
                 dontCalcSize = false;
                 f.revalidate();
                 dontCalcSize = true;

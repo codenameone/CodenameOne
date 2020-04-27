@@ -55,7 +55,8 @@ public class AutocompleteSample2788 {
             return;
         }
         Form hi = new Form("Popup test", BorderLayout.absolute());
-        AutoCompleteTextField autocomplete = new AutoCompleteTextField("1", "2", "3");
+        AutoCompleteTextField autocomplete = new AutoCompleteTextField("1", "2", "3", "11", "22", "33");
+        autocomplete.setMinimumLength(1);
         Button tapMe = new Button("Tap me leaving the popup opened");
         tapMe.addActionListener(l -> {
             hi.replace(autocomplete, new Label("other content"), null);
