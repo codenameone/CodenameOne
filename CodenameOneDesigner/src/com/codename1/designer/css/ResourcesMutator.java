@@ -477,7 +477,10 @@ public class ResourcesMutator {
         Platform.runLater(()->{
             //System.out.println("in screenshot callback id "+id);
             //System.out.println(imageProcessors);
-            if (imageProcessors.containsKey(id)) {
+            if (w == 0 || h == 0) {
+                System.err.println("Attempt to screenshot element with id "+id+" failed because width or height is zero: w="+w+", h="+h);
+            }
+            if (imageProcessors.containsKey(id) && w > 0 && h > 0) {
                 double ratio = 1.0;
                 //this.targetDensity = Display.DENSITY_VERY_HIGH;
                 SnapshotParameters params = new SnapshotParameters();
