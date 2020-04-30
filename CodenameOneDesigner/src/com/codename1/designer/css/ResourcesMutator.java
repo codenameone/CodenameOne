@@ -8,6 +8,7 @@ package com.codename1.designer.css;
 
 
 
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.ui.util.EditableResources;
 import java.awt.Graphics2D;
@@ -477,27 +478,32 @@ public class ResourcesMutator {
         Platform.runLater(()->{
             //System.out.println("in screenshot callback id "+id);
             //System.out.println(imageProcessors);
-            if (w == 0 || h == 0) {
-                System.err.println("Attempt to screenshot element with id "+id+" failed because width or height is zero: w="+w+", h="+h);
-            }
-            if (imageProcessors.containsKey(id) && w > 0 && h > 0) {
+            if (imageProcessors.containsKey(id)) {
                 double ratio = 1.0;
                 //this.targetDensity = Display.DENSITY_VERY_HIGH;
                 SnapshotParameters params = new SnapshotParameters();
                 //params.setTransform(Transform.scale(ratio, ratio));
                 params.setFill(Color.TRANSPARENT);
-                
-                WebviewSnapshotter snapper = new WebviewSnapshotter(web, params);
-                snapper.setBounds(x, y, w, h);
-                snapper.snapshot(()-> {
-                    BufferedImage img = snapper.getImage();
-                
-                    imageProcessors.get(id).process(img);
+                try {
+                    WebviewSnapshotter snapper = new WebviewSnapshotter(web, params);
+                    snapper.setBounds(x, y, w, h);
+                    snapper.snapshot(()-> {
+                        BufferedImage img = snapper.getImage();
+
+                        imageProcessors.get(id).process(img);
+                        Platform.runLater(()-> {
+                            web.getEngine().executeScript("window.captureScreenshots()");
+                        });
+
+                    });
+                } catch (Throwable t) {
+                    Log.p("Failed to create snapshot for UIID "+id+": "+t.getMessage());
+                    Log.e(t);
                     Platform.runLater(()-> {
                         web.getEngine().executeScript("window.captureScreenshots()");
                     });
-                    
-                });
+                }
+                
                 
                 
             } else {

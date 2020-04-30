@@ -1233,6 +1233,7 @@ public class CSSTheme {
                         case LexicalUnit.SAC_PERCENTAGE:
                             return property + ":"+ (int)(value.getFloatValue() / 100f * 640f) + "px";
                     }
+                    break;
                 }
                 case "height": {
                     LexicalUnit value = styles.get(property);
@@ -1240,6 +1241,7 @@ public class CSSTheme {
                         case LexicalUnit.SAC_PERCENTAGE:
                             return property + ":"+ (int)(value.getFloatValue() / 100f * 960f) + "px";
                     }
+                    break;
                 }
                 
                 case "border-image-slice": {
