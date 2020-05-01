@@ -207,6 +207,10 @@ public class AutoCompleteTextField extends TextField {
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if(v != popup.isVisible()) {
             if(popup.getComponentCount() > 0) {popup.getComponentAt(0).setScrollY(0);}
+            if(v && popup.getAbsoluteX() != getAbsoluteX()){
+                removePopup();
+                addPopup();
+            }
             popup.setVisible(v);
             popup.setEnabled(v);
             f.revalidate();
@@ -238,6 +242,10 @@ public class AutoCompleteTextField extends TextField {
             boolean v = filter.getSize() > 0 && text.length() >= minimumLength;
             if(v != popup.isVisible() && popup.getComponentCount() > 0) {
                 popup.getComponentAt(0).setScrollY(0);
+                if(v && popup.getAbsoluteX() != getAbsoluteX()){
+                    removePopup();
+                    addPopup();
+                }
                 popup.setVisible(v);
                 popup.setEnabled(v);
             }
