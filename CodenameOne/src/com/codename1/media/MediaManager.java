@@ -97,17 +97,39 @@ public class MediaManager {
      * @since 7.0
      */
     public static synchronized AudioBuffer getAudioBuffer(String path, boolean create, int size) {
+        AudioBuffer buf = null;
         if (create && !audioBuffers.containsKey(path)) {
-            audioBuffers.put(path, new AudioBuffer(size));
+            buf = new AudioBuffer(size);
+            audioBuffers.put(path, buf);
         }
         
-        return audioBuffers.get(path);
+        buf = audioBuffers.get(path);
+        buf.retain();
+        return buf;
+        
     }
     
+    /**
+     * Releases an audio buffer at a given path.  Audio buffers use a simple reference counter
+     * mechanism.  Every call to {@link #getAudioBuffer(java.lang.String, boolean, int) } will increment
+     * the counter, and calls to {@link #releaseAudioBuffer(java.lang.String) } will decrement the counter.
+     * @param path The path to the buffer.
+     * @since 7.0
+     */
+    public static synchronized void releaseAudioBuffer(String path) {
+        AudioBuffer buf = audioBuffers.get(path);
+        if (buf != null) {
+            int refCount = buf.release();
+            if (refCount <= 0) {
+                audioBuffers.remove(path);
+            }
+        }
+    }
     /**
      * Deletes the audio buffer at the given path.
      * @param path The path to the audio buffer to delete.
      * @since 7.0
+     * @deprecated Prefer to use {@link #releaseAudioBuffer(java.lang.String) }
      */
     public static synchronized void deleteAudioBuffer(String path) {
        audioBuffers.remove(path);

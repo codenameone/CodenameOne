@@ -11203,7 +11203,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 recording = false;
                 if (redirectToAudioBuffer) {
-                    MediaManager.deleteAudioBuffer(path);
+                    MediaManager.releaseAudioBuffer(path);
                 }
                 if (line == null) {
                     return;

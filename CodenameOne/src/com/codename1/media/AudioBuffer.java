@@ -32,6 +32,18 @@ import java.util.ArrayList;
  * @author shannah
  */
 public class AudioBuffer {
+    
+    private int refCounter;
+    
+    synchronized int retain() {
+        refCounter++;
+        return refCounter;
+    }
+    synchronized int release() {
+        refCounter--;
+        return refCounter;
+    }
+    
     /**
      * A callback that can be registered to receive notifications when the contents of the 
      * AudioBuffer is changed.

@@ -3120,7 +3120,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if (isPlaying) {
                         pauseImpl();
                     }
-                    
+                    MediaManager.releaseAudioBuffer(path);
                     nativeInstance.destroyAudioUnit(peer);
                 }
 

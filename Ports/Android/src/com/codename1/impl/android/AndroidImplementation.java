@@ -3683,7 +3683,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 public void cleanup() {
                                     pauseImpl();
                                     recorder.release();
-                                    com.codename1.media.MediaManager.deleteAudioBuffer(path);
+                                    com.codename1.media.MediaManager.releaseAudioBuffer(path);
                                     
                                 }
 
