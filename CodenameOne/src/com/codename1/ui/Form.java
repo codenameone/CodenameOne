@@ -486,6 +486,7 @@ public class Form extends Container {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
                 titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
+                titleArea.revalidateWithAnimationSafety();
             }
         }
     }
