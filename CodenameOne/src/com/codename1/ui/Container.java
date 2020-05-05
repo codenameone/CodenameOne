@@ -2075,44 +2075,33 @@ public class Container extends Component implements Iterable<Component>{
         int w = getWidth();
         int absX2 = absX + w;
 
-        if (absX + paddingLeft < safeX1) {
-            newPaddingLeft = safeX1 - absX;
+        if (absX >= 0) {
+            if (absX + paddingLeft < safeX1) {
+                newPaddingLeft = safeX1 - absX;
+            }
         }
-        if (absX2 - paddingRight > safeX2) {
-            newPaddingRight = absX2 - safeX2;
+        if (absX2 <= safeAreaRoot.getWidth()) {
+            if (absX2 - paddingRight > safeX2) {
+                newPaddingRight = absX2 - safeX2;
+            }
         }
             
         int absY = getAbsoluteY() - safeAreaRoot.getAbsoluteY();
         int h = getHeight();
         int absY2 = absY + h;
         
-        // Check for negative coordinates.  If the any of the bounds
-        // of the component are off screen, then we'll assume that their position
-        // is intentional, and we don't want to kludge it into the safe area.
-        // This is an heuristic in search of a perfect solution.  
-        // https://github.com/codenameone/CodenameOne/issues/3023
-        if (absY < 0) {
-            return false;
+        
+        if (absY >= 0) {
+            if (absY + paddingTop < safeY1) {
+                newPaddingTop = safeY1 - absY;
+            }
+        }
+        if (absY2 <= safeAreaRoot.getHeight()) {
+            if (absY2 - paddingBottom > safeY2) {
+                newPaddingBottom = absY2 - safeY2;
+            }
         }
         
-        if (absX < 0) {
-            return false;
-        }
-        
-        if (absX2 > safeAreaRoot.getWidth()) {
-            return false;
-        }
-        
-        if (absY2 > safeAreaRoot.getHeight()) {
-            return false;
-        }
-
-        if (absY + paddingTop < safeY1) {
-            newPaddingTop = safeY1 - absY;
-        }
-        if (absY2 - paddingBottom > safeY2) {
-            newPaddingBottom = absY2 - safeY2;
-        }
         boolean changed = false;
         if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
             if (!hasScrollableYParentInternal()) {
