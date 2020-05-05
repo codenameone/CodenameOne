@@ -1,6 +1,7 @@
 package com.codename1.samples;
 
 
+import com.codename1.components.ToastBar;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -13,6 +14,7 @@ import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Button;
 import com.codename1.ui.TextField;
 
 /**
@@ -65,7 +67,18 @@ public class IOS13RegressionTest {
             });
             
             setTitle("Form 1");
-            add(new TextField());
+            TextField tf = new TextField();
+            tf.setHint("Hint text");
+            tf.getHintLabel().getAllStyles().setFgColor(0xff0000);
+            add(tf);
+            
+            Button b = new Button("Test Button");
+            b.addActionListener(evt->{
+                ToastBar.showInfoMessage("Button worked");
+            });
+            add(b);
+            TextField tf2 = new TextField();
+            add(tf2);
             
         }
     }
