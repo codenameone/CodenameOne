@@ -2202,16 +2202,23 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
     POOL_BEGIN();
-    
+    float alpha1 = 1.0;
+    if (((n1 >> 24) & 0xff) != 0) {
+        alpha1 = ((float)((n1 >> 24) & 0xff))/255.0;
+    }
+    float alpha2 = 1.0;
+    if (((n2 >> 24) & 0xff) != 0) {
+        alpha2 = ((float)((n2 >> 24) & 0xff))/255.0;
+    }
     CGFloat components[8] = {
         ((float)((n1 & 0xFF0000) >> 16))/255.0,
         ((float)(n1 & 0xff00 >> 8))/255.0,
         ((float)(n1 & 0xff))/255.0,
-        1.0,
+        alpha1,
         ((float)((n2 & 0xFF0000) >> 16))/255.0,
         ((float)(n2 & 0xff00 >> 8))/255.0,
         ((float)(n2 & 0xff))/255.0,
-        1.0 };
+        alpha2 };
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
@@ -2229,15 +2236,24 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
     POOL_BEGIN();
+
+    float alpha1 = 1.0;
+    if (((n1 >> 24) & 0xff) != 0) {
+        alpha1 = ((float)((n1 >> 24) & 0xff))/255.0;
+    }
+    float alpha2 = 1.0;
+    if (((n2 >> 24) & 0xff) != 0) {
+        alpha2 = ((float)((n2 >> 24) & 0xff))/255.0;
+    }
     CGFloat components[8] = {
         ((float)((n1 >> 16) & 0xff))/255.0,
         ((float)((n1 >> 8) & 0xFF))/255.0,
         ((float)(n1 & 0xff))/255.0,
-        1.0,
+        alpha1,
         ((float)((n2 >> 16) & 0xFF))/255.0,
         ((float)((n2 >> 8) & 0xFF))/255.0,
         ((float)(n2 & 0xff))/255.0,
-        1.0 };
+        alpha2 };
     
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
