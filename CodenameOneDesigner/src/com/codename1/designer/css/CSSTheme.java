@@ -3597,35 +3597,35 @@ public class CSSTheme {
                 }
                 
                 
-                return i;
+                //return i;
             }
             
             if (!isNone(borderRadiusTopLeftX) || !isNone(borderRadiusBottomLeftX)) {
-                i.left = Math.max(getPixelValue(borderRadiusTopLeftX), getPixelValue(borderRadiusBottomLeftX)) + 
-                        borderInsets.left + boxShadowInsets.left + boxShadowInsets.right + 1;
+                i.left = Math.max(i.left, Math.max(getPixelValue(borderRadiusTopLeftX), getPixelValue(borderRadiusBottomLeftX)) + 
+                        borderInsets.left + boxShadowInsets.left + boxShadowInsets.right + 1);
             } else {
             
-                i.left = borderInsets.left + boxShadowInsets.left + boxShadowInsets.right + 1;
+                i.left = Math.max(i.left, borderInsets.left + boxShadowInsets.left + boxShadowInsets.right + 1);
             }
             if (!isNone(borderRadiusTopRightX) || !isNone(borderRadiusBottomRightX)) {
-                i.right = Math.max(getPixelValue(borderRadiusTopRightX), getPixelValue(borderRadiusBottomRightX)) + 
-                        borderInsets.right + boxShadowInsets.right + boxShadowInsets.left + 1;
+                i.right = Math.max(i.right, Math.max(getPixelValue(borderRadiusTopRightX), getPixelValue(borderRadiusBottomRightX)) + 
+                        borderInsets.right + boxShadowInsets.right + boxShadowInsets.left + 1);
             } else {
-                i.right = borderInsets.right + boxShadowInsets.left + boxShadowInsets.right + 1;
+                i.right = Math.max(i.right, borderInsets.right + boxShadowInsets.left + boxShadowInsets.right + 1);
             }
             if (!isNone(borderRadiusTopLeftY) || !isNone(borderRadiusTopRightY)) {
-                i.top = Math.max(getPixelValue(borderRadiusTopLeftY), getPixelValue(borderRadiusTopRightY)) + 
-                        borderInsets.top + boxShadowInsets.top + boxShadowInsets.bottom + 1;
+                i.top = Math.max(i.top, Math.max(getPixelValue(borderRadiusTopLeftY), getPixelValue(borderRadiusTopRightY)) + 
+                        borderInsets.top + boxShadowInsets.top + boxShadowInsets.bottom + 1);
             } else {
             
-                i.top = borderInsets.top + boxShadowInsets.top + boxShadowInsets.bottom + 1;
+                i.top = Math.max(i.top, borderInsets.top + boxShadowInsets.top + boxShadowInsets.bottom + 1);
             }
             if (!isNone(borderRadiusBottomLeftY) || !isNone(borderRadiusBottomRightY)) {
-                i.bottom = Math.max(getPixelValue(borderRadiusBottomLeftY), getPixelValue(borderRadiusBottomRightY)) + 
-                        borderInsets.bottom + boxShadowInsets.bottom + boxShadowInsets.top + 1;
+                i.bottom = Math.max(i.bottom, Math.max(getPixelValue(borderRadiusBottomLeftY), getPixelValue(borderRadiusBottomRightY)) + 
+                        borderInsets.bottom + boxShadowInsets.bottom + boxShadowInsets.top + 1);
             } else {
             
-                i.bottom = borderInsets.bottom + boxShadowInsets.bottom + boxShadowInsets.top + 1;
+                i.bottom = Math.max(i.bottom, borderInsets.bottom + boxShadowInsets.bottom + boxShadowInsets.top + 1);
             }
             
             //i.top = Math.max(getPixelValue(borderTopWidth), i.top);
