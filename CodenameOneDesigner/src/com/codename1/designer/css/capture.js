@@ -103,6 +103,7 @@ $(document).ready(function() {
             setTimeout(function() {
                 // This passes back actual coordinates in the real webview viewport - not the virtual viewport
                 //window.app.log("Element is located at "+rect.left+", "+rect.top+", "+rect.width+", "+rect.height);
+                //window.app.log("Element: "+$('<div>').append($(currEl).clone()).html());
                 window.app.createScreenshotCallback($(currEl).attr('id'), rect.left, rect.top, rect.width, rect.height);
             }, 2);
         }, 50);

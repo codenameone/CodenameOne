@@ -38,6 +38,7 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
 //#define ENABLE_WKWEBVIEW
 //#define NO_UIWEBVIEW
 //#define GOOGLE_SIGNIN
@@ -77,7 +78,6 @@
 #ifdef INCLUDE_FACEBOOK_CONNECT
 #ifdef USE_FACEBOOK_CONNECT_PODS
 #import <FBSDKCoreKit/FBSDKCoreKit.h>
-#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
 #else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
@@ -165,11 +165,8 @@
 #ifndef GOOGLE_SIGNIN
         ,GPPSignInDelegate
 #else
-        ,GIDSignInDelegate,GIDSignInUIDelegate
+        ,GIDSignInDelegate
 #endif
-#endif
-#ifdef INCLUDE_FACEBOOK_CONNECT
-        ,FBSDKAppInviteDialogDelegate
 #endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT

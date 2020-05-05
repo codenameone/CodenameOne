@@ -15,6 +15,7 @@ import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.layouts.BorderLayout;
@@ -62,6 +63,12 @@ public class SafeAreasSample {
         Container tab1Contents = new Container();
         tab1Contents.setLayout(BoxLayout.y());
         tab1Contents.setScrollableY(true);
+        
+        Button openDialog = new Button("Open Dialog");
+        openDialog.addActionListener(evt->{
+            Dialog.show("Test Dialog", "Test", "OK", null);
+        });
+        tab1Contents.add(openDialog);
         tab1Contents.setSafeArea(true);
         String[] names = new String[]{"John", "Mary", "Joseph", "Solomon", "Jan", "Judy", "Patricia", "Ron", "Harry"};
         String[] positions = new String[]{"Wizard", "Judge", "Doctor"};

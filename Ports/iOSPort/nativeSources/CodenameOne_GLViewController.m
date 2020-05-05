@@ -1731,9 +1731,6 @@ static CodenameOne_GLViewController *sharedSingleton;
 
   // Optional: declare signIn.actions, see "app activities"
   signIn.delegate = self;
-#ifdef GOOGLE_SIGNIN
-    signIn.uiDelegate = self;
-#endif
 #endif
     
 }
@@ -3683,33 +3680,7 @@ UIPopoverController* popoverControllerInstance;
     return sectionWidth;
 }
 
-#ifdef INCLUDE_FACEBOOK_CONNECT
-extern void com_codename1_social_FacebookImpl_inviteDidCompleteSuccessfully__(CN1_THREAD_STATE_SINGLE_ARG);
-extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_INT code, JAVA_OBJECT message);
-/*!
- @abstract Sent to the delegate when the app invite completes without error.
- @param appInviteDialog The FBSDKAppInviteDialog that completed.
- @param results The results from the dialog.  This may be nil or empty.
- */
-- (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didCompleteWithResults:(NSDictionary *)results {
-    
-    if (results != nil && [results objectForKey:@"completionGesture"] != nil && [@"cancel" isEqualToString:[results objectForKey:@"completionGesture"]]) {
-        com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG -1, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"User Canceled"));
-    } else {
-        com_codename1_social_FacebookImpl_inviteDidCompleteSuccessfully__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    }
-}
 
-/*!
- @abstract Sent to the delegate when the app invite encounters an error.
- @param appInviteDialog The FBSDKAppInviteDialog that completed.
- @param error The error.
- */
-- (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didFailWithError:(NSError *)error {
-    CN1Log(@"%@", [error localizedDescription]);
-    com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG 0, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
-}
-#endif
 
 - (void)documentInteractionControllerDidEndPreview:(UIDocumentInteractionController *)controller
 {

@@ -114,6 +114,11 @@ public class CSSBorderTest {
         cnt.setUIID("NinePiece");
         cnt.add(new Label("9-piece border with UIID"));
         hi.add(cnt);
+        
+        cnt = new Container();
+        cnt.setUIID("BorderRadiusTopLeft");
+        cnt.add(new Label("Border Radius Top Left"));
+        hi.add(cnt);
         hi.show();
     }
 

@@ -586,7 +586,7 @@
         
 
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
-        <exec command="ant">
+        <exec command="ant" failonerror="true">
             <arg value="-f" />
             <arg file="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" />
             <arg value="nbms" />

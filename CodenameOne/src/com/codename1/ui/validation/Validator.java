@@ -690,9 +690,11 @@ public class Validator {
             }
         }
         
-        if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
-            if(!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
-                cmp.getComponentForm().setGlassPane(new ComponentListener(null));
+        if (cmp.getComponentForm() != null) {
+            if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
+                if(!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
+                    cmp.getComponentForm().setGlassPane(new ComponentListener(null));
+                }
             }
         }
         if(v) {

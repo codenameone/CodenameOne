@@ -117,7 +117,11 @@ public class FacebookConnect extends Login{
         if(t != null){
             return t;
         }
-        return new AccessToken(getToken(), (String)null);
+        if (isNativeLoginSupported()) {
+            return new AccessToken(getToken(), (String)null);
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -204,6 +208,7 @@ public class FacebookConnect extends Login{
      * @param appLinkUrl App Link for what should be opened when the recipient 
      * clicks on the install/play button on the app invite page.
      * @param previewImageUrl url to an image to be used in the invite, can be null
+     * @deprecated The Facebook SDK no longer supports app invites. https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
      */ 
     public void inviteFriends(String appLinkUrl, String previewImageUrl){
     }
@@ -219,6 +224,7 @@ public class FacebookConnect extends Login{
      * If the invite was successful the onSucess method will be called
      * If the user canceled the onError method will be called with error code -1.
      * If an error occurred the onError method will be called with error code 0.
+     * @deprecated The Facebook SDK no longer supports app invites https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
      * 
      */ 
     public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
@@ -228,7 +234,12 @@ public class FacebookConnect extends Login{
      * Returns true if inviteFriends is implemented, it is supported on iOS and 
      * Android
      * 
+     * <p><em>NOTE:</em> Since updating to Facebook SDK 5.6.0 (April 1, 2020), invite friends is no longer
+     * supported on iOS.  It will eventually be removed from Android as well, as Facebook 
+     * no longer supports App invites in its native SDKs.</p>
+     * 
      * @return true if inviteFriends is implemented
+     * 
      */ 
     public boolean isInviteFriendsSupported(){
         return false;

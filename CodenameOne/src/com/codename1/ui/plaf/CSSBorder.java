@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.codename1.compat.java.util.Objects;
 
 /**
  * <p>A border that can be configured using a limited subset of CSS directives.  This 
@@ -53,7 +54,6 @@ import java.util.Map;
  * @author shannah
  */
 public class CSSBorder extends Border {
-    
     /**
      * Constant indicating no-repeat for background images.
      */
@@ -315,6 +315,12 @@ public class CSSBorder extends Border {
             
         }
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj == this;
+    }
+
     
     /**
      * Converts this border to a CSS string.
@@ -1636,6 +1642,7 @@ public class CSSBorder extends Border {
         int color = g.getColor();
         boolean antialias = g.isAntiAliased();
         g.setAntiAliased(true);
+        Style s = c.getStyle();
         try {
             if (contentRect == null) contentRect = new Rectangle2D();
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
@@ -1649,10 +1656,15 @@ public class CSSBorder extends Border {
                 if (boxShadow != null) {
                     boxShadow.paint(g, c, contentRect);
                 }
-                
-                if (!isTransparent(backgroundColor)) {
-                    setColor(g, backgroundColor);
+                if (s.getBgTransparency() != 0) {
+                    g.setColor(s.getBgColor());
+                    int tp = s.getBgTransparency() & 0xff;
+                    int al = (int)Math.round(alpha * tp/255.0);
+                    g.setAlpha(al);
                     g.fillShape(p);
+                    g.setColor(color);
+                    g.setAlpha(alpha);
+                    
                 }
 
                 if (hasBackgroundImages()) {
@@ -1724,9 +1736,7 @@ public class CSSBorder extends Border {
                                 setColor(g, stroke[TOP].color);
                                
                                 Stroke st = stroke[TOP].getStroke(c, contentRect, true);
-                                if (stroke[TOP].thickness.type == UNIT_PIXELS && stroke[TOP].thickness.value == 10f) {
-                                    int foo = 1;
-                                }
+
                                 g.drawShape(p, st);
                             }
                             if (stroke[BOTTOM].isVisible()) {

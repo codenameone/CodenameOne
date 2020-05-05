@@ -22,7 +22,6 @@
  */
 package com.codename1.l10n;
 
-import com.codename1.io.Util;
 import java.util.Calendar;
 import java.util.Hashtable;
 import java.util.TimeZone;
@@ -312,12 +311,7 @@ public class DateFormatSymbols implements Cloneable {
                 cal.set(Calendar.DAY_OF_MONTH, 15);
                 for (int i=0; i<len; i++) {
                     cal.set(Calendar.MONTH, i);
-                    String fmt = l10n.formatDateLongStyle(cal.getTime());
-                    try {
-                        platformLocalizedMonths[i] = extractMonthName(fmt);
-                    } catch (ParseException ex) {
-                        platformLocalizedMonths[i] = MONTHS[i];
-                    }
+                    platformLocalizedMonths[i] = l10n.getLongMonthName(cal.getTime());
                 }
             }
             return platformLocalizedMonths;
@@ -336,31 +330,13 @@ public class DateFormatSymbols implements Cloneable {
                 cal.set(Calendar.DAY_OF_MONTH, 15);
                 for (int i=0; i<len; i++) {
                     cal.set(Calendar.MONTH, i);
-                    String fmt = l10n.formatDateLongStyle(cal.getTime());
-                    try {
-                        platformLocalizedShortMonths[i] = limitLength(extractMonthName(fmt), 3);
-                    } catch (ParseException ex) {
-                        platformLocalizedShortMonths[i] = limitLength(MONTHS[i], 3);
-                    }
+                    platformLocalizedMonths[i] = l10n.getShortMonthName(cal.getTime());   
                 }
             }
             return platformLocalizedShortMonths;
         }
         
-        private String extractMonthName(String dateStr) throws ParseException {
-            String[] parts = Util.split(dateStr, " ");
-            for (String part : parts) {
-                if (part.length() == 0) {
-                    continue;
-                }
-                String firstChar = part.substring(0, 1);
-                if (!firstChar.toLowerCase().equals(firstChar.toUpperCase())) {
-                    return part;
-                }
-            }
-            throw new ParseException("Cannot extract month from string", 0);
-            
-        }
+        
         
 	public String[] getMonths() {
 		synchronized (this) {

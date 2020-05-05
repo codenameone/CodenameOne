@@ -1119,7 +1119,7 @@ public class EditableResources extends Resources implements TreeModel {
                                 }
                                 if (border instanceof CSSBorder) {
                                     bw.write("        <border key=\"" + key + "\" type=\"css\" "
-                                            + "css=\"" + encodeXML(((CSSBorder)border).toCSSString())+ "/>\n");
+                                            + "css=\"" + encodeXML(((CSSBorder)border).toCSSString())+ "\"/>\n");
                                     continue;
                                 }
                                 if(border instanceof RoundRectBorder) {

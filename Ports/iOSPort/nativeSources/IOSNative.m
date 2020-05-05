@@ -6161,6 +6161,44 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_
     return o;
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getLongMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getShortMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -7263,10 +7301,10 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
     
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
     POOL_BEGIN();
     SocketImpl* impl = [[SocketImpl alloc] init];
-    BOOL b = [impl connect:toNSString(CN1_THREAD_STATE_PASS_ARG host) port:port];
+    BOOL b = [impl connect:toNSString(CN1_THREAD_STATE_PASS_ARG host) port:port timeout:connectTimeout];
     POOL_END();
     if(b) {
         return (JAVA_LONG)impl;
@@ -8581,8 +8619,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_Stri
     return com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, callbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
-    return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port);
+JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
+    return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port, connectTimeout);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

@@ -87,7 +87,7 @@ public class Capture {
     }
     
     /**
-     * Same as captureAudio only a blocking version that holds the EDT
+     * Capture the audio, blocking version that holds the EDT; alternatively you can use the Media API.
      * @return the audio file location or null if the user canceled
      */
     public static String captureAudio() {
@@ -98,7 +98,7 @@ public class Capture {
     }
     
     /**
-     * Same as {@link #captureAudio(com.codename1.media.MediaRecorderBuilder) { only a blocking version that holds the EDT
+     * Capture the audio, blocking version that holds the EDT; alternatively you can use the Media API.
      * @return the audio file location or null if the user canceled
      * @since 7.0
      */

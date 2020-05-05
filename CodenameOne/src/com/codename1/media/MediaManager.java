@@ -52,10 +52,18 @@ import java.util.TimerTask;
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
  * 
  * <p>
- *     The code below demonstrates capturing and playing back audio files using this API:
+ *     The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
  * </p>
  * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
+ *
+ * <p>
+ *     The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
+ *     as alternative and more customizable approach than using the Capture API:
+ * </p>
+ * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
+ * <img src="https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png" alt="Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder" />
+ * 
  */
 public class MediaManager {
     
@@ -89,17 +97,39 @@ public class MediaManager {
      * @since 7.0
      */
     public static synchronized AudioBuffer getAudioBuffer(String path, boolean create, int size) {
+        AudioBuffer buf = null;
         if (create && !audioBuffers.containsKey(path)) {
-            audioBuffers.put(path, new AudioBuffer(size));
+            buf = new AudioBuffer(size);
+            audioBuffers.put(path, buf);
         }
         
-        return audioBuffers.get(path);
+        buf = audioBuffers.get(path);
+        buf.retain();
+        return buf;
+        
     }
     
+    /**
+     * Releases an audio buffer at a given path.  Audio buffers use a simple reference counter
+     * mechanism.  Every call to {@link #getAudioBuffer(java.lang.String, boolean, int) } will increment
+     * the counter, and calls to {@link #releaseAudioBuffer(java.lang.String) } will decrement the counter.
+     * @param path The path to the buffer.
+     * @since 7.0
+     */
+    public static synchronized void releaseAudioBuffer(String path) {
+        AudioBuffer buf = audioBuffers.get(path);
+        if (buf != null) {
+            int refCount = buf.release();
+            if (refCount <= 0) {
+                audioBuffers.remove(path);
+            }
+        }
+    }
     /**
      * Deletes the audio buffer at the given path.
      * @param path The path to the audio buffer to delete.
      * @since 7.0
+     * @deprecated Prefer to use {@link #releaseAudioBuffer(java.lang.String) }
      */
     public static synchronized void deleteAudioBuffer(String path) {
        audioBuffers.remove(path);

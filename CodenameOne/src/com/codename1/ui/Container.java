@@ -2018,7 +2018,7 @@ public class Container extends Component implements Iterable<Component>{
      * safe area.  If so, it will add padding to make the contents fit the safe area.
      */
     private boolean snapToSafeAreaInternal() {
-        if (!isInitialized() || isHidden()) {
+        if (isHidden()) {
             return false;
         }
         Container safeAreaRoot = getSafeAreaRoot();
@@ -2157,6 +2157,11 @@ public class Container extends Component implements Iterable<Component>{
     private static class TmpInsets {
         float top, left, bottom, right;
         byte topUnit, leftUnit, bottomUnit, rightUnit;
+
+        @Override
+        public String toString() {
+            return top+","+right+","+bottom+","+left;
+        }
         
         private void set(Style style){
             //boolean suppressEvents = style.isSuppressChangeEvents();
@@ -2199,9 +2204,11 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     private TmpInsets tmpInsets;
+    private int doLayoutDepth;
     void doLayout() {
+        doLayoutDepth++;
         boolean restoreBounds = false;
-        if (safeArea) {
+        if (safeArea && doLayoutDepth == 1) {
             // If this container is marked as a safe area
             // then we may need to add padding to make it *safe*
             Container parent = getParent();
@@ -2234,6 +2241,7 @@ public class Container extends Component implements Iterable<Component>{
         if(Form.activePeerCount > 0) {
             onParentPositionChange();
         }
+        doLayoutDepth--;
         
     }
 
@@ -2727,12 +2735,15 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
     
+    private TmpInsets calcTmpInsets;
+    private int calcPreferredSizeDepth;
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
+        calcPreferredSizeDepth++;
         boolean restoreBounds = false;
-        if (safeArea && getWidth() > 0 && getHeight() > 0) {
+        if (safeArea && getWidth() > 0 && getHeight() > 0 && calcPreferredSizeDepth == 1) {
             // If this container is marked as a safe area
             // then we may need to add padding to make it *safe*
             Container parent = getParent();
@@ -2740,11 +2751,11 @@ public class Container extends Component implements Iterable<Component>{
                 // For efficiency, we check if the parent is a safe area.
                 // If so, we don't need to worry because it has already
                 // added appropriate padding.
-                if (tmpInsets == null) {
-                    tmpInsets = new TmpInsets();
+                if (calcTmpInsets == null) {
+                    calcTmpInsets = new TmpInsets();
                 }
                 Style s = getStyle();
-                tmpInsets.set(s);
+                calcTmpInsets.set(s);
                 restoreBounds = snapToSafeAreaInternal();
             }
         }
@@ -2759,9 +2770,10 @@ public class Container extends Component implements Iterable<Component>{
             d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
         }
-        if (restoreBounds && tmpInsets != null) {
-            tmpInsets.restore(getStyle());
+        if (restoreBounds && calcTmpInsets != null) {
+            calcTmpInsets.restore(getStyle());
         }
+        calcPreferredSizeDepth--;
         return d;
     }
 

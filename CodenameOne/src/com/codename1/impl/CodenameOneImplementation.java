@@ -7436,6 +7436,19 @@ public abstract class CodenameOneImplementation {
      * @return the socket object to use
      */
     public Object connectSocket(String host, int port) {
+        return connectSocket(host, port, 0);
+    }
+    
+    
+    /**
+     * Creates a socket to connect to the given host on the given port
+     * @param host the host
+     * @param port the port
+     * @param connectTimeout connect timeout.  0 for infinite timeout.
+     * @return the socket object to use
+     * @since 7.0
+     */
+    public Object connectSocket(String host, int port, int connectTimeout) {
         throw new RuntimeException("Not supported");
     }
     

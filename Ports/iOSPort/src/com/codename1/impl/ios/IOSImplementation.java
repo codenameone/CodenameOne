@@ -3120,7 +3120,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if (isPlaying) {
                         pauseImpl();
                     }
-                    
+                    MediaManager.releaseAudioBuffer(path);
                     nativeInstance.destroyAudioUnit(peer);
                 }
 
@@ -7899,6 +7899,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return nativeInstance.formatInt(number);
                 }
 
+                @Override
+                public String getLongMonthName(Date date) {
+                    return nativeInstance.getLongMonthName(date.getTime());
+                }
+
+                @Override
+                public String getShortMonthName(Date date) {
+                    return nativeInstance.getShortMonthName(date.getTime());
+                }
+                
                 public String format(double number) {
                     return nativeInstance.formatDouble(number);
                 }
@@ -8736,8 +8746,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public Object connectSocket(String host, int port) {
-        long i = nativeInstance.connectSocket(host, port);
+    public Object connectSocket(String host, int port, int connectTimeout) {
+        long i = nativeInstance.connectSocket(host, port, connectTimeout);
         if(i != 0) {
             return new Long(i);
         }

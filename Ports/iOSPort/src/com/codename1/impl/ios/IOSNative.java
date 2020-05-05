@@ -429,6 +429,8 @@ public final class IOSNative {
     native double parseDouble(String localeFormattedDecimal);
     native String formatDateTimeMedium(long date);
     native String formatDateTimeShort(long date);
+    native String getLongMonthName(long time);
+    native String getShortMonthName(long time);
     native String getCurrencySymbol();
     
     native void scanQRCode();
@@ -465,7 +467,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port);    
+    public native long connectSocket(String host, int port, int connectTimeout);    
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
@@ -712,6 +714,8 @@ public final class IOSNative {
     native int getDisplaySafeInsetRight();
 
     native int getDisplaySafeInsetBottom();
+
+    
 
     
 

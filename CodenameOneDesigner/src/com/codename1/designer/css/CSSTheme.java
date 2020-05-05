@@ -5,7 +5,9 @@
  */
 package com.codename1.designer.css;
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.Util;
+import com.codename1.processing.Result;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.EditorTTFFont;
@@ -21,6 +23,7 @@ import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EditableResourcesForCSS;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
 import java.io.CharArrayReader;
 import java.io.DataOutputStream;
@@ -34,6 +37,7 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -96,6 +100,8 @@ public class CSSTheme {
     Map<String,LexicalUnit> constants = new HashMap<String,LexicalUnit>();
     EditableResources res;
     private String themeName = "Theme";
+    private ImagesMetadata imagesMetadata = new ImagesMetadata();
+    
     private List<FontFace> fontFaces = new ArrayList<FontFace>();
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_HD;
     public static final String[] supportedNativeBorderTypes = new String[]{
@@ -138,6 +144,59 @@ public class CSSTheme {
         }
         return false;
         
+    }
+    
+    class ImageMetadata {
+        private String imageName;
+        int sourceDpi;
+
+        public ImageMetadata(String imageName, int sourceDpi) {
+            this.imageName = imageName;
+            this.sourceDpi = sourceDpi;
+        }
+        
+        
+        
+    }
+    
+    
+    class ImagesMetadata {
+        private Map<String,ImageMetadata> images = new HashMap<>();
+        
+        public void addImageMetadata(ImageMetadata data) {
+            images.put(data.imageName, data);
+        }
+        
+        public ImageMetadata get(String name) {
+            return images.get(name);
+        }
+        
+         void load(Resources res) throws IOException {
+            images.clear();
+            String metadataStr = (String)res.getTheme(themeName).getOrDefault("@imageMetadata", "{}");
+            JSONParser parser = new JSONParser();
+            Map metadataMap = parser.parseJSON(new StringReader(metadataStr));
+            for (String key : (Set<String>)metadataMap.keySet()) {
+                Map data = (Map)metadataMap.get(key);
+                int sourceDpi = (int)Math.round((data.containsKey("sourceDpi") ? ((Number)data.get("sourceDpi")).intValue() : 
+                        currentDpi));
+                String name = (String)data.get("imageName");
+                ImageMetadata md = new ImageMetadata(name, sourceDpi);
+                addImageMetadata(md);
+            }
+        }
+         
+        void store(EditableResources res) {
+            Map map = new HashMap();
+            for (String key : images.keySet()) {
+                ImageMetadata md = images.get(key);
+                Map data = new HashMap();
+                data.put("imageName", md.imageName);
+                data.put("sourceDpi", md.sourceDpi);
+                map.put(md.imageName, data);
+            }
+            res.setThemeProperty(themeName, "@imageMetadata", Result.fromContent(map).toString());
+        }
     }
     
     static class CN1Gradient {
@@ -1121,6 +1180,8 @@ public class CSSTheme {
         return ((ScaledUnit)lu).renderAsCSSValue(160, 640, 960);
     }
     
+    
+    
     String renderCSSProperty(String property, Map<String, LexicalUnit> styles) {
         if (property.contains("padding") || property.contains("margin")) {
             return "";
@@ -1172,6 +1233,7 @@ public class CSSTheme {
                         case LexicalUnit.SAC_PERCENTAGE:
                             return property + ":"+ (int)(value.getFloatValue() / 100f * 640f) + "px";
                     }
+                    break;
                 }
                 case "height": {
                     LexicalUnit value = styles.get(property);
@@ -1179,6 +1241,33 @@ public class CSSTheme {
                         case LexicalUnit.SAC_PERCENTAGE:
                             return property + ":"+ (int)(value.getFloatValue() / 100f * 960f) + "px";
                     }
+                    break;
+                }
+                
+                case "border-image-slice": {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("border-image-slice: ");
+                    LexicalUnit value = styles.get(property);
+                    boolean first = true;
+                    while (value != null) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            sb.append(" ");
+                        }
+                        switch (value.getLexicalUnitType()) {
+                            case LexicalUnit.SAC_PERCENTAGE:
+                                sb.append(value.getFloatValue()+"%");
+                                break;
+                            case LexicalUnit.SAC_PIXEL:
+                                sb.append(value.getFloatValue()+"px");
+                        }
+                        value = value.getNextLexicalUnit();
+                    }
+                    if (first) {
+                        sb.append("none");
+                    }
+                    return sb.toString();
                 }
             }
             
@@ -1370,6 +1459,13 @@ public class CSSTheme {
     }
     
     private static String str(LexicalUnit lu) {
+        return str(lu, null);
+    }
+    
+    private static String str(LexicalUnit lu, String defaultVal) {
+        if (lu == null) {
+            return defaultVal;
+        }
         ScaledUnit su = (ScaledUnit)lu;
         double numVal = su.getNumericValue();
         String num = numVal+"";
@@ -1667,6 +1763,7 @@ public class CSSTheme {
             }
         }
 
+        imagesMetadata.store(res);
 
         Map<String,Object> theme = res.getTheme(themeName);
         HashSet<String> keys = new HashSet<String>();
@@ -2053,8 +2150,6 @@ public class CSSTheme {
                     
                     res.setMultiImage(imageName, multi);
                     loadedImages.put(imageFolder.toURL().toString(), multi.getBest());
-            
-            
                     return multi.getBest();
                     
                 }
@@ -2073,6 +2168,8 @@ public class CSSTheme {
     public Image getBorderImage(Map<String,LexicalUnit> styles) {
         return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
     }
+    
+    
     
     public Image getBackgroundImage(Map<String,LexicalUnit> styles, ScaledUnit bgImage)  {
         try {
@@ -2108,13 +2205,20 @@ public class CSSTheme {
                 }
                 */
             }
-            
-            if (res.getImage(imageIdStr) != null) {
-                if (refreshImages) {
+            Image resimg = res.getImage(imageIdStr);
+            if (resimg != null) {
+                ImageMetadata md = imagesMetadata.get(imageIdStr);
+                int srcDpi = (int)currentDpi;
+                if (styles.containsKey("cn1-source-dpi")) {
+                
+                    srcDpi  = (int)((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
+                }
+                if (refreshImages || (md != null && md.sourceDpi != srcDpi)) {
                     //
                     res.remove(imageIdStr);
                 } else {
-                    loadedImages.put(imageIdStr, res.getImage(imageIdStr));
+                    
+                    loadedImages.put(imageIdStr, resimg);
                     return res.getImage(imageIdStr);
                 }
             }
@@ -2159,9 +2263,13 @@ public class CSSTheme {
             
             ResourcesMutator resm = new ResourcesMutator(res, com.codename1.ui.Display.DENSITY_VERY_HIGH, minDpi, maxDpi);
             int[] dpis = getDpi(encImg);
+            int sourceDpi = (int)Math.round(currentDpi);
+            
+            
             if (styles.containsKey("cn1-source-dpi")) {
                 //System.out.println("Using cn1-source-dpi "+styles.get("cn1-source-dpi").getFloatValue());
                 double densityVal = ((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
+                sourceDpi = (int)Math.round(densityVal);
                 if (Math.abs(densityVal) < 0.5) {
                     resm.targetDensity = 0;
                 } else {
@@ -2193,6 +2301,8 @@ public class CSSTheme {
             //System.out.println("Finished storing image "+url);
             //System.out.println("Storing image "+url+" at id "+imageIdStr);
             loadedImages.put(url, im);
+            ImageMetadata md = new ImageMetadata(imageIdStr, sourceDpi);
+            imagesMetadata.addImageMetadata(md);
             
             
             return im;
@@ -2215,6 +2325,7 @@ public class CSSTheme {
                 res = new EditableResourcesForCSS(resourceFile);
             }
             res.openFile(new FileInputStream(resourceFile));
+            imagesMetadata.load(res);
         }
     }
     
@@ -2659,11 +2770,22 @@ public class CSSTheme {
         public String toString() {
             return borderColorTop + " " +borderColorRight + borderColorBottom + borderColorLeft +
                     gradient + boxShadow + borderRadius + thicknessTop + thicknessRight + thicknessBottom + thicknessLeft
-                    + styleTop + styleRight + styleBottom + styleLeft;
+                    + styleTop + styleRight + styleBottom + styleLeft + borderImage + borderImageSlice;
         }
         
         public boolean hasBorderRadius() {
-            return !isZero(borderRadius);
+            String br = borderRadius;
+            if (br != null) {
+                if (br.indexOf(":") > 0) {
+                    br = br.substring(br.indexOf(":")+1).trim();
+                }
+                
+            }
+            if (br == null || br.isEmpty()) {
+                return false;
+            }
+            
+            return !isZero(br);
         }
         
         public boolean hasGradient() {
@@ -2683,12 +2805,26 @@ public class CSSTheme {
         }
         
         public boolean hasBoxShadow() {
-            return !isNone(boxShadow);
+            String bs = boxShadow;
+            if (bs != null) {
+                if (bs.indexOf(":") > 0) {
+                    bs = bs.substring(bs.indexOf(":")+1).trim();
+                }
+            }
+            return !isNone(bs);
         }
         
         public boolean hasBorderImage() {
-            return !isNone(borderImage);
+            String bs = borderImage;
+            if (bs != null) {
+                if (bs.indexOf(":") > 0) {
+                    bs = bs.substring(bs.indexOf(":")+1).trim();
+                }
+            }
+            return !isNone(bs);
         }
+
+        
     }
     
     
@@ -2698,6 +2834,7 @@ public class CSSTheme {
     }
     
     private static boolean isNone(Object o) {
+        
         return o == null || "".equals(o) || "none".equals(o);
     }
     
@@ -4601,10 +4738,10 @@ public class CSSTheme {
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
             StringBuilder radiusString = new StringBuilder();
             if (topLeftRadius != null) {
-                radiusString.append(str(topLeftRadius)).append(" ")
-                        .append(str(topRightRadius)).append(" ")
-                        .append(str(bottomRightRadius)).append(" ")
-                        .append(str(bottomLeftRadius));
+                radiusString.append(str(topLeftRadius, "0")).append(" ")
+                        .append(str(topRightRadius, "0")).append(" ")
+                        .append(str(bottomRightRadius, "0")).append(" ")
+                        .append(str(bottomLeftRadius, "0"));
                 out.borderRadius(radiusString.toString());
             }
             String[] borderColors = new String[]{
@@ -4639,11 +4776,7 @@ public class CSSTheme {
             StringBuilder widthString = new StringBuilder();
             for (String widthKey: borderWidths) {
                 LexicalUnit borderWidth = styles.get(widthKey);
-                if (borderWidth != null) {
-                    widthString.append(str(borderWidth)).append(" ");
-                } else {
-                    widthString.append("0 ");
-                }
+                widthString.append(str(borderWidth, "0")).append(" ");
                 
             }
             
@@ -4684,19 +4817,23 @@ public class CSSTheme {
             }
             
             ScaledUnit borderImage = (ScaledUnit)styles.get("border-image");
+            //System.out.println("Border image "+borderImage);
             if (!isNone(borderImage)) {
                 Image img = getBorderImage(styles);
                 ScaledUnit sliceUnit = (ScaledUnit)styles.get("border-image-slice");
                 List<Double> slices = new ArrayList<>();
                 while (!isNone(sliceUnit)) {
+                    //System.out.println("Found next unit "+sliceUnit);
+                    
                     if (sliceUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                         slices.add(sliceUnit.getNumericValue() / 100.0);
                     } else {
                         
                     }
-                    sliceUnit = (ScaledUnit)sliceUnit.getNextNumericUnit();
+                    sliceUnit = (ScaledUnit)sliceUnit.getNextLexicalUnit();
                     
                 }
+                //System.out.println("Slices: "+slices);
                 if (slices.isEmpty()) {
                     slices.add(0.4);
                 }
@@ -4874,18 +5011,19 @@ public class CSSTheme {
             Border b = this.createBorder(styles);
             LexicalUnit cn1BackgroundType = styles.get("cn1-background-type");
             
+            
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
-            if (b.canBeAchievedWithCSSBorder(styles)) {
+            if (b.canBeAchievedWithCSSBorder(styles) && (b.hasBorderImage() || b.hasUnequalBorders() || b.hasBorderRadius()) ) {
                 return createCSSBorder(styles);
             }
             if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()) {
                 return createRoundRectBorder(styles);
             }
-            if (b.canBeAchievedWithUnderlineBorder(styles)) {
-                return createUnderlineBorder(styles);
-            }
+            //if (b.canBeAchievedWithUnderlineBorder(styles)) {
+            //    return createUnderlineBorder(styles);
+            //}
             if (b.hasUnequalBorders()) {
                 //System.out.println("We have unequal borders");
                 return com.codename1.ui.plaf.Border.createCompoundBorder(
@@ -4912,6 +5050,7 @@ public class CSSTheme {
             }
             return null;
         }
+               
         
         public com.codename1.ui.plaf.Border getThemeBorder(Map<String,LexicalUnit> styles, String side) {
             
@@ -5505,7 +5644,7 @@ public class CSSTheme {
                         if (units.get(0).getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
                             if ("cn1-round-border".equals(units.get(0).getStringValue())
                                     || "cn1-pill-border".equals(units.get(0).getStringValue())) {
-                                apply(style, "cn1-border-type", units.get(0));
+                                apply(style, "cn1-background-type", units.get(0));
                                 break;
                             }
                         }
