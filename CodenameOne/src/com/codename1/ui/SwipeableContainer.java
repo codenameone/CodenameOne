@@ -383,6 +383,8 @@ public class SwipeableContainer extends Container {
                     }
 
                     if (initialX != -1) {
+                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen())
+                            getPreviouslyOpened().close();
                         int diff = x - initialX;
                         int val = 0;
                         if(!isOpen()){
@@ -444,4 +446,12 @@ public class SwipeableContainer extends Container {
         }
     }
 
+    /**
+     * override to return a previously opened SwipeableContainer that should be automatically closed when starting to open this one
+     * @return 
+     */
+    public SwipeableContainer getPreviouslyOpened() {
+        return null;
+    }
+    
 }
