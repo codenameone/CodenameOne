@@ -44,6 +44,7 @@ public class SwipeableContainer extends Container {
     private Container bottomLeftWrapper;
     private Container bottomRightWrapper;
     private Container topWrapper;
+    private SwipeableContainer previouslyOpenSwípeable; 
 
     private boolean open = false;
     private boolean openedToRight = false;
@@ -56,6 +57,7 @@ public class SwipeableContainer extends Container {
     private int initialY = -1;
     private int topX = -1;
     private boolean waitForRelease;
+    private SwipeableContainer previouslyOpened;
 
     private final EventDispatcher dispatcher = new EventDispatcher();
     /**
@@ -382,6 +384,9 @@ public class SwipeableContainer extends Container {
                     }
 
                     if (initialX != -1) {
+                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen()) {
+                            getPreviouslyOpened().close();
+                        }
                         int diff = x - initialX;
                         int val = 0;
                         if(!isOpen()){
@@ -443,4 +448,32 @@ public class SwipeableContainer extends Container {
         }
     }
 
+    /**
+     * returns a previously opened SwipeableContainer that should be
+     * automatically closed when starting to open this one. Called as soon as
+     * this Swipeable starts opening. One approach is to override this method to
+     * return a previously opened SwipeableContainer Can be overridden to return
+     * a SwipeableContainer stored outside this container.
+     *
+     * @return an already open SwipeableContainer that will be closed when
+     * opening this one, or null if none
+     */
+    public SwipeableContainer getPreviouslyOpened() {
+        return previouslyOpened;
+    }
+
+    /**
+     * set a previously open SwipeableContainer, it will be closed as soon as
+     * the user starts swiping this one. Be aware that with a long list of
+     * Swipeable containers it may be a better approach to store the previously
+     * opened outside the list and simply override getPreviouslyOpened to return
+     * it
+     *
+     * @param previouslyOpened an already open SwipeableContainer that will be
+     * closed if this one is opened
+     */
+    public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
+        this.previouslyOpened = previouslyOpened;
+    }
+    
 }
