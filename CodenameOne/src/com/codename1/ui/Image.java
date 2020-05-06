@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
@@ -1206,5 +1207,348 @@ public class Image implements ActionSource {
         }
         listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
         
+    }
+    
+    /**
+     * <p>
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported).</p>
+     * <p>
+     * However, rotating and/or flipping an hi-res image is very inefficient,
+     * that's why you should consider to pass a maxSize value as small as
+     * possible: it makes this method working faster.</p>
+     * <p>
+     * If there is no rotation or flipping, or if the capturedImage has a format
+     * different from jpeg and png, the image is only copied or scaled if
+     * necessary.<br>Note that this method doesn't rely on the file extension,
+     * but on the mime type of the capturedImage, since some devices don't give
+     * appropriate extension to images returned from the gallery.</p>
+     * <p>
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * <a href="https://github.com/recurser/exif-orientation-examples">EXIF
+     * Orientation-flag example images</a></p>
+     * <p>
+     * Code example:</p>
+     * <script src="https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js"></script>
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     * usually inside a temporary directory
+     * @param rotatedImage is the FileSystemStorage path in which the capture
+     * photo is stored, normally this should be inside the
+     * FileSystemStorage.getAppHomePath().
+     * @return the rotated and/or flipped image
+     */
+    public static Image exifRotation(String capturedImage, String rotatedImage) throws IOException {
+        return exifRotation(capturedImage, rotatedImage, -1);
+    }
+
+    /**
+     * <p>
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported).</p>
+     * <p>
+     * However, rotating and/or flipping an hi-res image is very inefficient,
+     * that's why you should consider to pass a maxSize value as small as
+     * possible: it makes this method working faster.</p>
+     * <p>
+     * If there is no rotation or flipping, or if the capturedImage has a format
+     * different from jpeg and png, the image is only copied or scaled if
+     * necessary.<br>Note that this method doesn't rely on the file extension,
+     * but on the mime type of the capturedImage, since some devices don't give
+     * appropriate extension to images returned from the gallery.</p>
+     * <p>
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * <a href="https://github.com/recurser/exif-orientation-examples">EXIF
+     * Orientation-flag example images</a></p>
+     * <p>
+     * Code example:</p>
+     * <script src="https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js"></script>
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     * usually inside a temporary directory
+     * @param rotatedImage is the FileSystemStorage path in which the capture
+     * photo is stored, normally this should be inside the
+     * FileSystemStorage.getAppHomePath().
+     * @param maxSize is the maximum value of the width and height of the
+     * rotated images, that is scaled if necessary, keeping the ratio.
+     * @return the com.codename1.ui.Image
+     * @throws java.io.IOException
+     */
+    public static Image exifRotation(String capturedImage, String rotatedImage, int maxSize) throws IOException {
+        FileSystemStorage fss = FileSystemStorage.getInstance();
+        boolean isJpeg = isJPEG(fss.openInputStream(capturedImage));
+        boolean isPNG = isPNG(fss.openInputStream(capturedImage));
+        String format;
+        // IMPORTANT: we cannot relies on the file extension of the capturedImage path,
+        // because some Android devices return images from the gallery without extension!
+        if (!isJpeg && !isPNG) {
+            // Only jpeg and png images are supported, but some devices can return also different formats from the gallery (like gif).
+            // In this case, we simply copy the file.
+            Util.copy(fss.openInputStream(capturedImage), fss.openOutputStream(rotatedImage));
+            return EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));
+        } else if (isJpeg) {
+            format = ImageIO.FORMAT_JPEG;
+        } else {
+            format = ImageIO.FORMAT_PNG;
+        }
+        int orientation = getExifOrientationTag(fss.openInputStream(capturedImage));
+        Image img = EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));
+        if (maxSize > 0 && (img.getWidth() > maxSize || img.getHeight() > maxSize)) {
+            // Tested that scaling the image before rotating is a lot more efficient than rotating before scaling
+            img = img.scaledSmallerRatio(maxSize, maxSize);
+        }
+        switch (orientation) {
+            case 0:
+            case 1:
+                // no rotation
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return img;
+            case 2:
+                // action required: flip horizontally
+                img = img.flipHorizontally(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 3:
+                //  action required: rotate 180 degrees
+                img = img.rotate180Degrees(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 4:
+                //  action required: flip vertically
+                img = img.flipVertically(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 5:
+                //  action required: rotate 270 degrees
+                img = img.rotate270Degrees(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 6:
+                //  action required: rotate 90 degrees
+                img = img.rotate90Degrees(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 7:
+                //  action required: flip horizontally and rotate 90 degrees
+                img = img.flipHorizontally(true).rotate90Degrees(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            case 8:
+                //  action required: flip horizontally and rotate 270 degrees
+                img = img.rotate270Degrees(true);
+                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
+                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+            default:
+                // this never should happen
+                throw new IllegalStateException("Unsupported rotation");
+        }
+    }
+
+    /**
+     * <p>
+     * Gets the EXIF orientation tag of an image, if it's available.</p>
+     * <p>
+     * The Exif Orientation Tag is a number from 0 to 8, for the explanation of
+     * each value see the
+     * <a href="http://sylvana.net/jpegcrop/exif_orientation.html">Exif
+     * Orientation Tag</a> page</p>
+     * <p>
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * <a href="https://github.com/recurser/exif-orientation-examples">EXIF
+     * Orientation-flag example images</a></p>
+     *
+     * @param path FileSystemStorage path
+     * @return a value from 0 to 8; 0 is default in case of error or unavailable
+     * EXIF data.
+     * @throws java.io.IOException
+     */
+    public static int getExifOrientationTag(String path) throws IOException {
+        InputStream in = FileSystemStorage.getInstance().openInputStream(path);
+        return getExifOrientationTag(in);
+    }
+
+    /**
+     * <p>
+     * Gets the EXIF orientation tag of an image, if it's available.</p>
+     * <p>
+     * The Exif Orientation Tag is a number from 0 to 8, for the explanation of
+     * each value see the
+     * <a href="http://sylvana.net/jpegcrop/exif_orientation.html">Exif
+     * Orientation Tag</a> page</p>
+     * <p>
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * <a href="https://github.com/recurser/exif-orientation-examples">EXIF
+     * Orientation-flag example images</a></p>
+     *
+     * @param is
+     * @return a value from 0 to 8; 0 is default in case of error or unavailable
+     * EXIF data.
+     */
+    public static int getExifOrientationTag(InputStream is) {
+        if (is == null) {
+            return 0;
+        }
+
+        byte[] buf = new byte[8];
+        int length = 0;
+
+        // ISO/IEC 10918-1:1993(E)
+        while (read(is, buf, 2) && (buf[0] & 0xFF) == 0xFF) {
+            int marker = buf[1] & 0xFF;
+
+            // Check if the marker is a padding.
+            if (marker == 0xFF) {
+                continue;
+            }
+
+            // Check if the marker is SOI or TEM.
+            if (marker == 0xD8 || marker == 0x01) {
+                continue;
+            }
+            // Check if the marker is EOI or SOS.
+            if (marker == 0xD9 || marker == 0xDA) {
+                return 0;
+            }
+
+            // Get the length and check if it is reasonable.
+            if (!read(is, buf, 2)) {
+                return 0;
+            }
+            length = pack(buf, 0, 2, false);
+            if (length < 2) {
+                Log.p("EXIF Invalid length", Log.ERROR);
+                return 0;
+            }
+            length -= 2;
+
+            // Break if the marker is EXIF in APP1.
+            if (marker == 0xE1 && length >= 6) {
+                if (!read(is, buf, 6)) {
+                    return 0;
+                }
+                length -= 6;
+                if (pack(buf, 0, 4, false) == 0x45786966
+                        && pack(buf, 4, 2, false) == 0) {
+                    break;
+                }
+            }
+
+            // Skip other markers.
+            try {
+                is.skip(length);
+            } catch (IOException ex) {
+                return 0;
+            }
+            length = 0;
+        }
+
+        // JEITA CP-3451 Exif Version 2.2
+        if (length > 8) {
+            int offset = 0;
+            byte[] jpeg = new byte[length];
+            if (!read(is, jpeg, length)) {
+                return 0;
+            }
+
+            // Identify the byte order.
+            int tag = pack(jpeg, offset, 4, false);
+            if (tag != 0x49492A00 && tag != 0x4D4D002A) {
+                Log.p("EXIF Invalid byte order", Log.ERROR);
+                return 0;
+            }
+            boolean littleEndian = (tag == 0x49492A00);
+
+            // Get the offset and check if it is reasonable.
+            int count = pack(jpeg, offset + 4, 4, littleEndian) + 2;
+            if (count < 10 || count > length) {
+                Log.p("EXIF Invalid offset", Log.ERROR);
+                return 0;
+            }
+            offset += count;
+            length -= count;
+
+            // Get the count and go through all the elements.
+            count = pack(jpeg, offset - 2, 2, littleEndian);
+            while (count-- > 0 && length >= 12) {
+                // Get the tag and check if it is orientation.
+                tag = pack(jpeg, offset, 2, littleEndian);
+                if (tag == 0x0112) {
+                    // We do not really care about type and count, do we?
+                    int orientation = pack(jpeg, offset + 8, 2, littleEndian);
+                    return orientation;
+                }
+                offset += 12;
+                length -= 12;
+            }
+        }
+
+        Log.p("EXIF Orientation not found", Log.DEBUG);
+        return 0;
+    }
+
+    private static int pack(byte[] bytes, int offset, int length,
+            boolean littleEndian) {
+        int step = 1;
+        if (littleEndian) {
+            offset += length - 1;
+            step = -1;
+        }
+
+        int value = 0;
+        while (length-- > 0) {
+            value = (value << 8) | (bytes[offset] & 0xFF);
+            offset += step;
+        }
+        return value;
+    }
+
+    private static boolean read(InputStream is, byte[] buf, int length) {
+        try {
+            return is.read(buf, 0, length) == length;
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Very fast method to detect if the given inputStream is a JPEG image
+     * (according to its guessed mime type)
+     *
+     * @param inputStream
+     * @return true if jpeg, false otherwise
+     */
+    public static boolean isJPEG(InputStream inputStream) throws IOException {
+        String type = Util.guessMimeType(inputStream);
+        if ("image/jpeg".equals(type) || "image/jpg".equals(type)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Very fast method to detect if the given inputStream is a PNG image
+     * (according to its guessed mime type)
+     *
+     * @param inputStream
+     * @return true if PNG, false otherwise
+     */
+    public static boolean isPNG(InputStream inputStream) throws IOException {
+        String type = Util.guessMimeType(inputStream);
+        if ("image/png".equals(type)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
