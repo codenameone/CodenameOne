@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.*;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.util.EventDispatcher;
@@ -2675,6 +2676,93 @@ public class Style {
     public void setMarginUnitBottom(byte unit) {
         initMarginUnits();
         marginUnit[Component.BOTTOM] = unit;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(obj == null) {
+            return false;
+        }
+        if(getClass() != obj.getClass()) {
+            return false;
+        }
+        final Style other = (Style) obj;
+        if(this.fgColor != other.fgColor) {
+            return false;
+        }
+        if(this.bgColor != other.bgColor) {
+            return false;
+        }
+        if(this.font != other.font &&
+            (this.font == null || !this.font.equals(other.font))) {
+            return false;
+        }
+        if(this.bgImage != other.bgImage &&
+            (this.bgImage == null || !this.bgImage.equals(other.bgImage))) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.padding, other.padding)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.margin, other.margin)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.paddingUnit, other.paddingUnit)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.marginUnit, other.marginUnit)) {
+            return false;
+        }
+        if(this.transparency != other.transparency) {
+            return false;
+        }
+        if(this.opacity != other.opacity) {
+            return false;
+        }
+        if(this.backgroundType != other.backgroundType) {
+            return false;
+        }
+        if(this.backgroundAlignment != other.backgroundAlignment) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.backgroundGradient,
+            other.backgroundGradient)) {
+            return false;
+        }
+        if(this.border != other.border &&
+            (this.border == null || !this.border.equals(other.border))) {
+            return false;
+        }
+        if(this.align != other.align) {
+            return false;
+        }
+        if(this.textDecoration != other.textDecoration) {
+            return false;
+        }
+        return true;
+    } 
+    
+    private static boolean equals(float[] a, float[] a2) {
+        if (a==a2) {
+            return true;
+        }
+        
+        if (a==null || a2==null) {
+            return false;
+        }
+
+        int length = a.length;
+        if (a2.length != length) {
+            return false;
+        }
+
+        for (int i=0; i<length; i++) {
+            if (a[i] != a2[i]) {
+                return false;
+            }
+        }
+
+        return true;
     }
     
 }
