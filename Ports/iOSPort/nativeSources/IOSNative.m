@@ -7719,14 +7719,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         
         glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ac->width, ac->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, maskArray);
         GLErrorLog;
-        free(maskArray);
-        free(ac);
+        
         glBindTexture(GL_TEXTURE_2D, 0);
         GLErrorLog;
         _glDisableClientState(GL_VERTEX_ARRAY);
         GLErrorLog;
         _glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         GLErrorLog;
+        
+        free(maskArray);
+        free(ac);
+
         outTexture = tex;
         //return (JAVA_LONG)tex;
         POOL_END();
