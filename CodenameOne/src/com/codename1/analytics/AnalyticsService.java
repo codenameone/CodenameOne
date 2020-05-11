@@ -25,10 +25,9 @@ package com.codename1.analytics;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
-import com.codename1.io.Util;
 import com.codename1.ui.Display;
-import java.io.IOException;
-import java.io.InputStream;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 
 /**
  * <p>The analytics service allows an application to report its usage, it is seamlessly
@@ -71,6 +70,24 @@ public class AnalyticsService {
     public static boolean isAppsMode() {
         return appsMode;
     }
+    
+    /**
+     * Sets timeout for HTTP requests to Google Analytics service.
+     * @param ms Milliseconds timeout.
+     * @since 7.0
+     */
+    public static void setTimeout(int ms) {
+        timeout = ms;
+    }
+    
+    /**
+     * Sets read timeout for  HTTP requests to Google Analytics services.
+     * @param ms Milliseconds read timeout.
+     * @since 7.0
+     */
+    public static void setReadTimeout(int ms) {
+        readTimeout = ms;
+    }
 
     /**
      * Apps mode allows improved analytics using the newer google analytics API designed for apps.
@@ -84,6 +101,9 @@ public class AnalyticsService {
     private String agent;
     private String domain;
     private static boolean failSilently = true;
+    private ConnectionRequest lastRequest;
+    private static int timeout;
+    private static int readTimeout;
     
     /**
      * Indicates whether analytics is enabled for this application
@@ -142,19 +162,42 @@ public class AnalyticsService {
      * @param referer the page from which the user came
      */
     protected void visitPage(String page, String referer) {
+        if (lastRequest != null) {
+            final String fPage = page;
+            final String fReferer = referer;
+            ActionListener onComplete = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    visitPage(fPage, fReferer);
+                }
+            };
+            lastRequest.addResponseListener(onComplete);
+            lastRequest.addResponseCodeListener(onComplete);
+            lastRequest.addExceptionListener(onComplete);
+            return;
+        }
         if(appsMode) {
             // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#apptracking
-            ConnectionRequest req = GetGARequest();
+            final ConnectionRequest req = GetGARequest();
             req.addArgument("t", "appview");
             req.addArgument("an", Display.getInstance().getProperty("AppName", "Codename One App"));
             String version = Display.getInstance().getProperty("AppVersion", "1.0");
             req.addArgument("av", version);
             req.addArgument("cd", page);
-
+            ActionListener onComplete = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if (req == lastRequest) {
+                        lastRequest = null;
+                    }
+                }
+            };
+            req.addResponseListener(onComplete);
+            req.addResponseCodeListener(onComplete);
+            req.addExceptionListener(onComplete);
+            lastRequest = req;
             NetworkManager.getInstance().addToQueue(req);
         } else {
             String url = Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "anal";
-            ConnectionRequest r = new ConnectionRequest();
+            final ConnectionRequest r = new ConnectionRequest();
             r.setUrl(url);
             r.setPost(false);
             r.setFailSilently(failSilently);
@@ -171,6 +214,23 @@ public class AnalyticsService {
             r.addArgument("utmr", referer);
             r.addArgument("d", instance.domain);
             r.setPriority(ConnectionRequest.PRIORITY_LOW);
+            if (timeout > 0) {
+                r.setTimeout(timeout);
+            }
+            if (readTimeout > 0) {
+                r.setReadTimeout(readTimeout);
+            }
+            ActionListener onComplete = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if (r == lastRequest) {
+                        lastRequest = null;
+                    }
+                }
+            };
+            r.addResponseListener(onComplete);
+            r.addResponseCodeListener(onComplete);
+            r.addExceptionListener(onComplete);
+            lastRequest = r;
             NetworkManager.getInstance().addToQueue(r);
         }
     }
@@ -203,6 +263,12 @@ public class AnalyticsService {
         req.setFailSilently(true);
         req.addArgument("v", "1");
         req.addArgument("tid", instance.agent);
+        if (timeout > 0) {
+            req.setTimeout(timeout);
+        }
+        if (readTimeout > 0) {
+            req.setReadTimeout(readTimeout);
+        }
         long uniqueId = Log.getUniqueDeviceId();
         req.addArgument("cid", String.valueOf(uniqueId));
         return req;

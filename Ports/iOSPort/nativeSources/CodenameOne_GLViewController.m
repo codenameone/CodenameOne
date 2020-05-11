@@ -3538,9 +3538,9 @@ extern JAVA_LONG defaultDatePickerDate;
         currentDatePickerDate = nil;
         currentDatePickerDuration = -1;
         pickerStringArray = nil;
-        NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
-        UIView* v = (UIView*)[arr objectAtIndex:0];
-        [v removeFromSuperview];
+        //NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
+        //UIView* v = (UIView*)[arr objectAtIndex:0];
+        [currentActionSheet removeFromSuperview];
         currentActionSheet = nil;
         repaintUI();
     }
@@ -3572,6 +3572,9 @@ extern JAVA_LONG defaultDatePickerDate;
     }
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
     UIView* v = (UIView*)[arr objectAtIndex:0];
+    if(currentActionSheet != nil) {
+        v = currentActionSheet;
+    }
     [v removeFromSuperview];
     currentActionSheet = nil;
     repaintUI();

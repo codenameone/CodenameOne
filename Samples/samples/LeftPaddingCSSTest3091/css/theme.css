@@ -1,0 +1,9 @@
+#Constants {
+    includeNativeBool: true; 
+}
+ExampleLabel {
+    cn1-derive: 'Label';
+    text-align: left;
+    color: white;
+    padding-left: 100mm;
+}

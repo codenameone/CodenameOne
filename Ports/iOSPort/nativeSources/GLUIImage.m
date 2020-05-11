@@ -108,17 +108,10 @@ extern int nextPowerOf2(int val);
         GLErrorLog;
         CGContextRelease(context);
         GLErrorLog;
-        free(imageData);
+        
         glBindTexture(GL_TEXTURE_2D, 0);
         GLErrorLog;
-        //_glDisableClientState(GL_VERTEX_ARRAY);
-        //GLErrorLog;
-        //_glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        //GLErrorLog;
-        //natural_t memoryAfter = [ExecutableOp get_free_memory];
-        //if(name != nil) {
-        //    CN1Log(@"Allocated texture %@ that takes up %i", name, memoryBefore - memoryAfter);
-        //}
+        free(imageData);
     } else {
         if(texWidth != textureWidth || texHeight != textureHeight) {
             glDeleteTextures(1, &textureName);

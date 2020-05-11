@@ -57,6 +57,7 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
 import android.view.View;
+import com.codename1.charts.util.ColorUtil;
 import com.codename1.ui.CN;
 
 import com.codename1.ui.Component;
@@ -804,10 +805,23 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
+        int c1 = startColor;
+        int alphaStart = ColorUtil.alpha(startColor);
+        if (alphaStart == 0) {
+            alphaStart = 0xff;
+        }
+        int alphaEnd = ColorUtil.alpha(endColor);
+        if (alphaEnd == 0) {
+            alphaEnd = 0xff;
+        }
+        c1 = ColorUtil.argb(alphaStart, ColorUtil.red(c1), ColorUtil.green(c1), ColorUtil.blue(c1));
+        int c2 = endColor;
+        c2 = ColorUtil.argb(alphaEnd, ColorUtil.red(c2), ColorUtil.green(c2), ColorUtil.blue(c2));
+        
         if(!horizontal) {
-            paint.setShader(new LinearGradient(x, y, x, y+height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x, y+height, c1, c2, Shader.TileMode.MIRROR));
         } else {
-            paint.setShader(new LinearGradient(x, y, x+width, y, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x+width, y, c1, c2, Shader.TileMode.MIRROR));
         }
         canvas.save();
         applyTransform();

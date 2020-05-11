@@ -79,7 +79,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     // Sometimes we receive an event from a view that has already been removed from
     // the view hierarchy.  The call to [pressedView isDescendantOfView:xxx] will throw
     // a EXC_BAD_ACCESS in this case, so we need to test for this case.
-    BOOL viewInWindow = [pressedView window] != nil;
+    BOOL viewInWindow = pressedView != nil && [pressedView window] != nil;
     
     BOOL ignore = (touch == nil || pressedView == nil || !viewInWindow || ![pressedView isDescendantOfView:v]);
 
@@ -139,7 +139,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     // WARNING: DO NOT try to call super touchesMoved or touchesEnd
     // event won't be delivered on iOS 13 and up.
     // See https://groups.google.com/d/msgid/codenameone-discussions/9084cc3f-df2d-47f9-a6a7-036ad6e41a72%40googlegroups.com
-    if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
+    //if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
+    if(skipNextTouch || (editingComponent != nil && editingComponent == pressedView)) {
         self.state = UIGestureRecognizerStateCancelled;
         return;
     }

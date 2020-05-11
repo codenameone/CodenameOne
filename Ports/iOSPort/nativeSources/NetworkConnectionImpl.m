@@ -309,17 +309,24 @@ extern void connectionError(void* peer, NSString* message);
 -(void)dealloc {
     if(allHeaderFields != nil) {
         [allHeaderFields release];
+        allHeaderFields = nil;
     }
     if(connection != nil) {
         [connection release];
+        connection = nil;
     }
     if (sslCertificates != nil) {
        [sslCertificates release];
+        sslCertificates = nil;
     }
     if (pendingData != nil) {
         [pendingData release];
+        pendingData = nil;
     }
-    [request release];
+    if (request != nil) {
+        [request release];
+        request = nil;
+    }
 	[super dealloc];
 }
 #endif

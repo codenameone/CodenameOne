@@ -142,7 +142,7 @@ public class AutoCompleteTextField extends TextField {
 
             @Override
             public void run() {
-                addPopup();
+                addPopup(true);
             }
         });
     }
@@ -209,7 +209,7 @@ public class AutoCompleteTextField extends TextField {
             if(popup.getComponentCount() > 0) {popup.getComponentAt(0).setScrollY(0);}
             if(v && popup.getAbsoluteX() != getAbsoluteX()){
                 removePopup();
-                addPopup();
+                addPopup(false);
             }
             popup.setVisible(v);
             popup.setEnabled(v);
@@ -244,7 +244,7 @@ public class AutoCompleteTextField extends TextField {
                 popup.getComponentAt(0).setScrollY(0);
                 if(v && popup.getAbsoluteX() != getAbsoluteX()){
                     removePopup();
-                    addPopup();
+                    addPopup(false);
                 }
                 popup.setVisible(v);
                 popup.setEnabled(v);
@@ -346,12 +346,14 @@ public class AutoCompleteTextField extends TextField {
         listeners.remove(a);
     }
     
-    private void addPopup() {
+    private void addPopup(boolean updateFilter) {
         final Form f = getComponentForm();
         popup.removeAll();
         popup.setVisible(false);
         popup.setEnabled(false);
-        filter(getText());        
+        if (updateFilter) {
+            filter(getText());
+        }        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
         if(getMinimumElementsShownInPopup() > 0) {
             l.setMinElementHeight(getMinimumElementsShownInPopup());
@@ -560,7 +562,7 @@ public class AutoCompleteTextField extends TextField {
                 //something went wrong re-init the popup
                 if(popup.getAbsoluteX() != getAbsoluteX()){
                     removePopup();
-                    addPopup();
+                    addPopup(true);
                 }
                 evt.consume();                
                 popup.getComponentAt(0).setScrollY(0);
