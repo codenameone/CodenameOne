@@ -447,8 +447,8 @@ public class SwipeableContainer extends Container {
             }
         }
     }
-
-    /**
+    
+        /**
      * returns a previously opened SwipeableContainer that should be
      * automatically closed when starting to open this one. Called as soon as
      * this Swipeable starts opening. One approach is to override this method to
@@ -475,5 +475,5 @@ public class SwipeableContainer extends Container {
     public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
         this.previouslyOpened = previouslyOpened;
     }
-    
+
 }
