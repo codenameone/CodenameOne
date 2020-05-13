@@ -59,7 +59,9 @@
     
     if ( width < 0 ) width = -width;
     if ( height < 0 ) height = -height;
-    
+    if (width == 0 || height == 0) {
+        return;
+    }
     GLfloat vertexes[] = {
           (GLfloat)x, (GLfloat)y,
           (GLfloat)(x+width), (GLfloat)y,
