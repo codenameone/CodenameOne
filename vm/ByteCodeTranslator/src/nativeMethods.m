@@ -570,9 +570,9 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
 JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d, JAVA_BOOLEAN b) {
     char s[32];
     if ( !b ){
-        sprintf(s, "%lf", d);
+        snprintf(s, 32, "%lf", d);
     } else {
-        sprintf(s, "%1.20E", d);
+        snprintf(s, 32, "%1.20E", d);
     }
     
     // We need to match the format of Java spec.  That includes:
@@ -583,7 +583,7 @@ JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CO
     int i=32;
     char s2[32];
     BOOL inside=NO;
-    while (i-->0){
+    while (i-->0 && j < 32){
         if (inside){
             if (s[i]=='.'){
                 s2[j++]='0';
