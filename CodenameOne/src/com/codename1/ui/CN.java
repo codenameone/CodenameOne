@@ -31,6 +31,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
@@ -760,7 +761,7 @@ public class CN extends  CN1Constants {
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
      * 
-     * @return the name of the platform e.g. ios, rim, win, and, me
+     * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public static String getPlatformName() {
         return Display.impl.getPlatformName();
@@ -1455,5 +1456,51 @@ public class CN extends  CN1Constants {
     public static Image captureScreen() {
         return Display.impl.captureScreen();
     }
+    
+    /**
+     * Adds a listener to receive messages from the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * 
+     * <p>In the Javascript port, javascript can send messages to the CN1 app by calling
+     * 
+     * {@code
+     * window.dispatchEvent(new CustomEvent('cn1inbox', {detail:'The message', code: SOMEINTEGER}));
+     * }
+     * 
+     * @param l The listener.
+     * @since 7.0
+     */
+    public static void addMessageListener(ActionListener<MessageEvent> l) {
+        Display.INSTANCE.addMessageListener(l);
+    }
+    
+    /**
+     * Removes a listener from receiving messages from the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * @param l The listener.
+     * @since 7.0
+     */
+    public static void removeMessageListener(ActionListener<MessageEvent> l) {
+        Display.INSTANCE.removeMessageListener(l);
+    }
+    
+    /**
+     * Posts a message to the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * 
+     * <p>In the Javascript port these messages can be received in Javascript by adding an event listener
+     * for 'cn1outbox' events to the 'window' object.  The message is contained in the event data "detail" key. And the 
+     * code in the 'code' key.</p>
+     * @param message The message to send to the native platform.
+     * @since 7.0
+     */
+    public static void postMessage(MessageEvent message) {
+        Display.INSTANCE.postMessage(message);
+    }
+    
+    
 
 }
