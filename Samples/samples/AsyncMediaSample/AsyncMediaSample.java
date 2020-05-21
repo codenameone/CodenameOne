@@ -24,6 +24,8 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.Slider;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import java.util.Random;
@@ -122,7 +124,27 @@ public class AsyncMediaSample {
             record();
             
         });
-        
+        CN.addMessageListener((ActionListener<MessageEvent>)evt->{
+            String message = evt.getMessage();
+            if ("play".equals(message)) {
+                pause.setEnabled(true);
+                play.setEnabled(false);
+                play.setVisible(false);
+                pause.setVisible(true);
+                record();
+                return;
+            }
+            if ("pause".equals(message)) {
+                pause();
+                status.setText("Paused");
+                pause.setEnabled(false);
+                play.setEnabled(true);
+                play.setVisible(true);
+                pause.setVisible(false);
+                instructions.setText("Press play to begin");
+                return;
+            }
+        });
         f.setTitle("Test Async Media");
         f.setLayout(new BorderLayout());
         f.add(CENTER, LayeredLayout.encloseIn(pause, play));

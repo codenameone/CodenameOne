@@ -49,6 +49,7 @@ import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -90,6 +91,8 @@ public final class Display extends CN1Constants {
     boolean codenameOneExited;
     private boolean inNativeUI;
 
+    private EventDispatcher messageListeners;
+    
     /**
      * A common sound type that can be used with playBuiltinSound
      */
@@ -3203,7 +3206,62 @@ public final class Display extends CN1Constants {
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
     }
-
+    
+    /**
+     * Posts a message to the native platform.  Different platforms may handle messages posted this
+     * way differently.  
+     * <p>The Javascript port will dispatch the message on the {@literal window} object
+     * as a custom DOM event named 'cn1outbox', with the event data containing a 'detail' key with the 
+     * message, and a 'code' key with the code.</p>
+     * @param message The message.
+     * @since 7.0
+     */
+    public void postMessage(MessageEvent message) {
+        impl.postMessage(message);
+    }
+    
+    /**
+     * Adds a listener to receive messages from the native platform.  This is one mechanism for the native
+     * platform to communicate with the Codename one app.  
+     * 
+     * <p>In the JavaScript port, listeners will be notified when DOM events named 'cn1inbox' are received on the 
+     * window object.  The event data 'detail' key will be the source of the message, and the 'code' key will be the
+     * source of the code.
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void addMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners == null) {
+            messageListeners = new EventDispatcher();
+        }
+        messageListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a listener from receiving messages from the native platform.
+     * 
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void removeMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners != null) {
+            messageListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Dispatches a message to all of the registered listeners.
+     * @param evt 
+     * @see #addMessageListener(com.codename1.ui.events.ActionListener) 
+     * @see #removeMessageListener(com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void dispatchMessage(MessageEvent evt) {
+        if (messageListeners != null && messageListeners.hasListeners()) {
+            messageListeners.fireActionEvent(evt);
+        }
+    }
+    
     /**
      * Indicates the way commands should be added to a form as one of the ocmmand constants defined
      * in this class
@@ -3803,7 +3861,7 @@ hi.show();}</pre></noscript>
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
      * 
-     * @return the name of the platform e.g. ios, rim, win, and, me
+     * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public String getPlatformName() {
         return impl.getPlatformName();

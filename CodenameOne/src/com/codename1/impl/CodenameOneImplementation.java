@@ -58,6 +58,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -8431,6 +8432,15 @@ public abstract class CodenameOneImplementation {
      */
     public boolean supportsNativeTextAreaVerticalAlignment() {
         return false;
+    }
+    
+    /**
+     * Posts a message to the native platform.
+     * @param message The message.
+     * @since 7.0
+     */
+    public void postMessage(MessageEvent message) {
+        
     }
 
 }

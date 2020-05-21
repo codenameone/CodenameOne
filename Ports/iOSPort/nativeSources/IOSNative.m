@@ -7669,23 +7669,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         
         if ( width < 0 ) width = -width;
         if ( height < 0 ) height = -height;
-        
+        if (width == 0 || height == 0) {
+            POOL_END();
+            return;
+        }
         AlphaConsumer *ac = malloc(sizeof(AlphaConsumer));
         ac->originX = x;
         ac->originY = y;
         ac->width = width;
         ac->height = height;
-        
-        
-        //CN1Log(@"AC Width %d", ac.width);
-        
-        //jbyte maskArray[ac.width*ac.height];
+
         jbyte* maskArray = malloc(sizeof(jbyte)*ac->width*ac->height);
-        
-        //CN1Log(@"Mask width %d height %d",
-        //      ac.width,
-        //      ac.height
-        //      );
+
         ac->alphas = maskArray;
         Renderer_produceAlphas(renderer, ac);
         
@@ -7740,6 +7735,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #endif
     
 }
+
 
 
 float clamp_float_to_int(float val){

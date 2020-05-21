@@ -1098,10 +1098,12 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
 
     if(threadStateData->utf8Buffer == 0) {
         threadStateData->utf8Buffer = malloc(len + 1);
+        threadStateData->utf8BufferSize = len+1;
     } else {
         if(threadStateData->utf8BufferSize < len + 1) {
             free(threadStateData->utf8Buffer);
             threadStateData->utf8Buffer = malloc(len + 1);
+            threadStateData->utf8BufferSize = len+1;
         }
     }
     char* cs = threadStateData->utf8Buffer;

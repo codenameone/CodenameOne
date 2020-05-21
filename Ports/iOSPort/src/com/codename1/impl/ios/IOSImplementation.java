@@ -128,7 +128,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static RestoreCallback restoreCallback;
     private int timeout = 120000;
     private static final Object CONNECTIONS_LOCK = new Object();
-    private Map<Long, NetworkConnection> connections = new HashMap<Long, NetworkConnection>();
+    private ArrayList<NetworkConnection> connections = new ArrayList<NetworkConnection>();
     private NativeFont defaultFont;
     private NativeGraphics currentlyDrawingOn;
     //private NativeImage backBuffer;
@@ -6740,9 +6740,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public static void appendData(long peer, long data) {
-        NetworkConnection n;
+        NetworkConnection n = null;
         synchronized(CONNECTIONS_LOCK) {
-            n = instance.connections.get(peer);
+            int len = instance.connections.size();
+            for (int i=0; i<len; i++) {
+                if (instance.connections.get(i).peer == peer) {
+                    n = instance.connections.get(i);
+                }
+            }
         }
         if(n != null) {
             synchronized(n.LOCK) {
@@ -6754,9 +6759,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public static void streamComplete(long peer) {
-        NetworkConnection n;
+        NetworkConnection n = null;
         synchronized(CONNECTIONS_LOCK) {
-            n = instance.connections.get(peer);
+            int len = instance.connections.size();
+            for (int i=0; i<len; i++) {
+                if (instance.connections.get(i).peer == peer) {
+                    n = instance.connections.get(i);
+                }
+            }
         }
         if(n != null) {
             synchronized(n.LOCK) {
@@ -6768,9 +6778,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public static void networkError(long peer, String error) {
-        NetworkConnection n;
+        NetworkConnection n = null;
         synchronized(CONNECTIONS_LOCK) {
-            n = instance.connections.get(peer);
+            int len = instance.connections.size();
+            for (int i=0; i<len; i++) {
+                if (instance.connections.get(i).peer == peer) {
+                    n = instance.connections.get(i);
+                }
+            }
         }
         synchronized(n.LOCK) {
             if(error == null) {
@@ -6983,7 +6998,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public NetworkConnection(long peer) {
             this.peer = peer;
             synchronized(CONNECTIONS_LOCK) {
-                instance.connections.put(peer, this);
+                instance.connections.add(this);
             }
         }
         
@@ -7092,9 +7107,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 //pendingData = null;
                 super.close();
                 nativeInstance.closeConnection(peer);
+                peer = 0;
             }
             synchronized(CONNECTIONS_LOCK) {
-                instance.connections.remove(peer);
+                instance.connections.remove(this);
                 if (body != null && body.isBackedByFile() && FileSystemStorage.getInstance().exists(body.getFilePath())) {
                     FileSystemStorage.getInstance().delete(body.getFilePath());
                 }
