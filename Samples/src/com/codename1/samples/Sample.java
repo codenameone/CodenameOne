@@ -420,6 +420,7 @@ public class Sample {
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("-Dnb.internal.action.name=run");
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("run");
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
@@ -439,6 +440,7 @@ public class Sample {
         applyRunProperties(context, cmd);
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-Dnb.internal.action.name=debug");
         cmd.add("-Ddebug.class=com.codename1.impl.javase.Simulator");
         cmd.add("debug-sample");
@@ -479,7 +481,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("clean");
@@ -503,7 +505,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device");
@@ -523,7 +525,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device-release");
@@ -558,7 +560,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-android-device");
@@ -578,7 +580,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-windows-device");
@@ -598,7 +600,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-windows-desktop");
@@ -618,7 +620,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-mac-os-x-desktop");
@@ -704,6 +706,17 @@ public class Sample {
         return new File(getBuildLibDir(context), dep.getFile(context).getName());
     }
     
+    private static String javaHome() {
+        String home = System.getProperty("java.home");
+        if ("jre".equals(new File(home).getName())) {
+            File jdk = new File(home).getParentFile();
+            if (jdk.exists()) {
+                return jdk.getAbsolutePath();
+            }
+        }
+        return home;
+    }
+    
     public boolean installDependencies(SamplesContext context, Properties props) throws IOException, InterruptedException {
         boolean updated = false;
         for (Dependency dep : getDependencies(context)) {
@@ -713,11 +726,13 @@ public class Sample {
         }
         if (updated) {
             List<String> cmd = new ArrayList<>();
+            System.out.println("java.home="+javaHome());
             cmd.add(context.getAnt());
             applyRunProperties(context, cmd);
-
+            cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
             cmd.add("-f");
             cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+            
             cmd.add("refresh-libs");
             cmd.add("clean");
             cmd.add("jar");
