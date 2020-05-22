@@ -44,7 +44,6 @@ public class SwipeableContainer extends Container {
     private Container bottomLeftWrapper;
     private Container bottomRightWrapper;
     private Container topWrapper;
-    private SwipeableContainer previouslyOpenSwípeable; 
 
     private boolean open = false;
     private boolean openedToRight = false;
