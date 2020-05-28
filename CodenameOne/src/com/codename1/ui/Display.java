@@ -3393,6 +3393,43 @@ public final class Display extends CN1Constants {
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
     }
+    
+    /**
+     * Returns the device density as a string.
+     * 
+     * <ul>
+     * 
+     * <li>DENSITY_VERY_LOW : "very-low"</li>
+     * <li>DENSITY_LOW : "low"</li>
+     * <li>DENSITY_MEDIUM : "medium"</li>
+     * <li>DENSITY_HIGH : "high"</li>
+     * <li>DENSITY_VERY_HIGH : "very-high"</li>
+     * <li>DENSITY_HD : "hd"</li>
+     * <li>DENSITY_560 : "560"</li>
+     * <li>DENSITY_2HD : "2hd"</li>
+     * <li>DENSITY_4K : "4k";</li>
+     * </ul>
+     * 
+     * @return Device density as a string.
+     * @see #getDeviceDensity() 
+     * @since 7.0
+     * 
+     */
+    public String getDensityStr() {
+        switch (getDeviceDensity()) {
+            case DENSITY_VERY_LOW: return "very-low";
+            case DENSITY_LOW: return "low";
+            case DENSITY_MEDIUM: return "medium";
+            case DENSITY_HIGH: return "high";
+            case DENSITY_VERY_HIGH: return "very-high";
+            case DENSITY_HD: return "hd";
+            case DENSITY_560: return "560";
+            case DENSITY_2HD: return "2hd";
+            case DENSITY_4K: return "4k";
+            default:
+                throw new IllegalStateException("Unknown density "+getDeviceDensity());
+        }
+    }
 
     /**
      * Plays a builtin device sound matching the given identifier, implementations
