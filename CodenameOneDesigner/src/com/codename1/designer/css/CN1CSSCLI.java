@@ -11,6 +11,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import com.codename1.designer.css.CSSTheme.WebViewProvider;
 import com.codename1.io.Util;
+import com.codename1.ui.util.Resources;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -223,6 +224,9 @@ public class CN1CSSCLI extends Application {
     }
     
     public static void main(String[] args) throws Exception {
+        // We don't want media queries while editing CSS because we need to be 
+        // editing the rules raw.
+        Resources.setEnableMediaQueries(false);
         mergeMode = isMergeMode(args);
         String inputPath = getInputFile(args);
         
