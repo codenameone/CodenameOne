@@ -34,6 +34,7 @@ import java.util.Vector;
 /**
  * <p>Binds a {@link com.codename1.ui.Slider} to network progress events so it shows the progress of
  * the current {@link com.codename1.io.ConnectionRequest}</p>
+ * <p>Important note: every time that a connectionRequest is retried with the .retry() method, SliderBridge.bindProgress(cr, progress) must be invoked again.</p>
  * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
   *
