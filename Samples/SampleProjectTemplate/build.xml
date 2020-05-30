@@ -532,11 +532,22 @@
         <mkdir dir="native/javase" />
         <mkdir dir="native/internal_tmp" />
         <mkdir dir="lib/impl/native/javase" />
+        <path id="native.jars.class.path">
+            <pathelement path="${run.classpath}"/>
+             <pathelement path="${build.classes.dir}"/>
+              <pathelement path="lib/impl/native/javase"/>
+            <fileset dir="native/javase">
+              <include name="**/*.jar" />
+            </fileset>
+            <fileset dir="lib/impl/native/javase">
+              <include name="**/*.jar" />
+            </fileset>
+          </path>
         <javac destdir="native/internal_tmp"
             encoding="${source.encoding}"
             source="1.8"
             target="1.8"
-            classpath="${run.classpath}:${build.classes.dir}:lib/impl/native/javase">
+            classpathref="native.jars.class.path">
             <src path="native/javase"/>
             <src path="lib/impl/native/javase"/>
         </javac>

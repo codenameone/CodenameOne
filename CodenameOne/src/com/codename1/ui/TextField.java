@@ -1216,6 +1216,7 @@ public class TextField extends TextArea {
             pressedAndNotReleased = false;
             setHandlesInput(false);
         }
+        super.deinitialize();
     }
 
     /**

@@ -2626,22 +2626,8 @@ public class Container extends Component implements Iterable<Component>{
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y) && cmp.isVisible()) {
-                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
-                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
-                if(component != null && component.isBlockLead()) {
-                    return component;
-                }
+                
                 component = cmp;
-                if (!overlaps && component.isFocusable()) {
-                    // special case for lead blocking
-                    if(component instanceof Container && ((Container)component).getLeadParent() == component) {
-                        Component c = ((Container)component).getComponentAt(x, y);
-                        if(c.isBlockLead()) {
-                            return c;
-                        }
-                    }
-                    return component;
-                }
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
                     if(c != null){

@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -96,8 +97,8 @@ public class CSSTheme {
     File cssFile = new File("test.css");
     File resourceFile = new File("test.css.res");
     Element anyNodeStyle = new Element();
-    Map<String,Element> elements = new HashMap<String,Element>();
-    Map<String,LexicalUnit> constants = new HashMap<String,LexicalUnit>();
+    Map<String,Element> elements = new LinkedHashMap<String,Element>();
+    Map<String,LexicalUnit> constants = new LinkedHashMap<String,LexicalUnit>();
     EditableResources res;
     private String themeName = "Theme";
     private ImagesMetadata imagesMetadata = new ImagesMetadata();
@@ -161,7 +162,7 @@ public class CSSTheme {
     
     
     class ImagesMetadata {
-        private Map<String,ImageMetadata> images = new HashMap<>();
+        private Map<String,ImageMetadata> images = new LinkedHashMap<>();
         
         public void addImageMetadata(ImageMetadata data) {
             images.put(data.imageName, data);
@@ -187,10 +188,10 @@ public class CSSTheme {
         }
          
         void store(EditableResources res) {
-            Map map = new HashMap();
+            Map map = new LinkedHashMap();
             for (String key : images.keySet()) {
                 ImageMetadata md = images.get(key);
-                Map data = new HashMap();
+                Map data = new LinkedHashMap();
                 data.put("imageName", md.imageName);
                 data.put("sourceDpi", md.sourceDpi);
                 map.put(md.imageName, data);
@@ -1358,7 +1359,7 @@ public class CSSTheme {
     }
     
     public Map<String,String> calculateSelectorChecksums() {
-        Map<String,String> out = new HashMap<String,String>();
+        Map<String,String> out = new LinkedHashMap<String,String>();
         for (String id : elements.keySet()) {
             Element el = elements.get(id);
             //System.out.println("Checksum("+id+") is "+el.getChecksum());
@@ -1500,7 +1501,7 @@ public class CSSTheme {
         try {
             Map<String,String> current = calculateSelectorChecksums();
             Map<String,String> previous = loadSelectorChecksums(cachedFile);
-            HashMap<String, CacheStatus> out = new HashMap<String, CacheStatus>();
+            HashMap<String, CacheStatus> out = new LinkedHashMap<String, CacheStatus>();
             if (previous == null) {
                 for (String id : current.keySet()) {
                     out.put(id, CacheStatus.ADDED);
@@ -1898,7 +1899,7 @@ public class CSSTheme {
         return false;
     }
     
-    private Map<String,Image> loadedImages = new HashMap<String,Image>();
+    private Map<String,Image> loadedImages = new LinkedHashMap<String,Image>();
     
     
     public int[] getDpi(EncodedImage im) throws IOException {
@@ -2887,7 +2888,7 @@ public class CSSTheme {
     
     public class Element {
         Element parent = anyNodeStyle;
-        Map properties = new HashMap();
+        Map properties = new LinkedHashMap();
         
         Element unselected;
         Element selected;
@@ -2965,7 +2966,7 @@ public class CSSTheme {
         
         String generateBoxShadowPaddingString() {
             StringBuilder sb = new StringBuilder();
-            Map styles = new HashMap();
+            Map styles = new LinkedHashMap();
             styles.putAll(getFlattenedStyle());
             
             return ""+getBoxShadowPadding(styles);
@@ -2973,7 +2974,7 @@ public class CSSTheme {
         
         String generateStyleCSS() {
             StringBuilder sb = new StringBuilder();
-            Map styles = new HashMap();
+            Map styles = new LinkedHashMap();
             styles.putAll(getFlattenedStyle());
             
             if (this.requiresImageBorder(styles)) {
@@ -3046,7 +3047,7 @@ public class CSSTheme {
         }
         
         Map getFlattenedSelectedStyle() {
-            Map out = new HashMap();
+            Map out = new LinkedHashMap();
             
             LinkedList<Map> stack = new LinkedList<Map>();
             Element el = this;
@@ -3069,7 +3070,7 @@ public class CSSTheme {
         }
         
         Map getFlattenedPressedStyle() {
-            Map out = new HashMap();
+            Map out = new LinkedHashMap();
             
             LinkedList<Map> stack = new LinkedList<Map>();
             Element el = this;
@@ -3092,7 +3093,7 @@ public class CSSTheme {
         }
         
         Map getFlattenedUnselectedStyle() {
-            Map out = new HashMap();
+            Map out = new LinkedHashMap();
             
             LinkedList<Map> stack = new LinkedList<Map>();
             Element el = this;
@@ -3115,7 +3116,7 @@ public class CSSTheme {
         }
         
         Map getFlattenedDisabledStyle() {
-            Map out = new HashMap();
+            Map out = new LinkedHashMap();
             
             LinkedList<Map> stack = new LinkedList<Map>();
             Element el = this;
@@ -3138,7 +3139,7 @@ public class CSSTheme {
         }
         
         Map getFlattenedStyle() {
-            Map out = new HashMap();
+            Map out = new LinkedHashMap();
             if (this.isSelectedStyle()) {
                 if (parent != null) {
                     out.putAll(parent.getFlattenedStyle());
@@ -3455,7 +3456,7 @@ public class CSSTheme {
 //        
 //        }
         
-        Map style = new HashMap();
+        Map style = new LinkedHashMap();
         
         Border createBorder(Map<String,LexicalUnit> styles) {
             Border b = new Border();
@@ -6112,13 +6113,17 @@ public class CSSTheme {
         return (Element)elements.get(name);
     }
     
-    Element getElementForSelector(Selector sel) {
+    Element getElementForSelector(String media, Selector sel) {
         switch (sel.getSelectorType()) {
             case Selector.SAC_ANY_NODE_SELECTOR :
                 return anyNodeStyle;
             case Selector.SAC_ELEMENT_NODE_SELECTOR : {
                 ElementSelector esel = (ElementSelector)sel;
-                return getElementByName(esel.getLocalName());
+                if (media != null && !media.isEmpty()) {
+                    return getElementByName(media+"-"+esel.getLocalName());
+                } else {
+                    return getElementByName(esel.getLocalName());
+                }
             }
             case Selector.SAC_CONDITIONAL_SELECTOR : {
                 ConditionalSelector csel = (ConditionalSelector)sel;
@@ -6147,7 +6152,7 @@ public class CSSTheme {
                     }
                     case Selector.SAC_ELEMENT_NODE_SELECTOR : {
                         ElementSelector esel = (ElementSelector)simple;
-                        Element parent = getElementForSelector(esel);
+                        Element parent = getElementForSelector(media, esel);
                         switch (csel.getCondition().getConditionType()) {
                             case Condition.SAC_CLASS_CONDITION :
                                 AttributeCondition clsCond = (AttributeCondition)csel.getCondition();
@@ -6180,7 +6185,7 @@ public class CSSTheme {
         }
     }
     
-    public void apply(Selector sel, String property, LexicalUnit value) {
+    public void apply(String media, Selector sel, String property, LexicalUnit value) {
         if (sel.getSelectorType() == Selector.SAC_CONDITIONAL_SELECTOR) {
             ConditionalSelector csel = (ConditionalSelector)sel;
             if (csel.getCondition().getConditionType() == Condition.SAC_ID_CONDITION) {
@@ -6205,7 +6210,7 @@ public class CSSTheme {
                 }
             }
         }
-        Element el = getElementForSelector(sel);
+        Element el = getElementForSelector(media, sel);
         apply(el, property, value);
         
     }
@@ -6534,6 +6539,63 @@ public class CSSTheme {
         return (int)currentDpi * 3;
     }
     
+    private static List<String> getMediaPrefixes(SACMediaList l) {
+        
+        int len = l == null ? 0 : l.getLength();
+        if (len == 0) {
+            ArrayList<String> out = new ArrayList<String>();
+            out.add("");
+            return out;
+        }
+        ArrayList<String> out = new ArrayList<String>();
+        ArrayList<String> platforms = new ArrayList<String>();
+        ArrayList<String> densities = new ArrayList<String>();
+        ArrayList<String> types = new ArrayList<String>();
+        for (int i=0; i<len; i++) {
+            String key = l.item(i);
+            if (key.startsWith("platform-")) {
+                platforms.add(key);
+            } else if (key.startsWith("density-")) {
+                densities.add(key);
+            } else if (key.startsWith("device-")) {
+                types.add(key);
+            }
+        }
+        if (!platforms.isEmpty()) {
+            for (String platform : platforms) {
+                if (densities.isEmpty()) {
+                    out.add(platform);
+                } else {
+                    for (String density : densities) {
+                        out.add(platform+"-"+density);
+                    }
+                }
+            }
+        } else {
+            if (densities.isEmpty()) {
+                out.add("");
+            } else {
+                for (String density : densities) {
+                    out.add(density);
+                }
+            }
+        }
+        if (!types.isEmpty()) {
+            int outLen = out.size();
+            for (String type: types) {
+                for (int i=0; i<outLen; i++) {
+                    String curr = out.get(i);
+                    if (curr.isEmpty()) {
+                        out.set(i, type);
+                    } else {
+                        out.set(i, type+"-"+curr);
+                    }
+                }
+            }
+        }
+        return out;
+    }
+    
     public static CSSTheme load(URL uri) throws IOException {
         try {
             System.setProperty("org.w3c.css.sac.parser", "org.w3c.flute.parser.Parser");
@@ -6572,9 +6634,10 @@ public class CSSTheme {
             });
             //parser.setLocale(Locale.getDefault());
             parser.setDocumentHandler(new DocumentHandler() {
-                Map<String,LexicalUnit> variables = new HashMap<>();
+                Map<String,LexicalUnit> variables = new LinkedHashMap<>();
                 SelectorList currSelectors;
                 FontFace currFontFace;
+                SACMediaList currMediaList;
                 //double currentTargetDpi = 320;
                 //double currentMinDpi = 120;
                 //double currentMaxDpi = 640;
@@ -6614,12 +6677,12 @@ public class CSSTheme {
                 
                 @Override
                 public void startMedia(SACMediaList sacml) throws CSSException {
-                    
+                    currMediaList = sacml;
                 }
                 
                 @Override
                 public void endMedia(SACMediaList sacml) throws CSSException {
-                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                    currMediaList = null;
                 }
                 
                 @Override
@@ -6722,7 +6785,13 @@ public class CSSTheme {
                         int len = currSelectors.getLength();
                         for (int i=0; i<len; i++) {
                             Selector sel = currSelectors.item(i);
-                            theme.apply(sel, string, lu);
+                            if (currMediaList != null) {
+                                for (String mediaPrefix : getMediaPrefixes(currMediaList)) {
+                                    theme.apply(mediaPrefix, sel, string, lu);
+                                }
+                            } else {
+                                theme.apply(null, sel, string, lu);
+                            }
 
                         }
                     }

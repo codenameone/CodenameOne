@@ -1,0 +1,42 @@
+#Constants {
+    includeNativeBool: true; 
+    device-desktop-font-scale: "2.0";
+}
+
+Label {
+	font-size: 3mm;
+	background-color: blue;
+}
+
+@media platform-and {
+	Label {
+		font-size: 6mm;
+		background-color: green;
+	}
+}
+
+@media platform-and, density-very-high {
+	Label {
+		font-size: 4mm;
+	}
+}
+
+@media platform-ios {
+	Label {
+		font-size: 8mm;
+		background-color: red;
+	}
+}
+
+@media device-desktop {
+	Label {
+		border: 1px solid black;
+		font-size: 20mm;
+	}
+}
+
+@media device-tablet {
+	Label {
+		color: white;
+	}
+}
