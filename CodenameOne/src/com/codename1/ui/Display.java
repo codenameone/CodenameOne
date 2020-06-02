@@ -67,6 +67,7 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
@@ -4870,4 +4871,45 @@ hi.show();}</pre></noscript>
         return impl.captureScreen();
     }
 
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public Timer setTimeout(int timeout, final Runnable r) {
+        
+        Timer t = new Timer();
+        t.schedule(new TimerTask() {
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, (long)timeout);
+        return t;
+    }
+    
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public Timer setInterval(int period, final Runnable r) {
+        Timer t = new Timer();
+        t.schedule(new TimerTask(){
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, period, period);
+        
+        
+        return t;
+    }
+    
+    
 }

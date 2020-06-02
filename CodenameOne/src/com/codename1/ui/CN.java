@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Hashtable;
+import java.util.Timer;
 
 /**
  * This is a global context static class designed for static import, this class allows us to write more 
@@ -1502,6 +1503,29 @@ public class CN extends  CN1Constants {
         Display.INSTANCE.postMessage(message);
     }
     
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public static Timer setTimeout(int timeout, Runnable r) {
+        return Display.INSTANCE.setTimeout(timeout, r);
+    }
     
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public static Timer setInterval(int timeout, Runnable r) {
+        return Display.INSTANCE.setInterval(timeout, r);
+    }
 
 }
