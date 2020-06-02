@@ -80,6 +80,7 @@ public class Util {
 
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
+    private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis()); 
 
     static {
         register("EncodedImage", EncodedImage.class);
@@ -2110,28 +2111,29 @@ public class Util {
      * the progress (from 0 to 100); it can be null if you are not interested in
      * monitoring the progress
      * @param filesavedCallback invoked (in EDT) only when the download is
-     * finished; if null, if no action is taken
+     * finished; if null, no action is taken
+     * @return ConnectionRequest to be used only to add an exception listener
+     * (like in the second code example)
      * @throws IOException
      */
-    public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
+    public static ConnectionRequest downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
         // Code discussion here: https://stackoverflow.com/a/62137379/1277576
         String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + "partialDownloads";
         if (!FileSystemStorage.getInstance().isDirectory(partialDownloadsDir)) {
             FileSystemStorage.getInstance().mkdir(partialDownloadsDir);
         }
-        final String uniqueId = url.hashCode() + "" + System.currentTimeMillis() + "" + new Random(System.currentTimeMillis()).nextInt(100); // do its best to be unique if there are parallel downloads
+        final String uniqueId = url.hashCode() + "" + downloadUrlSafelyRandom.nextInt(); // do its best to be unique if there are parallel downloads
         final String partialDownloadPath = partialDownloadsDir + FileSystemStorage.getInstance().getFileSystemSeparator() + uniqueId;
         final boolean isStorage = fileName.indexOf("/") < 0; // as discussed here: https://stackoverflow.com/a/57984257
         final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support
         final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download
-        final Wrapper<Integer> downloadedTotalBytes = new Wrapper<Integer>(0);
+        final Wrapper<Long> downloadedTotalBytes = new Wrapper<Long>(0l);
         final OutputStream out;
         if (isStorage) {
             out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
         } else {
             out = FileSystemStorage.getInstance().openOutputStream(fileName);
         }
-        final Wrapper<Integer> completedPartialDownload = new Wrapper<Integer>(0);
         final EasyThread mergeFilesThread = EasyThread.start("mergeFilesThread"); // Codename One thread that supports crash protection and similar Codename One features.
 
         final ConnectionRequest cr = new GZConnectionRequest();
@@ -2140,7 +2142,6 @@ public class Util {
         if (fileSize > splittingSize) {
             // Which byte should the download start from?
             cr.addRequestHeader("Range", "bytes=0-" + splittingSize);
-            //cr.setDestinationStorage("split-" + fileName);
             cr.setDestinationFile(partialDownloadPath);
         } else {
             Util.cleanup(out);
@@ -2162,11 +2163,15 @@ public class Util {
                                 InputStream in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
                                 Util.copyNoClose(in, out, 8192);
                                 Util.cleanup(in);
+                                // before deleting the file, we check and update how much data we have actually downloaded
+                                downloadedTotalBytes.set(downloadedTotalBytes.get() + FileSystemStorage.getInstance().getLength(partialDownloadPath));
                                 FileSystemStorage.getInstance().delete(partialDownloadPath);
-                                completedPartialDownload.set(completedPartialDownload.get() + 1);
                             }
                             // Is the download finished?
-                            if (fileSize <= 0 || completedPartialDownload.get() * splittingSize >= fileSize || downloadedTotalBytes.get() >= fileSize) {
+                            if (downloadedTotalBytes.get() > fileSize) {
+                                throw new IllegalStateException("More content has been downloaded than the file length, check the code.");
+                            }
+                            if (fileSize <= 0 || downloadedTotalBytes.get() == fileSize) {
                                 // yes, download finished
                                 Util.cleanup(out);
                                 if (filesavedCallback != null) {
@@ -2179,7 +2184,7 @@ public class Util {
                                 }
                             } else {
                                 // no, it's not finished, we repeat the request after updating the "Range" header
-                                cr.addRequestHeader("Range", "bytes=" + downloadedTotalBytes.get() + "-" + (downloadedTotalBytes.get() + splittingSize));
+                                cr.addRequestHeader("Range", "bytes=" + downloadedTotalBytes.get() + "-" + (Math.min(downloadedTotalBytes.get() + splittingSize, fileSize)));
                                 NetworkManager.getInstance().addToQueue(cr);
                             }
 
@@ -2197,7 +2202,6 @@ public class Util {
             @Override
             public void actionPerformed(NetworkEvent evt) {
                 if (cr == evt.getConnectionRequest() && fileSize > 0) {
-                    downloadedTotalBytes.set(completedPartialDownload.get() * splittingSize + evt.getSentReceived());
                     // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
                     if (percentageCallback != null) {
                         CN.callSerially(new Runnable() {
@@ -2210,5 +2214,6 @@ public class Util {
                 }
             }
         });
+        return cr;
     }
 }
