@@ -112,7 +112,7 @@ public class Util {
 
 
     /**
-     * Copy the input stream into the fileName stream, closes both streams when finishing or in
+     * Copy the input stream into the output stream, closes both streams when finishing or in
  a case of an exception
      * 
      * @param i source
@@ -123,7 +123,7 @@ public class Util {
     }
 
     /**
-     * Copy the input stream into the fileName stream, without closing the streams when done
+     * Copy the input stream into the output stream, without closing the streams when done
      *
      * @param i source
      * @param o destination
@@ -134,7 +134,7 @@ public class Util {
     }
     
     /**
-     * Copy the input stream into the fileName stream, without closing the streams when done
+     * Copy the input stream into the output stream, without closing the streams when done
      *
      * @param i source
      * @param o destination
@@ -156,7 +156,7 @@ public class Util {
     }
     
     /**
-     * Copy the input stream into the fileName stream, closes both streams when finishing or in
+     * Copy the input stream into the output stream, closes both streams when finishing or in
  a case of an exception
      *
      * @param i source
@@ -276,7 +276,7 @@ public class Util {
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param o the object to write which can be null
-     * @param out the destination fileName stream
+     * @param out the destination output stream
      * @throws IOException thrown by the stream
      */
     public static void writeObject(Object o, DataOutputStream out) throws IOException {
@@ -1066,7 +1066,7 @@ public class Util {
      * Writes a string with a null flag, this allows a String which may be null
      *
      * @param s the string to write
-     * @param d the destination fileName stream
+     * @param d the destination output stream
      * @throws java.io.IOException
      */
     public static void writeUTF(String s, DataOutputStream d) throws IOException {
