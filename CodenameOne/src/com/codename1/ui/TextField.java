@@ -1566,7 +1566,11 @@ public class TextField extends TextArea {
         keyBack = rtl ? Display.GAME_RIGHT : Display.GAME_LEFT;
 
         // text field relies too much on animation to use internal animations
-        getComponentForm().registerAnimated(this);
+//        getComponentForm().registerAnimated(this);
+        Form f = getComponentForm();
+        if(f != null) {
+            f.registerAnimated(this);
+        }
     }
     
     /**
