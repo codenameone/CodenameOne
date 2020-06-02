@@ -113,7 +113,7 @@ public class Util {
 
     /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
- a case of an exception
+     * a case of an exception
      * 
      * @param i source
      * @param o destination
@@ -157,7 +157,7 @@ public class Util {
     
     /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
- a case of an exception
+     * a case of an exception
      *
      * @param i source
      * @param o destination
