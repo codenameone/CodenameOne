@@ -66,6 +66,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.Random;
 import java.util.Vector;
 
 /**
@@ -2080,10 +2081,11 @@ public class Util {
     
     /**
      * <p>
-     * Safely download the given URL to the Storage: this method is resistant to
-     * network errors and capable of resume the download as soon as network
-     * conditions allow and in a completely transparent way for the user; note
-     * that in the global network error handling, there must be an automatic
+     * Safely download the given URL to the Storage or to the FileSystemStorage:
+     * this method is resistant to network errors and capable of resume the
+     * download as soon as network conditions allow and in a completely
+     * transparent way for the user; note that in the global network error
+     * handling, there must be an automatic
      * <pre>.retry()</pre>, as in the first example below; alternatively, you
      * can add an exception listener to the returned ConnectionRequest, as in
      * the second example.</p>
@@ -2102,7 +2104,8 @@ public class Util {
      * Usage examples:</p>
      *
      * @param url
-     * @param fileName
+     * @param fileName must be a valid Storage file name or FileSystemStorage
+     * file path
      * @param percentageCallback invoked (in EDT) during the download to notify
      * the progress (from 0 to 100); it can be null if you are not interested in
      * monitoring the progress
@@ -2110,12 +2113,24 @@ public class Util {
      * finished; if null, if no action is taken
      * @throws IOException
      */
-    public static void downloadUrlToStorageSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
+    public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
         // Code discussion here: https://stackoverflow.com/a/62137379/1277576
+        String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + "partialDownloads";
+        if (!FileSystemStorage.getInstance().isDirectory(partialDownloadsDir)) {
+            FileSystemStorage.getInstance().mkdir(partialDownloadsDir);
+        }
+        final String uniqueId = url.hashCode() + "" + System.currentTimeMillis() + "" + new Random(System.currentTimeMillis()).nextInt(100); // do its best to be unique if there are parallel downloads
+        final String partialDownloadPath = partialDownloadsDir + FileSystemStorage.getInstance().getFileSystemSeparator() + uniqueId;
+        final boolean isStorage = fileName.indexOf("/") < 0; // as discussed here: https://stackoverflow.com/a/57984257
         final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support
         final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download
         final Wrapper<Integer> downloadedTotalBytes = new Wrapper<Integer>(0);
-        final OutputStream out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
+        final OutputStream out;
+        if (isStorage) {
+            out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
+        } else {
+            out = FileSystemStorage.getInstance().openOutputStream(fileName);
+        }
         final Wrapper<Integer> completedPartialDownload = new Wrapper<Integer>(0);
         final EasyThread mergeFilesThread = EasyThread.start("mergeFilesThread"); // Codename One thread that supports crash protection and similar Codename One features.
 
@@ -2125,10 +2140,15 @@ public class Util {
         if (fileSize > splittingSize) {
             // Which byte should the download start from?
             cr.addRequestHeader("Range", "bytes=0-" + splittingSize);
-            cr.setDestinationStorage("split-" + fileName);
+            //cr.setDestinationStorage("split-" + fileName);
+            cr.setDestinationFile(partialDownloadPath);
         } else {
             Util.cleanup(out);
-            cr.setDestinationStorage(fileName);
+            if (isStorage) {
+                cr.setDestinationStorage(fileName);
+            } else {
+                cr.setDestinationFile(fileName);
+            }
         }
         cr.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -2138,11 +2158,11 @@ public class Util {
                     public void run() {
                         try {
                             // We append the just saved partial download to the fileName, if it exists
-                            if (Storage.getInstance().exists("split-" + fileName)) {
-                                InputStream in = Storage.getInstance().createInputStream("split-" + fileName);
+                            if (FileSystemStorage.getInstance().exists(partialDownloadPath)) {
+                                InputStream in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
                                 Util.copyNoClose(in, out, 8192);
                                 Util.cleanup(in);
-                                Storage.getInstance().deleteStorageFile("split-" + fileName);
+                                FileSystemStorage.getInstance().delete(partialDownloadPath);
                                 completedPartialDownload.set(completedPartialDownload.get() + 1);
                             }
                             // Is the download finished?
