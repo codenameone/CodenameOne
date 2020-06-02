@@ -30,6 +30,7 @@ import com.codename1.io.Externalizable;
 import com.codename1.io.IOProgressListener;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Storage;
+import com.codename1.io.gzip.GZConnectionRequest;
 import com.codename1.l10n.DateFormat;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.ParseException;
@@ -45,6 +46,7 @@ import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
+import com.codename1.util.Wrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -2021,5 +2023,55 @@ public class Util {
         }
 
         return "application/octet-stream"; // unknown file type
+    }
+    
+    /**
+     * Returns -1 if the content length is unknown, a value greater than 0 if
+     * the Content-Length is known.
+     *
+     * @param url
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url) {
+        return getFileSizeWithoutDownload(url, false);
+    }
+
+    /**
+     * Returns -2 if the server doesn't accept partial downloads (and if
+     * checkPartialDownloadSupport is true), -1 if the content length is unknow,
+     * a value greater than 0 if the Content-Length is known.
+     *
+     * @param url
+     * @param checkPartialDownloadSupport if true returns -2 if the server
+     * doesn't accept partial downloads.
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url, final boolean checkPartialDownloadSupport) {
+        // documentation about the headers: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        // code discussed here: https://stackoverflow.com/a/62130371
+        final Wrapper<Long> result = new Wrapper<Long>(0l);
+        ConnectionRequest cr = new GZConnectionRequest() {
+            @Override
+            protected void readHeaders(Object connection) throws IOException {
+                String acceptRanges = getHeader(connection, "Accept-Ranges");
+                if (checkPartialDownloadSupport && (acceptRanges == null || !acceptRanges.equals("bytes"))) {
+                    // Log.p("The partial downloads of " + url + " are not supported.", Log.WARNING);
+                    result.set(-2l);
+                } else {
+                    String contentLength = getHeader(connection, "Content-Length");
+                    if (contentLength != null) {
+                        result.set(Long.parseLong(contentLength));
+                    } else {
+                        // Log.p("The Content-Length of " + url + " is unknown.", Log.WARNING);
+                        result.set(-1l);
+                    }
+                }
+            }
+        };
+        cr.setUrl(url);
+        cr.setHttpMethod("HEAD");
+        cr.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return result.get();
     }
 }
