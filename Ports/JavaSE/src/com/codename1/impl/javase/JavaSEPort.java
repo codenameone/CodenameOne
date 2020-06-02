@@ -4907,7 +4907,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fText = text;
             editingInProgress.invokeAfter(new Runnable() {
                 public void run() {
-                    editString(cmp, maxSize, constraint, fText, keyCode);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            editString(cmp, maxSize, constraint, fText, keyCode);
+                        }
+                    });
+                    
                 }
             });
             editingInProgress.endEditing();
@@ -10498,6 +10503,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public Component getVideoComponent() {
+            if (!isVideo) {
+                return new Label();
+            }
             if (videoPanel != null) {
                 final Component[] retVal = new Component[1];
                 Platform.runLater(new Runnable() {

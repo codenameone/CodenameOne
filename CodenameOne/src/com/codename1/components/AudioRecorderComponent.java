@@ -43,12 +43,27 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.EventDispatcher;
-import com.codename1.util.DateUtil;
 import java.io.IOException;
 
 /**
  * A component for recording Audio from the device microphone.
- * @author shannah
+ * 
+ * <p>Example usage</p>
+ * 
+ * <script src="https://gist.github.com/shannah/3e4d6448a6baf5684c736fd018f76f87.js"></script>
+ * 
+ * <p>This component enables a full recording workflow. When the component is first displayed, it provides a "Record"
+ * button to begin the recording.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-audiorecordercomponent1.png" alt="AudioRecorderComponent while recording" />
+ * 
+ * <p>While the recording is in progress, it provides a "Done" button and a "Pause" button.  The "Pause" button allows pausing and 
+ * continuing the recording.  The "Done" button indicates the recording is done.</p>
+ * 
+ * <p>After the user presses "Done", a preview screen is shown that allows the user to listen to the recording.  Then can choose
+ * to either accept the recording, cancel it, or try again.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-audiorecordercomponent2.png" alt="AudioRecorderComponent accept/reject screen" />
+ * 
+ * @author Steve Hannah
  * @since 7.0
  */
 public class AudioRecorderComponent extends Container implements ActionSource {
@@ -66,13 +81,45 @@ public class AudioRecorderComponent extends Container implements ActionSource {
      * Enum for tracking the recorder state.
      */
     public static enum RecorderState {
+        /**
+         * The recorder is initializing.
+         */
         Initializing,
+        
+        /**
+         * The recorder is currently recording.
+         */
         Recording,
+        
+        /**
+         * The recorder is currently paused.
+         */
         Paused,
+        
+        /**
+         * The recording is currently pending.  This recorder is in this state while the user is deciding whether to accept
+         * the recording.
+         */
         Pending,
+        
+        /**
+         * The user chose to cancel the recording.
+         */
         Canceled,
+        
+        /**
+         * The user has accepted the recording.
+         */
         Accepted,
+        
+        /**
+         * The recorder is initialized.
+         */
         Initialized,
+        
+        /**
+         * The recorder is not initialized yet.
+         */
         NotInitialized
     }
 
