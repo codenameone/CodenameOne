@@ -2087,9 +2087,11 @@ public class Util {
      * download as soon as network conditions allow and in a completely
      * transparent way for the user; note that in the global network error
      * handling, there must be an automatic
-     * <pre>.retry()</pre>, as in the first example below; alternatively, you
-     * can add an exception listener to the returned ConnectionRequest, as in
-     * the second example.</p>
+     * <pre>.retry()</pre>, as in the code example below.</p>
+     * <p>
+     * This method is useful if the server correctly returns Content-Length and
+     * if it supports partial downloads: if not, it works like a normal
+     * download.</p>
      * <p>
      * Pros: always allows you to complete downloads, even if very heavy (e.g.
      * 100MB), even if the connection is unstable (network errors) and even if
@@ -2102,7 +2104,9 @@ public class Util {
      * that slightly slow down the download and cause more traffic than normally
      * needed.</p>
      * <p>
-     * Usage examples:</p>
+     * Usage example:</p>
+     * <script src="https://gist.github.com/jsfan3/554590a12c3102a3d77e17533e7eca98.js"></script>
+     * 
      *
      * @param url
      * @param fileName must be a valid Storage file name or FileSystemStorage
@@ -2112,11 +2116,9 @@ public class Util {
      * monitoring the progress
      * @param filesavedCallback invoked (in EDT) only when the download is
      * finished; if null, no action is taken
-     * @return ConnectionRequest to be used only to add an exception listener
-     * (like in the second code example)
      * @throws IOException
      */
-    public static ConnectionRequest downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
+    public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
         // Code discussion here: https://stackoverflow.com/a/62137379/1277576
         String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + "partialDownloads";
         if (!FileSystemStorage.getInstance().isDirectory(partialDownloadsDir)) {
@@ -2214,6 +2216,5 @@ public class Util {
                 }
             }
         });
-        return cr;
     }
 }
