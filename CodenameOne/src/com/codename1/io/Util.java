@@ -36,6 +36,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.ParseException;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.properties.PropertyBusinessObject;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
@@ -44,7 +45,9 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
+import com.codename1.util.EasyThread;
 import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
 import com.codename1.util.SuccessCallback;
 import com.codename1.util.Wrapper;
 import java.io.ByteArrayOutputStream;
@@ -107,8 +110,8 @@ public class Util {
 
 
     /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
+     * Copy the input stream into the fileName stream, closes both streams when finishing or in
+ a case of an exception
      * 
      * @param i source
      * @param o destination
@@ -118,7 +121,7 @@ public class Util {
     }
 
     /**
-     * Copy the input stream into the output stream, without closing the streams when done
+     * Copy the input stream into the fileName stream, without closing the streams when done
      *
      * @param i source
      * @param o destination
@@ -129,7 +132,7 @@ public class Util {
     }
     
     /**
-     * Copy the input stream into the output stream, without closing the streams when done
+     * Copy the input stream into the fileName stream, without closing the streams when done
      *
      * @param i source
      * @param o destination
@@ -151,8 +154,8 @@ public class Util {
     }
     
     /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
+     * Copy the input stream into the fileName stream, closes both streams when finishing or in
+ a case of an exception
      *
      * @param i source
      * @param o destination
@@ -271,7 +274,7 @@ public class Util {
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param o the object to write which can be null
-     * @param out the destination output stream
+     * @param out the destination fileName stream
      * @throws IOException thrown by the stream
      */
     public static void writeObject(Object o, DataOutputStream out) throws IOException {
@@ -1061,7 +1064,7 @@ public class Util {
      * Writes a string with a null flag, this allows a String which may be null
      *
      * @param s the string to write
-     * @param d the destination output stream
+     * @param d the destination fileName stream
      * @throws java.io.IOException
      */
     public static void writeUTF(String s, DataOutputStream d) throws IOException {
@@ -2073,5 +2076,119 @@ public class Util {
         cr.setPost(false);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return result.get();
+    }
+    
+    /**
+     * <p>
+     * Safely download the given URL to the Storage: this method is resistant to
+     * network errors and capable of resume the download as soon as network
+     * conditions allow and in a completely transparent way for the user; note
+     * that in the global network error handling, there must be an automatic
+     * <pre>.retry()</pre>, as in the first example below; alternatively, you
+     * can add an exception listener to the returned ConnectionRequest, as in
+     * the second example.</p>
+     * <p>
+     * Pros: always allows you to complete downloads, even if very heavy (e.g.
+     * 100MB), even if the connection is unstable (network errors) and even if
+     * the app goes temporarily in the background (on some platforms the
+     * download will continue in the background, on others it will be
+     * temporarily suspended).</p>
+     * <p>
+     * Cons: since this method is based on splitting the download into small
+     * parts (512kbytes is the default), this approach causes many GET requests
+     * that slightly slow down the download and cause more traffic than normally
+     * needed.</p>
+     * <p>
+     * Usage examples:</p>
+     *
+     * @param url
+     * @param fileName
+     * @param percentageCallback invoked (in EDT) during the download to notify
+     * the progress (from 0 to 100); it can be null if you are not interested in
+     * monitoring the progress
+     * @param filesavedCallback invoked (in EDT) only when the download is
+     * finished; if null, if no action is taken
+     * @throws IOException
+     */
+    public static void downloadUrlToStorageSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
+        // Code discussion here: https://stackoverflow.com/a/62137379/1277576
+        final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support
+        final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download
+        final Wrapper<Integer> downloadedTotalBytes = new Wrapper<Integer>(0);
+        final OutputStream out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
+        final Wrapper<Integer> completedPartialDownload = new Wrapper<Integer>(0);
+        final EasyThread mergeFilesThread = EasyThread.start("mergeFilesThread"); // Codename One thread that supports crash protection and similar Codename One features.
+
+        final ConnectionRequest cr = new GZConnectionRequest();
+        cr.setUrl(url);
+        cr.setPost(false);
+        if (fileSize > splittingSize) {
+            // Which byte should the download start from?
+            cr.addRequestHeader("Range", "bytes=0-" + splittingSize);
+            cr.setDestinationStorage("split-" + fileName);
+        } else {
+            Util.cleanup(out);
+            cr.setDestinationStorage(fileName);
+        }
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                mergeFilesThread.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            // We append the just saved partial download to the fileName, if it exists
+                            if (Storage.getInstance().exists("split-" + fileName)) {
+                                InputStream in = Storage.getInstance().createInputStream("split-" + fileName);
+                                Util.copyNoClose(in, out, 8192);
+                                Util.cleanup(in);
+                                Storage.getInstance().deleteStorageFile("split-" + fileName);
+                                completedPartialDownload.set(completedPartialDownload.get() + 1);
+                            }
+                            // Is the download finished?
+                            if (fileSize <= 0 || completedPartialDownload.get() * splittingSize >= fileSize || downloadedTotalBytes.get() >= fileSize) {
+                                // yes, download finished
+                                Util.cleanup(out);
+                                if (filesavedCallback != null) {
+                                    CN.callSerially(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            filesavedCallback.completed(fileName);
+                                        }
+                                    });
+                                }
+                            } else {
+                                // no, it's not finished, we repeat the request after updating the "Range" header
+                                cr.addRequestHeader("Range", "bytes=" + downloadedTotalBytes.get() + "-" + (downloadedTotalBytes.get() + splittingSize));
+                                NetworkManager.getInstance().addToQueue(cr);
+                            }
+
+                        } catch (IOException ex) {
+                            Log.p("Error in appending splitted file to output file", Log.ERROR);
+                            Log.e(ex);
+                            Log.sendLogAsync();
+                        }
+                    }
+                });
+            }
+        });
+        NetworkManager.getInstance().addToQueue(cr);
+        NetworkManager.getInstance().addProgressListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                if (cr == evt.getConnectionRequest() && fileSize > 0) {
+                    downloadedTotalBytes.set(completedPartialDownload.get() * splittingSize + evt.getSentReceived());
+                    // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
+                    if (percentageCallback != null) {
+                        CN.callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                percentageCallback.completed((int) ((long) downloadedTotalBytes.get() * 100 / fileSize));
+                            }
+                        });
+                    }
+                }
+            }
+        });
     }
 }
