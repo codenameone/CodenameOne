@@ -1527,5 +1527,23 @@ public class CN extends  CN1Constants {
     public static Timer setInterval(int timeout, Runnable r) {
         return Display.INSTANCE.setInterval(timeout, r);
     }
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
+     * 
+     * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
+     * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
+     * 
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public static BrowserComponent getSharedJavascriptContext() {
+        return Display.impl.getSharedJavscriptContext();
+    }
 
 }
