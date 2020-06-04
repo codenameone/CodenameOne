@@ -10,6 +10,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.io.Log;
+import com.codename1.testing.TestRunnerComponent;
 import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
@@ -39,9 +40,10 @@ public class ComponentTest {
             current.show();
             return;
         }
-        Form hi = new Form("Hi World", BoxLayout.y());
-        hi.add(new Label("Hi World"));
-        hi.show();
+        TestRunnerComponent testRunner = new TestRunnerComponent();
+        testRunner.add(new TestComponent());
+        testRunner.showForm();
+       
         
         if (System.currentTimeMillis() < 100) {
             QRScanner.scanQRCode(new ScanResult() {
