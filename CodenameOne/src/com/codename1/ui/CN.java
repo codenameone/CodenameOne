@@ -738,7 +738,25 @@ public class CN extends  CN1Constants {
     public static boolean canDial() {
         return Display.impl.canDial();
     }
-        
+    
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public Boolean isDarkMode() {
+        return Display.INSTANCE.isDarkMode();
+    }
+    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public void setDarkMode(Boolean darkMode) {
+        Display.INSTANCE.setDarkMode(darkMode);
+    }
+    
     /**
      * <p>Opens the device gallery to pick an image or a video.<br>
      * The method returns immediately and the response is sent asynchronously

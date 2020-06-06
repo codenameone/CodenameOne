@@ -1171,6 +1171,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public Boolean isDarkMode() {
+        try {
+            int nightModeFlags = getActivity().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK; 
+            switch (nightModeFlags) { 
+                case Configuration.UI_MODE_NIGHT_YES: 
+                    return true;
+                case Configuration.UI_MODE_NIGHT_NO: 
+                    return false;
+                default: 
+                    return null;
+            } 
+        } catch(Throwable t) {
+            return null;
+        }
+    }
+
+    
     private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
     }

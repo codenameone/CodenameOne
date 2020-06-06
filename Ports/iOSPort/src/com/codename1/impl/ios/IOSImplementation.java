@@ -1090,6 +1090,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         instance.sizeChanged(w, h);
     }
 
+    @Override
+    public Boolean isDarkMode() {
+        if(nativeInstance.isDarkModeDetectionSupported()) {
+            return nativeInstance.isDarkMode();
+        }
+        return null;
+    }
+    
+
     public void flushGraphics() {
         flushGraphics(0, 0, getDisplayWidth(), getDisplayHeight());
     }

@@ -384,6 +384,8 @@ public final class Display extends CN1Constants {
     private long[] dragPathTime;
     private int dragPathOffset = 0;
     private int dragPathLength = 0;
+    
+    private Boolean darkMode;
 
      /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
@@ -714,8 +716,26 @@ public final class Display extends CN1Constants {
     }
 
     
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public Boolean isDarkMode() {
+        if(darkMode != null) {
+            return darkMode;
+        }
+        return impl.isDarkMode();
+    }
     
-    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public void setDarkMode(Boolean darkMode) {
+        this.darkMode = darkMode;
+    }
     
     private class EdtException extends RuntimeException {
         private Throwable cause;
