@@ -2221,7 +2221,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         /**
          * Stores weak references to TextureAlphaMask objects.
          */
-        Map<String, Object> textures = new HashMap<String,Object>();
+        Map<Long, Object> textures = new HashMap<Long,Object>();
         
         /**
          * Gets the alpha mask for a given shape/stroke from the
@@ -2234,7 +2234,7 @@ public class IOSImplementation extends CodenameOneImplementation {
          * in the cache.
          */
         TextureAlphaMaskProxy get(Shape s, Stroke stroke){
-            String shapeID = getShapeID(s, stroke);
+            long shapeID = getShapeID(s, stroke);
             Object out = textures.get(shapeID);
             if ( out != null ){
                 
@@ -2259,7 +2259,7 @@ public class IOSImplementation extends CodenameOneImplementation {
          * @param mask The alpha mask
          */
         void add(Shape s, Stroke stroke, TextureAlphaMask mask){
-            String shapeID = getShapeID(s, stroke);
+            long shapeID = getShapeID(s, stroke);
             textures.put(shapeID, Display.getInstance().createSoftWeakRef(mask));
             
         }
@@ -2273,39 +2273,54 @@ public class IOSImplementation extends CodenameOneImplementation {
          * is a contour mask.
          * @return The string ID used in the map.
          */
-        String getShapeID(Shape shape, Stroke stroke){
-            float[] bounds = shape.getBounds2D();
-            float x = bounds[0];
-            float y = bounds[1];
-            StringBuilder sb = new StringBuilder();
+        long getShapeID(Shape shape, Stroke stroke){
+            long id = 0;
+            
+            
+            //float[] bounds = shape.getBounds2D();
+            float x = 0;
+            float y = 0;//bounds[1];
+            boolean referencePointSet = false;
+            
+            
+            int ctr = 0;
+            //StringBuilder sb = new StringBuilder();
             PathIterator it = shape.getPathIterator();
             float[] buf = new float[6];
             float tx, ty, tx2, ty2, tx3, ty3;
-            if ( stroke != null ){
-                sb.append(stroke.hashCode()).append(":");
-            }
-            sb.append(it.getWindingRule());
-            sb.append(";");
+            
+            //sb.append(it.getWindingRule());
+            id = id ^ it.getWindingRule();
+            //sb.append(";");
             while ( !it.isDone() ){
+                ctr++;
                 int type = it.currentSegment(buf);
-                
+                if (!referencePointSet && type != PathIterator.SEG_CLOSE) {
+                    referencePointSet = true;
+                    x = buf[0];
+                    y = buf[1];
+                }
                 switch ( type ){
                     case PathIterator.SEG_MOVETO:
                        tx = buf[0]-x;
                        ty = buf[1]-y;
-                        sb.append("M:").append((int)tx).append(",").append((int)ty);
+                        //sb.append("M:").append((int)tx).append(",").append((int)ty);
+                       id = id ^ (ctr * (int)tx * (int)ty * type);
                         break;
                     case PathIterator.SEG_LINETO:
                        tx = buf[0]-x;
                        ty = buf[1]-y;
-                        sb.append("L:").append((int)tx).append(",").append((int)ty);
+                        //sb.append("L:").append((int)tx).append(",").append((int)ty);
+                       id = id ^ (ctr * (int)tx * (int)ty * type);
+                       
                         break;
                     case PathIterator.SEG_QUADTO:
                         tx = buf[0]-x;
                         ty = buf[1]-y;
                         tx2 = buf[2]-x;
                         ty2 = buf[3]-y;
-                        sb.append("Q:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2);
+                        //sb.append("Q:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2);
+                        id = id ^ (ctr * (int)tx * (int)ty * type + 10 * (int)tx2 * (int)ty2);
                         break;
                     case PathIterator.SEG_CUBICTO:
                         tx = buf[0]-x;
@@ -2314,17 +2329,23 @@ public class IOSImplementation extends CodenameOneImplementation {
                         ty2 = buf[3]-y;
                         tx3 = buf[4]-x;
                         ty3= buf[5]-y;
-                        sb.append("C:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2)
-                                .append(",").append((int)tx3).append(",").append((int)ty3);
+                        //sb.append("C:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2)
+                        //        .append(",").append((int)tx3).append(",").append((int)ty3);
+                        id = id ^ (ctr * (int)tx * (int)ty * type  + 10 * (int)tx2 * (int)ty2 + 100 *  (int)tx3  * (int)ty3 );
                         break;
                         
                     case PathIterator.SEG_CLOSE:
-                        sb.append(".");
+                        id = id ^ ctr;
                         
                 }
                 it.next();
             }
-            return sb.toString();
+            if ( stroke != null ){
+                id = id ^ stroke.hashCode();
+                
+                //sb.append(stroke.hashCode()).append(":");
+            }
+            return id;
             
         }
     }
