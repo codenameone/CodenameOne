@@ -2636,7 +2636,9 @@ public class Container extends Component implements Iterable<Component>{
                     Component c = ((Container) cmp).getComponentAt(x, y);
                     if(c != null){
                         if (top == null) {
-                            top = c;
+                            if (c.respondsToPointerEvents() || !(c instanceof Container)) {
+                                top = c;
+                            }
                         }
                         if (c != cmp) {
                             Component tmp = c;
@@ -2695,12 +2697,16 @@ public class Container extends Component implements Iterable<Component>{
                     } else {
                         // No children found here 
                         if (top == null) {
-                            top = cmp;
+                            if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                                top = cmp;
+                            }
                         }
                     }
                 } else {
                     if (top == null) {
-                        top = cmp;
+                        if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                            top = cmp;
+                        }
                     }
                 }
                 if (!overlaps) {

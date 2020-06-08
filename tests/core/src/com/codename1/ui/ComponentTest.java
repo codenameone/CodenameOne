@@ -12,6 +12,7 @@ import com.codename1.ui.util.Resources;
 import com.codename1.io.Log;
 import com.codename1.testing.TestRunnerComponent;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.geom.GeneralPathTest;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import org.littlemonkey.qrscanner.QRScanner;
@@ -41,6 +42,7 @@ public class ComponentTest {
             return;
         }
         TestRunnerComponent testRunner = new TestRunnerComponent();
+        testRunner.add(new GeneralPathTest());
         testRunner.add(new TestComponent());
         testRunner.showForm();
        

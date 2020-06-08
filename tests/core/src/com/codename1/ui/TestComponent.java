@@ -92,7 +92,20 @@ public class TestComponent extends AbstractTest {
         getComponentAt_int_int_browsercomponent();
         getComponentAt_int_int_nested_focusable_container();
         getComponentAt_int_int_outside_bounds();
+        getComponentAt_int_int_layered();
 
+    }
+    
+    private void getComponentAt_int_int_layered() {
+        Container cnt = new Container(new LayeredLayout());
+        Label l = new Label("Hello");
+        cnt.add(l);
+        cnt.add(new Container(new LayeredLayout()));
+        cnt.setWidth(500);
+        cnt.setHeight(500);
+        cnt.doLayout();
+        Component found = cnt.getComponentAt(250, 250);
+        assertEqual(l, found);
     }
 
     private void List_shouldRenderSelection() {
