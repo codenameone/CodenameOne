@@ -283,6 +283,9 @@ public final class IOSNative {
     native boolean fileExists(String file);
     native boolean isDirectory(String file);
 
+    native boolean isDarkMode();
+    native boolean isDarkModeDetectionSupported();
+    
     native int fileCountInDir(String dir);
     native void listFilesInDir(String dir, String[] files);
     native void createDirectory(String dir);
@@ -714,17 +717,4 @@ public final class IOSNative {
     native int getDisplaySafeInsetRight();
 
     native int getDisplaySafeInsetBottom();
-
-    
-
-    
-
-    
-    
-
-     
-
-
-
-   
 }

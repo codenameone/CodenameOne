@@ -222,6 +222,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private Boolean darkMode;
 
     /**
      * @return the fullScreen
@@ -347,9 +348,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isInFullScreenMode() {
         return fullScreen;
     }
-    
-    
-    
+
+    @Override
+    public Boolean isDarkMode() {
+        return darkMode;
+    }
+
     
     
     boolean takingScreenshot;
@@ -3187,6 +3191,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(testRecorderMenu);
+
+            JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
+            simulatorMenu.add(darkLightModeMenu);
+            final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
+            final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
+            final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
+            ButtonGroup group = new ButtonGroup();
+            group.add(darkMode);
+            group.add(lightMode);
+            group.add(unsupportedMode);
+            darkMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = true;
+                }
+            });
+            
+            lightMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = false;
+                }
+            });
+
+            unsupportedMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = null;
+                }
+            });
 
             manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);

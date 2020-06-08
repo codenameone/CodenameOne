@@ -8476,4 +8476,13 @@ public abstract class CodenameOneImplementation {
         
     }
 
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */
+    public Boolean isDarkMode() {
+        return null;
+    }
 }
