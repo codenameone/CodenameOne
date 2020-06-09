@@ -3936,8 +3936,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_
     return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_iisDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return @available(iOS 13.0, *);
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, *)) {
+        return JAVA_TRUE;
+    } else {
+        return JAVA_FALSE;
+    }
 }
 
 #ifdef INCLUDE_LOCATION_USAGE
