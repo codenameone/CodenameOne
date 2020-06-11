@@ -121,6 +121,7 @@ import java.util.Collections;
  */
 public class IOSImplementation extends CodenameOneImplementation {
     // Flag to indicate if the current openGallery process is selecting multiple files
+    private boolean disableUIWebView=true;
     private static boolean gallerySelectMultiple;
     public static IOSNative nativeInstance = new IOSNative();
     private static LocalNotificationCallback localNotificationCallback;
@@ -5437,7 +5438,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
-        if (!Boolean.FALSE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
+        if (disableUIWebView || !Boolean.FALSE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {
             final String[] res = new String[1];
             final boolean[] complete = new boolean[1];
             nativeInstance.browserExecuteAndReturnStringCallback(get(browserPeer), javaScript, new SuccessCallback<String>() {
@@ -5686,14 +5687,18 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
-        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true"));
-        if (!useWKWebView && browserComponent instanceof Component) {
-            ((Component)browserComponent).putClientProperty("BrowserComponent.useWKWebView", Boolean.FALSE);
+        boolean useWKWebView = disableUIWebView || 
+                (browserComponent instanceof Component && 
+                !Boolean.FALSE.equals(((Component)browserComponent).getClientProperty("BrowserComponent.useWKWebView")));
+        if (disableUIWebView && (browserComponent instanceof Component && 
+                Boolean.FALSE.equals(((Component)browserComponent).getClientProperty("BrowserComponent.useWKWebView")))) {
+            Log.p("The BrowserComponent.useWKWebView flag is currently disabled because Apple no longer allows apps that use the old UIWebView into the App Store.  You should remove calls to Display.setProperty(\"BrowserComponent.useWKWebView\", \"false\") from your codebase.");
         }
         long browserPeer = useWKWebView ? 
                 nativeInstance.createWKBrowserComponent(browserComponent) : 
                 nativeInstance.createBrowserComponent(browserComponent);
         PeerComponent pc = createNativePeer(new long[] {browserPeer});
+        pc.putClientProperty("BrowserComponent.useWKWebView", useWKWebView);
         nativeInstance.releasePeer(browserPeer);
         return pc;
     }

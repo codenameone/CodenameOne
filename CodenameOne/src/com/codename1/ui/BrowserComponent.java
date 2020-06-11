@@ -519,7 +519,7 @@ public class BrowserComponent extends Container {
      */
     public BrowserComponent() {
         setUIID("BrowserComponent");
-        
+        putClientProperty("BrowserComponent.useWKWebView", "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true")));
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, placeholder);
         CN.callSerially(new Runnable() {
