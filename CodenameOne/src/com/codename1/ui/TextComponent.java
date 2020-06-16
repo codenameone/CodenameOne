@@ -148,7 +148,8 @@ public class TextComponent extends InputComponent {
     }
 
     private void updateLabel() {
-        if(field.getText() == null || field.getText().length() == 0) {
+        if(isFocusAnimation() && 
+            (field.getText() == null || field.getText().length() == 0)) {
             field.setHint(getLabel().getText());
             getLabel().setVisible(false);
         } else {
