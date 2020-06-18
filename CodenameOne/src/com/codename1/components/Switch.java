@@ -165,15 +165,27 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private boolean animationLock;
 
     private int valign = CENTER;
+
     /**
      * Default constructor
      */
     public Switch() {
-        setUIID("Switch");
+        this("Switch");
+    }
+
+    /**
+     * This constructor should be used when customizing theme constants
+     * for a different UIID
+     * @param uiid accepts an alternate UIID for switch which might be 
+     * necessary for theme constants 
+     */
+    public Switch(String uiid) {
+        setUIID(uiid);
         setOpaque(false);
         initialize();
     }
 
+    
     private int getFontSize() {
         Font f = getUnselectedStyle().getFont();
         if (f == null) {

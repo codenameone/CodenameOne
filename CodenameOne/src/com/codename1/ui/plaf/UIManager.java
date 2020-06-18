@@ -699,6 +699,23 @@ public class UIManager {
             themeProps.put("PopupDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
         }        
        
+        if (installedTheme == null || !installedTheme.containsKey("TooltipDialog.derive")) {
+            themeProps.put("TooltipDialog.derive", "Dialog");
+            themeProps.put("TooltipDialog.border", RoundRectBorder.create().
+                cornerRadius(2f));
+            themeProps.put("TooltipDialog.transparency", "255");
+            themeProps.put("TooltipDialog.bgColor", "dddddd");
+            themeProps.put("TooltipDialog.padding", "4,4,4,4");
+            themeProps.put("TooltipDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+        }        
+       
+        if (installedTheme == null || !installedTheme.containsKey("Tooltip.derive")) {
+            themeProps.put("Tooltip.derive", "Label");
+            themeProps.put("Tooltip.fgColor", "0");
+            themeProps.put("Tooltip.align", centerAlign);
+            themeProps.put("TooltipDialog.padding", "2,2,2,2");
+            themeProps.put("TooltipDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+        }        
         
         if(installedTheme == null || !installedTheme.containsKey("DialogContentPane.derive")) {
             themeProps.put("DialogContentPane.margin", "0,0,0,0");
