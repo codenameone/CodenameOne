@@ -81,7 +81,6 @@ public class Form extends Container {
     static Component rippleComponent;
     static int rippleX;
     static int rippleY;
-    
     private TextSelection textSelection;
     
     private ArrayList<Component> componentsAwaitingRelease;
@@ -3558,7 +3557,7 @@ public class Form extends Container {
             LeadUtil.pointerHover(dragged, x, y);
             return;
         }
-
+        
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         if(actual != null) {
             Component cmp = actual.getComponentAt(x[0], y[0]);
@@ -3572,6 +3571,14 @@ public class Form extends Container {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
+            }
+            if(TooltipManager.getInstance() != null) {
+                String tip = cmp.getTooltip();
+                if(tip != null && tip.length() > 0) {
+                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
+                } else {
+                    TooltipManager.getInstance().clearTooltip();
+                }
             }
         }
     }

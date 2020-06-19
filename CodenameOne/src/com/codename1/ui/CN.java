@@ -745,7 +745,7 @@ public class CN extends  CN1Constants {
      * 
      * @return true in case of dark mode
      */    
-    public Boolean isDarkMode() {
+    public static Boolean isDarkMode() {
         return Display.INSTANCE.isDarkMode();
     }
     
@@ -753,7 +753,7 @@ public class CN extends  CN1Constants {
      * Override the default dark mode setting
      * @param darkMode can be set to null to reset to platform default
      */
-    public void setDarkMode(Boolean darkMode) {
+    public static void setDarkMode(Boolean darkMode) {
         Display.INSTANCE.setDarkMode(darkMode);
     }
     

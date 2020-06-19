@@ -453,6 +453,8 @@ public class Component implements Animation, StyleListener, Editable {
     private EventDispatcher stateChangeListeners;
     boolean isUnselectedStyle;
     
+    private String tooltip;
+    
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
     }
@@ -7333,5 +7335,19 @@ public class Component implements Animation, StyleListener, Editable {
 
         public void paint(Graphics g) {
         }
+    }
+
+    /**
+     * @return the tooltip
+     */
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    /**
+     * @param tooltip the tooltip to set
+     */
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
