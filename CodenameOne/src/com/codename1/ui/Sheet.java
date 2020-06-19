@@ -667,7 +667,6 @@ public class Sheet extends Container {
     private static final int W=3;
     private static final int C=4;
     
-    public static Sheet getCurrentSheet() { return null; }
     
     private int getPositionInt() {
         String pos = getPosition();
