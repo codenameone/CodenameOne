@@ -313,6 +313,29 @@ public class Sheet extends Container {
         show(DEFAULT_TRANSITION_DURATION);
     }
     
+    /**
+     * Gets the current sheet on the current form or null if no sheet is currently being displayed.
+     * @return The current sheet or null.
+     * @since 7.0
+     */
+    public static Sheet getCurrentSheet() {
+        if (CN.getCurrentForm() == null) {
+            return null;
+        }
+        Container cnt = CN.getCurrentForm().getFormLayeredPaneIfExists();
+        if (cnt == null) {
+            return null;
+        }
+        class Result {
+            Sheet found;
+        }
+        for (Component cmp : $(".Sheet", cnt)) {
+            if (cmp instanceof Sheet) {
+                return (Sheet)cmp;
+            }
+        }
+        return null;
+    }
    
     /**
      * Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
