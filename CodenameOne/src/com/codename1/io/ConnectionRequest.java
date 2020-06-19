@@ -948,9 +948,8 @@ public class ConnectionRequest implements IOProgressListener {
                     readResponse(input);
                 }
                 if(shouldAutoCloseResponse()) {
-                    input.close();
+                    if (input != null) input.close();
                 }
-                input = null;
             }
         } finally {
             // always cleanup connections/streams even in case of an exception

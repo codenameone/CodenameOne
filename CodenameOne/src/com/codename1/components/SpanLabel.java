@@ -24,16 +24,17 @@ package com.codename1.components;
 
 import static com.codename1.ui.CN.EAST;
 import static com.codename1.ui.CN.WEST;
+import com.codename1.ui.Component;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>A multi line label component that can be easily localized, this is simply based
@@ -43,8 +44,9 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class SpanLabel extends Container {
+public class SpanLabel extends Container implements IconHolder {
     private Label icon;
+    private int gap;
     private Container iconWrapper;
     private TextArea text;
     private boolean shouldLocalize = true;
@@ -64,6 +66,7 @@ public class SpanLabel extends Container {
     public SpanLabel(String txt, String textUiid) {
         this(txt);
         text.setUIID(textUiid);
+        updateGap();
     }
     
     /**
@@ -82,11 +85,45 @@ public class SpanLabel extends Container {
         icon = new Label();
         icon.setUIID("icon");
         iconWrapper = new Container(new FlowLayout(CENTER, CENTER));
-        iconWrapper.getStyle().setMargin(0, 0, 0, 0);
-        iconWrapper.getStyle().setPadding(0, 0, 0, 0);
+        iconWrapper.getAllStyles().stripMarginAndPadding();
         iconWrapper.add(icon);
         addComponent(BorderLayout.WEST, iconWrapper);
         addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
+        updateGap();
+    }
+
+    private int preferredW=-1;
+    
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setPreferredW(int preferredW) {
+        //We need to override preferredW for this component because the default
+        // implementation will prevent calcPreferredSize() from ever being called,
+        // and we still want to calculate the preferred height based on this preferred width.
+        this.preferredW = preferredW;
+    }
+
+    /**
+     * 
+     * {@inheritDoc }
+     */
+    @Override
+    public int getPreferredW() {
+        if (preferredW != -1) {
+            return preferredW;
+        }
+        return super.getPreferredW();
+    }
+    
+    /**
+     * Gets the component used for styling font icons on this SpanLabel.
+     * @return The component used for styling font icons on this SpanLabel.
+     * @since 7.0
+     */
+    public Component getIconStyleComponent() {
+        return icon.getIconStyleComponent();
     }
     
     /**
@@ -159,6 +196,7 @@ public class SpanLabel extends Container {
      */
     public void setIconUIID(String uiid) {
         icon.setUIID(uiid);
+        updateGap();
     }
     
     /**
@@ -187,6 +225,7 @@ public class SpanLabel extends Container {
      */
     public void setIcon(Image i) {
         icon.setIcon(i);
+        updateGap();
     }
     
     /**
@@ -255,12 +294,14 @@ public class SpanLabel extends Container {
         if(parent == this) {
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
+            parent.getAllStyles().stripMarginAndPadding();
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
         } else if (parent.getLayout() instanceof BoxLayout) {
             removeComponent(parent);
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
+            parent.getAllStyles().stripMarginAndPadding();
             parent.addComponent(text);
             addComponent(BorderLayout.CENTER, parent);
         } else {
@@ -284,7 +325,9 @@ public class SpanLabel extends Container {
     public void setIconPosition(String t) {
         removeComponent(iconWrapper);
         addComponent(t, iconWrapper);
-        revalidate();
+        updateGap();
+        revalidateWithAnimationSafety();
+        
     }
     
     /**
@@ -416,13 +459,13 @@ public class SpanLabel extends Container {
         return text.isTextSelectionEnabled();
     }
 
-    @Override
-    protected Dimension calcPreferredSize() {
-        return super.calcPreferredSize(); //To change body of generated methods, choose Tools | Templates.
-    }
-
+    
     
    
+    /**
+     * {@inheritDoc }
+     * 
+     */
     @Override
     public void setWidth(int width) {
         int w = getWidth();
@@ -444,8 +487,91 @@ public class SpanLabel extends Container {
         }
         
     }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     * 
+     */
+    @Override
+    public void setGap(int gap) {
+        if (gap != this.gap) {
+            this.gap = gap;
+            updateGap();
+        }
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public int getGap() {
+        return gap;
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public void setTextPosition(int textPosition) {
+        switch (textPosition) {
+            case Component.TOP:
+                setIconPosition(BorderLayout.SOUTH);
+                break;
+            case Component.BOTTOM:
+                setIconPosition(BorderLayout.NORTH);
+                break;
+            case Component.LEFT:
+                setIconPosition(BorderLayout.EAST);
+                break;
+            case Component.RIGHT:
+                setIconPosition(BorderLayout.WEST);
+                break;
+            default:
+                setIconPosition(BorderLayout.EAST);
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 7.0
+     */
+    @Override
+    public int getTextPosition() {
+        String iconPosition = getIconPosition();
+        if (BorderLayout.NORTH.equals(iconPosition)) {
+            return Component.BOTTOM;
+        }
+        if (BorderLayout.SOUTH.equals(iconPosition)) {
+            return Component.TOP;
+        }
+        if (BorderLayout.EAST.equals(iconPosition)) {
+            return Component.LEFT;
+        }
+        if (BorderLayout.WEST.equals(iconPosition)) {
+            return Component.RIGHT;
+        }
+        return Component.LEFT;
+        
+    }
     
     
+    private void updateGap() {
+        if (getIcon() == null) {
+            $(icon).setMargin(0);
+        } else if (BorderLayout.NORTH.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, 0, gap, 0);
+        } else if (BorderLayout.SOUTH.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(gap, 0, 0, 0);
+        } else if (BorderLayout.EAST.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, 0, 0, gap);
+        } else if (BorderLayout.WEST.equals(getIconPosition())) {
+            $(icon).selectAllStyles().setMargin(0, gap, 0, 0);
+        }
+    }
     
     
 }

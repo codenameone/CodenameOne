@@ -100,10 +100,11 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
         NSString *scope = toNSString(CN1_THREAD_STATE_PASS_ARG get_field_com_codename1_social_GoogleConnect_scope(googleLoginCallback));
 
         if (scope != nil) {
-            signIn.scopes = @[scope];
+            signIn.scopes = [scope componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]; //@[scope];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
 #ifdef GOOGLE_SIGNIN
+            [GIDSignIn sharedInstance].presentingViewController = [CodenameOne_GLViewController instance];
             [[GIDSignIn sharedInstance] signIn];
 #else
             [signIn authenticate];

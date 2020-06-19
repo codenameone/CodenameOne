@@ -58,6 +58,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -3625,6 +3626,29 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * This method returns a rectangle defining the "safe" area of the display, which excludes
+     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
+     * 
+     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
+     * is displayed on the screen near the bottom edge, and can interfere with components
+     * that are laid out at the bottom of the screen.</p>
+     * 
+     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+     * will return a rectangle that excludes the notch, and task bar regions.</p>
+     * @param rect Out parameter where safe bounds are set.
+     * @return The same rectangle that was passed as a parameter.
+     * @since 7.0
+     * @see Form#getSafeArea() 
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        rect.setBounds(0, 0, getDisplayWidth(), getDisplayHeight());
+        return rect;
+    }
+    
+    /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
      * in.
@@ -5380,6 +5404,39 @@ public abstract class CodenameOneImplementation {
         
     }
     
+    private BrowserComponent sharedJavascriptContext;
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public final BrowserComponent getSharedJavscriptContext() {
+        if (sharedJavascriptContext == null) {
+            sharedJavascriptContext = createSharedJavascriptContext();
+        }
+        return sharedJavascriptContext;
+    }
+    
+    /**
+     * Creates a shared javascript context.  This can be overridden by ports to 
+     * return a special browser component. On the Javascript port it returns a special component
+     * that encapsulates the browser environment that the application is running in.
+     * @since 7.0
+     * @return A shared BrowserComponent
+     * 
+     */
+    protected BrowserComponent createSharedJavascriptContext() {
+        BrowserComponent out = new BrowserComponent();
+        out.setPage("<!doctype html><html><body></body></html>", null);
+        
+        return out;
+    }
     
     /**
      * Captures a audio and notifies with the raw data when available
@@ -7413,6 +7470,19 @@ public abstract class CodenameOneImplementation {
      * @return the socket object to use
      */
     public Object connectSocket(String host, int port) {
+        return connectSocket(host, port, 0);
+    }
+    
+    
+    /**
+     * Creates a socket to connect to the given host on the given port
+     * @param host the host
+     * @param port the port
+     * @param connectTimeout connect timeout.  0 for infinite timeout.
+     * @return the socket object to use
+     * @since 7.0
+     */
+    public Object connectSocket(String host, int port, int connectTimeout) {
         throw new RuntimeException("Not supported");
     }
     
@@ -8396,5 +8466,23 @@ public abstract class CodenameOneImplementation {
     public boolean supportsNativeTextAreaVerticalAlignment() {
         return false;
     }
+    
+    /**
+     * Posts a message to the native platform.
+     * @param message The message.
+     * @since 7.0
+     */
+    public void postMessage(MessageEvent message) {
+        
+    }
 
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */
+    public Boolean isDarkMode() {
+        return null;
+    }
 }

@@ -32,6 +32,22 @@ import java.util.ArrayList;
  * @author shannah
  */
 public class AudioBuffer {
+    private Object refLock = new Object();
+    private int refCounter;
+    
+    int retain() {
+        synchronized(refLock) {
+            refCounter++;
+            return refCounter;
+        }
+    }
+    int release() {
+        synchronized(refLock) {
+            refCounter--;
+            return refCounter;
+        }
+    }
+    
     /**
      * A callback that can be registered to receive notifications when the contents of the 
      * AudioBuffer is changed.
@@ -97,7 +113,7 @@ public class AudioBuffer {
      * method.
      * @param source The source buffer to copy from.
      */
-    public synchronized void copyFrom(AudioBuffer source) {
+    public void copyFrom(AudioBuffer source) {
         copyFrom(source.getSampleRate(), source.getNumChannels(), source.buffer, 0, source.size);
     }
     
@@ -106,7 +122,7 @@ public class AudioBuffer {
      * method.
      * @param source 
      */
-    public synchronized void copyFrom(int sampleRate, int numChannels, float[] source) {
+    public void copyFrom(int sampleRate, int numChannels, float[] source) {
         copyFrom(sampleRate, numChannels, source, 0, source.length);
     }
     
@@ -117,7 +133,7 @@ public class AudioBuffer {
      * @param offset The offset in the source array to begin copying from.
      * @param len The length of the range to copy.
      */
-    public synchronized void copyFrom(int sampleRate, int numChannels, float[] source, int offset, int len) {
+    public void copyFrom(int sampleRate, int numChannels, float[] source, int offset, int len) {
         if (len > buffer.length) {
             throw new IllegalArgumentException("Buffer size is "+buffer.length+" but attempt to copy "+len+" samples into it");
         }
@@ -132,7 +148,7 @@ public class AudioBuffer {
      * Copies data to another audio buffer. This will trigger callbacks in the destination.
      * @param dest The destination audio buffer.
      */
-    public synchronized void copyTo(AudioBuffer dest) {
+    public void copyTo(AudioBuffer dest) {
         dest.copyFrom(this);
     }
     
@@ -140,7 +156,7 @@ public class AudioBuffer {
      * Copies data from this buffer to the given float array.
      * @param dest The destination float array to copy to.
      */
-    public synchronized void copyTo(float[] dest) {
+    public void copyTo(float[] dest) {
         copyTo(dest, 0);
     }
     
@@ -149,7 +165,7 @@ public class AudioBuffer {
      * @param dest The destination float array.
      * @param offset The offset in the destination array to start copying to.
      */
-    public synchronized void copyTo(float[] dest, int offset) {
+    public void copyTo(float[] dest, int offset) {
         int len = size;
         if (dest.length < offset + len) {
             throw new IllegalArgumentException("Destination is not big enough to store len "+len+" at offset "+offset+".  Length only "+dest.length);
@@ -178,7 +194,7 @@ public class AudioBuffer {
      * Called when a frame is received.  This will call the {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) } method in all
      * registered callbacks.
      */
-    private synchronized void fireFrameReceived() {
+    private void fireFrameReceived() {
         inFireFrame = true;
         
         try {
@@ -198,7 +214,7 @@ public class AudioBuffer {
      * Adds a callback to be notified when the contents of this buffer are changed.
      * @param l The AudioBufferCallback
      */
-    public synchronized void addCallback(final AudioBufferCallback l) {
+    public void addCallback(final AudioBufferCallback l) {
         if (inFireFrame) {
             pendingOps.add(new Runnable() {
                 public void run() {
@@ -214,7 +230,7 @@ public class AudioBuffer {
      * Removes a callback from the audio buffer.
      * @param l The callback to remove.
      */
-    public synchronized void removeCallback(final AudioBufferCallback l) {
+    public void removeCallback(final AudioBufferCallback l) {
         if (inFireFrame) {
             pendingOps.add(new Runnable() {
                 public void run() {

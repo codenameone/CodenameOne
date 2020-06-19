@@ -222,6 +222,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private Boolean darkMode;
 
     /**
      * @return the fullScreen
@@ -347,9 +348,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isInFullScreenMode() {
         return fullScreen;
     }
-    
-    
-    
+
+    @Override
+    public Boolean isDarkMode() {
+        return darkMode;
+    }
+
     
     
     boolean takingScreenshot;
@@ -698,6 +702,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private BufferedImage portraitSkin;
     private BufferedImage landscapeSkin;
     private boolean roundedSkin;
+    private Rectangle safeAreaPortrait = null;
+    private Rectangle safeAreaLandscape = null;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -1077,6 +1083,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
+                    safeAreaLandscape = null;
+                    safeAreaPortrait = null;
                     h.remove("@paintsTitleBarBool");
                 }
                 UIManager.getInstance().setThemeProps(h);
@@ -2456,8 +2464,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-
             if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+                safeAreaLandscape = new Rectangle();
+                safeAreaPortrait = new Rectangle();
+
+            
                 portraitScreenCoordinates.x = Integer.parseInt(props.getProperty("displayX"));
                 portraitScreenCoordinates.y = Integer.parseInt(props.getProperty("displayY"));
                 portraitScreenCoordinates.width = Integer.parseInt(props.getProperty("displayWidth"));
@@ -2466,11 +2477,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                 landscapeScreenCoordinates.y = portraitScreenCoordinates.x;
                 landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
                 landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
+                safeAreaPortrait.setBounds(
+                        Integer.parseInt(props.getProperty("safePortaitX", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitY", "0")), 
+                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safePortraitHeight", ""+portraitScreenCoordinates.height))
+                );
+                safeAreaLandscape.setBounds(
+                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")), 
+                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
+                );
                 roundedSkin = true;
             } else {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
             }
+            
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -2574,6 +2598,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
         }
     }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
+        if (!isSimulator() || safeAreaPortrait == null || safeAreaLandscape == null) {
+            return super.getDisplaySafeArea(rect);
+        }
+        if (rect == null) {
+            rect = new com.codename1.ui.geom.Rectangle();
+        }
+        if (portrait) {
+            rect.setBounds((int)safeAreaPortrait.getX(), (int)safeAreaPortrait.getY(), (int)safeAreaPortrait.getWidth(), (int)safeAreaPortrait.getHeight());
+        } else {
+            rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
+        }
+        return rect;
+    }
+    
+    
     
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
@@ -3149,6 +3191,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(testRecorderMenu);
+
+            JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
+            simulatorMenu.add(darkLightModeMenu);
+            final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
+            final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
+            final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
+            ButtonGroup group = new ButtonGroup();
+            group.add(darkMode);
+            group.add(lightMode);
+            group.add(unsupportedMode);
+            darkMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = true;
+                }
+            });
+            
+            lightMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = false;
+                }
+            });
+
+            unsupportedMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = null;
+                }
+            });
 
             manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
@@ -4243,6 +4315,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
+            safeAreaLandscape = null;
+            safeAreaPortrait = null;
             Toolkit tk = Toolkit.getDefaultToolkit();
             setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
             pixelMilliRatio = getDefaultPixelMilliRatio();
@@ -4867,7 +4941,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fText = text;
             editingInProgress.invokeAfter(new Runnable() {
                 public void run() {
-                    editString(cmp, maxSize, constraint, fText, keyCode);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            editString(cmp, maxSize, constraint, fText, keyCode);
+                        }
+                    });
+                    
                 }
             });
             editingInProgress.endEditing();
@@ -4883,82 +4962,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         //}
         
         checkEDT();
+        
+        class Repainter {
+            JComponent jcmp;
+            javax.swing.border.Border origBorder;
+            
+            Repainter(JComponent jcmp) {
+                this.jcmp = jcmp;
+            }
+            void repaint(long tm, int x, int y, int width, int height) {
+                int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
+                int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
+                int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
+                int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
+                Rectangle bounds;
+                if (getSkin() != null) {
+                    bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                            (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                            (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
+                            (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
+
+                } else {
+                    bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                }
+                if (!jcmp.getBounds().equals(bounds)) {
+                    jcmp.setBounds(bounds);
+                    if (origBorder == null) {
+                        origBorder = jcmp.getBorder();
+                    }
+                    //jcmp.setBorder(BorderFactory.createCompoundBorder(
+                    //    origBorder, 
+                    //    BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
+                    //);
+                    jcmp.setBorder( BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight));
+                }
+
+
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        cmp.repaint();
+                    }
+                });
+            }
+        }
+        
         javax.swing.text.JTextComponent swingT;
         if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
             JTextComponent t;
             if((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
                 t = new JPasswordField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                            textCmp.setBorder(BorderFactory.createCompoundBorder(
-                                textCmp.getBorder(), 
-                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                            );
-                        }
-                        
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
                     }
                 };
             } else {
                 t = new JTextField() {
+                    Repainter repainter = new Repainter(this);
+                    @Override
                     public void repaint(long tm, int x, int y, int width, int height) {
-                        int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                        int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                        int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                        int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                        int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                        Rectangle bounds;
-                        if (getSkin() != null) {
-                            bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                    (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
-                                    (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
-
-                        } else {
-                            bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                        if (repainter != null) {
+                            repainter.repaint(tm, x, y, width, height);
                         }
-                        if (textCmp != null && !textCmp.getBounds().equals(bounds)) {
-                            textCmp.setBounds(bounds);
-                            textCmp.setBorder(BorderFactory.createCompoundBorder(
-                                textCmp.getBorder(), 
-                                BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                            );
-                        }
-                        
-                        
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                cmp.repaint();
-                            }
-                        });
-                        
                     }
                 };
                 
@@ -4988,50 +5060,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             textCmp = swingT;
         } else {
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
-                
-                
-                
-                public void repaint(long tm, int x, int y, int width, int height) {
-                    
-                    int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
-                    int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
-                    int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                    int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
-                    int paddingTop = Math.round(cmp.getSelectedStyle().getPadding(Component.TOP) * zoomLevel);
-                        int paddingLeft = Math.round(cmp.getSelectedStyle().getPadding(Component.LEFT) * zoomLevel);
-                        int paddingRight = Math.round(cmp.getSelectedStyle().getPadding(Component.RIGHT) * zoomLevel);
-                        int paddingBottom = Math.round(cmp.getSelectedStyle().getPadding(Component.BOTTOM) * zoomLevel);
-                    Rectangle bounds;
-                    if (getSkin() != null) {
-                        bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
-                                (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
-                                (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
-                        
-                    } else {
-                        bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-                    }
-                    if(textCmp != null && !textCmp.getBounds().equals(bounds)){
-                        textCmp.setBounds(bounds);
-                        textCmp.setBorder(BorderFactory.createCompoundBorder(
-                            textCmp.getBorder(), 
-                            BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight))
-                        );
-                    }
-                    
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            cmp.repaint();
-                        }
-                    });
-                }
-                
-            };
+            JTextArea t = new JTextArea(); 
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
-            JScrollPane pane = new JScrollPane(swingT);
+            JScrollPane pane = new JScrollPane(swingT){
+                
+                Repainter repainter = new Repainter(this);
+                
+                @Override
+                public void repaint(long tm, int x, int y, int width, int height) {
+
+                    
+                    if (repainter != null) {
+                        repainter.repaint(tm, x, y, width, height); 
+                    }
+                }
+
+            };
+            if (ta.isGrowByContent()) {
+                pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            }
             pane.setBorder(null);
             pane.setOpaque(false);
             pane.getViewport().setOpaque(false);
@@ -5040,6 +5089,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             // Commenting these out for better usability - at least on OS X.
             //pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             //pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            
+            
             textCmp = pane;
         }
         if (cmp.isRTL()) {
@@ -5062,11 +5113,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public void keyReleased(KeyEvent e) {
                 if(e.getKeyCode() == KeyEvent.VK_TAB) {
-                    TextEditUtil.editNextTextArea();
+                    if (e.isShiftDown()) {
+                        TextEditUtil.editPrevTextArea();
+                    } else {
+                        TextEditUtil.editNextTextArea();
+                    }
                 }
             }
         });
-        swingT.setBorder(null);
+        //swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
         swingT.setCaretColor(new Color(cmp.getUnselectedStyle().getFgColor()));
@@ -5169,10 +5224,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             private final JTextComponent textCmp;
             private final JComponent swingComponentToRemove;
             private boolean performed;
+            private boolean fireDone;
             
             Listener(JTextComponent textCmp, JComponent swingComponentToRemove) {
                 this.textCmp = textCmp;
                 this.swingComponentToRemove = swingComponentToRemove;
+                if (textCmp instanceof JTextArea) {
+                    if (((com.codename1.ui.TextArea)cmp).getDoneListener() != null) {
+                        InputMap input = textCmp.getInputMap();
+                        KeyStroke enter = KeyStroke.getKeyStroke("ENTER");
+                        KeyStroke shiftEnter = KeyStroke.getKeyStroke("shift ENTER");
+                        input.put(shiftEnter, "insert-break");  // input.get(enter)) = "insert-break"
+                        input.put(enter, "text-submit");
+
+                        ActionMap actions = textCmp.getActionMap();
+                        actions.put("text-submit", new AbstractAction() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                fireDone = true;
+                                Listener.this.actionPerformed(null);
+                            }
+                        });
+                    }
+                }
+                
             }
             public void run() {
                 while (swingComponentToRemove.getParent() != null) {
@@ -5200,8 +5275,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     testRecorder.editTextFieldCompleted(cmp, txt);
                 }
                 Display.getInstance().onEditingComplete(cmp, txt);
-                if (e != null && cmp instanceof com.codename1.ui.TextField) {
-                    final com.codename1.ui.TextField cn1Tf = (com.codename1.ui.TextField)cmp;
+                if (e != null && cmp instanceof com.codename1.ui.TextField || fireDone) {
+                    final com.codename1.ui.TextArea cn1Tf = (com.codename1.ui.TextArea)cmp;
                     if (cmp != null && cn1Tf.getDoneListener() != null) {
                         cn1Tf.fireDoneEvent();
                     }
@@ -5242,7 +5317,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 if (t.length() >= ((TextArea) cmp).getMaxSize()) {
                     e.consume();
-                }
+                } 
             }
 
             public void keyPressed(KeyEvent e) {
@@ -5268,7 +5343,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                     return;
-                }
+                }  
             }
 
             public void textValueChanged(TextEvent e) {
@@ -6039,6 +6114,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
         }
     }
+
+    //@Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        
+        Color c1 = new Color(startColor);
+        int alphaStart = ColorUtil.alpha(startColor);
+        int alphaEnd = ColorUtil.alpha(endColor);
+        c1 = new Color(c1.getRed(), c1.getGreen(), c1.getBlue(), alphaStart);
+        Color c2 = new Color(endColor);
+        c2 = new Color(c2.getRed(), c2.getGreen(), c2.getBlue(), alphaEnd);
+        Paint oldPaint = nativeGraphics.getPaint();
+        GradientPaint paint = horizontal ?
+                new GradientPaint(x, y + height/2, c1, x + width, y + height/2, c2) :
+                new GradientPaint(x + width/2, y, c1, x + width/2, y + height, c2);
+        nativeGraphics.setPaint(paint);
+        nativeGraphics.fillRect(x, y, width, height);
+        nativeGraphics.setPaint(oldPaint);
+        
+        
+    }
+    
+    
 
     /**
      * @inheritDoc
@@ -8793,7 +8892,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Thread.sleep(1000);
                     } catch(Exception e) {}
                 }
-                nr.setTimeServerResponse(System.currentTimeMillis());
+                if (nr != null) {
+                    nr.setTimeServerResponse(System.currentTimeMillis());
+                }
                 if(disconnectedMode) {
                     throw new IOException("Unreachable");
                 }
@@ -10436,6 +10537,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public Component getVideoComponent() {
+            if (!isVideo) {
+                return new Label();
+            }
             if (videoPanel != null) {
                 final Component[] retVal = new Component[1];
                 Platform.runLater(new Runnable() {
@@ -10858,7 +10962,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public L10NManager getLocalizationManager() {
         if (l10n == null) {
-            Locale l = Locale.getDefault();
+            final Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
 
                 public double parseDouble(String localeFormattedDecimal) {
@@ -10867,6 +10971,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     } catch (ParseException err) {
                         return Double.parseDouble(localeFormattedDecimal);
                     }
+                }
+                
+                @Override
+                public String getLongMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMMM", l);
+                    return fmt.format(date);
+                }
+
+                @Override
+                public String getShortMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM", l);
+                    return fmt.format(date);
                 }
                 
                 public String format(int number) {
@@ -11129,7 +11245,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 recording = false;
                 if (redirectToAudioBuffer) {
-                    MediaManager.deleteAudioBuffer(path);
+                    MediaManager.releaseAudioBuffer(path);
                 }
                 if (line == null) {
                     return;
@@ -11545,6 +11661,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
     }
 
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        setBrowserURL(browserPeer, url);
+    }
+
+    
+    
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             try {
@@ -12183,6 +12306,35 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     }
 
+    private ServerSockets serverSockets;
+    private synchronized ServerSockets getServerSockets() {
+        if (serverSockets == null) {
+            serverSockets = new ServerSockets();
+        }
+        return serverSockets;
+    }
+    
+    class ServerSockets {
+        Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
+        
+        public synchronized ServerSocket get(int port) throws IOException {
+            if (socks.containsKey(port)) {
+                ServerSocket sock = socks.get(port);
+                if (sock.isClosed()) {
+                    sock = new ServerSocket(port);
+                    socks.put(port, sock);
+                }
+                return sock;
+            } else {
+                ServerSocket sock = new ServerSocket(port);
+                socks.put(port, sock);
+                return sock;
+            }
+        }
+        
+        
+    }
+    
     class SocketImpl {
         java.net.Socket socketInstance;
         int errorCode = -1;
@@ -12190,9 +12342,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         InputStream is;
         OutputStream os;
 
-        public boolean connect(String param, int param1) {
+        public boolean connect(String param, int param1, int connectTimeout) {
+            
             try {
-                socketInstance = new java.net.Socket(param, param1);
+                
+                socketInstance = new java.net.Socket();
+                socketInstance.connect(new InetSocketAddress(param, param1), connectTimeout);
+                //socketInstance = new java.net.Socket(param, param1);
                 return true;
             } catch(Exception err) {
                 err.printStackTrace();
@@ -12304,7 +12460,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public Object listen(int param) {
             try {
-                ServerSocket serverSocketInstance = new ServerSocket(param);
+                ServerSocket serverSocketInstance = getServerSockets().get(param);
                 socketInstance = serverSocketInstance.accept();
                 return this;
             } catch(Exception err) {
@@ -12324,13 +12480,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     @Override
-    public Object connectSocket(String host, int port) {
+    public Object connectSocket(String host, int port, int connectTimeout) {
         SocketImpl i = new SocketImpl();
-        if(i.connect(host, port)) {
+        if(i.connect(host, port, connectTimeout)) {
             return i;
         }
         return null;
     }
+
     
     @Override
     public Object listenSocket(int port) {
@@ -12385,11 +12542,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public String getSocketErrorMessage(Object socket) {
+        if (socket == null) {
+            return null;
+        }
         return ((SocketImpl)socket).getErrorMessage();
     }
     
     @Override
     public int getSocketErrorCode(Object socket) {
+        if (socket == null) {
+            return 0;
+        }
         return ((SocketImpl)socket).getErrorCode();
     }
     

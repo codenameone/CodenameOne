@@ -195,6 +195,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.CookieHandler;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.security.MessageDigest;
@@ -1170,6 +1171,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public Boolean isDarkMode() {
+        try {
+            int nightModeFlags = getActivity().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK; 
+            switch (nightModeFlags) { 
+                case Configuration.UI_MODE_NIGHT_YES: 
+                    return true;
+                case Configuration.UI_MODE_NIGHT_NO: 
+                    return false;
+                default: 
+                    return null;
+            } 
+        } catch(Throwable t) {
+            return null;
+        }
+    }
+
+    
     private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
     }
@@ -3682,7 +3701,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 public void cleanup() {
                                     pauseImpl();
                                     recorder.release();
-                                    com.codename1.media.MediaManager.deleteAudioBuffer(path);
+                                    com.codename1.media.MediaManager.releaseAudioBuffer(path);
                                     
                                 }
 
@@ -6470,10 +6489,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         File newFile = new File(mediaStorageDir.getPath() + File.separator
-                + "IMG_" + timeStamp + "_" + cn1File.getName());
+                    + cn1File.getName());
+        if(newFile.exists()) {
+            // Create a media file name
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            newFile = new File(mediaStorageDir.getPath() + File.separator
+                    + "IMG_" + timeStamp + "_" + cn1File.getName());
+        }
 
 
         //Uri fileUri = Uri.fromFile(newFile);
@@ -8358,7 +8381,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public L10NManager getLocalizationManager() {
         if (l10n == null) {
-            Locale l = Locale.getDefault();
+            final Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 public double parseDouble(String localeFormattedDecimal) {
                     try {
@@ -8367,6 +8390,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return Double.parseDouble(localeFormattedDecimal);
                     }
                 }
+
+                @Override
+                public String getLongMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMMM", l);
+                    return fmt.format(date);
+                }
+
+                @Override
+                public String getShortMonthName(Date date) {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM", l);
+                    return fmt.format(date);
+                }
+                
+                
 
                 public String format(int number) {
                     return NumberFormat.getNumberInstance().format(number);
@@ -9394,6 +9431,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
+    private ServerSockets serverSockets;
+    private synchronized ServerSockets getServerSockets() {
+        if (serverSockets == null) {
+            serverSockets = new ServerSockets();
+        }
+        return serverSockets;
+    }
+    
+    class ServerSockets {
+        Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
+        
+        public synchronized ServerSocket get(int port) throws IOException {
+            if (socks.containsKey(port)) {
+                ServerSocket sock = socks.get(port);
+                if (sock.isClosed()) {
+                    sock = new ServerSocket(port);
+                    socks.put(port, sock);
+                }
+                return sock;
+            } else {
+                ServerSocket sock = new ServerSocket(port);
+                socks.put(port, sock);
+                return sock;
+            }
+        }
+        
+        
+    }
 
     class SocketImpl {
         java.net.Socket socketInstance;
@@ -9402,9 +9468,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         InputStream is;
         OutputStream os;
 
-        public boolean connect(String param, int param1) {
+        public boolean connect(String param, int param1, int connectTimeout) {
             try {
-                socketInstance = new java.net.Socket(param, param1);
+                socketInstance = new java.net.Socket();
+                socketInstance.connect(new InetSocketAddress(param, param1), connectTimeout);
                 return true;
             } catch(Exception err) {
                 err.printStackTrace();
@@ -9513,7 +9580,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public Object listen(int param) {
             try {
-                ServerSocket serverSocketInstance = new ServerSocket(param);
+                ServerSocket serverSocketInstance = getServerSockets().get(param);
                 socketInstance = serverSocketInstance.accept();
                 SocketImpl si = new SocketImpl();
                 si.socketInstance = socketInstance;
@@ -9536,8 +9603,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object connectSocket(String host, int port) {
+        return connectSocket(host, port, 0);
+    }
+
+    
+    
+    @Override
+    public Object connectSocket(String host, int port, int connectTimeout) {
         SocketImpl i = new SocketImpl();
-        if(i.connect(host, port)) {
+        if(i.connect(host, port, connectTimeout)) {
             return i;
         }
         return null;
@@ -9583,6 +9657,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isSocketConnected(Object socket) {
         return ((SocketImpl)socket).isConnected();
     }
+
+    
 
     @Override
     public boolean isServerSocketAvailable() {

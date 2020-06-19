@@ -112,15 +112,29 @@ public class Result {
      * Create an evaluator object from a StructuredContent element.
      *
      * @param content a parsed dom
+     * @param subTree If true, then this is treated as a subtree, and won't try to take the parent as the actual root.
      * @return Result a result evaluator object
      * @throws IllegalArgumentException thrown if null content is passed.
      */
-    static Result fromContent(StructuredContent content)
+    static Result fromContent(StructuredContent content, boolean subTree)
             throws IllegalArgumentException {
         if (content == null) {
             throw new IllegalArgumentException("content cannot be null");
         }
-        return new Result(content);
+        return new Result(content, subTree);
+    }
+    
+    /**
+     * Internal method, do not use.
+     *
+     * Create an evaluator object from a StructuredContent element.
+     *
+     * @param content a parsed dom
+     * @return Result a result evaluator object
+     * @throws IllegalArgumentException thrown if null content is passed.
+     */
+    static Result fromContent(StructuredContent content) {
+        return fromContent(content, false);
     }
 
 	// TODO: add a cache mapping subpaths to objects to improve performance
@@ -133,15 +147,17 @@ public class Result {
      * @return Result a result evaluator object
      * @throws IllegalArgumentException thrown if null content is passed.
      */
-    private Result(final StructuredContent obj) throws IllegalArgumentException {
+    private Result(final StructuredContent obj, boolean subTree) throws IllegalArgumentException {
         if (obj == null) {
             throw new IllegalArgumentException("dom object cannot be null");
         }
         this.root = obj;
-        if (root.getParent() != null) {
-            root = root.getParent();
+        if (!subTree && root.getParent() != null) {
+            root = root.getParent();  // <--- WHY??  
         }
     }
+    
+    
 
     /**
      * Create an evaluator object from a structured content document (XML, JSON,

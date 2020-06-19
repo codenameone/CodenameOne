@@ -74,6 +74,14 @@ public class Sample {
         return new File(getJavaFile(context).getParentFile(), "css");
     }
     
+    private File getIndexHtml(SamplesContext context) {
+        return new File(getJavaFile(context).getParentFile(), "index.html");
+    }
+    
+    private File getIndexHtmlInBuildDir(SamplesContext context) {
+        return new File(getBuildSrcDir(context), "index.html");
+    }
+    
     private File getHtmlDir(SamplesContext context) {
         return new File(getJavaFile(context).getParentFile(), "html");
     }
@@ -81,6 +89,8 @@ public class Sample {
     private File getHtmlDirInBuildDir(SamplesContext context) {
         return new File(getBuildSrcDir(context), "html");
     }
+    
+    
     
     private File getCSSDirInBuildDir(SamplesContext context) {
         return new File(getBuildProjectDir(context), "css");
@@ -198,6 +208,10 @@ public class Sample {
         copyDir(getHtmlDir(context), getHtmlDirInBuildDir(context));
     }
     
+    private void copyIndexHtmlToBuildDir(SamplesContext context) throws IOException {
+        copyFile(getIndexHtml(context), getIndexHtmlInBuildDir(context));
+    }
+    
     private void copyCodenameOneBuildClient(SamplesContext context) throws IOException {
         copyFile(context.getCodenameOneBuildClientJar(), new File(getBuildProjectDir(context), "CodeNameOneBuildClient.jar"));
     }
@@ -239,6 +253,11 @@ public class Sample {
         if (getHtmlDir(context).exists()) {
             if (!getHtmlDirInBuildDir(context).exists() || lastModifiedRecursive(getHtmlDirInBuildDir(context)) < lastModifiedRecursive(getHtmlDir(context))) {
                 copyHtmlToBuildDir(context);
+            }
+        }
+        if (getIndexHtml(context).exists()) {
+            if (!getIndexHtmlInBuildDir(context).exists() || lastModifiedRecursive(getIndexHtmlInBuildDir(context)) < lastModifiedRecursive(getIndexHtml(context))) {
+                copyIndexHtmlToBuildDir(context);
             }
         }
         
@@ -401,6 +420,7 @@ public class Sample {
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("-Dnb.internal.action.name=run");
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("run");
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
@@ -420,6 +440,7 @@ public class Sample {
         applyRunProperties(context, cmd);
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-Dnb.internal.action.name=debug");
         cmd.add("-Ddebug.class=com.codename1.impl.javase.Simulator");
         cmd.add("debug-sample");
@@ -460,7 +481,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("clean");
@@ -484,7 +505,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device");
@@ -504,7 +525,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-ios-device-release");
@@ -539,7 +560,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-android-device");
@@ -559,7 +580,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-windows-device");
@@ -579,7 +600,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-windows-desktop");
@@ -599,7 +620,7 @@ public class Sample {
         List<String> cmd = new ArrayList<>();
         cmd.add(context.getAnt());
         applyRunProperties(context, cmd);
-    
+        cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
         cmd.add("-f");
         cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
         cmd.add("build-for-mac-os-x-desktop");
@@ -685,6 +706,17 @@ public class Sample {
         return new File(getBuildLibDir(context), dep.getFile(context).getName());
     }
     
+    private static String javaHome() {
+        String home = System.getProperty("java.home");
+        if ("jre".equals(new File(home).getName())) {
+            File jdk = new File(home).getParentFile();
+            if (jdk.exists()) {
+                return jdk.getAbsolutePath();
+            }
+        }
+        return home;
+    }
+    
     public boolean installDependencies(SamplesContext context, Properties props) throws IOException, InterruptedException {
         boolean updated = false;
         for (Dependency dep : getDependencies(context)) {
@@ -694,11 +726,13 @@ public class Sample {
         }
         if (updated) {
             List<String> cmd = new ArrayList<>();
+            System.out.println("java.home="+javaHome());
             cmd.add(context.getAnt());
             applyRunProperties(context, cmd);
-
+            cmd.add("-Dplatforms.JDK_1.8.home="+javaHome());
             cmd.add("-f");
             cmd.add(new File(getBuildProjectDir(context), "build.xml").getAbsolutePath());
+            
             cmd.add("refresh-libs");
             cmd.add("clean");
             cmd.add("jar");

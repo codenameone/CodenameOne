@@ -221,6 +221,13 @@ public class Stroke {
     }
 
     @Override
+    public String toString() {
+        return "Stroke{lineWidth="+lineWidth+";capStyle="+capStyle+";joinStyle="+joinStyle+";miterLimit:"+miterLimit+"}";
+    }
+    
+    
+
+    @Override
     public int hashCode() {
         int hash = 7;
         hash = 59 * hash + this.joinStyle;

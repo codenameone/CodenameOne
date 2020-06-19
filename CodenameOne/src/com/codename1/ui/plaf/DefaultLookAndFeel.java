@@ -43,12 +43,14 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -924,10 +926,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int topPadding = ta.getStyle().getPaddingTop();
         switch (ta.getVerticalAlignment()) {
             case Component.CENTER :
-                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line)/2);
+                topPadding += Math.max(0, (ta.getInnerHeight() - ta.getRowsGap()*(line-1) - fontHeight* line)/2);
                 break;
             case Component.BOTTOM :
-                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line));
+                topPadding += Math.max(0, (ta.getInnerHeight() - ta.getRowsGap()*(line-1) - fontHeight* line));
         }
         boolean shouldBreak = false;
         
@@ -1487,10 +1489,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
                         g.drawImage(icon, x + strWidth + gap, y);
                     } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
                         strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
-
-                        g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
+                        drawLabelImageValign(g, l, icon, x + strWidth + gap, y, fontHeight, iconHeight);
                     }
                     break;
                 case Label.RIGHT:
@@ -1499,8 +1499,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         g.drawImage(icon, x, y);
                         drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);
                     } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
-                        g.drawImage(icon, x, y + iconStringHGap);
+                        drawLabelImageValign(g, l, icon, x, y, fontHeight, iconHeight);
                         drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceX, textSpaceW);
                     }
                     break;
@@ -1531,19 +1530,152 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     break;
             }
         }
+        
+        String badgeText = l.getBadgeText();
+        if (badgeText != null && badgeText.length() > 0) {
+            
+            Component badgeCmp = l.getBadgeStyleComponent();
+            int badgePaddingTop = CN.convertToPixels(1);
+            int badgePaddingBottom = badgePaddingTop;
+            int badgePaddingLeft = badgePaddingTop;
+            int badgePaddingRight = badgePaddingTop;
+            int fgColor = 0xffffff;
+            int bgColor = 0x666666;
+            int strokeColor = bgColor;
+            Font badgeFont = null;
+            Style badgeStyle;
+            if (badgeCmp == null) {
+                badgeStyle = l.getUIManager().getComponentStyle("Badge");
+                
+            } else {
+                badgeStyle = badgeCmp.getStyle();
+            }
+            if (badgeStyle != null) {
+                fgColor = badgeStyle.getFgColor();
+                bgColor = badgeStyle.getBgColor();
+                if (badgeStyle.getBorder() instanceof RoundBorder) {
+                    strokeColor = ((RoundBorder)badgeStyle.getBorder()).getStrokeColor();
+                } else {
+                    strokeColor = bgColor;
+                }
+                badgeFont = badgeStyle.getFont();
+                badgePaddingTop = badgeStyle.getPaddingTop();
+                badgePaddingBottom = badgeStyle.getPaddingBottom();
+                badgePaddingLeft = badgeStyle.getPaddingLeftNoRTL();
+                badgePaddingRight = badgeStyle.getPaddingRightNoRTL();
+            }
+            if (badgeFont == null) {
+                if (Font.isNativeFontSchemeSupported()) {
+                    badgeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT).derive(fontHeight/2, 0);
+                } else {
+                    badgeFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+                }
+            } 
+            
+            int badgeFontHeight = badgeFont.getHeight();
+            int badgeTextWidth = badgeFont.stringWidth(badgeText);
+            GeneralPath path = new GeneralPath();
+            
+            Rectangle rect = new Rectangle(
+                    cmpX + cmpWidth - badgeTextWidth - badgePaddingLeft - badgePaddingRight, 
+                    cmpY, 
+                    badgePaddingLeft + badgePaddingRight + badgeTextWidth, 
+                    badgePaddingTop+badgePaddingBottom+badgeFontHeight
+            );
+            if (rect.getWidth() < rect.getHeight()) {
+                rect.setX(cmpX + cmpWidth - rect.getHeight());
+                rect.setWidth(rect.getHeight());
+            }
+
+            path.moveTo(rect.getX() + rect.getHeight()/2, rect.getY());
+            path.lineTo(rect.getX() + rect.getWidth() - rect.getHeight()/2, rect.getY());
+            path.arcTo(rect.getX() + rect.getWidth() - rect.getHeight()/2, rect.getY() + rect.getHeight() / 2, rect.getX() + rect.getWidth() - rect.getHeight()/2, rect.getY() + rect.getHeight(), true);
+            path.lineTo(rect.getX() + rect.getHeight()/2, rect.getY() + rect.getHeight());
+            path.arcTo(rect.getX() + rect.getHeight()/2, rect.getY() + rect.getHeight()/2, rect.getX() + rect.getHeight()/2, rect.getY(), true);
+            path.closePath();
+            
+            int col = g.getColor();
+            boolean antialias = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.setColor(bgColor);
+            
+            
+            g.fillShape(path);
+            if (bgColor != strokeColor) {
+                g.setColor(strokeColor);
+                g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+            }
+            
+            
+            g.setColor(fgColor);
+            g.setFont(badgeFont);
+            g.drawString(badgeText, rect.getX() + rect.getWidth()/2 - badgeTextWidth/2, rect.getY() + badgePaddingTop);
+            
+            
+            g.setColor(col);
+            g.setAntiAliased(antialias);
+            
+            
+            
+            
+            
+        }
     }
 
+    private void drawLabelImageValign(Graphics g, Label l, Image icon, int x, int y, int fontHeight, int iconHeight) {
+        int iconStringHGap = (fontHeight - iconHeight) / 2;
+        //int strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
+        switch (l.getVerticalAlignment()) {
+            case Component.TOP:
+                g.drawImage(icon, x, y + iconStringHGap);
+                break;
+            case Component.BOTTOM:
+                g.drawImage(icon, x, y + fontHeight - iconHeight);
+                break;
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                iconStringHGap = textFont.getAscent() - iconFont.getAscent();
+                g.drawImage(icon, x, y + iconStringHGap);
+                break;
+            default:
+                g.drawImage(icon, x, y + iconStringHGap);
+
+        }
+    }
+    
     /**
      * Implements the drawString for the text component and adjust the valign
      * assuming the icon is in one of the sides
      */
     private int drawLabelStringValign(Graphics g, Label l, String str, int x, int y,
             int iconStringHGap, int iconHeight, int textSpaceX, int textSpaceW, int fontHeight) {
+        if (str.length() == 0) {
+            return 0;
+        }
         switch (l.getVerticalAlignment()) {
             case Component.TOP:
                 return drawLabelString(g, l, str, x, y, textSpaceX, textSpaceW);
             case Component.CENTER:
                 return drawLabelString(g, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceX, textSpaceW);
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                int ascentDiff = iconFont.getAscent() - textFont.getAscent();
+                return drawLabelString(g, l, str, x, y + ascentDiff, textSpaceX, textSpaceW);
+                
             default:
                 return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceX, textSpaceW);
         }
@@ -1556,6 +1688,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 return calculateSpanForLabelString(sel, l, str, x, y, textSpaceW);
             case Component.CENTER:
                 return calculateSpanForLabelString(sel, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW);
+            case Component.BASELINE:
+                Font iconFont = l.getIconStyleComponent().getStyle().getFont();
+                Font textFont = l.getStyle().getFont();
+                if (iconFont == null) {
+                    iconFont = Font.getDefaultFont();
+                }
+                if (textFont == null) {
+                    textFont = Font.getDefaultFont();
+                }
+                int ascentDiff = iconFont.getAscent() - textFont.getAscent();
+                return calculateSpanForLabelString(sel, l, str, x, y + ascentDiff, textSpaceW);
             default:
                 return calculateSpanForLabelString(sel, l, str, x, y + iconStringHGap, textSpaceW);
         }
@@ -1566,6 +1709,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * assuming the icon is in one of the sides
      */
     private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceX, int textSpaceW) {
+        if (text.length() == 0) {
+            return 0;
+        }
         Style style = l.getStyle();
 
         int cx = g.getClipX();

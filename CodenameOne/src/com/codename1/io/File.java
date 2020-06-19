@@ -234,7 +234,7 @@ public class File {
      */
     public boolean delete() {
         FileSystemStorage.getInstance().delete(path);
-        return FileSystemStorage.getInstance().exists(path);
+        return !FileSystemStorage.getInstance().exists(path);
     }
     
     /**

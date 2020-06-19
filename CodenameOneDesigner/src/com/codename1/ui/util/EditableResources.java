@@ -51,6 +51,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.Form;
+import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.xml.Data;
@@ -63,6 +64,7 @@ import com.codename1.ui.util.xml.Theme;
 import com.codename1.ui.util.xml.Ui;
 import com.codename1.ui.util.xml.Val;
 import com.codename1.ui.util.xml.comps.ComponentEntry;
+import com.codename1.util.StringUtil;
 import java.awt.Frame;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -110,7 +112,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 10;
+    private static final short MINOR_VERSION = 11;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -586,6 +588,7 @@ public class EditableResources extends Resources implements TreeModel {
 
                                         if("round".equals(b.getType())) {
                                             RoundBorder rb = RoundBorder.create();
+                                            rb = rb.opacity(b.getOpacity());
                                             rb = rb.color(b.getRoundBorderColor());
                                             rb = rb.rectangle(b.isRectangle());
                                             rb = rb.shadowBlur(b.getShadowBlur());
@@ -596,10 +599,16 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.stroke(b.getStrokeThickness(), b.isStrokeMM());
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
+                                            
                                             theme.put(b.getKey(), rb);
                                             continue;
                                         }
-
+                                        if("css".equals(b.getType())) {
+                                            CSSBorder cb = new CSSBorder(this, b.getCSS());
+                                            theme.put(b.getKey(), cb);
+                                            continue;
+                                        }
+                                        
                                         if("roundRect".equals(b.getType())) {
                                             RoundRectBorder rb = RoundRectBorder.create();
                                             rb = rb.shadowBlur(b.getShadowBlur());
@@ -611,8 +620,12 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
                                             rb = rb.bezierCorners(b.isBezierCorners());
-                                            rb = rb.bottomOnlyMode(b.isBottomOnlyMode());
-                                            rb = rb.topOnlyMode(b.isTopOnlyMode());
+                                            if (b.isTopOnlyMode()) {
+                                                rb.topOnlyMode(true);
+                                            } else if (b.isBottomOnlyMode()) {
+                                                rb.bottomOnlyMode(true);
+                                            }
+                                            
                                             rb = rb.cornerRadius(b.getCornerRadius());
                                             theme.put(b.getKey(), rb);
                                             continue;
@@ -1102,6 +1115,11 @@ public class EditableResources extends Resources implements TreeModel {
                                             + "shadowMM=\"" + rb.isShadowMM()+ "\" " 
                                             + "rectangle=\"" + rb.isRectangle()+ "\" />\n");
                             
+                                    continue;
+                                }
+                                if (border instanceof CSSBorder) {
+                                    bw.write("        <border key=\"" + key + "\" type=\"css\" "
+                                            + "css=\"" + encodeXML(((CSSBorder)border).toCSSString())+ "\"/>\n");
                                     continue;
                                 }
                                 if(border instanceof RoundRectBorder) {
@@ -2063,6 +2081,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
     
     private void writeBorder(DataOutputStream output, Border border, boolean newVersion) throws IOException {
+        
         if(border instanceof RoundBorder) {
             output.writeShort(0xff12);
             RoundBorder rb = (RoundBorder)border;
@@ -2079,6 +2098,12 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeBoolean(rb.isShadowMM());
             output.writeFloat(rb.getShadowX());
             output.writeFloat(rb.getShadowY());
+            return;
+        }
+        if (border instanceof CSSBorder) {
+            CSSBorder cb = (CSSBorder)border;
+            output.writeShort(0xff16);
+            output.writeUTF(cb.toCSSString());
             return;
         }
         if(border instanceof RoundRectBorder) {
@@ -2254,6 +2279,23 @@ public class EditableResources extends Resources implements TreeModel {
                 }
                 break;
         }
+    }
+    
+    private static final String[][] escapes = {
+        {"&", "&amp;"},
+        {"\"", "&quot;"},
+        {"<", "&lt;"},
+        {">", "&gt;"},
+        {"'", "&apos;"}
+    };
+    private String encodeXML(String text) {
+        
+        int elen = escapes.length;
+        for (int i = 0; i < elen; i++) {
+            text = StringUtil.replaceAll(text, escapes[i][0], escapes[i][1]);
+        }
+        
+        return text;
     }
 
     com.codename1.ui.Font loadFont(DataInputStream input, String id, boolean packed) throws IOException {

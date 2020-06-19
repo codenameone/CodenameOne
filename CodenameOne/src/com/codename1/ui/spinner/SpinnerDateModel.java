@@ -51,7 +51,7 @@ class SpinnerDateModel implements ListModel {
         int oldIndex = getSelectedIndex();
         Calendar cal = Calendar.getInstance();
         cal.setTime(value);
-        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.HOUR_OF_DAY, 12);
         cal.add(Calendar.MINUTE, 0);
         cal.add(Calendar.SECOND, 0);
         cal.add(Calendar.MILLISECOND, 0);

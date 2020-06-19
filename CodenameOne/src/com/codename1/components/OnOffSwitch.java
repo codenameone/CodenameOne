@@ -32,6 +32,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
@@ -51,7 +52,7 @@ import java.util.Vector;
  * @author Shai Almog
  * @deprecated Use new {@link Switch} class instead as it conforms to the latest platform looks and feels.
  */
-public class OnOffSwitch extends Container {
+public class OnOffSwitch extends Container implements ActionSource {
     private String on = "ON";
     private String off = "OFF";
     private boolean iosMode;

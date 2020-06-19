@@ -28,6 +28,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ import java.util.Vector;
  * 
  * @author Chen Fishbein
  */
-public class Button extends Label implements ReleasableComponent {
+public class Button extends Label implements ReleasableComponent, ActionSource, SelectableIconHolder {
     /**
      * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
      */
@@ -123,6 +124,7 @@ public class Button extends Label implements ReleasableComponent {
     public static final int STATE_DEFAULT = 2;
     
     private EventDispatcher dispatcher = new EventDispatcher();
+    private EventDispatcher stateChangeListeners;
     
     private int state = STATE_DEFAULT;
     
@@ -327,6 +329,52 @@ public class Button extends Label implements ReleasableComponent {
     public Button(String text, String id) {
         this(text, null, id);
     }
+    
+    /**
+     * A listener used to bind the state with another button.  When that button's state
+     * changes, then this button state will also change.
+     * @since 7.0
+     */
+    private ActionListener bindListener;
+    private ActionListener bindListener() {
+        if (bindListener == null) {
+            bindListener = new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    if (e.getSource() instanceof Button) {
+                        Button b = (Button)e.getSource();
+                        if (state != b.getState()) {
+                            setState(b.getState());
+                            repaint();
+                        }
+                    }
+                }
+            };
+        }
+        return bindListener;
+    }
+    
+    /**
+     * Bind the state of this button to another button's state.  Once bound, when the other
+     * button's state changes, this button will change its state to match.
+     * @param button The button whose state to bind to.
+     * @see #unbindStateFrom(com.codename1.ui.Button) 
+     * @since 7.0
+     */
+    public void bindStateTo(Button button) {
+        button.addStateChangeListener(bindListener());
+    }
+    
+    /**
+     * Unbinds the state of this button from another button.
+     * @param button The button to unbind state from.
+     * @since 7.0
+     * @see #bindStateTo(com.codename1.ui.Button) 
+     */
+    public void unbindStateFrom(Button button) {
+        if (bindListener != null) {
+            button.removeStateChangeListener(bindListener);
+        }
+    }
 
     /**
      * {@inheritDoc}
@@ -342,6 +390,7 @@ public class Button extends Label implements ReleasableComponent {
         super.focusGainedInternal();
         if(state != STATE_PRESSED) {
             state = STATE_ROLLOVER;
+            fireStateChange();
         }
     }
     
@@ -350,7 +399,11 @@ public class Button extends Label implements ReleasableComponent {
      */
     void focusLostInternal() {
         super.focusLostInternal();
-        state = STATE_DEFAULT;
+        if (state != STATE_DEFAULT) {
+            state = STATE_DEFAULT;
+            fireStateChange();
+        }
+        
     }
     
     /**
@@ -363,7 +416,10 @@ public class Button extends Label implements ReleasableComponent {
     }
     
     void setState(int state) {
-        this.state = state;
+        if (state != this.state) {
+            this.state = state;
+            fireStateChange();
+        }
     }
     
     /**
@@ -381,6 +437,7 @@ public class Button extends Label implements ReleasableComponent {
      * @return icon used
      * @see #STATE_PRESSED
      */
+    @Override
     public Image getPressedIcon() {
         return pressedIcon;
     }
@@ -391,6 +448,7 @@ public class Button extends Label implements ReleasableComponent {
      *
      * @return icon used
      */
+    @Override
     public Image getRolloverPressedIcon() {
         return rolloverPressedIcon;
     }
@@ -401,6 +459,7 @@ public class Button extends Label implements ReleasableComponent {
      *
      * @param rolloverPressedIcon icon used
      */
+    @Override
     public void setRolloverPressedIcon(Image rolloverPressedIcon) {
         this.rolloverPressedIcon = rolloverPressedIcon;
     }
@@ -411,6 +470,7 @@ public class Button extends Label implements ReleasableComponent {
      *
      * @return icon used
      */
+    @Override
     public Image getDisabledIcon() {
         return disabledIcon;
     }
@@ -422,6 +482,7 @@ public class Button extends Label implements ReleasableComponent {
      * @return icon used
      * @see #STATE_ROLLOVER
      */
+    @Override
     public Image getRolloverIcon() {
         return rolloverIcon;
     }
@@ -433,6 +494,7 @@ public class Button extends Label implements ReleasableComponent {
      * @param rolloverIcon icon to use
      * @see #STATE_ROLLOVER
      */
+    @Override
     public void setRolloverIcon(Image rolloverIcon) {
         this.rolloverIcon = rolloverIcon;
         setShouldCalcPreferredSize(true);
@@ -447,6 +509,7 @@ public class Button extends Label implements ReleasableComponent {
      * @param pressedIcon icon used
      * @see #STATE_PRESSED
      */
+    @Override
     public void setPressedIcon(Image pressedIcon) {
         this.pressedIcon = pressedIcon;
         setShouldCalcPreferredSize(true);
@@ -460,6 +523,7 @@ public class Button extends Label implements ReleasableComponent {
      *
      * @param disabledIcon icon used
      */
+    @Override
     public void setDisabledIcon(Image disabledIcon) {
         this.disabledIcon = disabledIcon;
         setShouldCalcPreferredSize(true);
@@ -478,6 +542,41 @@ public class Button extends Label implements ReleasableComponent {
                 // good enough. We never want to stop this sort of animation
                 parent.registerAnimated(this);
             }
+        }
+    }
+    
+    /**
+     * Adds a listener to be notified when the button state changes. 
+     * @param l Listener to be notified when state changes
+     * @see #getState() 
+     * @see #setState(int) 
+     * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void addStateChangeListener(ActionListener l) {
+        if (stateChangeListeners == null) {
+            stateChangeListeners = new EventDispatcher();
+        }
+        stateChangeListeners.addListener(l);
+    }
+    
+    /**
+     * Removes state change listener.
+     * @param l State change listener to remove.
+     * @see #addStateChangeListener(com.codename1.ui.events.ActionListener) 
+     * @see #getState() 
+     * @see #setState(int) 
+     * @since 7.0
+     */
+    public void removeStateChangeListener(ActionListener l) {
+        if (stateChangeListeners != null) {
+            stateChangeListeners.removeListener(l);
+        }
+    }
+    
+    private void fireStateChange() {
+        if (stateChangeListeners != null && stateChangeListeners.hasListeners()) {
+            stateChangeListeners.fireActionEvent(new ActionEvent(this));
         }
     }
     
@@ -521,6 +620,7 @@ public class Button extends Label implements ReleasableComponent {
      *
      * @return the button icon based on its current state
      */
+    @Override
     public Image getIconFromState() {
         Image icon = getMaskedIcon();
         if(!isEnabled() && getDisabledIcon() != null) {
@@ -589,7 +689,10 @@ public class Button extends Label implements ReleasableComponent {
      */
     public void pressed(){
         if (!Display.impl.isScrollWheeling()) {
-            state=STATE_PRESSED;
+            if (state != STATE_PRESSED) {
+                state=STATE_PRESSED;
+                fireStateChange();
+            }
             repaint();
         }
     }
@@ -609,9 +712,14 @@ public class Button extends Label implements ReleasableComponent {
      */
     public void released(int x, int y) {
         if (!Display.impl.isScrollWheeling()) {
-            state=STATE_ROLLOVER;
+            if (state != STATE_ROLLOVER) {
+                state=STATE_ROLLOVER;
+                fireStateChange();
+            }
+            //if (releaseRadius > 0 || (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1))) {
             fireActionEvent(x, y);
-        
+            //}
+            
             repaint();
         }
     }
@@ -621,6 +729,8 @@ public class Button extends Label implements ReleasableComponent {
      */
     public void keyPressed(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
+            pressedX = -1;
+            pressedY = -1;
             pressed();
         }
     }
@@ -673,15 +783,20 @@ public class Button extends Label implements ReleasableComponent {
         }
     }
 
+    private int pressedX, pressedY;
+    
     /**
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        clearDrag();
-        setDragActivated(false);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.clearDrag();
+        leadParent.setDragActivated(false);
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
+        pressedX = x;
+        pressedY = y;
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
@@ -704,7 +819,7 @@ public class Button extends Label implements ReleasableComponent {
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
-        	f.removeComponentAwaitingRelease(this);
+            f.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it
@@ -721,9 +836,15 @@ public class Button extends Label implements ReleasableComponent {
      */
     protected void dragInitiated() {
         if(Display.getInstance().shouldRenderSelection(this)) {
-            state=STATE_ROLLOVER;
+            if (state != STATE_ROLLOVER) {
+                state=STATE_ROLLOVER;
+                fireStateChange();
+            }
         } else {
-            state=STATE_DEFAULT;
+            if (state != STATE_DEFAULT) {
+                state=STATE_DEFAULT;
+                fireStateChange();
+            }
         }
         repaint();
     }

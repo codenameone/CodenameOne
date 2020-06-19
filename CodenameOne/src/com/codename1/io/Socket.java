@@ -29,6 +29,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Class implementing the socket API
@@ -69,7 +71,7 @@ public class Socket {
         }
         Display.getInstance().startThread(new Runnable() {
             public void run() {
-                Object connection = Util.getImplementation().connectSocket(host, port);
+                Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
                 if(connection != null) {
                     sc.setConnected(true);
                     sc.connectionEstablished(new SocketInputStream(connection, sc), new SocketOutputStream(connection, sc));

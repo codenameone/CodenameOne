@@ -201,6 +201,9 @@ public class ActionEvent {
     public ActionEvent(Object source,Type type) {
         this.source = source;
         this.trigger = type;
+        if (type == Type.LongPointerPress) {
+            longEvent = true;
+        }
     }
 
     /**
@@ -216,6 +219,9 @@ public class ActionEvent {
         this.keyEvent = x;
         this.y = y;
         this.trigger = type;
+        if (type == Type.LongPointerPress) {
+            longEvent = true;
+        }
     }
     
     /**
@@ -233,6 +239,9 @@ public class ActionEvent {
         this.keyEvent = x;
         this.y = y;
         this.trigger = type;
+        if (type == Type.LongPointerPress) {
+            longEvent = true;
+        }
     }
     /**
      * Creates a new instance of ActionEvent for a drop operation
@@ -249,6 +258,9 @@ public class ActionEvent {
         this.keyEvent = x;
         this.y = y;
         this.trigger = type;
+        if (type == Type.LongPointerPress) {
+            longEvent = true;
+        }
     }
     
     
@@ -263,6 +275,9 @@ public class ActionEvent {
         this.source = source;
         this.keyEvent = keyEvent;
         this.trigger = type;
+        if (type == Type.LongPointerPress) {
+            longEvent = true;
+        }
     }
     
     

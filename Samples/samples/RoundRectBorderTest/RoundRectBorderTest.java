@@ -89,9 +89,13 @@ public class RoundRectBorderTest {
         
         l = l("Border Radius 10");
         l.getStyle().setBorder(b().cornerRadius(10f));
+        
+        
         hi.add(l);
         
-        
+        l = l("Bottom left and right");
+        l.getStyle().setBorder(b().bottomLeftMode(true).bottomRightMode(true).topLeftMode(false).topRightMode(false));
+        hi.add(l);
         
         hi.show();
     }

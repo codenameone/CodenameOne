@@ -1,6 +1,7 @@
 package com.codename1.samples;
 
 
+import com.codename1.components.RadioButtonList;
 import static com.codename1.ui.CN.*;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -18,6 +19,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.DefaultListModel;
 
 /**
  * Sample using Sheet class.
@@ -58,14 +60,23 @@ public class SheetSample {
         }
         Form hi = new Form("Hi World", new BorderLayout());
 
-
+        RadioButtonList sheetPos = new RadioButtonList(new DefaultListModel(
+                BorderLayout.NORTH, BorderLayout.EAST, BorderLayout.SOUTH, BorderLayout.WEST, BorderLayout.CENTER
+        ));
         Button b = new Button("Open Sheet");
+        
         b.addActionListener(e->{
-            new MySheet(null).show();
+            MySheet sheet = new MySheet(null);
+            int positionIndex = sheetPos.getModel().getSelectedIndex();
+            if (positionIndex >= 0) {
+                String pos = (String)sheetPos.getModel().getItemAt(positionIndex);
+                sheet.setPosition(pos);
+            }
+            sheet.show();
             
             
         });
-        hi.add(BorderLayout.NORTH, b);
+        hi.add(BorderLayout.NORTH, BoxLayout.encloseY(sheetPos, b));
         hi.show();
     }
     

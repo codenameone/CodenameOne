@@ -2202,16 +2202,23 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
     POOL_BEGIN();
-    
+    float alpha1 = 1.0;
+    if (((n1 >> 24) & 0xff) != 0) {
+        alpha1 = ((float)((n1 >> 24) & 0xff))/255.0;
+    }
+    float alpha2 = 1.0;
+    if (((n2 >> 24) & 0xff) != 0) {
+        alpha2 = ((float)((n2 >> 24) & 0xff))/255.0;
+    }
     CGFloat components[8] = {
         ((float)((n1 & 0xFF0000) >> 16))/255.0,
         ((float)(n1 & 0xff00 >> 8))/255.0,
         ((float)(n1 & 0xff))/255.0,
-        1.0,
+        alpha1,
         ((float)((n2 & 0xFF0000) >> 16))/255.0,
         ((float)(n2 & 0xff00 >> 8))/255.0,
         ((float)(n2 & 0xff))/255.0,
-        1.0 };
+        alpha2 };
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
@@ -2229,15 +2236,24 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
     POOL_BEGIN();
+
+    float alpha1 = 1.0;
+    if (((n1 >> 24) & 0xff) != 0) {
+        alpha1 = ((float)((n1 >> 24) & 0xff))/255.0;
+    }
+    float alpha2 = 1.0;
+    if (((n2 >> 24) & 0xff) != 0) {
+        alpha2 = ((float)((n2 >> 24) & 0xff))/255.0;
+    }
     CGFloat components[8] = {
         ((float)((n1 >> 16) & 0xff))/255.0,
         ((float)((n1 >> 8) & 0xFF))/255.0,
         ((float)(n1 & 0xff))/255.0,
-        1.0,
+        alpha1,
         ((float)((n2 >> 16) & 0xFF))/255.0,
         ((float)((n2 >> 8) & 0xFF))/255.0,
         ((float)(n2 & 0xff))/255.0,
-        1.0 };
+        alpha2 };
     
     size_t num_locations = 2;
     CGFloat locations[2] = { 0.0, 1.0 };
@@ -2486,6 +2502,9 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
                 NSURLRequest* r = [NSURLRequest requestWithURL:nu];
                 [w loadRequest:r];
             } else {
+                if ([str hasPrefix:@"file://localhost"]) {
+                    str = [str substringFromIndex:16];
+                }
                 NSURL* nu = [NSURL fileURLWithPath:str];           
                 [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
             }
@@ -3912,6 +3931,23 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_END();
     });
 }
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, *)) {
+        return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    } else {
+        return JAVA_FALSE;
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, *)) {
+        return JAVA_TRUE;
+    } else {
+        return JAVA_FALSE;
+    }
+}
+
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif
@@ -6158,6 +6194,44 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_
     return o;
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getLongMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getShortMonthName___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+#else
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
+    [formatter setDateFormat:@"MMM"];
+    JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
+    POOL_END();
+    return o;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG d) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -6871,7 +6945,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             
             pickerView.frame = CGRectMake(0, 22, preferredWidth/scaleValue, preferredHeight/scaleValue);
             popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
-
+            toolbar.frame = CGRectMake(0,0, preferredWidth/scaleValue, toolbar.intrinsicContentSize.height);
             
         } else {
             if(isIOS7()) {
@@ -7053,7 +7127,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
-            
+            toolbar.frame = CGRectMake(0,0, preferredWidth/scaleValue, toolbar.intrinsicContentSize.height);
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
         } else {
@@ -7260,10 +7334,10 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
     
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
     POOL_BEGIN();
     SocketImpl* impl = [[SocketImpl alloc] init];
-    BOOL b = [impl connect:toNSString(CN1_THREAD_STATE_PASS_ARG host) port:port];
+    BOOL b = [impl connect:toNSString(CN1_THREAD_STATE_PASS_ARG host) port:port timeout:connectTimeout];
     POOL_END();
     if(b) {
         return (JAVA_LONG)impl;
@@ -7612,23 +7686,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         
         if ( width < 0 ) width = -width;
         if ( height < 0 ) height = -height;
-        
+        if (width == 0 || height == 0) {
+            POOL_END();
+            return;
+        }
         AlphaConsumer *ac = malloc(sizeof(AlphaConsumer));
         ac->originX = x;
         ac->originY = y;
         ac->width = width;
         ac->height = height;
-        
-        
-        //CN1Log(@"AC Width %d", ac.width);
-        
-        //jbyte maskArray[ac.width*ac.height];
+
         jbyte* maskArray = malloc(sizeof(jbyte)*ac->width*ac->height);
-        
-        //CN1Log(@"Mask width %d height %d",
-        //      ac.width,
-        //      ac.height
-        //      );
+
         ac->alphas = maskArray;
         Renderer_produceAlphas(renderer, ac);
         
@@ -7662,14 +7731,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         
         glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ac->width, ac->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, maskArray);
         GLErrorLog;
-        free(maskArray);
-        free(ac);
+        
         glBindTexture(GL_TEXTURE_2D, 0);
         GLErrorLog;
         _glDisableClientState(GL_VERTEX_ARRAY);
         GLErrorLog;
         _glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         GLErrorLog;
+        
+        free(maskArray);
+        free(ac);
+
         outTexture = tex;
         //return (JAVA_LONG)tex;
         POOL_END();
@@ -7680,6 +7752,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #endif
     
 }
+
 
 
 float clamp_float_to_int(float val){
@@ -8030,6 +8103,42 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted___R_boolean(CN1_THREAD_S
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__(instanceObject);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetLeft___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 11.0, *)) {
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        return (JAVA_INT)(window.safeAreaInsets.left * scaleValue);
+    } else {
+        return 0;
+    }
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetTop___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 11.0, *)) {
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        return (JAVA_INT)(window.safeAreaInsets.top * scaleValue);
+    } else {
+        return 0;
+    }
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 11.0, *)) {
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        return (JAVA_INT)(window.safeAreaInsets.right * scaleValue);
+    } else {
+        return 0;
+    }
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 11.0, *)) {
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        return (JAVA_INT)(window.safeAreaInsets.bottom * scaleValue);
+    } else {
+        return 0;
+    }
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -8542,8 +8651,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_Stri
     return com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, callbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
-    return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port);
+JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
+    return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port, connectTimeout);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

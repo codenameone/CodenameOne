@@ -23,14 +23,9 @@
 
 package com.codename1.impl.javase;
 
-import com.codename1.ui.ComboBox;
 import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.TextArea;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.list.DefaultListModel;
 
 /**
  * Helper method for textfield onscreen keyboard (editStringAt)
@@ -87,6 +82,33 @@ public class TextEditUtil {
         };
         Display.getInstance().callSerially(task);
     }
+    
+    /**
+     * Opens onscreenkeyboard for the next textfield. The method works in EDT if
+     * needed.
+     */
+    public static void editPrevTextArea() {
+        Runnable task = new Runnable() {
+
+            public void run() {
+                Component next = getPrevEditComponent();
+                if (next != null) {
+                    if (next.isFocusable()) {
+                        next.requestFocus();
+                        next.startEditingAsync();
+                    }
+                    /*
+                    if (next instanceof TextArea) {
+                        TextArea text = (TextArea) next;
+                        text.requestFocus();
+                        Display.getInstance().editString(next,
+                                text.getMaxSize(), text.getConstraint(), text.getText(), 0);
+                    }*/
+                } 
+            }
+        };
+        Display.getInstance().callSerially(task);
+    }
 
     /**
      *
@@ -98,6 +120,22 @@ public class TextEditUtil {
             Form parent = curEditedComponent.getComponentForm();
             if (parent != null) {
                 return parent.getNextComponent(curEditedComponent);
+            }
+            
+        }
+        return null;
+    }
+    
+    /**
+     *
+     * @return the next editable TextArea after the currently edited component.
+     */
+    private static Component getPrevEditComponent() {
+        
+        if (curEditedComponent != null) {
+            Form parent = curEditedComponent.getComponentForm();
+            if (parent != null) {
+                return parent.getPreviousComponent(curEditedComponent);
             }
             
         }

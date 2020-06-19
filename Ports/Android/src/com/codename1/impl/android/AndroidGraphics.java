@@ -57,8 +57,11 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
 import android.view.View;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.CN;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -802,10 +805,23 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
+        int c1 = startColor;
+        int alphaStart = ColorUtil.alpha(startColor);
+        if (alphaStart == 0) {
+            alphaStart = 0xff;
+        }
+        int alphaEnd = ColorUtil.alpha(endColor);
+        if (alphaEnd == 0) {
+            alphaEnd = 0xff;
+        }
+        c1 = ColorUtil.argb(alphaStart, ColorUtil.red(c1), ColorUtil.green(c1), ColorUtil.blue(c1));
+        int c2 = endColor;
+        c2 = ColorUtil.argb(alphaEnd, ColorUtil.red(c2), ColorUtil.green(c2), ColorUtil.blue(c2));
+        
         if(!horizontal) {
-            paint.setShader(new LinearGradient(x, y, x, y+height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x, y+height, c1, c2, Shader.TileMode.MIRROR));
         } else {
-            paint.setShader(new LinearGradient(x, y, x+width, y, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x+width, y, c1, c2, Shader.TileMode.MIRROR));
         }
         canvas.save();
         applyTransform();
@@ -1458,7 +1474,13 @@ class AndroidGraphics {
         canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);
     }
 
+    private int maxBitmapSize, maxBitmapHeight;
+    
     public void drawPath(Path p, Stroke stroke) {
+        if (maxBitmapSize == 0) {
+            maxBitmapSize = Integer.parseInt(Display.getInstance().getProperty("android.maxBitmapSize", Math.max(CN.getDisplayWidth(), CN.getDisplayHeight())*2+""));
+        }
+        
         paint.setStyle(Paint.Style.STROKE);
         Stroke old = setStroke(stroke);
         //canvas.save();
@@ -1479,7 +1501,7 @@ class AndroidGraphics {
             float bw2 = Math.max(1, b2w) / Math.max(1, bw);
             float bh2 = Math.max(1, bounds2.height())/Math.max(1, bounds.height());
             float ratio = Math.max(bw2, bh2);
-            if (ratio > 2 && !isMutableImageGraphics) {
+            if (ratio > 2 && !isMutableImageGraphics && bounds2.width() <= maxBitmapSize && bounds2.height() <= maxBitmapSize) {
                 // If the canvas is hardware accelerated, then it will rasterize the path
                 // first, then apply the transform which leads to blurry paths if the transform does
                 // significant scaling.

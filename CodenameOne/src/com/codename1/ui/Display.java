@@ -49,6 +49,7 @@ import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -66,6 +67,7 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
@@ -90,6 +92,8 @@ public final class Display extends CN1Constants {
     boolean codenameOneExited;
     private boolean inNativeUI;
 
+    private EventDispatcher messageListeners;
+    
     /**
      * A common sound type that can be used with playBuiltinSound
      */
@@ -365,7 +369,7 @@ public final class Display extends CN1Constants {
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;
-    private int longPressInterval = 800;
+    private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
     private int keyRepeatInitialIntervalTime = 800;
@@ -380,6 +384,8 @@ public final class Display extends CN1Constants {
     private long[] dragPathTime;
     private int dragPathOffset = 0;
     private int dragPathLength = 0;
+    
+    private Boolean darkMode;
 
      /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
@@ -463,6 +469,7 @@ public final class Display extends CN1Constants {
     private EventDispatcher virtualKeyboardListeners;
     
     private int lastSizeChangeEventWH = -1;
+    
 
     /**
      * Private constructor to prevent instanciation
@@ -709,8 +716,26 @@ public final class Display extends CN1Constants {
     }
 
     
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public Boolean isDarkMode() {
+        if(darkMode != null) {
+            return darkMode;
+        }
+        return impl.isDarkMode();
+    }
     
-    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public void setDarkMode(Boolean darkMode) {
+        this.darkMode = darkMode;
+    }
     
     private class EdtException extends RuntimeException {
         private Throwable cause;
@@ -1502,7 +1527,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidate();
+            current.revalidateWithAnimationSafety();
             current.repaint();
             current.onShowCompletedImpl();
             return;
@@ -1550,9 +1575,12 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
+            newForm.revalidateWithAnimationSafety();
+            
         }
 
         boolean transitionExists = false;
@@ -1760,6 +1788,10 @@ public final class Display extends CN1Constants {
     public void stopEditing(Component cmp, Runnable onFinish) {
         if(isTextEditing(cmp)) {
             impl.stopTextEditing(onFinish);
+        } else {
+            if (onFinish != null) {
+                onFinish.run();
+            }
         }
     }
 
@@ -2131,6 +2163,8 @@ public final class Display extends CN1Constants {
         }        
     }
     
+    private Rectangle tmpRect = new Rectangle();
+    
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2144,11 +2178,12 @@ public final class Display extends CN1Constants {
             return;
         }
         if(w == current.getWidth() && h == current.getHeight()) {
-            // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == current.getWidth() + current.getHeight()) {
+        // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
+            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
                 return;            
             }
         }
+        
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
@@ -3192,7 +3227,62 @@ public final class Display extends CN1Constants {
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
     }
-
+    
+    /**
+     * Posts a message to the native platform.  Different platforms may handle messages posted this
+     * way differently.  
+     * <p>The Javascript port will dispatch the message on the {@literal window} object
+     * as a custom DOM event named 'cn1outbox', with the event data containing a 'detail' key with the 
+     * message, and a 'code' key with the code.</p>
+     * @param message The message.
+     * @since 7.0
+     */
+    public void postMessage(MessageEvent message) {
+        impl.postMessage(message);
+    }
+    
+    /**
+     * Adds a listener to receive messages from the native platform.  This is one mechanism for the native
+     * platform to communicate with the Codename one app.  
+     * 
+     * <p>In the JavaScript port, listeners will be notified when DOM events named 'cn1inbox' are received on the 
+     * window object.  The event data 'detail' key will be the source of the message, and the 'code' key will be the
+     * source of the code.
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void addMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners == null) {
+            messageListeners = new EventDispatcher();
+        }
+        messageListeners.addListener(l);
+    }
+    
+    /**
+     * Removes a listener from receiving messages from the native platform.
+     * 
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void removeMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners != null) {
+            messageListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Dispatches a message to all of the registered listeners.
+     * @param evt 
+     * @see #addMessageListener(com.codename1.ui.events.ActionListener) 
+     * @see #removeMessageListener(com.codename1.ui.events.ActionListener) 
+     * @since 7.0
+     */
+    public void dispatchMessage(MessageEvent evt) {
+        if (messageListeners != null && messageListeners.hasListeners()) {
+            messageListeners.fireActionEvent(evt);
+        }
+    }
+    
     /**
      * Indicates the way commands should be added to a form as one of the ocmmand constants defined
      * in this class
@@ -3324,6 +3414,43 @@ public final class Display extends CN1Constants {
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
     }
+    
+    /**
+     * Returns the device density as a string.
+     * 
+     * <ul>
+     * 
+     * <li>DENSITY_VERY_LOW : "very-low"</li>
+     * <li>DENSITY_LOW : "low"</li>
+     * <li>DENSITY_MEDIUM : "medium"</li>
+     * <li>DENSITY_HIGH : "high"</li>
+     * <li>DENSITY_VERY_HIGH : "very-high"</li>
+     * <li>DENSITY_HD : "hd"</li>
+     * <li>DENSITY_560 : "560"</li>
+     * <li>DENSITY_2HD : "2hd"</li>
+     * <li>DENSITY_4K : "4k";</li>
+     * </ul>
+     * 
+     * @return Device density as a string.
+     * @see #getDeviceDensity() 
+     * @since 7.0
+     * 
+     */
+    public String getDensityStr() {
+        switch (getDeviceDensity()) {
+            case DENSITY_VERY_LOW: return "very-low";
+            case DENSITY_LOW: return "low";
+            case DENSITY_MEDIUM: return "medium";
+            case DENSITY_HIGH: return "high";
+            case DENSITY_VERY_HIGH: return "very-high";
+            case DENSITY_HD: return "hd";
+            case DENSITY_560: return "560";
+            case DENSITY_2HD: return "2hd";
+            case DENSITY_4K: return "4k";
+            default:
+                throw new IllegalStateException("Unknown density "+getDeviceDensity());
+        }
+    }
 
     /**
      * Plays a builtin device sound matching the given identifier, implementations
@@ -3337,6 +3464,18 @@ public final class Display extends CN1Constants {
         impl.playBuiltinSound(soundIdentifier);
     }
 
+    /**
+     * Gets the display safe area as a rectangle.  
+     * @param rect Out parameter that will store the display safe area.
+     * @return The display safe area.
+     * @see Form#getSafeArea() 
+     * @since 7.0
+     */
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        return impl.getDisplaySafeArea(rect);
+    }
+    
+    
     /**
      * Installs a replacement sound as the builtin sound responsible for the given
      * sound identifier (this will override the system sound if such a sound exists).
@@ -3780,7 +3919,7 @@ hi.show();}</pre></noscript>
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
      * 
-     * @return the name of the platform e.g. ios, rim, win, and, me
+     * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public String getPlatformName() {
         return impl.getPlatformName();
@@ -4752,4 +4891,62 @@ hi.show();}</pre></noscript>
         return impl.captureScreen();
     }
 
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public Timer setTimeout(int timeout, final Runnable r) {
+        
+        Timer t = new Timer();
+        t.schedule(new TimerTask() {
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, (long)timeout);
+        return t;
+    }
+    
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public Timer setInterval(int period, final Runnable r) {
+        Timer t = new Timer();
+        t.schedule(new TimerTask(){
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, period, period);
+        
+        
+        return t;
+    }
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
+     * 
+     * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
+     * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
+     * 
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public BrowserComponent getSharedJavascriptContext() {
+        return impl.getSharedJavscriptContext();
+    }
+    
 }

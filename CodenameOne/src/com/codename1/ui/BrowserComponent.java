@@ -35,6 +35,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
@@ -518,7 +519,7 @@ public class BrowserComponent extends Container {
      */
     public BrowserComponent() {
         setUIID("BrowserComponent");
-        
+        putClientProperty("BrowserComponent.useWKWebView", "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true")));
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, placeholder);
         CN.callSerially(new Runnable() {
@@ -573,6 +574,16 @@ public class BrowserComponent extends Container {
         }
     }
     
+    /**
+     * Registers a callback to be run when the BrowserComponent is "ready".  The browser component
+     * is considered to be ready once the onLoad event has been fired on the first page.
+     * If this method is called after the browser component is already "ready", then the callback
+     * will be executed immediately.  Otherwise it will be called in the first onLoad event.
+     * @param onReady Callback to be executed when the browser component is ready.
+     * @return Self for chaining.
+     * @since 7.0
+     * @see #waitForReady() 
+     */
     public BrowserComponent ready(final SuccessCallback<BrowserComponent> onReady) {
         if (ready) {
             onReady.onSucess(this);
@@ -583,8 +594,74 @@ public class BrowserComponent extends Container {
                     onReady.onSucess(BrowserComponent.this);
                 }
             };
+            addWebEventListener(onStart, l);
         }
         return this;
+    }
+    
+    /**
+     * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
+     * ready once it has received the start or load event from at least one page.  Default timeout is 5000ms.
+     * @return AsyncResouce that will complete when the browser component is ready.
+     * @since 7.0
+     */
+    public AsyncResource<BrowserComponent> ready() {
+        return ready(5000);
+    }
+    
+    /**
+     * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
+     * ready once it has received the start or load event from at least one page.
+     * @return AsyncResouce that will complete when the browser component is ready.
+     * @param timeout Timeout in milliseconds to wait. 
+     * @since 7.0
+     */
+    public AsyncResource<BrowserComponent> ready(int timeout) {
+        final AsyncResource<BrowserComponent> out = new AsyncResource<BrowserComponent>();
+        
+        if (ready) {
+            out.complete(this);
+        } else {
+            class LoadWrapper {
+                Timer timer;
+                ActionListener l;
+            }
+            final LoadWrapper w = new LoadWrapper();
+            if (timeout > 0) {
+                
+                w.timer = CN.setTimeout(timeout, new Runnable(){
+                    public void run() {
+                        w.timer = null;
+                        if (w.l != null) {
+                            removeWebEventListener(onStart, w.l);
+                            removeWebEventListener(onLoad, w.l);
+                        }
+                        if (!out.isDone()) {
+                            out.error(new RuntimeException("Timeout exceeded waiting for browser component to be ready"));
+                        }
+                    }
+
+                });
+            }
+            w.l = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    w.l = null;
+                    if (w.timer != null) {
+                        w.timer.cancel();
+                        w.timer = null;
+                    }
+                    removeWebEventListener(onStart, this);
+                    removeWebEventListener(onLoad, this);
+                    
+                    if (!out.isDone()) {
+                        out.complete(BrowserComponent.this);
+                    }
+                }
+            };
+            addWebEventListener(onStart, w.l);
+            addWebEventListener(onLoad, w.l);
+        }
+        return out;
     }
 
     /**

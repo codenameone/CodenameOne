@@ -283,6 +283,9 @@ public final class IOSNative {
     native boolean fileExists(String file);
     native boolean isDirectory(String file);
 
+    native boolean isDarkMode();
+    native boolean isDarkModeDetectionSupported();
+    
     native int fileCountInDir(String dir);
     native void listFilesInDir(String dir, String[] files);
     native void createDirectory(String dir);
@@ -429,6 +432,8 @@ public final class IOSNative {
     native double parseDouble(String localeFormattedDecimal);
     native String formatDateTimeMedium(long date);
     native String formatDateTimeShort(long date);
+    native String getLongMonthName(long time);
+    native String getShortMonthName(long time);
     native String getCurrencySymbol();
     
     native void scanQRCode();
@@ -465,7 +470,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port);    
+    public native long connectSocket(String host, int port, int connectTimeout);    
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
@@ -705,14 +710,11 @@ public final class IOSNative {
 
     native void setConnectionId(long peer, int id);
 
-    
+    native int getDisplaySafeInsetLeft();
 
-    
-    
+    native int getDisplaySafeInsetTop();
 
-     
+    native int getDisplaySafeInsetRight();
 
-
-
-   
+    native int getDisplaySafeInsetBottom();
 }

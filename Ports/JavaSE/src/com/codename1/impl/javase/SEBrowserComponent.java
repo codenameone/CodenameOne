@@ -419,8 +419,13 @@ public class SEBrowserComponent extends PeerComponent {
         this.panel = fx;
         WebEngine we = web.getEngine();
         try {
+            File home = new File(System.getProperty("user.home") + File.separator + JavaSEPort.getAppHomeDir());
+            File userdata = new File(home, ".fxuserdata");
+            if(!userdata.exists()){
+                userdata.mkdirs();
+            }
             Method mtd = we.getClass().getMethod("setUserDataDirectory",java.io.File.class); 
-            mtd.invoke(we, new File(JavaSEPort.getAppHomeDir()));
+            mtd.invoke(we, userdata);
         } catch(Throwable t) {
             System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
             t.printStackTrace();

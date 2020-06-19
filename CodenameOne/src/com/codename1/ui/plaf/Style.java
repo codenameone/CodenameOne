@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.*;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.util.EventDispatcher;
@@ -58,6 +59,12 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Chen Fishbein
  */
 public class Style {
+    
+    /**
+     * Flag to suppress change events
+     */
+    private boolean suppressChangeEvents;
+    
     private Style[] proxyTo;
     
     /**
@@ -1223,6 +1230,17 @@ public class Style {
     }
 
     /**
+     * Strips all margin and padding from this style.
+     * 
+     * @since 7.0
+     */
+    public void stripMarginAndPadding() {
+        setPadding(0, 0, 0, 0);
+        setMargin(0, 0, 0, 0);
+        setBorder(Border.createEmpty());
+    }
+    
+    /**
      * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
      *  
      * @param top number of units to pad the top
@@ -1446,6 +1464,52 @@ public class Style {
             return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
         }
         return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+    
+    private void initPaddingUnits() {
+        if (paddingUnit == null) {
+            paddingUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};
+        }
+    }
+    
+    /**
+     * Sets left padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitLeft(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.LEFT] = unit;
+    }
+    
+    /**
+     * Sets right padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitRight(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.RIGHT] = unit;
+    }
+    
+    /**
+     * Sets top padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitTop(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.TOP] = unit;
+    }
+    
+    /**
+     * Sets bottom padding unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setPaddingUnitBottom(byte unit) {
+        initPaddingUnits();
+        paddingUnit[Component.BOTTOM] = unit;
     }
     
     
@@ -2339,12 +2403,31 @@ public class Style {
             firePropertyChanged(MARGIN);
         }
     }
-
+    
+    
+    /**
+     * Checks to see if change events are currently suppressed.
+     * @return True if change events are suppressed.
+     * @since 7.0
+     */
+    public boolean isSuppressChangeEvents() {
+        return suppressChangeEvents;
+    }
+    
+    /**
+     * Enables or disables events.  Use this to temporarily suppress change events.
+     * @param suppress True to suppress change events.
+     * @since 7.0
+     */
+    public void setSuppressChangeEvents(boolean suppress) {
+        this.suppressChangeEvents = suppress;
+    }
     
     private void firePropertyChanged(String propertName) {
+        
         roundRectCache = null;
         nativeOSCache = null;
-        if (listeners == null) {
+        if (listeners == null || suppressChangeEvents) {
             return;
         }
         listeners.fireStyleChangeEvent(propertName, this);
@@ -2500,7 +2583,14 @@ public class Style {
         if(paddingUnit != null && paddingUnit.length < 4) {
             this.paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
         } else {
-            this.paddingUnit = paddingUnit;
+            if (paddingUnit == null) {
+                this.paddingUnit = null;
+            } else {
+                if (this.paddingUnit == null) {
+                    this.paddingUnit = new byte[4];
+                }
+                System.arraycopy(paddingUnit, 0, this.paddingUnit, 0, 4);
+            }
         }
     }
 
@@ -2531,7 +2621,148 @@ public class Style {
         if(marginUnit != null && marginUnit.length < 4) {
             this.marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
         } else {
-            this.marginUnit = marginUnit;
+            if (marginUnit == null) {
+                this.marginUnit = null;
+            } else {
+                if (this.marginUnit == null) {
+                    this.marginUnit = new byte[4];
+                }
+                System.arraycopy(marginUnit, 0, this.marginUnit, 0, 4);
+            }
         }
     }
+    
+    private void initMarginUnits() {
+        if (marginUnit == null) {
+            marginUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};
+        }
+    }
+    
+    /**
+     * Sets left margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitLeft(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.LEFT] = unit;
+    }
+    
+    /**
+     * Sets right margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitRight(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.RIGHT] = unit;
+    }
+    
+    /**
+     * Sets top margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitTop(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.TOP] = unit;
+    }
+    
+    /**
+     * Sets bottom margin unit.
+     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @since 7.0
+     */
+    public void setMarginUnitBottom(byte unit) {
+        initMarginUnits();
+        marginUnit[Component.BOTTOM] = unit;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(obj == null) {
+            return false;
+        }
+        if(getClass() != obj.getClass()) {
+            return false;
+        }
+        final Style other = (Style) obj;
+        if(this.fgColor != other.fgColor) {
+            return false;
+        }
+        if(this.bgColor != other.bgColor) {
+            return false;
+        }
+        if(this.font != other.font &&
+            (this.font == null || !this.font.equals(other.font))) {
+            return false;
+        }
+        if(this.bgImage != other.bgImage &&
+            (this.bgImage == null || !this.bgImage.equals(other.bgImage))) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.padding, other.padding)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.margin, other.margin)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.paddingUnit, other.paddingUnit)) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.marginUnit, other.marginUnit)) {
+            return false;
+        }
+        if(this.transparency != other.transparency) {
+            return false;
+        }
+        if(this.opacity != other.opacity) {
+            return false;
+        }
+        if(this.backgroundType != other.backgroundType) {
+            return false;
+        }
+        if(this.backgroundAlignment != other.backgroundAlignment) {
+            return false;
+        }
+        if(!Objects.deepEquals(this.backgroundGradient,
+            other.backgroundGradient)) {
+            return false;
+        }
+        if(this.border != other.border &&
+            (this.border == null || !this.border.equals(other.border))) {
+            return false;
+        }
+        if(this.align != other.align) {
+            return false;
+        }
+        if(this.textDecoration != other.textDecoration) {
+            return false;
+        }
+        return true;
+    } 
+    
+    private static boolean equals(float[] a, float[] a2) {
+        if (a==a2) {
+            return true;
+        }
+        
+        if (a==null || a2==null) {
+            return false;
+        }
+
+        int length = a.length;
+        if (a2.length != length) {
+            return false;
+        }
+
+        for (int i=0; i<length; i++) {
+            if (a[i] != a2[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    
 }

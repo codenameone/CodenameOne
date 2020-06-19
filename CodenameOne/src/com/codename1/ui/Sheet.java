@@ -33,6 +33,8 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
@@ -127,6 +129,7 @@ public class Sheet extends Container {
     private Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Label title = new Label();
     private Container commandsContainer = new Container(BoxLayout.x());
+    private boolean allowClose = true;
     private Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
             BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
@@ -196,6 +199,7 @@ public class Sheet extends Container {
      */
     public Sheet(Sheet parent, String title, String uiid) {
         if (parent != null) {
+            allowClose = parent.allowClose;
             position = parent.position;
             tabletPosition = parent.tabletPosition;
         }
@@ -212,7 +216,43 @@ public class Sheet extends Container {
         this.parentSheet = parent;
         this.title.setText(title);
         initUI();
+        updateBorderForPosition();
         
+    }
+    
+    /**
+     * Sets whether the user is able to close this sheet.  Default is true.  If you set
+     * this value to false, then there will be no close button, and pressing outside of the sheet
+     * will have no effect.
+     * 
+     * <p>Child sheets will assume the settings of the parent.  The back button will still work,
+     * but the top level sheet will not include a close button.</p>
+     * 
+     * @param allowClose True to allow user to close the sheet.  False to prevent it.
+     * @since 7.0
+     */
+    public void setAllowClose(boolean allowClose) {
+        if (allowClose != this.allowClose) {
+            this.allowClose = allowClose;
+            if (!allowClose && isInitialized()) {
+                form.removePointerPressedListener(formPointerListener);
+            } else if (allowClose && isInitialized()) {
+                form.addPointerPressedListener(formPointerListener);
+            }
+            if (parentSheet == null) {
+                backButton.setVisible(allowClose);
+                backButton.setEnabled(allowClose);
+            }
+        }
+    }
+    
+    /**
+     * Checks whether the user is allowed to close this sheet.
+     * @return True if user can close the sheet.
+     * 
+     */
+    public boolean isAllowClose() {
+        return allowClose;
     }
 
     /**
@@ -250,6 +290,8 @@ public class Sheet extends Container {
 
     private void initUI() {
         setLayout(new BorderLayout());
+        contentPane.setSafeArea(true);
+        titleBar.setSafeArea(true);
         add(BorderLayout.NORTH, titleBar);
         if (parentSheet != null) {
             FontImage.setMaterialIcon(backButton, FontImage.MATERIAL_ARROW_BACK);
@@ -271,6 +313,29 @@ public class Sheet extends Container {
         show(DEFAULT_TRANSITION_DURATION);
     }
     
+    /**
+     * Gets the current sheet on the current form or null if no sheet is currently being displayed.
+     * @return The current sheet or null.
+     * @since 7.0
+     */
+    public static Sheet getCurrentSheet() {
+        if (CN.getCurrentForm() == null) {
+            return null;
+        }
+        Container cnt = CN.getCurrentForm().getFormLayeredPaneIfExists();
+        if (cnt == null) {
+            return null;
+        }
+        class Result {
+            Sheet found;
+        }
+        for (Component cmp : $(".Sheet", cnt)) {
+            if (cmp instanceof Sheet) {
+                return (Sheet)cmp;
+            }
+        }
+        return null;
+    }
    
     /**
      * Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
@@ -281,6 +346,48 @@ public class Sheet extends Container {
      * @see #show() 
      */
     public void show(final int duration) {
+        
+        // We need to add some margin to the title  to prevent overlap with the 
+        // back button and the commaneds.
+        int titleMargin = Math.max(
+                commandsContainer.getPreferredW() + commandsContainer.getStyle().getHorizontalMargins(), 
+                backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()
+        );
+
+        // Set the padding in the content pane to match the corner radius
+        Style s = getStyle();
+        Style titleParentStyle = title.getParent().getStyle();
+        titleParentStyle.setMarginLeft(titleMargin);
+        titleParentStyle.setMarginRight(titleMargin);
+        Border border = s.getBorder();
+        if (border instanceof RoundRectBorder) {
+            RoundRectBorder b = (RoundRectBorder)border;
+            
+            $(contentPane).setPaddingMillimeters(b.getCornerRadius());
+        }
+        
+        // Deal with iPhoneX notch.
+        UIManager uim = UIManager.getInstance();
+        
+        Style statusBarStyle =  uim.getComponentStyle("StatusBar");
+        Style titleAreaStyle = uim.getComponentStyle("TitleArea");
+        
+        int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
+        int positionInt = getPositionInt();
+        if (positionInt == S || positionInt == C) {
+            // For Center and South position we use margin to 
+            // prevent overlap with top notch.  This looks better as overlap is only
+            // an edge case that occurs when the sheet is the full screen height.
+            $(this).setMargin(topPadding, 0 , 0, 0);
+        } else {
+            // For other cases we use padding to prevent overlap with top notch.  This looks
+            // better as it appears that the sheet bleeds all the way to the top edge of the screen,
+            // but the content is not obscured by the notch.
+            $(this).setPadding(topPadding, s.getPaddingRightNoRTL(), s.getPaddingBottom(), s.getPaddingLeftNoRTL());
+        }
+       
+        // END Deal with iPhoneX notch
+        
         Form f = CN.getCurrentForm();
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
@@ -353,6 +460,7 @@ public class Sheet extends Container {
             cnt.animateLayout(duration);
         } else {
             cnt.add(getPosition(), this);
+            
             this.setWidth(getPreferredW(cnt));
             this.setHeight(getPreferredH(cnt));
             this.setX(getHiddenX(cnt));
@@ -405,7 +513,23 @@ public class Sheet extends Container {
         Border border = getStyle().getBorder();
         if (border instanceof RoundRectBorder) {
             RoundRectBorder b = (RoundRectBorder)border;
-            
+            RoundRectBorder nb = RoundRectBorder.create();
+            nb.bezierCorners(b.isBezierCorners());
+            nb.bottomLeftMode(b.isBottomLeft());
+            nb.bottomRightMode(b.isBottomRight());
+            nb.topRightMode(b.isTopRight());
+            nb.topLeftMode(b.isTopLeft());
+            nb.cornerRadius(b.getCornerRadius());
+            nb.shadowBlur(b.getShadowBlur());
+            nb.shadowColor(b.getShadowColor());
+            nb.shadowOpacity(b.getShadowOpacity());
+            nb.shadowSpread(b.getShadowSpread());
+            nb.shadowX(b.getShadowX());
+            nb.shadowY(b.getShadowY());
+            nb.strokeColor(b.getStrokeColor());
+            nb.strokeOpacity(b.getStrokeOpacity());
+            nb.stroke(b.getStrokeThickness(), b.isStrokeMM());
+            b = nb;
             switch (getPositionInt()) {
                 case C:
                     b.bottomRightMode(true);
@@ -436,10 +560,12 @@ public class Sheet extends Container {
                     b.topLeftMode(false);
                     b.topRightMode(false);
                     b.bottomLeftMode(true);
-                    b.bottomLeftMode(false);
+                    b.bottomRightMode(true);
                     break;
                    
             }
+            getStyle().setBorder(b);
+            
         }
         
     }
@@ -528,7 +654,7 @@ public class Sheet extends Container {
             case C:
             case W:
             case E:
-                return Math.min(getPreferredW(), cnt.getWidth());
+                return Math.min(getPreferredW() + (backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins())* 2, cnt.getWidth()) ;
             
   
         }
@@ -540,6 +666,7 @@ public class Sheet extends Container {
     private static final int E=2;
     private static final int W=3;
     private static final int C=4;
+    
     
     private int getPositionInt() {
         String pos = getPosition();
@@ -640,7 +767,7 @@ public class Sheet extends Container {
     protected void initComponent() {
         super.initComponent();
         form = getComponentForm();
-        if (form != null) {
+        if (form != null && allowClose) {
             form.addPointerPressedListener(formPointerListener);
         }
     }

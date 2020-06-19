@@ -31,12 +31,14 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Hashtable;
+import java.util.Timer;
 
 /**
  * This is a global context static class designed for static import, this class allows us to write more 
@@ -736,7 +738,25 @@ public class CN extends  CN1Constants {
     public static boolean canDial() {
         return Display.impl.canDial();
     }
-        
+    
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public static Boolean isDarkMode() {
+        return Display.INSTANCE.isDarkMode();
+    }
+    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public static void setDarkMode(Boolean darkMode) {
+        Display.INSTANCE.setDarkMode(darkMode);
+    }
+    
     /**
      * <p>Opens the device gallery to pick an image or a video.<br>
      * The method returns immediately and the response is sent asynchronously
@@ -760,7 +780,7 @@ public class CN extends  CN1Constants {
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
      * 
-     * @return the name of the platform e.g. ios, rim, win, and, me
+     * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public static String getPlatformName() {
         return Display.impl.getPlatformName();
@@ -1027,7 +1047,8 @@ public class CN extends  CN1Constants {
 
     /**
      * Adds a generic listener to a network error that is invoked before the exception is propagated.
-     * Notice that this doesn't apply to server error codes!
+     * Note that this handles also server error codes by default! You can change this default behavior setting to false
+     * ConnectionRequest.setHandleErrorCodesInGlobalErrorHandler(boolean).
      * Consume the event in order to prevent it from propagating further.
      *
      * @param e callback will be invoked with the Exception as the source object
@@ -1454,6 +1475,93 @@ public class CN extends  CN1Constants {
      */
     public static Image captureScreen() {
         return Display.impl.captureScreen();
+    }
+    
+    /**
+     * Adds a listener to receive messages from the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * 
+     * <p>In the Javascript port, javascript can send messages to the CN1 app by calling
+     * 
+     * {@code
+     * window.dispatchEvent(new CustomEvent('cn1inbox', {detail:'The message', code: SOMEINTEGER}));
+     * }
+     * 
+     * @param l The listener.
+     * @since 7.0
+     */
+    public static void addMessageListener(ActionListener<MessageEvent> l) {
+        Display.INSTANCE.addMessageListener(l);
+    }
+    
+    /**
+     * Removes a listener from receiving messages from the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * @param l The listener.
+     * @since 7.0
+     */
+    public static void removeMessageListener(ActionListener<MessageEvent> l) {
+        Display.INSTANCE.removeMessageListener(l);
+    }
+    
+    /**
+     * Posts a message to the native platform.  This is a mechanism to communicate
+     * between the app and the native platform.  Currently the Javascript port is the only port to use
+     * this mechanism.
+     * 
+     * <p>In the Javascript port these messages can be received in Javascript by adding an event listener
+     * for 'cn1outbox' events to the 'window' object.  The message is contained in the event data "detail" key. And the 
+     * code in the 'code' key.</p>
+     * @param message The message to send to the native platform.
+     * @since 7.0
+     */
+    public static void postMessage(MessageEvent message) {
+        Display.INSTANCE.postMessage(message);
+    }
+    
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public static Timer setTimeout(int timeout, Runnable r) {
+        return Display.INSTANCE.setTimeout(timeout, r);
+    }
+    
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public static Timer setInterval(int timeout, Runnable r) {
+        return Display.INSTANCE.setInterval(timeout, r);
+    }
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
+     * 
+     * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
+     * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
+     * 
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public static BrowserComponent getSharedJavascriptContext() {
+        return Display.impl.getSharedJavscriptContext();
     }
 
 }

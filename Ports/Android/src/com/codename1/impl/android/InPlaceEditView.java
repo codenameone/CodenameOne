@@ -63,6 +63,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+
 import com.codename1.ui.Accessor;
 
 import com.codename1.ui.Component;
@@ -727,10 +729,7 @@ public class InPlaceEditView extends FrameLayout{
         }
 
         Object getDoneListener() {
-            if (isTextField) {
-                return ((TextField)textArea).getDoneListener();
-            }
-            return null;
+            return ((TextArea)textArea).getDoneListener();
         }
 
         String getHint() {
@@ -904,7 +903,8 @@ public class InPlaceEditView extends FrameLayout{
         Component nextDown = textArea.nextDown;
         boolean imeOptionTaken = true;
         int ime = EditorInfo.IME_FLAG_NO_EXTRACT_UI;
-        if (textArea.isSingleLineTextArea()) {
+        if (textArea.isSingleLineTextArea() || textArea.getDoneListener() != null) {
+
             if(textArea.getClientProperty("searchField") != null) {
                 mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_SEARCH);
             } else {
@@ -914,7 +914,7 @@ public class InPlaceEditView extends FrameLayout{
                     if(textArea.getClientProperty("goButton") != null) {
                         mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_GO);
                     } else {
-                        if(textArea.isTextField && textArea.getDoneListener() != null){
+                        if(textArea.getDoneListener() != null){
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
                         } else if (nextDown != null) {
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);
@@ -977,7 +977,18 @@ public class InPlaceEditView extends FrameLayout{
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
         } else {
-            mEditText.setInputType(getAndroidInputType(codenameOneInputType, true));
+            if (textArea.getDoneListener() != null) {
+                mEditText.setHorizontallyScrolling(false);
+                mEditText.setMaxLines(Integer.MAX_VALUE);
+                mEditText.setInputType(InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+                mEditText.setMaxWidth(textArea.getWidth());
+                mEditText.setMaxHeight(textArea.getHeight());
+                mEditText.setHorizontalScrollBarEnabled(false);
+                mEditText.getLayoutParams().width = textArea.getWidth();
+                mEditText.getLayoutParams().height = textArea.getHeight();
+            } else {
+                mEditText.setInputType(getAndroidInputType(codenameOneInputType, true));
+            }
         }
         if (password) {
             int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
@@ -1144,10 +1155,9 @@ public class InPlaceEditView extends FrameLayout{
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
         if (reason == REASON_IME_ACTION
-                && mEditText.mTextArea instanceof TextField
-                && ((TextField) mEditText.mTextArea).getDoneListener() != null
+                && ((TextArea) mEditText.mTextArea).getDoneListener() != null
                 && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
-            ((TextField) mEditText.mTextArea).fireDoneEvent();
+            ((TextArea) mEditText.mTextArea).fireDoneEvent();
 
         }
         
@@ -1482,6 +1492,17 @@ public class InPlaceEditView extends FrameLayout{
                                         sInstance.mEditLayoutParams.setMargins(txtx, txty, 0, 0);
                                         sInstance.mEditLayoutParams.width = w;
                                         sInstance.mEditLayoutParams.height = h;
+                                        if (!txt.isSingleLineTextArea() && txt.getDoneListener() != null) {
+                                            sInstance.mEditText.getLayoutParams().width = w;
+                                            sInstance.mEditText.getLayoutParams().height = h;
+                                            sInstance.mEditText.setMaxWidth(w);
+                                            sInstance.mEditText.setMaxHeight(h);
+                                            sInstance.setHorizontalScrollBarEnabled(false);
+                                            sInstance.mEditText.setHorizontallyScrolling(false);
+                                        }
+
+
+
                                         sInstance.mEditText.requestLayout();
                                         sInstance.invalidate();
                                         if (sInstance.getVisibility() != VISIBLE) {

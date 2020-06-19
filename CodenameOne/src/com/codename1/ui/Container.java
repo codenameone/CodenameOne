@@ -31,6 +31,10 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
+import static com.codename1.ui.Component.BOTTOM;
+import static com.codename1.ui.Component.LEFT;
+import static com.codename1.ui.Component.RIGHT;
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -428,7 +432,7 @@ public class Container extends Component implements Iterable<Component>{
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
     }
-    
+
     /**
      * Sets the lead component for this container, a lead component takes over the entire
      * component hierarchy and receives all the events for the container hierarchy.
@@ -436,12 +440,24 @@ public class Container extends Component implements Iterable<Component>{
      * @param lead component that takes over the hierarchy
      */
     public void setLeadComponent(Component lead) {
+        if (lead == leadComponent) {
+            return;
+        }
         leadComponent = lead;
         if(lead == null) {
             // clear the lead component from the hierarchy
-            setFocusable(false);
-            hasLead = false;
-            enableFocusAndDeinitLead(this);
+            
+            if (!isBlockLead() && getParent() != null && getParent().hasLead) {
+                // hasLead should still be true because of parent lead
+                
+            } else {
+                setFocusable(false);
+                hasLead = false;
+                if (isInitialized()) {
+                    enableFocusAndDeinitLead(this);
+                }
+            }
+            
         } else {
             if(isInitialized()) {
                 initLead();
@@ -469,11 +485,12 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Component getLeadComponent() {
-        if(isBlockLead()) {
-            return null;
-        }
+        
         if(leadComponent != null) {
             return leadComponent;
+        }
+        if(isBlockLead()) {
+            return null;
         }
         if(hasLead) {
             return super.getLeadComponent();
@@ -488,11 +505,12 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Container getLeadParent() {
-        if(isBlockLead()) {
-            return null;
-        }
+        
         if(leadComponent != null) {
             return this;
+        }
+        if(isBlockLead()) {
+            return null;
         }
         if(hasLead) {
             return getParent().getLeadParent();
@@ -503,7 +521,7 @@ public class Container extends Component implements Iterable<Component>{
     private void initLead() {
         disableFocusAndInitLead(this);
         setFocusable(true);
-        hasLead = !isBlockLead();
+        hasLead = leadComponent != null || !isBlockLead();
     }
 
     /**
@@ -529,25 +547,42 @@ public class Container extends Component implements Iterable<Component>{
     private void disableFocusAndInitLead(Container c) {
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
-            if(cu instanceof Container) {
-                disableFocusAndInitLead((Container)cu);
-            }
+            boolean isContainer = (cu instanceof Container);
             cu.setFocusable(false);
-            cu.hasLead = !cu.isBlockLead();
+            if (isContainer) {
+                cu.hasLead = ((Container)cu).leadComponent != null || !cu.isBlockLead();
+            } else {
+                cu.hasLead = !cu.isBlockLead();
+            }
+            if(isContainer && cu.hasLead) {
+                disableFocusAndInitLead((Container)cu);
+                if (((Container)cu).leadComponent != null) {
+                    ((Container)cu).setFocusable(true);
+                }
+                
+            }
+            
         }
     }
 
     private void enableFocusAndDeinitLead(Container c) {
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
-            if(cu instanceof Container) {
+            boolean isContainer = (cu instanceof Container);
+            if (isContainer) {
+                cu.hasLead = ((Container)cu).leadComponent != null;
+            } else {
+                cu.hasLead = false;
+            }
+            if(isContainer && !cu.hasLead) {
                 enableFocusAndDeinitLead((Container)cu);
             }
-            cu.resetFocusable();
-            cu.hasLead = false;
+            if (!cu.hasLead) {
+                cu.resetFocusable();
+            }
         }
     }
-
+    
     /**
      * Returns the layout manager responsible for arranging this container. 
      * 
@@ -654,11 +689,11 @@ public class Container extends Component implements Iterable<Component>{
      * @return the layout width
      */
     public int getLayoutWidth() {
-        if (isScrollableX()) {
+        if (scrollableX) {
             return Math.max(getWidth(), getPreferredW());
         } else {
-            Container parent = getScrollableParent();
-            if (parent != null && parent.isScrollableX()) {
+            Container parent = getScrollableParentX();
+            if (parent != null && parent.scrollableX) {
                 return Math.max(getWidth(), getPreferredW());
             }
             int width = getWidth();
@@ -679,7 +714,7 @@ public class Container extends Component implements Iterable<Component>{
         if (scrollableY) {
             return Math.max(getHeight(), getPreferredH());
         } else {
-            Container parent = getScrollableParent();
+            Container parent = getScrollableParentY();
             if (parent != null && parent.scrollableY) {
                 return Math.max(getHeight(), getPreferredH());
             }
@@ -712,21 +747,87 @@ public class Container extends Component implements Iterable<Component>{
 
 
     /**
-     * Returns a parent container that is scrollable or null if no parent is 
+     * Returns a parent container that is scrollableX or null if no parent is 
      * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutWidth()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
      * 
      * @return a parent container that is scrollable or null if no parent is 
      * scrollable.
      */
-    private Container getScrollableParent() {
+    private Container getScrollableParentX() {
         Container parent = getParent();
         while (parent != null) {
-            if (parent.isScrollable()) {
+            if (parent.scrollableX && !parent.constrainWidthWhenScrollable()) {
+                return parent;
+            }
+            if (parent.hasFixedPreferredSize()) {
                 return parent;
             }
             parent = parent.getParent();
         }
         return null;
+    }
+    
+    /**
+     * Returns a parent container that is scrollableY or null if no parent is 
+     * scrollable.
+     * 
+     * NOTE:  This is a utility method that is designed for the getLayoutHeight()
+     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
+     * 
+     * @return a parent container that is scrollable or null if no parent is 
+     * scrollable.
+     */
+    private Container getScrollableParentY() {
+        Container parent = getParent();
+        while (parent != null) {
+            if (parent.scrollableY && !parent.constrainHeightWhenScrollable()) {
+                return parent;
+            }
+            if (parent.hasFixedPreferredSize()) {
+                return parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+    
+    
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable X.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainWidthWhenScrollable() {
+        return false;
+    }
+    
+    /**
+     * Indicates that children's widths should be calculated as if this component weren't 
+     * scrollable-X, even when the component is scrollable Y.  Normally, when a component
+     * is figuring out its layout width, it will walk up the UI hierarchy to find the 
+     * first scrollable container.  If there is a scrollable container, then the component
+     * will try to grow as big as it wants.  If there are no scrollable containers found,
+     * it will constrain itself to the space available.   In some cases, we may want the children
+     * of a component to lay themselves out conservatively though because it wants to use its
+     * scrollability for other features.  
+     * @return True if children should calculate their layout widgets as if the component
+     * weren't scrollable.
+     * @since 7.0
+     */
+    protected boolean constrainHeightWhenScrollable() {
+        return false;
     }
 
     /**
@@ -801,7 +902,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(insertion);
                         }
-                        revalidate();
+                        revalidateWithAnimationSafety();
                     }
                 }
 
@@ -1195,7 +1296,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(removed);
                         }
-                        revalidate();
+                        revalidateWithAnimationSafety();
                     }
                 }
 
@@ -1752,10 +1853,366 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
 
+    private boolean hasScrollableYParentInternal() {
+        if (getParent() == null) {
+            return false;
+        }
+        if (getParent().scrollableYFlag()) {
+            return true;
+        }
+        return getParent().hasScrollableYParentInternal();
+    }
+    
+    private boolean hasScrollableXParentInternal() {
+        if (getParent() == null) {
+            return false;
+        }
+        if (getParent().scrollableXFlag()) {
+            return true;
+        }
+        return getParent().hasScrollableXParentInternal();
+    }
+    
+    /**
+     * Flag to 
+     */
+    private boolean safeArea;
+    
+    /**
+     * Indicates that this container is a "safe area" root.
+     */
+    private boolean safeAreaRoot;
+    
+    /**
+     * Marks this container as a "safe area", meaning that it will automatically supply
+     * sufficient padding as necessary for its children to be laid out inside the 
+     * safe area of the screen.
+     * 
+     * <p>This was primarily added for the iPhone X which covers portions of the screen
+     * and may interfere with components that are rendered there.</p>
+     * 
+     * <p>The "safe" area is calculated against a "safe area root"'s bounds, which is 
+     * the parent form by default.  In some cases it may be helpful to make the root
+     * a sub-container, such as if you need to lay a component out off-screen.  See 
+     * {@link #setSafeAreaRoot(boolean)} for more details.</p>
+     * 
+     * @param safeArea True to make this container a safe area.
+     * @since 7.0
+     * @see Form#getSafeArea() 
+     * @see #isSafeArea() 
+     * @see #setSafeAreaRoot(boolean) 
+     */
+    public void setSafeArea(boolean safeArea) {
+        this.safeArea = safeArea;
+    }
+    
+    /**
+     * Checks if this container is a "safe area".  A "safe area" is a container whose 
+     * contents will always be displayed inside the device's "safe display area".  
+     * <p>This feature was added primarily for the iPhone X which covers some parts of 
+     * the screen and would cover or interfere with any content drawn in those regions. In particular,
+     * the notch, the rounded corners, and the task bar cover portions of the screen.</p>
+     * 
+     * <p>A container that is a safe area will automatically add appropriate padding 
+     * on layout so that its children will be rendered completely in the safe area of
+     * the screen.  This only applies if the container has no scrollable parents.  If a 
+     * "safe" container has scrollable parents, then it is assumed that the user can
+     * just scroll it into a safe area.</p>
+     * 
+     * @return True if this container is a safe area.
+     * @since 7.0
+     * @see #setSafeArea(boolean) 
+     * @see Form#getSafeArea() 
+     */
+    public boolean isSafeArea() {
+        return this.safeArea;
+    }
+    
+    /**
+     * Set whether this container is a safe area root.   A safe area root is a container
+     * against whose bounds, safe area margins are calculated for child components.
+     * 
+     * <p><strong>Safe Area root vs Safe Area</strong></p>
+     * 
+     * <p>A Safe Area root is not actually a safe area.  It will lay out its children
+     * normally, without any adjustments to padding to accommodate the display safe area.  They
+     * are rather <em>used</em> by safe area child containers to calculate safe area margins,
+     * according to if the safe area root container spanned the entire screen</p>
+     * 
+     * <p>In most cases you don't need to explicitly set a safe area root, since Forms are 
+     * marked as roots by default.  However, there are edge cases where components may be 
+     * initially laid out off-screen (in which safe areas are not applied), but are transitioned
+     * in.  Once on the screen, the safe margins would be applied which may cause an abrupt
+     * re-layout at the moment that the safe margins are applied.  This edge case occurs in,
+     * for example, a side menu bar which is rendered off-screen.  By making the side menu bar
+     * container a "root" itself, the safe areas will be applied to the layout, even when
+     * the menu is off-screen.  Then there is no "jerk" when it transitions in.</p>
+     * 
+     * @param root True to make this a root.  False to make it "not" a root.
+     * 
+     * @since 7.0
+     * @see #isSafeAreaRoot() 
+     */
+    public void setSafeAreaRoot(boolean root) {
+        this.safeAreaRoot = root;
+    }
+    
+    /**
+     * Checks if this container is a safe area root.  A safe area root is a container
+     * against whose bounds, safe area margins are calculated for child components.
+     * 
+     * <p>Forms are safe area roots by default.</p>
+     * @return 
+     * @since 7.0
+     * @see #setSafeAreaRoot(boolean) 
+     */
+    public boolean isSafeAreaRoot() {
+        return safeAreaRoot;
+    }
+    
+    /**
+     * Gets the Safe area "root" container for this container.  This method will walk 
+     * up the component hierarchy until is finds a Container with {@link #isSafeAreaRoot() } true.
+     * 
+     * <p>Forms are safe area roots by default, but it is possible to mark other containers 
+     * as safe area roots.</p>
+     * 
+     * <p>A safe area root is a container from which safe area margins are applied when 
+     * calculating the safe areas of child components.  Setting a root can facilitate the 
+     * layout of a container's children before it appears on the screen.</p>
+     * @return 
+     * @since 7.0
+     */
+    public Container getSafeAreaRoot() {
+        if (safeAreaRoot) {
+            return this;
+        }
+        Container parent = getParent();
+        if (parent != null) {
+            return parent.getSafeAreaRoot();
+        }
+        return null;
+    }
+    
+    /**
+     * Checks to see if this container or any of its parents are safe areas.
+     * @param checkParents True to check parents too.  False to just check this container.
+     * @return 
+     */
+    private boolean isSafeAreaInternal(boolean checkParents) {        
+        if (safeArea) {
+            return true;
+        }
+        if (checkParents) {
+            Container parent = getParent();
+            if (parent != null) {
+                return parent.isSafeAreaInternal(true);
+            }
+        }
+        return false;
+    }
+    
+
+    /**
+     * For iPhone X primarily.  This will check if the current bounds goes outside the
+     * safe area.  If so, it will add padding to make the contents fit the safe area.
+     */
+    private boolean snapToSafeAreaInternal() {
+        if (isHidden()) {
+            return false;
+        }
+        Container safeAreaRoot = getSafeAreaRoot();
+        if (safeAreaRoot == null) {
+            return false;
+        }
+        Rectangle rect = Display.impl.getDisplaySafeArea(new Rectangle());
+        int safeLeftMargin = rect.getX();
+        int safeRightMargin = CN.getDisplayWidth() - rect.getWidth() - rect.getX();
+        int safeTopMargin = rect.getY();
+        int safeBottomMargin = CN.getDisplayHeight() - rect.getHeight() - rect.getY();
+        if (safeLeftMargin == 0 && safeRightMargin == 0 && safeBottomMargin == 0 && safeTopMargin == 0) {
+            return false;
+        }
+        rect.setWidth(Math.max(0, safeAreaRoot.getWidth() - safeLeftMargin - safeRightMargin));
+        rect.setHeight(Math.max(0, safeAreaRoot.getHeight() - safeTopMargin - safeBottomMargin));
+        if (rect.getWidth() == 0 || rect.getHeight() == 0) {
+            return false;
+        }
+        Rectangle safeArea = rect;
+        //Form f = getComponentForm();
+        //if (f == null) {
+        //    return false;
+        //}
+        
+        //Rectangle safeArea = f.getSafeArea();
+        
+        //if (safeArea.getX() == 0 && safeArea.getY() == 0 && safeArea.getWidth() == CN.getDisplayWidth() && safeArea.getHeight() == CN.getDisplayHeight()) {
+        //    return false;
+        //}
+        Style style = getStyle();
+        int safeX1 = safeArea.getX();
+        int safeX2 = safeArea.getWidth() + safeX1;
+        int safeY1 = safeArea.getY();
+        int safeY2 = safeArea.getHeight() + safeY1;
+        
+        
+        
+        int paddingLeft = style.getPaddingLeftNoRTL();
+        int paddingRight = style.getPaddingRightNoRTL();
+        int paddingTop = style.getPaddingTop();
+        int paddingBottom = style.getPaddingBottom();
+        
+        
+        int newPaddingTop = paddingTop;
+        int newPaddingBottom = paddingBottom;
+        int newPaddingLeft = paddingLeft;
+        int newPaddingRight = paddingRight;
+        
+        
+            
+        
+        int absX = getAbsoluteX() - safeAreaRoot.getAbsoluteX();
+        int w = getWidth();
+        int absX2 = absX + w;
+
+        if (absX >= 0) {
+            if (absX + paddingLeft < safeX1) {
+                newPaddingLeft = safeX1 - absX;
+            }
+        }
+        if (absX2 <= safeAreaRoot.getWidth()) {
+            if (absX2 - paddingRight > safeX2) {
+                newPaddingRight = absX2 - safeX2;
+            }
+        }
+            
+        int absY = getAbsoluteY() - safeAreaRoot.getAbsoluteY();
+        int h = getHeight();
+        int absY2 = absY + h;
+        
+        
+        if (absY >= 0) {
+            if (absY + paddingTop < safeY1) {
+                newPaddingTop = safeY1 - absY;
+            }
+        }
+        if (absY2 <= safeAreaRoot.getHeight()) {
+            if (absY2 - paddingBottom > safeY2) {
+                newPaddingBottom = absY2 - safeY2;
+            }
+        }
+        
+        boolean changed = false;
+        if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
+            if (!hasScrollableYParentInternal()) {
+                changed = true;
+                
+                if (newPaddingTop != paddingTop) {
+                    style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingTop(newPaddingTop);
+                }
+                if (newPaddingBottom != paddingBottom) {
+                    style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingBottom(newPaddingBottom);
+                }
+               
+            }   
+        }
+        
+        if (newPaddingLeft != paddingLeft || newPaddingRight != paddingRight) {
+            if (!hasScrollableXParentInternal()) {
+                changed = true;
+                
+                if (newPaddingLeft != paddingLeft) {
+                    style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingLeft(newPaddingLeft);
+                }
+                if (newPaddingRight != paddingRight) {
+                    style.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);
+                    style.setPaddingRight(newPaddingRight);
+                }
+                
+                        
+            }
+        }
+        return changed;
+        
+    }
+    
     /**
      * Lays out the container
      */
+    
+    private static class TmpInsets {
+        float top, left, bottom, right;
+        byte topUnit, leftUnit, bottomUnit, rightUnit;
+
+        @Override
+        public String toString() {
+            return top+","+right+","+bottom+","+left;
+        }
+        
+        private void set(Style style){
+            //boolean suppressEvents = style.isSuppressChangeEvents();
+            //style.setSuppressChangeEvents(true);
+            top = style.getPaddingValue(false, TOP);
+            left = style.getPaddingValue(false, LEFT);
+            bottom = style.getPaddingValue(false, BOTTOM);
+            right = style.getPaddingValue(false, RIGHT);
+            byte[] units = style.getPaddingUnit();
+            if (units != null) {
+                topUnit = units[TOP];
+                leftUnit = units[LEFT];
+                bottomUnit = units[BOTTOM];
+                rightUnit = units[RIGHT];
+            } else {
+                topUnit = leftUnit = bottomUnit = rightUnit = Style.UNIT_TYPE_PIXELS;
+            }
+            //style.setSuppressChangeEvents(suppressEvents);
+        }
+        
+        private void restore(Style style) {
+            boolean suppressEvents = style.isSuppressChangeEvents();
+            style.setSuppressChangeEvents(true);
+            style.setPadding(TOP, top, true);
+            style.setPadding(LEFT, left, true);
+            style.setPadding(BOTTOM, bottom, true);
+            style.setPadding(RIGHT, right, true);
+            byte[] units = style.getPaddingUnit();
+            if (units != null) {
+                units[TOP] = topUnit;
+                units[BOTTOM] = bottomUnit;
+                units[LEFT] = leftUnit;
+                units[RIGHT] = rightUnit;
+            } else {
+                style.setPaddingUnit(topUnit, leftUnit, bottomUnit, rightUnit);
+            }
+            style.setSuppressChangeEvents(suppressEvents);
+        }
+        
+    }
+
+    private TmpInsets tmpInsets;
+    private int doLayoutDepth;
     void doLayout() {
+        doLayoutDepth++;
+        boolean restoreBounds = false;
+        if (safeArea && doLayoutDepth == 1) {
+            // If this container is marked as a safe area
+            // then we may need to add padding to make it *safe*
+            Container parent = getParent();
+            if (parent == null || !parent.isSafeAreaInternal(true)) {
+                // For efficiency, we check if the parent is a safe area.
+                // If so, we don't need to worry because it has already
+                // added appropriate padding.
+                if (tmpInsets == null) {
+                    tmpInsets = new TmpInsets();
+                }
+                Style s = getStyle();
+                tmpInsets.set(s);
+                restoreBounds = snapToSafeAreaInternal();
+            }
+        }
         layout.layoutContainer(this);
         int count = getComponentCount();
         for (int i = 0; i < count; i++) {
@@ -1766,10 +2223,15 @@ public class Container extends Component implements Iterable<Component>{
                 c.laidOut();
             }
         }
+        if (restoreBounds && tmpInsets != null) {
+            tmpInsets.restore(getStyle());
+        }
         laidOut();
         if(Form.activePeerCount > 0) {
             onParentPositionChange();
         }
+        doLayoutDepth--;
+        
     }
 
     /**
@@ -2123,6 +2585,8 @@ public class Container extends Component implements Iterable<Component>{
         return null;  
     }
     
+    
+    
     /**
      * Returns a Component at coordinate {@literal (x, y)}.
      * 
@@ -2140,7 +2604,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public Component getComponentAt(int x, int y) {
         if (!contains(x, y) || !isVisible()) {
-            return null;
+            return this;
         }
         int startIter = 0;
         int count = getComponentCount();
@@ -2161,55 +2625,114 @@ public class Container extends Component implements Iterable<Component>{
         }
         boolean overlaps = getActualLayout().isOverlapSupported();
         Component component = null;
+        Component top = null;
+        
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y) && cmp.isVisible()) {
-                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
-                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
-                if(component != null && component.isBlockLead()) {
-                    return component;
-                }
                 component = cmp;
-                if (!overlaps && component.isFocusable()) {
-                    // special case for lead blocking
-                    if(component instanceof Container && ((Container)component).getLeadParent() == component) {
-                        Component c = ((Container)component).getComponentAt(x, y);
-                        if(c.isBlockLead()) {
-                            return c;
-                        }
-                    }
-                    return component;
-                }
+                boolean isPotentialCandidate = cmp.respondsToPointerEvents();
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
                     if(c != null){
-                        component = c;
+                        if (top == null) {
+                            if (c.respondsToPointerEvents() || !(c instanceof Container)) {
+                                top = c;
+                            }
+                        }
+                        if (c != cmp) {
+                            Component tmp = c;
+                            if (cmp.isFocusable()) {
+                                isPotentialCandidate = true;
+                                boolean found = false;
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.isFocusable()) {
+                                        // We found a focusable child
+                                        // so we will use that.
+                                        c = tmp;
+                                        found = true;
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                                if (!found) {
+                                    // Since the container is focusable 
+                                    // and none of its children are focusable
+                                    // we will prefer to take the container over
+                                    // its children here.
+                                    c = cmp;
+                                }
+                            
+                            } else if (cmp.respondsToPointerEvents()){
+                                isPotentialCandidate = true;
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.respondsToPointerEvents()) {
+                                        // We found a child that also responds to
+                                        // pointer events so we will use that.
+                                        c = tmp;
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                                
+                            
+                            } else {
+                                // In this last case, the parent doesn't respond to pointer events
+                                // so all we want to know is if any of the children respond to pointer events
+                                // so we know if it will be eligible to be returned in the case of an overlapping
+                                // layout.
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.respondsToPointerEvents()) {
+                                        isPotentialCandidate = true;
+                                        
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                            }
+                            component = c;
+                            
+                        }
+                        
+                    } else {
+                        // No children found here 
+                        if (top == null) {
+                            if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                                top = cmp;
+                            }
+                        }
+                    }
+                } else {
+                    if (top == null) {
+                        if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                            top = cmp;
+                        }
                     }
                 }
-                if (!overlaps || component.respondsToPointerEvents()) {
+                if (!overlaps) {
+                    
                     return component;
-                } else if (cmp != component) {
-                    // Check if there is anything between component and cmp that grabs pointer events
-                    // if so - we stop the chain
-                    Container tmp = component.getParent();
-                    while (tmp != cmp && tmp != null) {
-                        if (tmp.respondsToPointerEvents()) {
-                            return component;
-                        }
-                        tmp = tmp.getParent();
-                    }
-                    if (cmp.respondsToPointerEvents()) {
+                    
+                } else {
+                    if (isPotentialCandidate) {
                         return component;
                     }
                     
                 }
+                
             }
         }
+        if (component == null || (!component.respondsToPointerEvents() && top != null)) {
+            if (top != null) {
+                return top;
+            }
+        }
+            
         if (component != null){
             return component;
         }
         return this;
-    }    
+    }
     /**
      * Recursively searches the container hierarchy for a drop target
      * 
@@ -2240,8 +2763,9 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        clearDrag();
-        setDragActivated(false);
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        leadParent.clearDrag();
+        leadParent.setDragActivated(false);
         Component cmp = getComponentAt(x, y);
         if (cmp == this) {
             super.pointerPressed(x, y);
@@ -2260,11 +2784,32 @@ public class Container extends Component implements Iterable<Component>{
             cmp.pointerPressed(x, y);            
         }
     }
-
+    
+    private TmpInsets calcTmpInsets;
+    private int calcPreferredSizeDepth;
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
+        calcPreferredSizeDepth++;
+        boolean restoreBounds = false;
+        if (safeArea && getWidth() > 0 && getHeight() > 0 && calcPreferredSizeDepth == 1) {
+            // If this container is marked as a safe area
+            // then we may need to add padding to make it *safe*
+            Container parent = getParent();
+            if (parent == null || !parent.isSafeAreaInternal(true)) {
+                // For efficiency, we check if the parent is a safe area.
+                // If so, we don't need to worry because it has already
+                // added appropriate padding.
+                if (calcTmpInsets == null) {
+                    calcTmpInsets = new TmpInsets();
+                }
+                Style s = getStyle();
+                calcTmpInsets.set(s);
+                restoreBounds = snapToSafeAreaInternal();
+            }
+        }
+        
         Dimension d = layout.getPreferredSize(this);
         Style style = getStyle();
         if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
@@ -2275,6 +2820,10 @@ public class Container extends Component implements Iterable<Component>{
             d.setWidth(Math.max(style.getBgImage().getWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBgImage().getHeight(), d.getHeight()));
         }
+        if (restoreBounds && calcTmpInsets != null) {
+            calcTmpInsets.restore(getStyle());
+        }
+        calcPreferredSizeDepth--;
         return d;
     }
 

@@ -23,6 +23,8 @@
 
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
+import com.codename1.io.File;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
@@ -36,6 +38,8 @@ import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded 
@@ -66,6 +70,9 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public class URLImage extends EncodedImage {
+    
+    private static final Map<String,URLImage> pendingToStorage = new HashMap<String,URLImage>();
+    private static final Map<String,URLImage> pendingToFile = new HashMap<String,URLImage>();
     
     /**
      * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.
@@ -231,6 +238,15 @@ public class URLImage extends EncodedImage {
         };
     }
     
+    public static ImageAdapter createMaskAdapter(final Object mask) {
+        return new ScaleToFill() {
+            @Override
+            Image postProcess(Image i) {
+                return i.applyMask(mask);
+            }
+        };
+    }
+    
     class DownloadCompleted implements ActionListener, Runnable {
         private EncodedImage adapt;
         private EncodedImage adaptedIns;
@@ -283,11 +299,13 @@ public class URLImage extends EncodedImage {
                         o.write(adapted.getImageData());
                         o.close();
                         Storage.getInstance().deleteStorageFile(storageFile + IMAGE_SUFFIX);
+                        pendingToStorage.remove(storageFile);
                     } else if (fileSystemFile != null) {
                         OutputStream o = FileSystemStorage.getInstance().openOutputStream(fileSystemFile);
                         o.write(adapted.getImageData());
                         o.close();
                         FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);
+                        pendingToFile.remove(fileSystemFile);
                     }
                 } catch (IOException ex) {
                     if(exceptionHandler != null) {
@@ -310,6 +328,145 @@ public class URLImage extends EncodedImage {
         void setSourceImage(Image sourceImage) {
             this.sourceImage = sourceImage;
         }
+    }
+    
+    private void loadImageFromStorageURLToStorage(final String targetKey) {
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+                    if (!Objects.equals(url, targetKey)) {
+                        InputStream input = Storage.getInstance().createInputStream(url);
+                        OutputStream output = Storage.getInstance().createOutputStream(targetKey);
+                        Util.copy(input, output);
+                    }
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            try {
+                                Image value = Image.createImage(Storage.getInstance().createInputStream(targetKey));
+                                DownloadCompleted onComplete = new DownloadCompleted();
+                                onComplete.setSourceImage(value);
+                                onComplete.actionPerformed(new ActionEvent(value));
+                            } catch (Exception ex) {
+                                if(exceptionHandler != null) {
+                                    exceptionHandler.onError(URLImage.this, ex);
+                                } else {
+                                    throw new RuntimeException(ex.toString());
+                                }
+                            }
+                        }
+                    });
+                } catch (Exception t) {
+                    if(exceptionHandler != null) {
+                        exceptionHandler.onError(URLImage.this, t);
+                    } else {
+                        throw new RuntimeException(t.toString());
+                    }
+                }
+            }
+        });
+    }
+    
+    private void loadImageFromFileURLToStorage(final String targetKey) {
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+                    InputStream input = FileSystemStorage.getInstance().openInputStream(url);
+                    OutputStream output = Storage.getInstance().createOutputStream(targetKey);
+                    Util.copy(input, output);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            try {
+                                Image value = Image.createImage(Storage.getInstance().createInputStream(targetKey));
+                                DownloadCompleted onComplete = new DownloadCompleted();
+                                onComplete.setSourceImage(value);
+                                onComplete.actionPerformed(new ActionEvent(value));
+                            } catch (Exception ex) {
+                                if(exceptionHandler != null) {
+                                    exceptionHandler.onError(URLImage.this, ex);
+                                } else {
+                                    throw new RuntimeException(ex.toString());
+                                }
+                            }
+                        }
+                    });
+                } catch (Exception t) {
+                    if(exceptionHandler != null) {
+                        exceptionHandler.onError(URLImage.this, t);
+                    } else {
+                        throw new RuntimeException(t.toString());
+                    }
+                }
+            }
+        });
+    }
+    
+    private void loadImageFromStorageURLToFileSystem(final String targetFile) {
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+
+                    InputStream input = Storage.getInstance().createInputStream(url);
+                    OutputStream output = FileSystemStorage.getInstance().openOutputStream(targetFile);
+                    Util.copy(input, output);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            try {
+                                Image value = Image.createImage(FileSystemStorage.getInstance().openInputStream(targetFile));
+                                DownloadCompleted onComplete = new DownloadCompleted();
+                                onComplete.setSourceImage(value);
+                                onComplete.actionPerformed(new ActionEvent(value));
+                            } catch (Exception ex) {
+                                if(exceptionHandler != null) {
+                                    exceptionHandler.onError(URLImage.this, ex);
+                                } else {
+                                    throw new RuntimeException(ex.toString());
+                                }
+                            }
+                        }
+                    });
+                } catch (Exception t) {
+                    if(exceptionHandler != null) {
+                        exceptionHandler.onError(URLImage.this, t);
+                    } else {
+                        throw new RuntimeException(t.toString());
+                    }
+                }
+            }
+        });
+    }
+    
+    private void loadImageFromFileURLToFileSystem(final String targetFile) {
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+                    InputStream input = FileSystemStorage.getInstance().openInputStream(url);
+                    OutputStream output = FileSystemStorage.getInstance().openOutputStream(targetFile);
+                    Util.copy(input, output);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            try {
+                                Image value = Image.createImage(FileSystemStorage.getInstance().openInputStream(targetFile));
+                                DownloadCompleted onComplete = new DownloadCompleted();
+                                onComplete.setSourceImage(value);
+                                onComplete.actionPerformed(new ActionEvent(value));
+                            } catch (Exception ex) {
+                                if(exceptionHandler != null) {
+                                    exceptionHandler.onError(URLImage.this, ex);
+                                } else {
+                                    throw new RuntimeException(ex.toString());
+                                }
+                            }
+                        }
+                    });
+                } catch (Exception t) {
+                    if(exceptionHandler != null) {
+                        exceptionHandler.onError(URLImage.this, t);
+                    } else {
+                        throw new RuntimeException(t.toString());
+                    }
+                }
+            }
+        });
     }
     
     /**
@@ -335,27 +492,45 @@ public class URLImage extends EncodedImage {
                     resetCache();
                     fetching = false;
                     repaintImage = true;
+                    fireChangedEvent();
                     return;
                 }
                 if (adapter != null) {
-                    Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX,
-                            new SuccessCallback<Image>() {
-                                public void onSucess(Image value) {
-                                    DownloadCompleted onComplete = new DownloadCompleted();
-                                    onComplete.setSourceImage(value);
-                                    onComplete.actionPerformed(new ActionEvent(value));
-                                }
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX,
+                                new SuccessCallback<Image>() {
+                                    public void onSucess(Image value) {
+                                        DownloadCompleted onComplete = new DownloadCompleted();
+                                        onComplete.setSourceImage(value);
+                                        onComplete.actionPerformed(new ActionEvent(value));
+                                    }
 
-                            });
+                                });
+                    } else if (url.startsWith("file:/")) {
+                        // from file
+                        loadImageFromFileURLToStorage(storageFile + IMAGE_SUFFIX);
+                    } else {
+                        loadImageFromStorageURLToStorage(storageFile + IMAGE_SUFFIX);
+                    }
                 } else {
-                    Util.downloadImageToStorage(url, storageFile,
-                            new SuccessCallback<Image>() {
-                                public void onSucess(Image value) {
-                                    DownloadCompleted onComplete = new DownloadCompleted();
-                                    onComplete.setSourceImage(value);
-                                    onComplete.actionPerformed(new ActionEvent(value));
-                                }
-                            });
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        // Load image from http
+                        Util.downloadImageToStorage(url, storageFile,
+                                new SuccessCallback<Image>() {
+                                    public void onSucess(Image value) {
+                                        DownloadCompleted onComplete = new DownloadCompleted();
+                                        onComplete.setSourceImage(value);
+                                        onComplete.actionPerformed(new ActionEvent(value));
+                                    }
+                                });
+                    } else if (url.startsWith("file:/")) {
+                        //load image from file system
+                        loadImageFromFileURLToStorage(storageFile);
+                    } else {
+                        // load image from storage
+                        loadImageFromStorageURLToStorage(storageFile);
+                        
+                    }
                 }
             } else {
                 if(FileSystemStorage.getInstance().exists(fileSystemFile)) {
@@ -366,30 +541,47 @@ public class URLImage extends EncodedImage {
                     resetCache();
                     fetching = false;
                     repaintImage = true;
+                    fireChangedEvent();
                     return;
                 }
                 if(adapter != null) {
-                    Util.downloadImageToFileSystem(url, fileSystemFile + IMAGE_SUFFIX,
-                            new SuccessCallback<Image>() {
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        // Load image over http
+                        Util.downloadImageToFileSystem(url, fileSystemFile + IMAGE_SUFFIX,
+                                new SuccessCallback<Image>() {
 
-                                public void onSucess(Image value) {
-                                    DownloadCompleted onComplete = new DownloadCompleted();
-                                    onComplete.setSourceImage(value);
-                                    onComplete.actionPerformed(new ActionEvent(value));
-                                }
+                                    public void onSucess(Image value) {
+                                        DownloadCompleted onComplete = new DownloadCompleted();
+                                        onComplete.setSourceImage(value);
+                                        onComplete.actionPerformed(new ActionEvent(value));
+                                    }
 
-                            });
+                                });
+                    } else if (url.startsWith("file:/")) {
+                        // load image from file system
+                        loadImageFromFileURLToFileSystem(fileSystemFile + IMAGE_SUFFIX);
+                    } else {
+                        // load image from storage
+                        loadImageFromStorageURLToFileSystem(fileSystemFile + IMAGE_SUFFIX);
+                        
+                    }
                 } else {
-                    Util.downloadImageToFileSystem(url, fileSystemFile,
-                            new SuccessCallback<Image>() {
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        Util.downloadImageToFileSystem(url, fileSystemFile,
+                                new SuccessCallback<Image>() {
 
-                                public void onSucess(Image value) {
-                                    DownloadCompleted onComplete = new DownloadCompleted();
-                                    onComplete.setSourceImage(value);
-                                    onComplete.actionPerformed(new ActionEvent(value));
-                                }
+                                    public void onSucess(Image value) {
+                                        DownloadCompleted onComplete = new DownloadCompleted();
+                                        onComplete.setSourceImage(value);
+                                        onComplete.actionPerformed(new ActionEvent(value));
+                                    }
 
-                            });
+                                });
+                    } else if (url.startsWith("file:")) {
+                        loadImageFromFileURLToFileSystem(fileSystemFile);
+                    } else {
+                        loadImageFromStorageURLToFileSystem(fileSystemFile);
+                    }
                 }
             }
         } catch(IOException ioErr) {
@@ -488,7 +680,13 @@ public class URLImage extends EncodedImage {
      */
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
-        return new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
+        URLImage out = pendingToStorage.get(storageFile);
+        if (out != null) {
+            return out;
+        }
+        out = new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
+        pendingToStorage.put(storageFile, out);
+        return out;
     }
     
     /**
@@ -504,7 +702,13 @@ public class URLImage extends EncodedImage {
      */
     public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
-        return new URLImage(placeholder, url.intern(), adapter, null, file.intern());
+        URLImage out = pendingToFile.get(file);
+        if (out != null) {
+            return out;
+        }
+        out = new URLImage(placeholder, url.intern(), adapter, null, file.intern());
+        pendingToFile.put(file, out);
+        return out;
     }
     
     /**
@@ -683,6 +887,7 @@ public class URLImage extends EncodedImage {
                         
                         image = downloadedImage.getImage();
                         repaintImage = true;
+                        fireChangedEvent();
                     }
                     
                 }, new FailureCallback<Image>() {

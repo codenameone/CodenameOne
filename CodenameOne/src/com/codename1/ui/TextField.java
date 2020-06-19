@@ -116,8 +116,6 @@ public class TextField extends TextArea {
     private boolean qwerty = qwertyDevice;
     private boolean replaceMenu = replaceMenuDefault;
     private Command[] originalCommands;
-    private EventDispatcher listeners = new EventDispatcher();
-    private ActionListener doneListener;
     private boolean overwriteMode;
     private boolean enableInputScroll = true;
 
@@ -835,7 +833,6 @@ public class TextField extends TextArea {
     public void setText(String text) {
         super.setText(text);
         if(text != null) {
-            fireDataChanged(DataChangedListener.CHANGED, -1);
             int pos = getCursorPosition();
             if(pos < 0) {
                 pos = text.length();
@@ -846,7 +843,6 @@ public class TextField extends TextArea {
             }
             setCursorPosition(pos);
         } else {
-            fireDataChanged(DataChangedListener.CHANGED, -1);
             setCursorPosition(0);
         }
     }
@@ -1220,6 +1216,7 @@ public class TextField extends TextArea {
             pressedAndNotReleased = false;
             setHandlesInput(false);
         }
+        super.deinitialize();
     }
 
     /**
@@ -1569,7 +1566,11 @@ public class TextField extends TextArea {
         keyBack = rtl ? Display.GAME_RIGHT : Display.GAME_LEFT;
 
         // text field relies too much on animation to use internal animations
-        getComponentForm().registerAnimated(this);
+//        getComponentForm().registerAnimated(this);
+        Form f = getComponentForm();
+        if(f != null) {
+            f.registerAnimated(this);
+        }
     }
     
     /**
@@ -1707,95 +1708,8 @@ public class TextField extends TextArea {
         this.useSoftkeys = useSoftkeys;
     }
     
-    /**
-     * Sets a Done listener on the TextField - notice this listener will be called
-     * only on supported platforms that supports done action on the keyboard
-     * 
-     * @param l the listener
-     */
-    public void setDoneListener(ActionListener l) {
-        doneListener = l;
-    }
-
-    /**
-     * Gets the done listener of this TextField.
-     * 
-     * @return the done listener or null if not exists
-     */ 
-    public ActionListener getDoneListener() {
-        return doneListener;
-    }
     
-    /**
-     * Fire the done event to done listener
-     */ 
-    public void fireDoneEvent() {
-        if (doneListener != null) {
-            if (!Display.getInstance().isEdt()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    
-                    public void run() {
-                        fireDoneEvent();
-                    }
-                });
-                return;
-            }
-            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
-        }
-    }
-
-    /**
-     * Adds a listener for data change events it will be invoked for every change
-     * made to the text field, notice most platforms will invoke only the 
-     * DataChangedListener.CHANGED event
-     * 
-     * @param d the listener
-     */
-    public void addDataChangedListener(DataChangedListener d) {
-        listeners.addListener(d);
-    }
-
-    /**
-     * Removes the listener for data change events 
-     * 
-     * @param d the listener
-     */
-    public void removeDataChangedListener(DataChangedListener d) {
-        listeners.removeListener(d);
-    }
     
-    /**
-     * Adds a listener for data change events it will be invoked for every change
-     * made to the text field, notice most platforms will invoke only the 
-     * DataChangedListener.CHANGED event
-     * 
-     * @param d the listener
-     * @deprecated use #addDataChangedListener(DataChangedListener) instead
-     */
-    public void addDataChangeListener(DataChangedListener d) {
-        listeners.addListener(d);
-    }
-
-    /**
-     * Removes the listener for data change events 
-     * 
-     * @param d the listener
-     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
-     */
-    public void removeDataChangeListener(DataChangedListener d) {
-        listeners.removeListener(d);
-    }
-    
-    /**
-     * Alert the TextField listeners the text has been changed on the TextField
-     * @param type the event type: Added, Removed or Change
-     * @param index cursor location of the event
-     */
-    public void fireDataChanged(int type, int index) {
-        if(listeners != null) {
-            listeners.fireDataChangeEvent(index, type);
-        }
-    }
     
     /**
      * {@inheritDoc}

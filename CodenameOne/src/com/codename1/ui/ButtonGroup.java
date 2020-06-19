@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import java.util.ArrayList;
 
 /**
@@ -40,7 +41,7 @@ import java.util.ArrayList;
  * 
  * @author Nir Shabi
  */
-public class ButtonGroup {
+public class ButtonGroup implements ActionSource<ActionEvent> {
     
     
     private ArrayList<RadioButton> buttons = new ArrayList<RadioButton>();

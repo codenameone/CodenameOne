@@ -9,7 +9,7 @@
     BOOL connected;
 }
 
--(BOOL)connect:(NSString*)host port:(int)port;
+-(BOOL)connect:(NSString*)host port:(int)port timeout:(int)timeout;
 -(int)getAvailableInput;
 -(NSString*)getErrorMessage;
 +(NSString*)getIP;

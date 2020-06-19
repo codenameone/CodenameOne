@@ -22,6 +22,7 @@
  */
 package com.codename1.l10n;
 
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import java.util.Date;
 
@@ -39,6 +40,14 @@ import java.util.Date;
 public class L10NManager {
     private String language;
     private String locale;
+    private DateFormatSymbols symbols;
+    
+    private DateFormatSymbols getSymbols() {
+        if (symbols == null) {
+            symbols = new DateFormatSymbols();
+        }
+        return symbols;
+    }
     
     /**
      * Instances of this class should be received via the Display class
@@ -88,6 +97,59 @@ public class L10NManager {
     public String format(double number) {
         return "" + number;
     }
+    
+    /**
+     * Gets the short month name in the current locale for the given date.
+     * @param date The date.
+     * @return Short month name.  E.g. Jan, Feb, etc..
+     * @since 7.0
+     */
+    public String getShortMonthName(Date date) {
+        return limitLength(getLongMonthName(date), 3);
+    }
+    
+    /**
+     * Gets the long month name in the current locale for the given date.
+     * @param date The date.
+     * @return Long month name.  E.g. January, February, etc..
+     * @since 7.0
+     */
+    public String getLongMonthName(Date date) {
+        String fmt = formatDateLongStyle(date);
+        try {
+            return extractMonthName(fmt);
+        } catch (ParseException ex) {
+            int v = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
+            
+            return getSymbols().getMonths()[v];
+        }
+    }
+    
+    private String limitLength(String s, int len) {
+        if(s.length() > len) {
+            return s.substring(0, len);
+        }
+        return s;
+    }
+    
+    private String extractMonthName(String dateStr) throws ParseException {
+        String[] parts = Util.split(dateStr, " ");
+        for (String part : parts) {
+            if (part.length() == 0) {
+                continue;
+            }
+            if (part.toLowerCase().equals("de")) {
+                continue;
+            }
+            String firstChar = part.substring(0, 1);
+            if (!firstChar.toLowerCase().equals(firstChar.toUpperCase())) {
+                return part;
+            }
+        }
+        throw new ParseException("Cannot extract month from string", 0);
+
+    }
+    
 
     /**
      * Format a currency value

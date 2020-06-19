@@ -126,6 +126,7 @@ public class Tabs extends Container {
         contentPane.setUIID("TabbedPane");
         super.addComponent(BorderLayout.CENTER, contentPane);
         tabsContainer = new Container();
+        tabsContainer.setSafeArea(true);
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
         tabsContainer.getStyle().setMargin(0, 0, 0, 0);
@@ -146,6 +147,7 @@ public class Tabs extends Container {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
+        
     }
 
     // A flag that is used internally to temporily override the output of the 

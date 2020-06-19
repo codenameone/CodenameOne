@@ -153,15 +153,24 @@ static GLuint getOGLProgram(){
         CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
         
         UIGraphicsPushContext(context);
+        
+        float alpha1 = 1.0;
+        if (((startColor >> 24) & 0xff) != 0) {
+            alpha1 = ((float)((startColor >> 24) & 0xff))/255.0;
+        }
+        float alpha2 = 1.0;
+        if (((endColor >> 24) & 0xff) != 0) {
+            alpha2 = ((float)((endColor >> 24) & 0xff))/255.0;
+        }
         CGFloat components[8] = {
             ((float)((startColor >> 16) & 0xff))/255.0,
             ((float)((startColor >> 8) & 0xFF))/255.0,
             ((float)(startColor & 0xff))/255.0,
-            1.0,
+            alpha1,
             ((float)((endColor >> 16) & 0xFF))/255.0,
             ((float)((endColor >> 8) & 0xFF))/255.0,
             ((float)(endColor & 0xff))/255.0,
-            1.0 };
+            alpha2 };
         size_t num_locations = 2;
         CGFloat locations[2] = { 0.0, 1.0 };
         CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
