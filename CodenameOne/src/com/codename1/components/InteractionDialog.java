@@ -771,7 +771,7 @@ public class InteractionDialog extends Container {
             }
         }
                 
-        contentPaneStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        
         if(showPortrait) {
             if(width < availableWidth) {
                 int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
@@ -790,31 +790,31 @@ public class InteractionDialog extends Container {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, availableHeight - y);
-                contentPaneStyle.setPaddingTop(contentPaneStyle.getPaddingTop() + 1);
+                padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
-                contentPaneStyle.setPaddingTop(contentPaneStyle.getPaddingTop() - 1);
+                padOrientation(contentPaneStyle, TOP, -1);
             } else if (rect.getY() > availableHeight / 2){
                 // popup upwards
                 int height = Math.min(prefHeight, rect.getY());
                 y = rect.getY() - height;
-                contentPaneStyle.setPaddingBottom(contentPaneStyle.getPaddingBottom() + 1);
+                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
-                contentPaneStyle.setPaddingBottom(contentPaneStyle.getPaddingBottom() - 1);
+                padOrientation(contentPaneStyle, BOTTOM, -1);
             } else if (rect.getY() < availableHeight / 2) {
                 // popup over aligned with top of rect, but inset a few mm
                 y = rect.getY() + CN.convertToPixels(3);
                 
                 int height = Math.min(prefHeight, availableHeight - y);
-                contentPaneStyle.setPaddingBottom(contentPaneStyle.getPaddingBottom() + 1);
+                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
-                contentPaneStyle.setPaddingBottom(contentPaneStyle.getPaddingBottom() - 1);
+                padOrientation(contentPaneStyle, BOTTOM, -1);
             } else {
                 // popup over aligned with bottom of rect but inset a few mm
                 y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
                 int height = prefHeight;
-                contentPaneStyle.setPaddingTop(contentPaneStyle.getPaddingTop() + 1);
+                padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
-                contentPaneStyle.setPaddingTop(contentPaneStyle.getPaddingTop() - 1);                
+                padOrientation(contentPaneStyle, TOP, -1);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
@@ -852,6 +852,15 @@ public class InteractionDialog extends Container {
         }
     }
     
+    
+    private void padOrientation(Style s, int orientation, int padding) {
+        byte unit = s.getPaddingUnit()[orientation];
+        if(unit != Style.UNIT_TYPE_DIPS) {
+            padding = Display.getInstance().convertToPixels(padding);
+        }
+        s.setPadding(orientation, s.getPaddingValue(isRTL(), 
+                orientation) + padding);
+    }
 
     /**
      * Simple setter to set the Dialog uiid

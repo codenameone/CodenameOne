@@ -29,12 +29,12 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
-import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.SelectableIconHolder;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextHolder;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
@@ -55,7 +55,7 @@ import com.codename1.ui.plaf.UIManager;
  * @see MultiButton
  * @author Francesco Galgani
  */
-public class SpanMultiButton extends Container implements ActionSource, SelectableIconHolder {
+public class SpanMultiButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
     private final TextArea firstRow = new TextArea();
     private final TextArea secondRow = new TextArea();
     private final TextArea thirdRow = new TextArea();
@@ -1034,6 +1034,25 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         return null;
     }
 
+    /**
+     * Returns the line 1 text
+     * {@inheritDoc}
+     */
+    @Override
+    public void setText(String text) {
+        setTextLine1(text);
+    }
+
+    /**
+     * Sets the line 1 text
+     * {@inheritDoc}
+     */
+    @Override
+    public String getText() {
+        return getTextLine1();
+    }
+
+    
     /**
      * {@inheritDoc}
      */

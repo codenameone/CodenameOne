@@ -950,6 +950,8 @@ public abstract class LookAndFeel {
         fadeScrollEdgeLength = manager.getThemeConstant("fadeScrollEdgeInt", fadeScrollEdgeLength);
         fadeScrollBar = manager.isThemeConstant("fadeScrollBarBool", false);
 
+        InputComponent.setMultiLineErrorMessage(manager.isThemeConstant("inputComponentErrorMultilineBool", false));
+
         try {
             tickerSpeed = Long.parseLong(manager.getThemeConstant("tickerSpeedInt", "" + tickerSpeed));
             if(tickerSpeed < 1) {
