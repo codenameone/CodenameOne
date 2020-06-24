@@ -121,7 +121,7 @@ public abstract class InputComponent extends Container {
      * {@code ErrorLabel} UIID
      */
     protected TextHolder createErrorLabel() {
-        if(multiLineErrorMessage) {
+        if(multiLineErrorMessage && onTopMode) {
             TextArea errorLabel = new TextArea();
             errorLabel.setActAsLabel(true);
             errorLabel.setGrowByContent(true);
