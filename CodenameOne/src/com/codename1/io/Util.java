@@ -2260,7 +2260,7 @@ public class Util {
      * @return a pseudo-random Universally Unique Identifier in its canonical
      * textual representation
      */
-    public static String getUIID() {
+    public static String getUUID() {
         return new Util.UUID().toString();
     }
 
@@ -2273,7 +2273,7 @@ public class Util {
      * @return a Universally Unique Identifier in its canonical textual
      * representation
      */
-    public static String getUIID(long time, long clockSeqAndNode) {
+    public static String getUUID(long time, long clockSeqAndNode) {
         return new Util.UUID(time, clockSeqAndNode).toString();
     }
 
