@@ -854,7 +854,8 @@ public class InteractionDialog extends Container {
     
     
     private void padOrientation(Style s, int orientation, int padding) {
-        byte unit = s.getPaddingUnit()[orientation];
+        byte[] b = s.getPaddingUnit();
+        byte unit = b == null ? Style.UNIT_TYPE_PIXELS : s.getPaddingUnit()[orientation];
         if(unit != Style.UNIT_TYPE_DIPS) {
             padding = Display.getInstance().convertToPixels(padding);
         }
