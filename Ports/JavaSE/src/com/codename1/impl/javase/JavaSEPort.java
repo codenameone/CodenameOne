@@ -6108,7 +6108,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
+        if (cmp instanceof Peer) {
+            Peer peer = (Peer)cmp;
+            if (peer.peerBuffer != null) {
+                // PeerBuffer is used in cases like CEF where the peer component is rendered
+                // using a BufferedImage and the pixels are piped directly from that 
+                // Native CEF callback - no swing paint() involvement
+                Graphics2D nativeGraphics = getGraphics(graphics);
+                int tx = cmp.getAbsoluteX();
+                int ty = cmp.getAbsoluteY();
+                double scale = 2;
+                nativeGraphics.translate(tx, ty);
+                //nativeGraphics.scale(scale, scale);
+                peer.peerBuffer.paint(nativeGraphics, jcmp);
+                //nativeGraphics.scale(1/scale, 1/scale);
+                nativeGraphics.translate(-tx, -ty);
+                return;
+            }
+        }
         if (cmp.getClientProperty("__buffer") != null) {
+            // Swing peer components have an internal BufferedImage where they are 
+            // rendered to on the swing paint() thread.  Then the image is drawn
+            // to the CN1 graphics context.  This differs from the peerBuffer approach
+            // in that the 
             BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
             Graphics2D nativeGraphics = getGraphics(graphics);
             nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
@@ -7988,8 +8010,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     
-    
-    
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
 
         @Override
@@ -8168,6 +8188,249 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         public CN1JFXPanel() {
             final CN1JFXPanel panel = this;
+            
+            /*
+            panel.addMouseListener(new MouseListener() {
+                
+                
+
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    //SEBrowserComponent.this.instance.canvas.mouseE
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                }
+            });
+
+            panel.addMouseMotionListener(new MouseMotionListener() {
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+
+            panel.addMouseWheelListener(new MouseWheelListener() {
+
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+            */
+            
+        }
+
+        
+    }
+    
+    public static class CN1JPanel extends JPanel {
+
+        @Override
+        public void revalidate() {
+            // We need to override this with an empty implementation to workaround
+            // Deadlock bug  http://bugs.java.com/view_bug.do?bug_id=8058870
+            // If we allow the default implementation, then it will periodically deadlock
+            // when displaying a browser component
+        }
+
+        
+        
+        @Override
+        protected void processMouseEvent(MouseEvent e) {
+            //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
+            if (!sendToCn1(e)) {
+                if (isFocusable() && !hasFocus()) {
+                    if (e.getID() == MouseEvent.MOUSE_PRESSED)
+                    requestFocus();
+                }
+                super.processMouseEvent(e);
+            }
+            
+        }
+
+        @Override
+        protected void processMouseMotionEvent(MouseEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+            
+        }
+
+        @Override
+        protected void processMouseWheelEvent(MouseWheelEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+        }
+
+
+        
+        
+        private boolean peerGrabbedDrag=false;
+        
+        private boolean sendToCn1(MouseEvent e) {
+            
+            int cn1X = getCN1X(e);
+            int cn1Y = getCN1Y(e);
+            if ((!peerGrabbedDrag || true) && Display.isInitialized()) {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    //if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
+                        // It's not a peer component, so we should pass the event to the canvas
+                        e = SwingUtilities.convertMouseEvent(this, e, instance.canvas);
+                        switch (e.getID()) {
+                            case MouseEvent.MOUSE_CLICKED:
+                                instance.canvas.mouseClicked(e);
+                                break;
+                            case MouseEvent.MOUSE_DRAGGED:
+                                instance.canvas.mouseDragged(e);
+                                break;
+                            case MouseEvent.MOUSE_MOVED:
+                                instance.canvas.mouseMoved(e);
+                                break;
+                            case MouseEvent.MOUSE_PRESSED:
+                                // Mouse pressed in native component - passed to lightweight cmp
+                                if (!(cmp instanceof PeerComponent)) {
+                                    instance.cn1GrabbedDrag = true;
+                                }
+                                instance.canvas.mousePressed(e);
+                                break;
+                            case MouseEvent.MOUSE_RELEASED:
+                                instance.cn1GrabbedDrag = false;
+                                instance.canvas.mouseReleased(e);
+                                break;
+                            case MouseEvent.MOUSE_WHEEL:
+                                instance.canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                break;
+                                
+                        }
+                        //return true;
+                        if (instance.cn1GrabbedDrag) {
+                            return true;
+                        }
+                        if (cmp instanceof PeerComponent) {
+                            return false;
+                        }
+                        return true;
+                    //}
+                }
+            }
+            if (e.getID() == MouseEvent.MOUSE_RELEASED) {
+                instance.cn1GrabbedDrag = false;
+                peerGrabbedDrag = false;
+            } else if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+                peerGrabbedDrag = true;
+            }
+            return false;
+        }
+        
+        private int getCN1X(MouseEvent e) {
+            if (instance.canvas == null) {
+                int out = e.getXOnScreen();
+                if (out == 0) {
+                    // For some reason the web browser would return 0 for screen coordinates
+                    // but would still have correct values for getX() and getY() when 
+                    // dealing with mouse wheel events.  In these cases we need to 
+                    // get the screen coordinate from the component
+                    // and add it to the relative coordinate.
+                    out = e.getX(); // In some cases absX is set to zero for mouse wheel events
+                    Object source = e.getSource();
+                    if (source instanceof java.awt.Component) {
+                        Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                        out  += pt.x;
+                    }
+                }
+                return out;
+            }
+            java.awt.Rectangle screenCoords = instance.getScreenCoordinates();
+            if (screenCoords == null) {
+                screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
+            }
+            int x = e.getXOnScreen();
+            if (x == 0) {
+                // For some reason the web browser would return 0 for screen coordinates
+                // but would still have correct values for getX() and getY() when 
+                // dealing with mouse wheel events.  In these cases we need to 
+                // get the screen coordinate from the component
+                // and add it to the relative coordinate.
+                x = e.getX();
+                Object source = e.getSource();
+                if (source instanceof java.awt.Component) {
+                    Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                    x += pt.x;
+                }
+            }
+            return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * instance.zoomLevel / retinaScale) / instance.zoomLevel * retinaScale);
+        }
+
+        private int getCN1Y(MouseEvent e) {
+            if (instance.canvas == null) {
+                int out = e.getYOnScreen();
+                if (out == 0) {
+                    // For some reason the web browser would return 0 for screen coordinates
+                    // but would still have correct values for getX() and getY() when 
+                    // dealing with mouse wheel events.  In these cases we need to 
+                    // get the screen coordinate from the component
+                    // and add it to the relative coordinate.
+                    out = e.getY();
+                    Object source = e.getSource();
+                    if (source instanceof java.awt.Component) {
+                        Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                        out  += pt.y;
+                    }
+                }
+                return out;
+            }
+            java.awt.Rectangle screenCoords = instance.getScreenCoordinates();
+            if (screenCoords == null) {
+                screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
+            }
+            int y = e.getYOnScreen();
+            if (y == 0) {
+                // For some reason the web browser would return 0 for screen coordinates
+                // but would still have correct values for getX() and getY() when 
+                // dealing with mouse wheel events.  In these cases we need to 
+                // get the screen coordinate from the component
+                // and add it to the relative coordinate.
+                y = e.getY();
+                Object source = e.getSource();
+                if (source instanceof java.awt.Component) {
+                    Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                    y += pt.y;
+                }
+            }
+            return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * instance.zoomLevel / retinaScale) / instance.zoomLevel * retinaScale);
+        }
+        
+        public CN1JPanel() {
+            final CN1JPanel panel = this;
             
             /*
             panel.addMouseListener(new MouseListener() {
@@ -11570,6 +11833,42 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
+        if (CN.getProperty("BrowserComponent.useCEF", "false").equals("true")) {
+            return createCEFBrowserComponent(parent);
+        } else {
+            return createFXBrowserComponent(parent);
+            
+        }
+    }
+    
+    
+    public PeerComponent createCEFBrowserComponent(final Object parent) {
+        final PeerComponent[] out = new PeerComponent[1];
+        if (!EventQueue.isDispatchThread()) {
+            try {
+                EventQueue.invokeAndWait(new Runnable() {
+                    public void run() {
+                        
+                        out[0] = createCEFBrowserComponent(parent);
+                    }
+                });
+            } catch (Throwable ex) {
+                throw new RuntimeException("Failed to create CEF browser", ex);
+            }
+            
+            return out[0];
+        } else {
+            java.awt.Container cnt = canvas.getParent();
+            while (!(cnt instanceof JFrame)) {
+                cnt = cnt.getParent();
+                if (cnt == null) {
+                    return null;
+                }
+            }
+            return CEFBrowserComponent.create((JFrame)cnt);
+        }
+    }
+    public PeerComponent createFXBrowserComponent(final Object parent) {
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
@@ -11641,24 +11940,24 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
-        ((SEBrowserComponent) browserPeer).setProperty(key, value);
+        ((IBrowserComponent) browserPeer).setProperty(key, value);
     }
 
     public String getBrowserTitle(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).getTitle();
+        return ((IBrowserComponent) browserPeer).getTitle();
     }
 
     public String getBrowserURL(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).getURL();
+        return ((IBrowserComponent) browserPeer).getURL();
     }
 
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
-        ((SEBrowserComponent) browserPeer).execute(javaScript);
+        ((IBrowserComponent) browserPeer).execute(javaScript);
     }
 
     @Override
     public String browserExecuteAndReturnString(PeerComponent browserPeer, String javaScript) {
-        return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
+        return ((IBrowserComponent) browserPeer).executeAndReturnString(javaScript);
     }
 
     @Override
@@ -11697,21 +11996,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             url = this.getClass().getResource(url).toExternalForm();
         }
         final String theUrl = url;
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).setURL(theUrl);
+                ((IBrowserComponent) browserPeer).setURL(theUrl);
             }
         });
     }
 
     public void browserStop(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).stop();
+                ((IBrowserComponent) browserPeer).stop();
             }
         });
     }
@@ -11722,11 +12021,11 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param browserPeer browser instance
      */
     public void browserReload(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).reload();
+                ((IBrowserComponent) browserPeer).reload();
             }
         });
     }
@@ -11738,57 +12037,61 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @return true if back should work
      */
     public boolean browserHasBack(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).hasBack();
+        return ((IBrowserComponent) browserPeer).hasBack();
     }
 
     public boolean browserHasForward(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).hasForward();
+        return ((IBrowserComponent) browserPeer).hasForward();
     }
 
     public void browserBack(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).back();
+                ((IBrowserComponent) browserPeer).back();
             }
         });
     }
 
     public void browserForward(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).forward();
+                ((IBrowserComponent) browserPeer).forward();
             }
         });
     }
 
     public void browserClearHistory(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).clearHistory();
+                ((IBrowserComponent) browserPeer).clearHistory();
             }
         });
     }
 
     public void setBrowserPage(final PeerComponent browserPeer, final String html, final String baseUrl) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).setPage(html, baseUrl);
+                ((IBrowserComponent) browserPeer).setPage(html, baseUrl);
             }
         });
     }
 
     private void browserExposeInJavaScriptImpl(final PeerComponent browserPeer, final Object o, final String name) {
-        ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
+        ((IBrowserComponent) browserPeer).exposeInJavaScript(o, name);
     }
+    
     public void browserExposeInJavaScript(final PeerComponent browserPeer, final Object o, final String name) {
+        if (!(browserPeer instanceof SEBrowserComponent)) {
+            return;
+        }
         if (Platform.isFxApplicationThread()) {
             browserExposeInJavaScriptImpl(browserPeer, o, name);
             return;
@@ -12689,7 +12992,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
     
-    class Peer extends PeerComponent {
+    static class Peer extends PeerComponent {
         
         // Container that will hold the native peer component.
         // Wrapping the component in a container allows us to
@@ -12706,6 +13009,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private boolean matchCN1Style;
         
+        
+        private PeerComponentBuffer peerBuffer;
+        
         // Buffered image that will be drawn to by AWT and read from
         // by CN1
         BufferedImage buf;
@@ -12719,16 +13025,25 @@ public class JavaSEPort extends CodenameOneImplementation {
          * @see #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) 
          */
         private BufferedImage getBuffer() {
-            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / zoomLevel) {
+            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / instance.zoomLevel) {
 
-                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / zoomLevel), (int)(cnt.getHeight() * retinaScale / zoomLevel), BufferedImage.TYPE_INT_ARGB);
+                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / instance.zoomLevel), (int)(cnt.getHeight() * retinaScale / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
             }
             return buf;
         }
         
+        public void setPeerComponentBuffer(PeerComponentBuffer buf) {
+            if (peerBuffer != null) {
+                peerBuffer.setPeer(null);
+            }
+            buf.setPeer(this);
+            peerBuffer = buf;
+        }
+                
+        
         /**
          * Paints the native peer onto a buffered image and stores the image
-         * in the peer to be later drawn by drawNativePeer (in the CN1 pipeline).
+         * in the peer to be later drawn by {@link #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) } (in the CN1 pipeline).
          * 
          * THis method should be called only on the AWT dispatch thread.
          */
@@ -12865,7 +13180,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
             Graphics2D g2d = buf.createGraphics();
-            g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+            g2d.scale(retinaScale / instance.zoomLevel, retinaScale / instance.zoomLevel);
 
             cmp.paintAll(g2d);
             g2d.dispose();
@@ -12913,6 +13228,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     cnt = new JPanel() {
                         @Override
                         public void paint(java.awt.Graphics g) {
+                            if (peerBuffer != null) {
+                                //peerBuffer.paint((Graphics2D)g, cnt);
+                                // If we are using a peer buffer, we won't *actually* paint the 
+                                // component because the peer buffer will be painted
+                                // in the CN1 paint cycle on the CN1 context
+                                return;
+                            }
                             paintOnBuffer();
                             
                             // We need to tell CN1 to repaint now
@@ -12955,9 +13277,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void deinitialize() {
             super.deinitialize();
-            if (testRecorder != null) {
-                testRecorder.dispose();
-                testRecorder = null;
+            if (instance.testRecorder != null) {
+                instance.testRecorder.dispose();
+                instance.testRecorder = null;
             }
             SwingUtilities.invokeLater(new Runnable() {
 
@@ -12996,15 +13318,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / zoomLevel), 
-                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / zoomLevel));
+            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / instance.zoomLevel), 
+                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
         }
 
         @Override
         public void paint(final Graphics g) {
             if (init) {
                 onPositionSizeChange();
-                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                if (peerBuffer != null) {
+                    // Peer buffers are kept "painted" on their own
+                    // we don't need to initiate any further calls to paintOnBuffer or such.
+                    return;
+                }
+                
                 
                 // Tell AWT to do a repaint so that we know we have the latest.
                 EventQueue.invokeLater(new Runnable() {
@@ -13019,7 +13347,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
                 
             }else{
-                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                if(getComponentForm() != null && getComponentForm() == instance.getCurrentForm()){
                     setLightweightMode(false);
                 }
             }
@@ -13049,14 +13377,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
 
-            if (lastZoom == zoomLevel && x == lastX && y == lastY && w == lastW && h == lastH) {
+            if (lastZoom == instance.zoomLevel && x == lastX && y == lastY && w == lastW && h == lastH) {
                 return;
             }
             final int screenX;
             final int screenY;
-            if (getScreenCoordinates() != null) {
-                screenX = getScreenCoordinates().x;
-                screenY = getScreenCoordinates().y;
+            if (instance.getScreenCoordinates() != null) {
+                screenX = instance.getScreenCoordinates().x;
+                screenY = instance.getScreenCoordinates().y;
             } else {
                 screenX = 0;
                 screenY = 0;
@@ -13066,15 +13394,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastY = y;
             lastW = w;
             lastH = h;
-            lastZoom = zoomLevel;
+            lastZoom = instance.zoomLevel;
             final double zoom = lastZoom;
 
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
                     setCntBounds(
-                            (int) ((x + screenX + canvas.x) * zoom / retinaScale),
-                            (int) ((y + screenY + canvas.y) * zoom / retinaScale),
+                            (int) ((x + screenX + instance.canvas.x) * zoom / retinaScale),
+                            (int) ((y + screenY + instance.canvas.y) * zoom / retinaScale),
                             (int) (w * zoom / retinaScale),
                             (int) (h * zoom / retinaScale)
                     );

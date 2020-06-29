@@ -99,6 +99,20 @@ public class Simulator {
                 }
             }
         }
+        File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
+        if (cef.exists()) {
+            System.out.println("Adding CEF to classpath");
+            System.setProperty("java.class.path", System.getProperty("java.class.path") 
+                    + File.pathSeparator + cef.getAbsolutePath());
+            for (File jar : cef.listFiles()) {
+                if (jar.getName().endsWith(".jar")) {
+                    System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
+                    files.add(jar);
+                }
+            }
+            setLibraryPath(System.getProperty("java.library.path")+File.pathSeparator+cef.getAbsolutePath()+File.separator+"macos64");
+            System.out.println("Class path now: "+System.getProperty("java.class.path"));
+        }
         loadFXRuntime();
         final ClassLoader ldr = new ClassPathLoader( files.toArray(new File[files.size()]));
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
@@ -150,6 +164,14 @@ public class Simulator {
         } 
     }
     
+    public static void setLibraryPath(String path) throws Exception {
+        System.setProperty("java.library.path", path);
+
+        //set sys_paths to null so that java.library.path will be reevalueted next time it is needed
+        final Field sysPathsField = ClassLoader.class.getDeclaredField("sys_paths");
+        sysPathsField.setAccessible(true);
+        sysPathsField.set(null, null);
+    }
     
 }
 

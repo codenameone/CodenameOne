@@ -23,15 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.location.Location;
-import java.awt.BorderLayout;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.prefs.Preferences;
-import javafx.application.Platform;
-import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
-import javafx.scene.web.WebView;
-import netscape.javascript.JSObject;
 
 /**
  *

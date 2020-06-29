@@ -64,7 +64,7 @@ import javax.swing.SwingUtilities;
  * 
  * @author Chen
  */
-public class SEBrowserComponent extends PeerComponent {
+public class SEBrowserComponent extends PeerComponent implements IBrowserComponent{
     private static boolean firstTime = true;
     private WebView web;
     private javafx.embed.swing.JFXPanel panel;
@@ -450,6 +450,7 @@ public class SEBrowserComponent extends PeerComponent {
      * @param js
      * @return
      */
+    @Override
     public String executeAndReturnString(final String js){
         if (isFXThread()) {
             try {
@@ -514,6 +515,7 @@ public class SEBrowserComponent extends PeerComponent {
         return Platform.isFxApplicationThread();
     }
     
+    @Override
     public void execute(final String js) {
         if (isFXThread()) {
             executeImpl(js);
@@ -764,56 +766,66 @@ public class SEBrowserComponent extends PeerComponent {
         return r.y;
     }
     
-    void setProperty(String key, Object value) {
+    @Override
+    public void setProperty(String key, Object value) {
         if(key.equalsIgnoreCase("User-Agent")) {
             web.getEngine().setUserAgent((String)value);
         }
     }
 
-    String getTitle() {
+    @Override
+    public String getTitle() {
         return web.getEngine().getTitle();
     }
 
-    String getURL() {
+    @Override
+    public String getURL() {
         return web.getEngine().getLocation();
     }
 
-    void setURL(String url) {
+    @Override
+    public void setURL(String url) {
         web.getEngine().load(url);
     }
 
-    void stop() {
+    @Override
+    public void stop() {
     }
 
-    void reload() {
+    @Override
+    public void reload() {
         web.getEngine().reload();
     }
 
-    boolean hasBack() {
+    public boolean hasBack() {
         return web.getEngine().getHistory().getCurrentIndex() > 0;
     }
 
-    boolean hasForward() {
+    public boolean hasForward() {
         return web.getEngine().getHistory().getCurrentIndex() < web.getEngine().getHistory().getMaxSize() - 1;
     }
 
-    void back() {
+    @Override
+    public void back() {
         web.getEngine().getHistory().go(-1);
     }
 
-    void forward() {
+    public void forward() {
         web.getEngine().getHistory().go(1);
     }
 
-    void clearHistory() {
+    @Override
+    public void clearHistory() {
     }
 
-    void setPage(String html, String baseUrl) {
+    @Override
+    public void setPage(String html, String baseUrl) {
         web.getEngine().loadContent(html);
         repaint();
     }
 
-    void exposeInJavaScript(Object o, String name) {
+    @Override
+    public void exposeInJavaScript(Object o, String name) {
     }
 
     @Override
@@ -855,5 +867,12 @@ public class SEBrowserComponent extends PeerComponent {
         
         
     }
+
+    @Override
+    public void runLater(Runnable r) {
+        Platform.runLater(r);
+    }
    
+    
+    
 }
