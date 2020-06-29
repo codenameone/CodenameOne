@@ -1712,7 +1712,9 @@ public class BrowserComponent extends Container {
                             }
                         }
                         if (key != null) {
-                            returnValueCallbacks.remove(key);
+                            if (jsCallbacks == null || !jsCallbacks.contains(callback)) {
+                                returnValueCallbacks.remove(key);
+                            }
                             if (callback instanceof Callback) {
                                 ((Callback)callback).onError(BrowserComponent.this, new RuntimeException("Javascript execution timeout"), 1, "Javascript execution timeout");
                             } else {
