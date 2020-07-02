@@ -27,8 +27,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -42,14 +44,41 @@ class ClassPathLoader extends ClassLoader {
 
     private File[] classpath;
     private Map classes = new HashMap();
+    private List<String> excludes = new ArrayList<String>();
+    {
+        excludes.add("com.github.sarxos.webcam");
+        excludes.add("org.bridj");
+        excludes.add("java");
+        excludes.add("com.sun");
+        excludes.add("org.jdesktop");
+        excludes.add("netscape.javascript");
+        excludes.add("javafx");
+    }
 
     public ClassPathLoader(File[] classpath) {
-        super(ClassPathLoader.class.getClassLoader());
+        this(ClassPathLoader.class.getClassLoader(), classpath);
+    }
+    
+    public ClassPathLoader(ClassLoader parent, File[] classpath) {
+        super(parent);
         this.classpath = classpath;
+    }
+    
+    public void addExclude(String exclude) {
+        excludes.add(exclude);
+    }
+    
+    private boolean isExcluded(String className) {
+        for (String prefix : excludes) {
+            if (className.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Class loadClass(String className) throws ClassNotFoundException {
-        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop") || className.startsWith("netscape.javascript") || className.startsWith("javafx")) {
+        if (isExcluded(className)) {
             return super.loadClass(className);
         }
         return findClass(className);
@@ -57,7 +86,7 @@ class ClassPathLoader extends ClassLoader {
 
     @Override
     protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
-        if (className.startsWith("com.github.sarxos.webcam") || className.startsWith("org.bridj") || className.startsWith("java") || className.startsWith("com.sun") || className.startsWith("org.jdesktop") || className.startsWith("netscape.javascript") || className.startsWith("javafx")) {
+        if (isExcluded(className)) {
             return super.loadClass(className, resolve);
         }
         return findClass(className);

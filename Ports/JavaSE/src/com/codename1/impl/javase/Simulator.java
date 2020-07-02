@@ -45,6 +45,8 @@ import java.util.StringTokenizer;
 public class Simulator {
     
     private static final String DEFAULT_SKIN="/iPhoneX.skin";
+    private static ClassPathLoader rootClassLoader;
+    
 
     /**
      * Accepts the classname to launch
@@ -99,8 +101,16 @@ public class Simulator {
                 }
             }
         }
+        boolean cefSupported = false;
+        boolean fxSupported = false;
+        try {
+            Class.forName("javafx.embed.swing.JFXPanel");
+            fxSupported = true;
+        } catch (Throwable ex) {}
+        
         File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         if (cef.exists()) {
+            cefSupported = true;
             System.out.println("Adding CEF to classpath");
             System.setProperty("java.class.path", System.getProperty("java.class.path") 
                     + File.pathSeparator + cef.getAbsolutePath());
@@ -113,15 +123,54 @@ public class Simulator {
             setLibraryPath(System.getProperty("java.library.path")+File.pathSeparator+cef.getAbsolutePath()+File.separator+"macos64");
             System.out.println("Class path now: "+System.getProperty("java.class.path"));
         }
+        
+        File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
+        if (jmf.exists()) {
+            System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jmf.getAbsolutePath());
+            files.add(jmf);
+            setLibraryPath(System.getProperty("java.library.path")+File.pathSeparator+jmf.getAbsolutePath());
+        }
+        
+        String implementation = System.getProperty("cn1.javase.implementation", "");
+
+        
+        if (implementation.equalsIgnoreCase("cef") && !cefSupported) {
+            // We will use CEF
+            System.err.println("cn1.javase.implementation=cef but CEF was not found.  Please update your Codename One libraries and try again.\nAlternatively, you can try using a different implementation.");
+            System.exit(1);
+        }
+        if (implementation.equalsIgnoreCase("fx") && !fxSupported) {
+            System.err.println("cn1.javase.implementation=fx but JavaFX was not found.  Please use a JDK that has JavaFX such as ZuluFX.  https://www.azul.com/downloads/zulu-community/");
+            System.exit(1);
+        }
+        if ("".equals(implementation)) {
+            if (cefSupported) {
+                System.setProperty("cn1.javase.implementation", "cef");
+            } else if (fxSupported) {
+                System.setProperty("cn1.javase.implementation", "fx");
+            } else {
+                System.setProperty("cn1.javase.implementation", "jmf");
+            }
+        }
+        
         loadFXRuntime();
-        final ClassLoader ldr = new ClassPathLoader( files.toArray(new File[files.size()]));
+        ClassLoader ldr = rootClassLoader == null ? 
+                new ClassPathLoader( files.toArray(new File[files.size()])) :
+                new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
+        if (rootClassLoader == null) {
+            rootClassLoader = (ClassPathLoader)ldr;
+            ldr = new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
+            
+        }
+        ((ClassPathLoader)ldr).addExclude("org.cef.");
+        final ClassLoader fLdr = ldr;
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
 
         new Thread() {
             public void run() {
-                setContextClassLoader(ldr);
+                setContextClassLoader(fLdr);
                 while (true) {
                     try {
                         sleep(500);
@@ -129,6 +178,7 @@ public class Simulator {
                     }
                     String r = System.getProperty("reload.simulator");
                     if (r != null && r.equals("true")) {
+                        System.out.println("Detected reload of simulator");
                         System.setProperty("reload.simulator", "");
                         try {
                             main(argv);

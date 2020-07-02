@@ -52,7 +52,8 @@ public class PeerComponentBuffer {
     
     public void repaint(int x, int y, int w, int h) {
         if (peer != null) {
-            peer.repaint(peer.getAbsoluteX()+x, peer.getAbsoluteY()+y, w+1, h+1);
+            double scale = JavaSEPort.instance.zoomLevel;
+            peer.repaint((int)(peer.getAbsoluteX()+x/scale), (int)(peer.getAbsoluteY()+y/scale), (int)((w+1)/scale), (int)((h+1)/scale));
             //peer.repaint(x, y, w, h);
         }
     }

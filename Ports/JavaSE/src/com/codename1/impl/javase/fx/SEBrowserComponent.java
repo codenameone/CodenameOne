@@ -20,8 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase;
+package com.codename1.impl.javase.fx;
 
+import com.codename1.impl.javase.IBrowserComponent;
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
@@ -730,8 +732,8 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                 
                 frm.doLayout();
                 cnt.setBounds(
-                    (int) ((x + screenX + instance.canvas.x) * zoom / JavaSEPort.retinaScale),
-                    (int) ((y + screenY + instance.canvas.y) * zoom / JavaSEPort.retinaScale),
+                    (int) ((x + screenX + instance.getCanvasX()) * zoom / JavaSEPort.retinaScale),
+                    (int) ((y + screenY + instance.getCanvasY()) * zoom / JavaSEPort.retinaScale),
                     (int) (w * zoom / JavaSEPort.retinaScale),
                     (int) (h * zoom / JavaSEPort.retinaScale)
                 );
@@ -872,6 +874,12 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     public void runLater(Runnable r) {
         Platform.runLater(r);
     }
+
+    @Override
+    public boolean supportsExecuteAndReturnString() {
+        return true;
+    }
+    
    
     
     

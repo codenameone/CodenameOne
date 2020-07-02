@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.fx.JavaFXLoader;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;

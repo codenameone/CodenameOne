@@ -4,6 +4,7 @@
 
 package com.codename1.impl.javase.cef;
 
+import com.codename1.ui.BrowserComponent;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -13,13 +14,15 @@ import org.cef.callback.CefQueryCallback;
 import org.cef.handler.CefMessageRouterHandlerAdapter;
 
 public class MessageRouterHandlerEx extends CefMessageRouterHandlerAdapter {
+    private BrowserComponent browserComponent_;
     private final CefClient client_;
     private final CefMessageRouterConfig config_ =
             new CefMessageRouterConfig("myQuery", "myQueryAbort");
     private CefMessageRouter router_ = null;
 
-    public MessageRouterHandlerEx(final CefClient client) {
+    public MessageRouterHandlerEx(final CefClient client, BrowserComponent browserComponent) {
         client_ = client;
+        this.browserComponent_ = browserComponent;
     }
 
     @Override
@@ -34,7 +37,7 @@ public class MessageRouterHandlerEx extends CefMessageRouterHandlerAdapter {
             if (router_ != null) {
                 callback.failure(-1, "Already enabled");
             } else {
-                router_ = CefMessageRouter.create(config_, new JavaVersionMessageRouter());
+                router_ = CefMessageRouter.create(config_, new ShouldNavigateMessageRouter());
                 client_.addMessageRouter(router_);
                 callback.success("");
             }
@@ -65,4 +68,24 @@ public class MessageRouterHandlerEx extends CefMessageRouterHandlerAdapter {
             return false;
         };
     }
+    
+    private class ShouldNavigateMessageRouter extends CefMessageRouterHandlerAdapter {
+
+        @Override
+        public boolean onQuery(CefBrowser browser, CefFrame frame, long queryId, String request, boolean persistent, CefQueryCallback callback) {
+            if (request.startsWith("shouldNavigate:")) {
+                String url = request.substring(request.indexOf(":")+1);
+                if (browserComponent_ != null) {
+                    browserComponent_.fireBrowserNavigationCallbacks(url);
+                    callback.success("true");
+                }
+                return true;
+                
+            }
+            return false;
+        }
+        
+    }
+    
+    
 }

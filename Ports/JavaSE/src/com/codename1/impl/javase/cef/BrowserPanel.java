@@ -5,8 +5,13 @@
  */
 package com.codename1.impl.javase.cef;
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.JavaSEPort.CN1JPanel;
 import com.codename1.impl.javase.PeerComponentBuffer;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -50,10 +55,15 @@ public class BrowserPanel extends CN1JPanel {
     private String url_ = null;
     private final CefClient client_;
     private String errorMsg_ = "";
-    private PeerComponentBuffer buffer_;
+    private CEFPeerComponentBuffer buffer_;
     private boolean browserFocus_ = true;
-    public BrowserPanel(PeerComponentBuffer buffer, boolean osrEnabled, boolean transparentPaintingEnabled,
+    private BrowserComponent browserComponent;
+    private CEFBrowserComponent cefBrowserComponent;
+    
+    public BrowserPanel(CEFPeerComponentBuffer buffer, BrowserComponent browserComponent, boolean osrEnabled, boolean transparentPaintingEnabled,
             boolean createImmediately, String[] args) {
+        setZoom(1);
+        this.browserComponent = browserComponent;
         this.buffer_ = buffer;
         setLayout(new CardLayout());
         
@@ -139,7 +149,9 @@ public class BrowserPanel extends CN1JPanel {
             settings.windowless_rendering_enabled = osrEnabled;
             // try to load URL "about:blank" to see the background color
             settings.background_color = settings.new ColorType(100, 255, 242, 211);
-            System.out.println("Offscreen rendering enabled? "+osrEnabled);
+            //settings.user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1";
+            settings.user_agent = CN.getProperty("user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1" );
+            settings.remote_debugging_port = 8088;
             myApp = CefApp.getInstance(args, settings);
 
             CefApp.CefVersion version = myApp.getVersion();
@@ -173,7 +185,7 @@ public class BrowserPanel extends CN1JPanel {
         client_.addDragHandler(new DragHandler());
         client_.addJSDialogHandler(new JSDialogHandler());
         client_.addKeyboardHandler(new KeyboardHandler());
-        client_.addRequestHandler(new RequestHandler(this));
+        client_.addRequestHandler(new RequestHandler(this, browserComponent));
         
 
         //    Beside the normal handler instances, we're registering a MessageRouter
@@ -182,8 +194,8 @@ public class BrowserPanel extends CN1JPanel {
         //    that the JavaScript binding methods "cefQuery" and "cefQueryCancel"
         //    are used.
         CefMessageRouter msgRouter = CefMessageRouter.create();
-        msgRouter.addHandler(new MessageRouterHandler(), true);
-        msgRouter.addHandler(new MessageRouterHandlerEx(client_), false);
+        msgRouter.addHandler(new MessageRouterHandler(browserComponent), true);
+        //msgRouter.addHandler(new MessageRouterHandlerEx(client_), false);
         client_.addMessageRouter(msgRouter);
 
         // 2.1) We're overriding CefDisplayHandler as nested anonymous class
@@ -218,16 +230,29 @@ public class BrowserPanel extends CN1JPanel {
                     boolean canGoBack, boolean canGoForward) {
                 //control_pane_.update(browser, isLoading, canGoBack, canGoForward);
                 //status_panel_.setIsInProgress(isLoading);
-
-                if (!isLoading && !errorMsg_.isEmpty()) {
-                    //browser.loadURL(DataUri.create("text/html", errorMsg_));
-                    errorMsg_ = "";
+                if (browserComponent != null) {
+                    if (isLoading) {
+                        //System.out.println("Firing onStart "+url_);
+                        browserComponent.fireWebEvent(BrowserComponent.onStart, new ActionEvent(url_));
+                    } else {
+                        //System.out.println("Firing onLoad "+url_);
+                        //String bootstrap = "if (!window.cn1application) window.cn1application={};"
+                        //        + "window.cn1application."
+                        
+                        browser_.executeJavaScript("window.cn1application = ", url_, ERROR);
+                        browserComponent.fireWebEvent(BrowserComponent.onLoad, new ActionEvent(url_));
+                       
+                    }
                 }
+
             }
 
             @Override
             public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode,
                     String errorText, String failedUrl) {
+                if (browserComponent != null) {
+                    browserComponent.fireWebEvent(BrowserComponent.onError, new ActionEvent(errorText, errorCode.getCode()));
+                }
                 if (errorCode != CefLoadHandler.ErrorCode.ERR_NONE && errorCode != CefLoadHandler.ErrorCode.ERR_ABORTED) {
                     errorMsg_ = "<html><head>";
                     errorMsg_ += "<title>Error while loading</title>";
@@ -242,9 +267,12 @@ public class BrowserPanel extends CN1JPanel {
         });
 
         // Create the browser.
+        CN1CefBrowser.setComponentFactory(new CEFComponentFactory());
+        CN1CefBrowser.setUIPlatform(new CEFUIPlatform());
         CefBrowser browser = client_.createBrowser(
                 "http://www.youtube.com", osrEnabled, transparentPaintingEnabled, null);
         ((CN1CefBrowser)browser).setPeerComponentBuffer(buffer);
+
         setBrowser(browser);
 
         // Set up the UI for this example implementation.
@@ -321,6 +349,9 @@ public class BrowserPanel extends CN1JPanel {
             public void onAfterCreated(CefBrowser browser) {
                 System.out.println("BrowserFrame.onAfterCreated id=" + browser.getIdentifier());
                 browserCount_++;
+                if (cefBrowserComponent != null) {
+                    cefBrowserComponent.fireReady();
+                }
             }
 
             @Override
@@ -376,6 +407,15 @@ public class BrowserPanel extends CN1JPanel {
     
     public String getURL() {
         return url_;
+    }
+
+    public void setBrowserComponent(BrowserComponent parent) {
+        
+        this.browserComponent = parent;
+    }
+    
+    public void setCEFBrowserComponent(CEFBrowserComponent cefBc) {
+        this.cefBrowserComponent = cefBc;
     }
 
    

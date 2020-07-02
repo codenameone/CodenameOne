@@ -4,6 +4,7 @@
 
 package com.codename1.impl.javase.cef;
 
+import com.codename1.ui.BrowserComponent;
 import java.awt.Container;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -31,14 +32,26 @@ import javax.swing.SwingUtilities;
 
 public class RequestHandler extends CefResourceRequestHandlerAdapter implements CefRequestHandler {
     private final Container owner_;
+    private BrowserComponent browserComponent_;
 
-    public RequestHandler(Container owner) {
+    public RequestHandler(Container owner, BrowserComponent browserComponent) {
         owner_ = owner;
+        this.browserComponent_ = browserComponent;
     }
 
     @Override
     public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
             boolean user_gesture, boolean is_redirect) {
+        
+        if (browserComponent_ != null) {
+            System.out.println("in onBeforeBrowse "+request.getURL());
+            boolean res = browserComponent_.fireBrowserNavigationCallbacks(request.getURL());
+            System.out.println("Allowed to browse? "+res);
+            if (!res) {
+                return res;
+            }
+        }
+        
         CefPostData postData = request.getPostData();
         if (postData != null) {
             Vector<CefPostDataElement> elements = new Vector<CefPostDataElement>();

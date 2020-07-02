@@ -32,5 +32,6 @@ public interface IBrowserComponent {
     
     public void runLater(Runnable r);
     void exposeInJavaScript(Object o, String name);
+    public boolean supportsExecuteAndReturnString();
     
 }
