@@ -319,10 +319,7 @@ public class InteractionDialog extends Container {
             getParent().setWidth(getWidth());
             getParent().setHeight(getHeight());
             
-            getLayeredPane(f).animateLayout(400);
-            
-
-            
+            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         }
     }
     
@@ -377,7 +374,7 @@ public class InteractionDialog extends Container {
                 getParent().setWidth(getWidth());
                 getParent().setHeight(getHeight());
             }
-            getLayeredPane(f).animateLayout(400);
+            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         } else {
             getLayeredPane(f).revalidate();
         }
@@ -421,7 +418,7 @@ public class InteractionDialog extends Container {
                         setWidth(1);
                         setHeight(1);
                     }
-                    p.animateUnlayoutAndWait(400, 100);
+                    p.animateUnlayoutAndWait(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 100);
                 }
                 Container pp = getLayeredPane(f);
                 remove();
@@ -503,7 +500,7 @@ public class InteractionDialog extends Container {
                 }
                 
                 if(animateShow) {
-                    p.animateUnlayout(400, 255, new Runnable() {
+                    p.animateUnlayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 255, new Runnable() {
                         public void run() {
                             if(p.getParent() != null) {
                                 Container pp = getLayeredPane(f);

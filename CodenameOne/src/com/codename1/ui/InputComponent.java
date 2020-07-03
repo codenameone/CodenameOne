@@ -121,8 +121,18 @@ public abstract class InputComponent extends Container {
      * {@code ErrorLabel} UIID
      */
     protected TextHolder createErrorLabel() {
-        if(multiLineErrorMessage && onTopMode) {
-            TextArea errorLabel = new TextArea();
+        if(multiLineErrorMessage && isOnTopMode()) {
+            TextArea errorLabel = new TextArea() {
+                @Override
+                protected Dimension calcPreferredSize() {
+                    if(getText() == null || getText().length() == 0) {
+                        return new Dimension();
+                    }
+                    return super.calcPreferredSize(); 
+                }
+                
+            };
+            errorLabel.setRows(1);
             errorLabel.setActAsLabel(true);
             errorLabel.setGrowByContent(true);
             errorLabel.setFocusable(false);
