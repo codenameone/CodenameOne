@@ -80,6 +80,7 @@ public abstract class InputComponent extends Container {
     static Boolean guiBuilderMode;
     
     Button action;
+    private boolean actionAsButton;
     
     /**
      * Protected constructor for subclasses to override
@@ -190,12 +191,18 @@ public abstract class InputComponent extends Container {
         return super.calcPreferredSize();
     }
     
-    void addEditorAction() {
+    private void addEditorAction() {
         if(action != null) {
-            add(BorderLayout.CENTER, LayeredLayout.encloseIn(
-                getEditor(),
-                FlowLayout.encloseRightMiddle(action)
-            ));
+            if(actionAsButton) {
+                add(BorderLayout.CENTER, BorderLayout.centerEastWest(
+                        getEditor(),
+                        action, null));
+            } else {
+                add(BorderLayout.CENTER, LayeredLayout.encloseIn(
+                    getEditor(),
+                    FlowLayout.encloseRightMiddle(action)
+                ));
+            }
         } else {
             add(BorderLayout.CENTER, getEditor());
         }
@@ -367,6 +374,70 @@ public abstract class InputComponent extends Container {
         if(action == null) {
             action = new Button("", "InputComponentAction");
         }
+    }
+    
+    /**
+     * Sets the UIID for the action button
+     * @param uiid a custom UIID for the action
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionUIID(String uiid) {
+        initAction();
+        action.setUIID(uiid);
+        return this;
+    }
+    
+    /**
+     * UIID for the action button
+     * @return the UIID
+     */
+    public String getActionUIID() {
+        initAction();
+        return action.getUIID();
+    }
+    
+    /**
+     * Indicates the action should behave as a button next to the component
+     * and not layered on top of the text component. This is useful for UI
+     * in the style of a browse button next to a text field.
+     * @param asButton true so the action will act like a button
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionAsButton(boolean asButton) {
+        initAction();
+        this.actionAsButton = asButton;
+        return this;
+    }
+    
+    /**
+     * Indicates the action should behave as a button next to the component
+     * and not layered on top of the text component. This is useful for UI
+     * in the style of a browse button next to a text field.
+     * @return true if the action acts as a button
+     */
+    public boolean isActionAsButton() {
+        return actionAsButton;
+    }
+
+    /**
+     * Provides the text of the action button
+     * @param text the text that should appear on the action button
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionText(String text) {
+        initAction();
+        action.setText(text);
+        return this;
+    }
+    
+    /**
+     * Provides the text of the action button
+     * 
+     * @return the text of the action
+     */
+    public String getActionText() {
+        initAction();
+        return action.getText();
     }
     
     /**
