@@ -31,6 +31,7 @@ import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextHolder;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -44,7 +45,7 @@ import com.codename1.ui.plaf.Style;
  *
  * @author Shai Almog
  */
-public class SpanLabel extends Container implements IconHolder {
+public class SpanLabel extends Container implements IconHolder, TextHolder {
     private Label icon;
     private int gap;
     private Container iconWrapper;

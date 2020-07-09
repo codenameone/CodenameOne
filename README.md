@@ -1,32 +1,110 @@
-<img src="https://www.codenameone.com/img/blog/codenameone-6-release-banner.jpg"> 
+<img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 
 [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
 ## Write Once Run Anywhere Native Mobile Apps for Java and Kotlin Developers
 
-<img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
-
-[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
-It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
+[Codename One](https://www.codenameone.com/) is a mobile first cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
+It's a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder/css), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
 
 Codename One is the only platform that...
 
 - Has Write Once Run Anywhere support with no special hardware requirements and 100% code reuse
-- Compiles Java (or Kotlin) into native code for iOS, UWP (Universal Windows Platform), Android & even JavaScript (with seamless PWA support)
-- Is Open Source & Free with an enterprise grade commercial offering
-- Is Easy to use with 100% portable Drag & Drop GUI builder
+- Compiles Java or Kotlin into native code for iOS, UWP (Universal Windows Platform), Android and even JavaScript (with seamless PWA and Thread support)
+- Is Open Source and Free with an enterprise grade commercial offering
+- Is Easy to use with 100% portable Drag and Drop GUI builder
 - Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
 - Has full control over every pixel on the screen! Just override paint and draw or use a glass pane to draw anywhere...
 - Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
 - Supports seamless Continuous Integration out of the box
 
-[Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=EMRmo6ZRnGw).
+Here are some concrete benefits you can get with Codename One:
+
+<img align="right" src="https://www.codenameone.com/img/github/content/runs-instantly.png" height="200">
+
+### Codename One's Simulator Runs Instantly
+
+Unlike emulators which you can see in Android etc. Codename One uses a simulator. This means it starts up fast even when debugging. You can enjoy IDE features such as live code reload to modify code in runtime etc.
+
+This means faster debugging cycle and faster development process!
+
+<img align="left" src="https://www.codenameone.com/img/github/content/large-selection-skins.png" height="200">
+
+### Large Selection of Device Skins
+
+Choose from a large selection of device “skins” to see how your app will look on particular devices. The skin takes into account factors such as resolution and
+device density to provide a pixel-perfectre presentation of your app, as it would appear on the real device.
+Switching between device skins is nearly instant.
+
+You can edit and contribute skins in their own open source project [here](https://github.com/codenameone/codenameone-skins).
+
+<img align="right" src="https://www.codenameone.com/img/github/content/interactive-console.png" height="200">
+
+### Interactive Console
+
+Interact with your application’s APIs at runtime using the interactive Groovy Console. Inspect the application state or experiment with changes all while the app is running. 
+
+This lets you investigate issues and experiment without even the small overhead of recompiling.
+
+<img align="left" src="https://www.codenameone.com/img/github/content/live-reload.png" height="200">
+
+### Live Reload
+
+The Simulator let’s you take advantage of the "Reload Changed Classes" feature in IntelliJ (named "Apply Code Changes" in NetBeans) so that changes you make in your Java source code will be applied immediately to your already-running app in the simulator.
+
+Note that this is often superior to the interactive console but there are limitations such as the ability to add methods/change structure of the code. These limits don't apply to the interactive console!
+
+<img align="right" src="https://www.codenameone.com/img/github/content/css-live-update.png" height="200">
+
+### CSS Live Update
+
+When you make changes to your app’s CSS stylesheet, the changes are reflected instantly in the simulator. This includes changing your theme, images, fonts etc. All changes are instantly refreshed on save, no need to reload/refresh or anything of the sort!
+
+This makes the process of styling an application remarkably easy and fast.
+
+<img align="left" src="https://www.codenameone.com/img/github/content/component-inspector.png" height="200">
+
+### Component Inspector
+
+Use the powerful component inspector to browse the UI component hierarchy in your app. 
+This tool makes it easy to find out where that extra padding is coming from or why something just isn’t lining up the way you’d like. You can also change the UIID (selector) of a component in runtime to see how it impacts the UI and see which component in the hierarchy maps to an element in the component tree (DOM equivalent).
+
+<img align="right" src="https://www.codenameone.com/img/github/content/network-monitor.png" height="200">
+
+### Network Monitor
+
+See all of the network connections that your app makes using the Network Monitor. This valuable tool comes in handy when you’re trying to figure out why an HTTP request isn’t working for you. Check the headers and bodies of both the request and the response. You can even throttle the network to simulate a slow network connection.
+
+<img align="left" src="https://www.codenameone.com/img/github/content/record-ui-unit-tests.png" height="200">
+
+### Record UI Unit Tests
+
+Use the Test Recorder tool to record unit tests for your app. Once you start recording, it will save your interactions into a unit test that can be played back later to verify that behaviour remains correct.
+
+You can then connect the recorded tests to your CI process including automated on device testing.
+
+## How Does it Work?
+
+[Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=MrwbpdMALig).
+
+Codename One apps perform like native apps, because they are real native apps.
+
+They are statically compiled into native binaries using the target platform’s official build tools. 
+
+On platforms that do not support Java natively, such as iOS, the app’s JVM bytecode is first transpiled into a form that the native build tools will accept. On iOS, the app’s JVM bytecode is transformed into C source code, in a real xcode project. On Android, since Java is supported natively, no such transformation is necessary. The app jar is bundled directly into an Android studio gradle project, which can be built directly using the Android SDK build tools.
+
+The figure below shows the build process for each supported platform
+
+<a href="https://www.codenameone.com/img/github/codename-one-architecture.jpg" target="_blank"><img width="70%" src="https://www.codenameone.com/img/github/codename-one-architecture.jpg"></a>
+
+You can click the image to enlarge or view a PDF version [here](https://www.codenameone.com/img/github/architecture.pdf).
+
 
 ## Quick Start
 
-There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA [here](https://www.codenameone.com/download.html):
+There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
 
-[![Hello Codename One](http://img.youtube.com/vi/73d65cvyQv4/0.jpg)](http://www.youtube.com/watch?v=73d65cvyQv4 "Hello World Codename One")
+[![Hello Codename One](http://img.youtube.com/vi/oR3KHYf5OrY/0.jpg)](http://www.youtube.com/watch?v=oR3KHYf5OrY "Hello World Codename One")
 
 ## Extensible
 

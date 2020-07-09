@@ -983,7 +983,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                             if (nativeInstance.isAsyncEditMode()) {
                                 nativeInstance.setNativeEditingComponentVisible(false);
                             }
-                            cmp.putClientProperty(LAST_UPDATED_EDITOR_BOUNDS_KEY, null);
+                            if(cmp != null) {
+                                cmp.putClientProperty(LAST_UPDATED_EDITOR_BOUNDS_KEY, null);
+                            }
                             EDITING_LOCK.notify();
                         }
                         Form current = Display.getInstance().getCurrent();
