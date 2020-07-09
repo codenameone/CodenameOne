@@ -5436,6 +5436,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.browserExecute(get(browserPeer), javaScript);
     }
     
+    public boolean supportsExecuteAndReturnString(final PeerComponent browserPeer) {
+        return true;
+    }
+    
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
         if (disableUIWebView || !Boolean.FALSE.equals(browserPeer.getClientProperty("BrowserComponent.useWKWebView"))) {

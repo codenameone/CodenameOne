@@ -4,7 +4,7 @@
 
 package com.codename1.impl.javase.cef;
 
-import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.Container;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -32,20 +32,21 @@ import javax.swing.SwingUtilities;
 
 public class RequestHandler extends CefResourceRequestHandlerAdapter implements CefRequestHandler {
     private final Container owner_;
-    private BrowserComponent browserComponent_;
+    //private BrowserComponent browserComponent_;
+    private BrowserNavigationCallback navigationCallback_;
 
-    public RequestHandler(Container owner, BrowserComponent browserComponent) {
+    public RequestHandler(Container owner, BrowserNavigationCallback navigationCallback) {
         owner_ = owner;
-        this.browserComponent_ = browserComponent;
+        this.navigationCallback_ = navigationCallback;
     }
 
     @Override
     public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
             boolean user_gesture, boolean is_redirect) {
         
-        if (browserComponent_ != null) {
+        if (navigationCallback_ != null) {
             System.out.println("in onBeforeBrowse "+request.getURL());
-            boolean res = browserComponent_.fireBrowserNavigationCallbacks(request.getURL());
+            boolean res = navigationCallback_.shouldNavigate(request.getURL());
             System.out.println("Allowed to browse? "+res);
             if (!res) {
                 return res;

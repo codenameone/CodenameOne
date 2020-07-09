@@ -90,6 +90,10 @@ public class BrowserComponent extends Container {
     private boolean ready = false;
     private boolean fireCallbacksOnEdt=true;
     
+    PeerComponent getInternal() {
+        return internal;
+    }
+    
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
      */
@@ -1094,7 +1098,12 @@ public class BrowserComponent extends Container {
                 });
             }
         }
-        return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
+            return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        } else {
+            return executeAndWait("callback.onSuccess(eval(${0}))", new Object[]{javaScript}).toString();
+            
+        }
     }
     
     /**
@@ -1674,7 +1683,8 @@ public class BrowserComponent extends Container {
                 .append("function doCallback(val) { ")
                 //.append("cn1application.log('in doCallback');")
                 .append("  var url = BASE_URL + encodeURIComponent(JSON.stringify(val));")
-                .append("  if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
+                .append("  if (window.cefQuery) { window.cefQuery({request:'shouldNavigate:'+url, onSuccess: function(response){}, onFailure:function(error_code, error_message) { console.log(error_message)}});}")
+                .append("  else if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
                 .append("} ")
                 .append("var result = {value:null, type:null, errorMessage:null, errorCode:0, callbackId:").append(callbackId).append("};")
                 .append("var callback = {")

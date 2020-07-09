@@ -153,6 +153,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.text.AttributedString;
@@ -2235,7 +2236,7 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
     protected boolean cn1GrabbedDrag=false;
     public C canvas;
 
-    protected java.awt.Container getCanvas() {
+    public java.awt.Container getCanvas() {
         return canvas;
     }
 
@@ -8277,6 +8278,11 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
         throw new UnsupportedOperationException("Not implemented");
         
     }
+    
+    public String getMimetype(File file) throws IOException {
+       return Files.probeContentType(file.toPath());
+    }
+    
     
     public String guessSuffixForMimetype(String mimeType) {
         String suffix = "";

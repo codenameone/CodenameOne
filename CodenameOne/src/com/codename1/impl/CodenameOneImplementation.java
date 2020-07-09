@@ -4357,6 +4357,10 @@ public abstract class CodenameOneImplementation {
         browserExecute(internal, javaScript);
         return null;
     }
+    
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent internal) {
+        return false;
+    }
 
     /**
      * Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods

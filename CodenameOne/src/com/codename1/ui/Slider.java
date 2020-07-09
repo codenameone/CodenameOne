@@ -57,6 +57,7 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Shai Almog
  */
 public class Slider extends Label implements ActionSource {
+    private int actionEventValue;
     private int value;
     private int maxValue = 100;
     private int minValue = 0;
@@ -231,7 +232,21 @@ public class Slider extends Label implements ActionSource {
     public int getProgress() {
         return value;
     }
-
+    
+    /**
+     * Gets the progress of the slider at the point where the provided ActionEvent
+     * was triggered.
+     * @param evt An ActionEvent that originated from this slider.
+     * @return The progress of the slider.
+     * @since 7.0
+     */
+    public int getProgress(ActionEvent evt) {
+        if (evt instanceof SliderActionEvent) {
+            return ((SliderActionEvent)evt).value;
+        }
+        return value;
+    }
+    
     /**
      * Indicates the value of progress made, this method is thread safe and
      * can be invoked from any thread although discretion should still be kept
@@ -467,7 +482,7 @@ public class Slider extends Label implements ActionSource {
             setProgressInternal((int)(Math.min(maxValue, ((float)x) / ((float)getWidth()) * maxValue)));
         }
         value = Math.max(value, minValue);
-        
+        actionEventValue = value;
         if(vertical) {
             if(previousY < y){
                 fireDataChanged(DataChangedListener.ADDED, value);
@@ -517,7 +532,7 @@ public class Slider extends Label implements ActionSource {
         per = Math.max(per, minValue);
         if(per != getProgress()) {
             setProgressInternal(per);
-
+            actionEventValue = value;
             if(vertical) {
                 if(previousY < y){
                     fireDataChanged(DataChangedListener.ADDED, value);
@@ -650,7 +665,7 @@ public class Slider extends Label implements ActionSource {
     }
     
     private void fireActionEventImpl() {
-        actionListeners.fireActionEvent(new ActionEvent(this,ActionEvent.Type.PointerPressed));
+        actionListeners.fireActionEvent(new SliderActionEvent());
     }
 
     /**
@@ -774,5 +789,13 @@ public class Slider extends Label implements ActionSource {
      */
     protected boolean shouldBlockSideSwipe() {
         return editable && !vertical;
+    }
+    
+    private class SliderActionEvent extends ActionEvent {
+        private int value;
+        private SliderActionEvent() {
+            super(Slider.this, ActionEvent.Type.PointerPressed);
+            this.value = Slider.this.actionEventValue;
+        }
     }
 }

@@ -4977,6 +4977,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent browserPeer) {
+        return true;
+    }
 
     public boolean canForceOrientation() {
         return true;

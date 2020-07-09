@@ -6,13 +6,13 @@
 package com.codename1.impl.javase.cef;
 
 import com.codename1.impl.javase.IBrowserComponent;
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.JavaSEPort.Peer;
-import com.codename1.impl.javase.PeerComponentBuffer;
 import com.codename1.impl.javase.cef.BrowserPanel;
 import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.BrowserComponent.JSRef;
 import com.codename1.ui.CN;
-import com.codename1.util.SuccessCallback;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.EventQueue;
 import java.io.File;
 import java.util.ArrayList;
@@ -36,19 +36,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static boolean isMac = isMac();
     private static boolean isUnix = isUnix();
     static {
-        /*
-        SystemBootstrap.setLoader(new SystemBootstrap.Loader() {
-            @Override
-            public void loadLibrary(String libname) {
-                String res = System.getProperty("SystemBootstrap.loader."+libname);
-                if (res != null) {
-                    return;
-                }
-                System.setProperty("SystemBootstrap.loader."+libname, libname);
-                System.loadLibrary(libname);
-            }
-        });
-        */
+        
        CefBrowserFactory.setInstance(new CN1CefBrowserFactory());
        
     }
@@ -121,10 +109,18 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         } else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
+        //args.add("--allow-file-access-from-files");
+        args.add("--autoplay-policy=no-user-gesture-required");
         return args.toArray(new String[args.size()]);
     }
     
-    public static CEFBrowserComponent create(JFrame frame, BrowserComponent parent) {
+    public static CEFBrowserComponent create(BrowserComponent bc) {
+        return create(new CEFBrowserComponentAdapter(bc));
+    }
+    public static CEFBrowserComponent create(CEFBrowserComponentListener parent) {
+        return create(null, parent);
+    }
+    public static CEFBrowserComponent create(String startingURL, CEFBrowserComponentListener parent) {
         CefSettings settings = new CefSettings();
         
         String[] args = createArgs();
@@ -154,16 +150,56 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             }
         }
 
-        System.out.println("Offscreen rendering " + (osrEnabledArg ? "enabled" : "disabled"));
+        
         CEFPeerComponentBuffer buffer = new CEFPeerComponentBuffer();
+        BrowserNavigationCallback navigationCallback = new BrowserNavigationCallback() {
+            @Override
+            public boolean shouldNavigate(String url) {
+                return parent.shouldNavigate(url);
+            }
+            
+        };
         final BrowserPanel panel = new BrowserPanel(
-                buffer, parent,  osrEnabledArg, transparentPaintingEnabledArg, createImmediately, args);
-        panel.setBrowserComponent(parent);
+                startingURL, buffer, navigationCallback,  osrEnabledArg, transparentPaintingEnabledArg, createImmediately, args) {
+            @Override
+            protected void onError(ActionEvent l) {
+                parent.onError(l);
+            }
+
+            @Override
+            protected void onStart(ActionEvent l) {
+                parent.onStart(l);
+            }
+
+            @Override
+            protected void onLoad(ActionEvent l) {
+                parent.onLoad(l);
+            }
+
+            
+            
+            
+            
+                    
+                };
         
+
+        java.awt.Container cnt = JavaSEPort.instance.getCanvas().getParent();
         
-        CEFBrowserComponent out =  new CEFBrowserComponent(frame, panel);
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                return null;
+            }
+        }
+        
+        CEFBrowserComponent out =  new CEFBrowserComponent((JFrame)cnt, panel);
         out.setPeerComponentBuffer(buffer);
-        panel.setCEFBrowserComponent(out);
+        panel.setReadyCallback(new Runnable() {
+            public void run() {
+                out.fireReady();
+            }
+        });
         return out;
     }
 
@@ -195,14 +231,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
     @Override
     public void setPage(String html, String baseUrl) {
-        if (!ready) {
-            readyCallbacks.add(new Runnable() {
-                public void run() {
-                    setPage(html, baseUrl);
-                }
-            });
-            return;
-        }
         String url = "data:text/html,"+com.codename1.io.Util.encodeUrl(html);
         setURL(url);
     }
@@ -229,14 +257,17 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     @Override
     public void setURL(String url) {
         if (!ready) {
+            System.out.println("Setting URL but not ready "+url);
             url_ = url;
             readyCallbacks.add(new Runnable() {
                 public void run() {
+                    System.out.println("Setting url "+url);
                     setURL(url);
                 }
             });
             return;
         }
+        url_ = url;
         panel.getBrowser().loadURL(url);
     }
 
@@ -335,6 +366,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         }
         if (!ready) {
             ready = true;
+            System.out.println("Running ready callbacks");
             while (!readyCallbacks.isEmpty()) {
                 readyCallbacks.remove(0).run();
             }
@@ -348,6 +380,18 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     }
     
     
-    
-    
+    public void cleanup() {
+        if (panel != null) {
+            final BrowserPanel fPanel = panel;
+            panel = null;
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    if (fPanel != null) {
+                        fPanel.cleanup();
+                    }
+                }
+            });
+        }
+    }
+   
 }

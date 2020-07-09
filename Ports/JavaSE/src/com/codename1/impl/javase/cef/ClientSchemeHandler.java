@@ -4,7 +4,11 @@
 
 package com.codename1.impl.javase.cef;
 
+import com.codename1.io.Log;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -36,6 +40,45 @@ public class ClientSchemeHandler extends CefResourceHandlerAdapter {
     public synchronized boolean processRequest(CefRequest request, CefCallback callback) {
         boolean handled = false;
         String url = request.getURL();
+        
+        if (url.indexOf("/streams/") != -1) {
+            File f = new File("/Users/shannah/tmp/test.mp3");
+            try (FileInputStream fis = new FileInputStream(f)){
+                data_ = new byte[(int)f.length()];
+                fis.read(data_);
+                mime_type_ = "audio/mp3";
+                handled = true;
+            } catch (IOException ex) {
+                Log.e(ex);
+            }
+        }
+        /*
+        if (url.indexOf("/streams/") != -1) {
+            System.out.println("Processing "+url);
+            String streamId = url.substring(url.lastIndexOf("/")+1);
+            StreamWrapper w = BrowserPanel.getStreamRegistry().getStream(streamId);
+            data_ = new byte[(int)w.getLength()];
+            mime_type_ = w.getMimeType();
+            if (mime_type_ == null) {
+                mime_type_ = "audio/wav";
+            }
+            try {
+                w.getStream().read(data_);
+                handled = true;
+            } catch (IOException ex) {
+                Log.e(ex);
+            } finally {
+                try {
+                    w.getStream().close();
+                } catch (Throwable t){}
+                w.setStream(new ByteArrayInputStream(data_));
+                //BrowserPanel.getStreamRegistry().removeStream(w);
+            }
+            
+            
+            
+        }
+*/
         if (url.indexOf("handler.html") != -1) {
             // Build the response html
             String html;
@@ -94,6 +137,7 @@ public class ClientSchemeHandler extends CefResourceHandlerAdapter {
 
         // Set the resulting response length
         response_length.set(data_.length);
+        System.out.println("Response length: "+data_.length);
     }
 
     @Override
@@ -106,7 +150,7 @@ public class ClientSchemeHandler extends CefResourceHandlerAdapter {
             int transfer_size = Math.min(bytes_to_read, (data_.length - offset_));
             System.arraycopy(data_, offset_, data_out, 0, transfer_size);
             offset_ += transfer_size;
-
+            System.out.println("Read "+transfer_size+".  Offset now "+offset_);
             bytes_read.set(transfer_size);
             has_data = true;
         } else {
