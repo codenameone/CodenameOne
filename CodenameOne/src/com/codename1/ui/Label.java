@@ -51,7 +51,7 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * @author Chen Fishbein
  */
-public class Label extends Component implements IconHolder {
+public class Label extends Component implements IconHolder, TextHolder {
     
     private final ActionListener iconChangeListener = new ActionListener() {
         @Override

@@ -897,12 +897,23 @@ public class CN extends  CN1Constants {
         Display.impl.deregisterPush();
     }
 
+    /**
+     * Start a Codename One thread that supports crash protection and similar Codename One features.
+     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     * @param name the name for the thread
+     * @return a thread instance which must be explicitly started!
+     */
+    public static Thread createThread(Runnable r, String name) {
+        return Display.INSTANCE.createThread(r, name);
+    }
+    
     
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
      * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
+     * @deprecated confusing name, use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
      */
     public static Thread startThread(Runnable r, String name) {
         return Display.INSTANCE.startThread(r, name);

@@ -4472,11 +4472,23 @@ hi.show();}</pre></noscript>
         impl.setPollingFrequency(freq);
     }
     
+
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
      * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
+     */
+    public Thread createThread(Runnable r, String name) {
+        return new CodenameOneThread(r, name);
+    }
+
+    /**
+     * Start a Codename One thread that supports crash protection and similar Codename One features.
+     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     * @param name the name for the thread
+     * @return a thread instance which must be explicitly started!
+     * @deprecated confusing name use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
      */
     public Thread startThread(Runnable r, String name) {
         return new CodenameOneThread(r, name);

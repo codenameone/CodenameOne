@@ -545,6 +545,10 @@ public class JavaFXLoader {
     }
 
     public boolean runWithJavaFX(Class launchClass, Class mainClass, String[] args) throws JavaFXNotLoadedException, InvocationTargetException {
+        if(System.getProperty("skip.fx.test", "false").equalsIgnoreCase("true")) {
+            System.out.println("Skipping JavaFX auto-install");
+            return false;
+        }
         if (!JavaFXLoader.isJavaFXLoaded()) {
             System.out.println("JavaFX Not loaded.  Classpath="+System.getProperty("java.class.path")+" . Adding to classpath");
             try {

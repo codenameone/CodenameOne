@@ -2217,4 +2217,193 @@ public class Util {
             }
         });
     }
+    
+       /**
+     * <p>
+     * Creates a new UUID, that is a 128-bit number used to identify information
+     * in computer systems. UUIDs aim to be unique for practical purposes.</p>
+     *
+     * <p>
+     * This implementation uses the system clock and some device info as seeds
+     * for random data, that are enough for practical usage. More specifically,
+     * two instances of Random, instantiated with different seeds, are used. The
+     * first seed corresponds to the timestamp in which the first object of the
+     * static class UUID is created, the second seed is a number (long type)
+     * that identifies the current installation of the app and is assumed to be
+     * as different as possible from other installations of the app. A unique
+     * identifier (long type) associated with the current app installation can
+     * be specified by the developer via the Preference "CustomDeviceId__$" (as
+     * in the following example) BEFORE the generation of the first UIID, or -
+     * if it is not specified - it is obtained from an internal Codename One
+     * implementation; in the worst case, if an identifier has not been
+     * specified by the developer and Codename One is unable to distinguish the
+     * current installation of the app from other installations, an internal
+     * algorithm will be used that will generate a number based on some hardware
+     * and software characteristics of the device: the number thus generated
+     * will be the same on identical models of the same device and with the same
+     * version of the operating system, but will vary between different models.
+     * Even in the worst case scenario, the probability that two app
+     * installations with identical device identifiers will generate the first
+     * UIID in the same timestamp is very low.</p>
+     *
+     * <p>
+     * As a tip, consider that any alphanumeric text string (corresponding for
+     * example to a username) can be converted into a long type number,
+     * considering this string as a number based on 36, provided it does not
+     * exceed 12 characters. This suggestion is applied in the following
+     * example.</p>
+     *
+     * <p>
+     * Code example:</p>
+     * <script src="https://gist.github.com/jsfan3/2fdc5fae2b723cba40e65faab923e552.js"></script>
+     *
+     * @return a pseudo-random Universally Unique Identifier in its canonical
+     * textual representation
+     */
+    public static String getUUID() {
+        return new Util.UUID().toString();
+    }
+
+    /**
+     * Creates a custom UUID, from the given two <code>long</code> values.
+     *
+     * @param time the upper 64 bits
+     * @param clockSeqAndNode the lower 64 bits
+     *
+     * @return a Universally Unique Identifier in its canonical textual
+     * representation
+     */
+    public static String getUUID(long time, long clockSeqAndNode) {
+        return new Util.UUID(time, clockSeqAndNode).toString();
+    }
+
+    /**
+     * This class represents an UUID according to the DCE Universal Token
+     * Identifier specification.
+     * <p>
+     * All you need to know:
+     * <pre>
+     * UUID u = new UUID().toString();
+     * </pre>
+     */
+    static class UUID {
+
+        /*
+         * UUID - an implementation of the UUID specification for Codename One
+         * by Francesco Galgani
+         *
+         * You can use this class as you want (public-domain license).
+         */
+        private static final char[] DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+        private static final Random randomTime = new Random(System.currentTimeMillis());
+        private static final Random randomClockSeqAndNode = new Random(getUniqueDeviceID());
+
+        private long time = 0l;
+        private long clockSeqAndNode = 0l;
+
+        /**
+         * Constructor for UUID, it uses the system clock and some device info
+         * as seeds for random data, that are enough for practical usage.
+         */
+        public UUID() {
+            this.time = randomTime.nextLong();
+            this.clockSeqAndNode = randomClockSeqAndNode.nextLong();
+        }
+
+        /**
+         * Constructs a UUID from two <code>long</code> values.
+         *
+         * @param time the upper 64 bits
+         * @param clockSeqAndNode the lower 64 bits
+         */
+        public UUID(long time, long clockSeqAndNode) {
+            this.time = time;
+            this.clockSeqAndNode = clockSeqAndNode;
+        }
+
+        /**
+         * Returns this UUID as a String.
+         *
+         * @return a String, never <code>null</code>
+         */
+        @Override
+        public final String toString() {
+            return toCanonicalForm();
+        }
+
+        private String toCanonicalForm() {
+            String out = "";
+            out = append(out, (int) (time >> 32)) + '-'
+                    + append(out, (short) (time >> 16)) + '-'
+                    + append(out, (short) time) + '-'
+                    + append(out, (short) (clockSeqAndNode >> 48)) + '-'
+                    + append(out, clockSeqAndNode, 12);
+            return out;
+        }
+
+        private static String append(String a, short in) {
+            return append(a, (long) in, 4);
+        }
+
+        private static String append(String a, int in) {
+            return append(a, (long) in, 8);
+        }
+
+        private static String append(String a, long in, int length) {
+            int lim = (length << 2) - 4;
+            while (lim >= 0) {
+                a += (DIGITS[(byte) (in >> lim) & 0x0f]);
+                lim -= 4;
+            }
+            return a;
+        }
+
+        private static long getUniqueDeviceID() {
+            long id = Preferences.get("CustomDeviceId__$", (long) -1);
+            if (id == -1) {
+                id = Preferences.get("DeviceId__$", (long) -1);
+            }
+            if (id == -1) {
+                id = generateLongFromDeviceInfo();
+            }
+            return id;
+        }
+
+        /**
+         * Generates a long number using some device info: the same type of
+         * device (a specific model of a specific brand, with the same OS
+         * version) will always produce the same number, while different devices
+         * will most likely produce different numbers.
+         *
+         * @return
+         */
+        private static long generateLongFromDeviceInfo() {
+            long random = CN.getDeviceDensity()
+                    * CN.getDisplayHeight()
+                    * CN.getDisplayWidth()
+                    * CN.convertToPixels(10)
+                    * Long.parseLong(sanitizeString(CN.getPlatformName()), 36)
+                    * Long.parseLong(sanitizeString(CN.getProperty("User-Agent", "1")), 36)
+                    * Long.parseLong(sanitizeString(CN.getProperty("OSVer", "1")), 36);
+            return random;
+        }
+
+        /**
+         * Removes all non-alphanumeric characters from a string and returns the
+         * first 10 characters.
+         *
+         * @param input
+         * @return
+         */
+        private static String sanitizeString(String input) {
+            String result = "";
+            for (char myChar : input.toCharArray()) {
+                if ((myChar >= '0' && myChar <= '9') || (myChar >= 'a' && myChar <= 'z') || (myChar >= 'A' && myChar <= 'Z')) {
+                    result += myChar;
+                }
+            }
+            return result.substring(0, Math.min(10, result.length())).toUpperCase();
+        }
+
+    }
 }
