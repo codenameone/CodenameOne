@@ -19,6 +19,9 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.dnd.DropTarget;
@@ -31,14 +34,17 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import javax.swing.JPanel;
 
 import javax.swing.MenuSelectionManager;
 import javax.swing.SwingUtilities;
 import org.cef.OS;
+import org.cef.handler.CefScreenInfo;
 
 /**
  * This class represents an off-screen rendered browser.
@@ -234,19 +240,16 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         component_.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
-                System.out.println("Key typed "+e);
                 sendKeyEvent(e);
             }
 
             @Override
             public void keyPressed(KeyEvent e) {
-                System.out.println("Key pressed"+e);
                 sendKeyEvent(e);
             }
 
             @Override
             public void keyReleased(KeyEvent e) {
-                System.out.println("Key released "+e);
                 sendKeyEvent(e);
             }
         });
@@ -300,7 +303,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     
     @Override
     public void onPaint(CefBrowser browser, boolean popup, final Rectangle[] dirtyRects,
-            ByteBuffer buffer, int width, int height) {
+            ByteBuffer buffer, int width, int height) {        
         BufferedImage img = buffer_.getBufferedImage();
         boolean imgUpdated = false;
          if (img == null || img.getWidth() != width || img.getHeight() != height) {
@@ -415,9 +418,9 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     @Override
     public void loadURL(String url) {
-        System.out.println("CN1CefBrowser::loadURL("+url+")");
+        
         super.loadURL(url);
-        System.out.println("After CN1CefBrowser::loadURL("+url+")");
+        
     }
 
     public static void setUIPlatform(UIPlatform p) {
@@ -426,6 +429,83 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     
     public static void setComponentFactory(ComponentFactory factory) {
         componentFactory = factory;
+    }
+
+    @Override
+    public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
+        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        GraphicsConfiguration graphicsConfig = graphicsDevice.getDefaultConfiguration();
+        
+        screenInfo.Set(calcRetinaScale(),
+                    graphicsConfig.getColorModel().getPixelSize(),
+                    graphicsConfig.getColorModel().getComponentSize(0), 
+                    false, 
+                    graphicsConfig.getBounds(), graphicsConfig.getBounds());
+        return true;
+    }
+    
+    private static double calcRetinaScale() {
+        
+        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        
+        try {
+            if (getJavaVersion() >= 9) {
+                // JDK9 Doesn't like the old hack for getting the scale via reflection.
+                // https://bugs.openjdk.java.net/browse/JDK-8172962
+                GraphicsConfiguration graphicsConfig = graphicsDevice 
+                        .getDefaultConfiguration(); 
+
+                AffineTransform tx = graphicsConfig.getDefaultTransform(); 
+                double scaleX = tx.getScaleX(); 
+                double scaleY = tx.getScaleY(); 
+                return Math.max(1.0, Math.min(scaleX, scaleY));
+            } else {
+
+                Field field = graphicsDevice.getClass().getDeclaredField("scale");
+                if (field != null) {
+                    field.setAccessible(true);
+                    Object scale = field.get(graphicsDevice);
+                    if (scale instanceof Integer && ((Integer) scale).intValue() >= 2) {
+                        return ((Integer)scale).doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            //e.printStackTrace();
+        }
+        return 1.0;
+    }
+    
+    private static int cachedJavaVersion=-1;
+    /**
+     * Returns the Java version as an int value.
+     *
+     * @return the Java version as an int value (8, 9, etc.)
+     * @since 12130
+     */
+    private static int getJavaVersion() {
+        if (cachedJavaVersion < 0) {
+
+            String version = System.getProperty("java.version");
+            if (version.startsWith("1.")) {
+                version = version.substring(2);
+            }
+            // Allow these formats:
+            // 1.8.0_72-ea
+            // 9-ea
+            // 9
+            // 9.0.1
+            int dotPos = version.indexOf('.');
+            int dashPos = version.indexOf('-');
+            if (dotPos < 0 && dashPos < 0) {
+                cachedJavaVersion = Integer.parseInt(version);
+                return cachedJavaVersion;
+            }
+            cachedJavaVersion = Integer.parseInt(version.substring(0,
+                    dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+            return cachedJavaVersion;
+        }
+        return cachedJavaVersion;
     }
     
     

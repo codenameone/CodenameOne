@@ -204,7 +204,7 @@ import org.w3c.dom.NodeList;
  *
  * @author Shai Almog
  */
-public abstract class JavaSEPort extends CodenameOneImplementation {
+public class JavaSEPort extends CodenameOneImplementation {
 
     
     
@@ -6114,15 +6114,15 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
                 
                 int tx = cmp.getAbsoluteX();
                 int ty = cmp.getAbsoluteY();
-
+                double scale = 1/zoomLevel;
                 if (isScreenGraphics(nativeGraphics)) {
-                    nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
+                    nativeGraphics.scale(scale, scale);
                 }
-                nativeGraphics.translate(tx*zoomLevel, ty*zoomLevel);
+                nativeGraphics.translate(tx/scale, ty/scale);
                 peer.peerBuffer.paint(nativeGraphics, jcmp);
-                nativeGraphics.translate(-tx*zoomLevel, -ty*zoomLevel);
+                nativeGraphics.translate(-tx/scale, -ty/scale);
                 if (isScreenGraphics(nativeGraphics)) {
-                    nativeGraphics.scale(zoomLevel, zoomLevel);
+                    nativeGraphics.scale(1/scale, 1/scale);
                 }
                 return;
             }
@@ -8160,7 +8160,7 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
             }
             
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            
+            //return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom) / zoom);
             return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
         }
 
@@ -8202,6 +8202,7 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
             }
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
             return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
+            //return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom) / zoom );
         }
         
         public void setZoom(double zoom) {
@@ -12124,12 +12125,24 @@ public abstract class JavaSEPort extends CodenameOneImplementation {
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
-                    setCntBounds(
-                            (int) ((x + screenX + instance.canvas.x) * zoom / retinaScale),
-                            (int) ((y + screenY + instance.canvas.y) * zoom / retinaScale),
-                            (int) (w * zoom / retinaScale),
-                            (int) (h * zoom / retinaScale)
-                    );
+                    if (peerBuffer == null) {
+                        double scale = zoom/retinaScale;
+                        setCntBounds(
+                                (int) ((x + screenX + instance.canvas.x) * scale),
+                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) (w * scale),
+                                (int) (h * scale)
+                        );
+                    } else {
+                        double scale = zoom/retinaScale;
+                        setCntBounds(
+                                (int) ((x + screenX + instance.canvas.x) * scale),
+                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) (w * scale),
+                                (int) (h * scale)
+                        );
+                    }
+                    
                     cnt.doLayout();
                     if (cmp instanceof Container) {
                         ((Container)cmp).doLayout();

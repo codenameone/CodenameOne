@@ -110,6 +110,8 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
         //args.add("--allow-file-access-from-files");
+        args.add("--device-scale-factor=4");
+        args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         return args.toArray(new String[args.size()]);
     }
