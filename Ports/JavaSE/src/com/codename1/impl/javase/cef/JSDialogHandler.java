@@ -13,8 +13,8 @@ import org.cef.misc.BoolRef;
 
 public class JSDialogHandler extends CefJSDialogHandlerAdapter {
     @Override
-    public boolean onJSDialog(CefBrowser browser, String origin_url, JSDialogType dialog_type,
-            String message_text, String default_prompt_text, CefJSDialogCallback callback,
+    public boolean onJSDialog(final CefBrowser browser, final String origin_url, final JSDialogType dialog_type,
+            final String message_text, final String default_prompt_text, final CefJSDialogCallback callback,
             BoolRef suppress_message) {
         
         switch (dialog_type) {

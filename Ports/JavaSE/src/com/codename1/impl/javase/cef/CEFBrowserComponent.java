@@ -122,7 +122,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     public static CEFBrowserComponent create(CEFBrowserComponentListener parent) {
         return create(null, parent);
     }
-    public static CEFBrowserComponent create(String startingURL, CEFBrowserComponentListener parent) {
+    public static CEFBrowserComponent create(final String startingURL, final CEFBrowserComponentListener parent) {
         CefSettings settings = new CefSettings();
         
         String[] args = createArgs();
@@ -195,7 +195,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             }
         }
         
-        CEFBrowserComponent out =  new CEFBrowserComponent((JFrame)cnt, panel);
+        final CEFBrowserComponent out =  new CEFBrowserComponent((JFrame)cnt, panel);
         out.setPeerComponentBuffer(buffer);
         panel.setReadyCallback(new Runnable() {
             public void run() {
@@ -257,7 +257,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private String title_;
     
     @Override
-    public void setURL(String url) {
+    public void setURL(final String url) {
         if (!ready) {
             System.out.println("Setting URL but not ready "+url);
             url_ = url;
@@ -316,7 +316,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     }
 
     @Override
-    public void execute(String js) {
+    public void execute(final String js) {
         if (!ready) {
             readyCallbacks.add(new Runnable() {
                 public void run() {

@@ -47,7 +47,7 @@ import javafx.concurrent.Worker.State;
 import javafx.event.EventHandler;
 
 import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebErrorEvent;
+//import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JFrame;
@@ -215,7 +215,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
         }
         
     }
-    
+    /*
     private static EventHandler<WebErrorEvent> createOnErrorHandler() {
         return new EventHandler<WebErrorEvent>() {
             @Override
@@ -224,7 +224,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
             }
         };
     }
-    
+    */
     
     private static void init(SEBrowserComponent self, BrowserComponent p) {
         final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<>(self);
@@ -433,7 +433,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
             t.printStackTrace();
         }
         
-        we.setOnError(createOnErrorHandler());
+        //we.setOnError(createOnErrorHandler());
         
         init(this, p);
         
@@ -771,7 +771,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     @Override
     public void setProperty(String key, Object value) {
         if(key.equalsIgnoreCase("User-Agent")) {
-            web.getEngine().setUserAgent((String)value);
+            //web.getEngine().setUserAgent((String)value);
         }
     }
 

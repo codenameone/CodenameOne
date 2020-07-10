@@ -204,7 +204,7 @@ public class JavaCEFSEPort extends JavaSEPort {
         public void init(String uri, boolean isVideo, JFrame f,  final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
             
             _callback = callback;
-            JSONParser parser = new JSONParser();
+            final JSONParser parser = new JSONParser();
             String mediaTag = isVideo ? "video" : "audio";
             String style = "<style type='text/css'>document, body {padding:0;margin:0; width:100%; height: 100%} video, audio {margin:0; padding:0; width:100%; height: 100%}</style>";
             String script = "<script>window.cn1Media = document.getElementById('cn1Media');"
@@ -219,7 +219,7 @@ public class JavaCEFSEPort extends JavaSEPort {
             String html = "<!doctype html><html><head>"+style+"</head><body><"+mediaTag+" id='cn1Media' width='640' height='480' style='width:100%;height:100%' src='"+uri+"'/>"+script+"</body></html>";
             
             
-            String url = "data:text/html,"+Util.encodeUrl(html);
+            final String url = "data:text/html,"+Util.encodeUrl(html);
             bc = CEFBrowserComponent.create(url, new CEFBrowserComponentListener() {
                 @Override
                 public void onLoad(ActionEvent e) {
@@ -240,7 +240,7 @@ public class JavaCEFSEPort extends JavaSEPort {
                 }
 
                 @Override
-                public boolean shouldNavigate(String url) {
+                public boolean shouldNavigate(final String url) {
                     if (url.startsWith("{")) {
                         CN.callSerially(new Runnable() {
                             public void run() {

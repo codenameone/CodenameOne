@@ -50,8 +50,8 @@ import javax.swing.JLabel;
 public class JavaJMFSEPort extends JavaSEPort {
 
     @Override
-    public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
-        AsyncResource<Media> out = new AsyncResource<Media>();
+    public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
@@ -74,8 +74,8 @@ public class JavaJMFSEPort extends JavaSEPort {
     }
 
     @Override
-    public AsyncResource<Media> createMediaAsync(String uriAddress, boolean isVideo, Runnable onCompletion) {
-        AsyncResource<Media> out = new AsyncResource<Media>();
+    public AsyncResource<Media> createMediaAsync(final String uriAddress, final boolean isVideo, final Runnable onCompletion) {
+        final AsyncResource<Media> out = new AsyncResource<Media>();
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
@@ -565,7 +565,7 @@ public class JavaJMFSEPort extends JavaSEPort {
             if (!isVideo) {
                 return new Label();
             }
-            java.awt.Component awtComponent = player.getVisualComponent();
+            final java.awt.Component awtComponent = player.getVisualComponent();
             if (awtComponent != null) {
                 if (videoComponent == null) {
                     EventQueue.invokeLater(new Runnable() {

@@ -302,8 +302,8 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     private boolean firstPaint=true;
     
     @Override
-    public void onPaint(CefBrowser browser, boolean popup, final Rectangle[] dirtyRects,
-            ByteBuffer buffer, int width, int height) {        
+    public void onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
+            final ByteBuffer buffer, final int width, final int height) {        
         BufferedImage img = buffer_.getBufferedImage();
         boolean imgUpdated = false;
          if (img == null || img.getWidth() != width || img.getHeight() != height) {

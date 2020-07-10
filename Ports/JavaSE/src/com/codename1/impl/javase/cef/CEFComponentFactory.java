@@ -24,7 +24,7 @@ import org.cef.browser.ComponentFactory;
 public class CEFComponentFactory implements ComponentFactory {
 
     @Override
-    public JPanel createComponent(ComponentDelegate delegate) {
+    public JPanel createComponent(final ComponentDelegate delegate) {
         return new CN1JPanel() {
             @Override
             public void setBounds(int x, int y, int w, int h) {
