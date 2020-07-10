@@ -60,3 +60,8 @@ node_modules
 /Ports/CLDC11/dist/
 /Samples/SampleProjectTemplate/nbproject/private/
 /Samples/config
+**/.DS_Store
+**/build-impl.xml
+**/genfiles.properties
+**/private/private.properties
+

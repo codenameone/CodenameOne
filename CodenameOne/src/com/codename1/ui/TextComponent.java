@@ -297,11 +297,37 @@ public class TextComponent extends InputComponent {
     /**
      * Overridden for covariant return type
      * {@inheritDoc}
- }
      */
     public TextComponent label(String text) {
         super.label(text);
         return this;
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionAsButton(boolean asButton) {
+        return (TextComponent)super.actionAsButton(asButton); 
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionUIID(String uiid) {
+        return (TextComponent)super.actionUIID(uiid); 
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionText(String text) {
+        return (TextComponent)super.actionText(text); 
     }
 
     /**
