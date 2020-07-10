@@ -1557,7 +1557,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 AffineTransform t= g2d.getTransform();
                 //t.translate(-t.getTranslateX(), -t.getTranslateY());
                 t.scale(1/t.getScaleX(), 1/t.getScaleY());
-                System.out.println("Updating graphics scale to "+zoomLevel);
+                //System.out.println("Updating graphics scale to "+zoomLevel);
                 t.scale(zoomLevel, zoomLevel);
                 g2d.setTransform(t);
             }
