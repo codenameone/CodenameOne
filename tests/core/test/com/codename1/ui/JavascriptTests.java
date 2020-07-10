@@ -28,6 +28,10 @@ public class JavascriptTests extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
         Form f = new Form("Test Browser");
+        if (!BrowserComponent.isNativeBrowserSupported()) {
+        	System.out.println("This platform doesn't support the native browser component.  Skipping JavascriptTests");
+        	return true;
+        }
         f.setLayout(new BorderLayout());
         BrowserComponent bc = new BrowserComponent();
         bc.setPage("<!doctype html><html><head><title>Foo</title><body>Body</body></head></html>", "http://www.codenameone.com");
