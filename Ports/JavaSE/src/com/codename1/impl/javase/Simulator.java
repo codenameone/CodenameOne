@@ -107,20 +107,65 @@ public class Simulator {
             Class.forName("javafx.embed.swing.JFXPanel");
             fxSupported = true;
         } catch (Throwable ex) {}
-        
+        boolean fxOnSystemPath = fxSupported;
         File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         if (cef.exists()) {
             cefSupported = true;
             System.out.println("Adding CEF to classpath");
-            System.setProperty("java.class.path", System.getProperty("java.class.path") 
-                    + File.pathSeparator + cef.getAbsolutePath());
+            String cn1LibPath = System.getProperty("cn1.library.path", ".");
+            String nativeDir = isMac ? "macos64" : isWindows ? "win64" : "linux64";
+            System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
             for (File jar : cef.listFiles()) {
                 if (jar.getName().endsWith(".jar")) {
-                    System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
                     files.add(jar);
                 }
             }
         }
+        
+        /*
+        Tried to add JavaDX to classpath dynamically, but was dismal failure.
+        if (!fxSupported) {
+            if (getJavaVersion() == 8) {
+                File fx = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx8");
+                File fxLibDir = new File(fx, "lib");
+                File fxJarDir = new File(fxLibDir, "ext");
+                if (fxLibDir.exists() && fxJarDir.exists()) {
+                    System.setProperty("java.class.path", System.getProperty("java.class.path") 
+                        + File.pathSeparator + fxJarDir.getAbsolutePath());
+                    String cn1LibPath = System.getProperty("cn1.library.path", ".");
+                    System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + fxLibDir.getPath());
+                     for (File jar : fxJarDir.listFiles()) {
+                        if (jar.getName().endsWith(".jar")) {
+                            System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
+                            files.add(jar);
+                        }
+                    }
+                     fxSupported = true;
+                }
+            } else if (getJavaVersion() >= 9) {
+                File fx = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx");
+                File fxLibDir = new File(fx, "lib");
+                File fxJarDir = fxLibDir;
+                if (fxLibDir.exists() && fxJarDir.exists()) {
+                    
+                    System.setProperty("java.class.path", System.getProperty("java.class.path") 
+                        + File.pathSeparator + fxJarDir.getAbsolutePath());
+                    String cn1LibPath = System.getProperty("cn1.library.path", ".");
+                    System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + fxLibDir.getPath());
+                     for (File jar : fxJarDir.listFiles()) {
+                        if (jar.getName().endsWith(".jar")) {
+                            System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
+                            files.add(jar);
+                        }
+                    }
+                    fxSupported = true;
+                    System.out.println("Classpath now "+System.getProperty("java.class.path"));
+                }
+            }
+            
+        }
+        */
+        
         
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
@@ -150,21 +195,22 @@ public class Simulator {
             }
         }
         
-        loadFXRuntime();
+        //loadFXRuntime();
         ClassLoader ldr = rootClassLoader == null ? 
                 new ClassPathLoader( files.toArray(new File[files.size()])) :
                 new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
         if (rootClassLoader == null) {
             rootClassLoader = (ClassPathLoader)ldr;
+            
             ldr = new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
             
         }
         ((ClassPathLoader)ldr).addExclude("org.cef.");
+        
         final ClassLoader fLdr = ldr;
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
-
         new Thread() {
             public void run() {
                 setContextClassLoader(fLdr);
@@ -210,4 +256,45 @@ public class Simulator {
 
         } 
     }
+    
+    private static String getJavaFXVersionStr() {
+        return (getJavaVersion() == 8) ? "8" : "";
+    }
+    
+    private static int cachedJavaVersion = -1;
+
+    private static int getJavaVersion() {
+        if (cachedJavaVersion < 0) {
+
+            String version = System.getProperty("java.version");
+            if (version.startsWith("1.")) {
+                version = version.substring(2);
+            }
+            // Allow these formats:
+            // 1.8.0_72-ea
+            // 9-ea
+            // 9
+            // 9.0.1
+            int dotPos = version.indexOf('.');
+            int dashPos = version.indexOf('-');
+            if (dotPos < 0 && dashPos < 0) {
+                cachedJavaVersion = Integer.parseInt(version);
+                return cachedJavaVersion;
+            }
+            cachedJavaVersion = Integer.parseInt(version.substring(0,
+                    dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+            return cachedJavaVersion;
+        }
+        return cachedJavaVersion;
+    }
+    
+    private static String OS = System.getProperty("os.name").toLowerCase();
+    private static boolean isWindows = (OS.indexOf("win") >= 0);
+    
+
+    private static boolean isMac =  (OS.indexOf("mac") >= 0);
+    
+
+    private static boolean isUnix = (OS.indexOf("nux") >= 0);
+    
 }

@@ -116,10 +116,6 @@ public class Executor {
     
     
     public static void main(Class launcherClass, final String[] argv) throws Exception {
-        if (JavaFXLoader.main(launcherClass, Executor.class, argv)) {
-            return;
-        }
-        
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
