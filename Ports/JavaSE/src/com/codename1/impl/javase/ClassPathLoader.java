@@ -92,6 +92,24 @@ class ClassPathLoader extends ClassLoader {
         return findClass(className);
         
     }
+
+    @Override
+    protected String findLibrary(String libname) {
+       
+        String out = super.findLibrary(libname);
+        if (out == null) {
+             File userHome = new File(System.getProperty("user.home"));
+            File cn1 = new File(userHome, ".codenameone");
+            File cef = new File(cn1, "cef");
+            File cefLibs = new File(cef, "macos64");
+            File f = new File(cefLibs, "lib"+libname+".dylib");
+            if (f.exists()) {
+                return f.getAbsolutePath();
+            }
+            
+        }
+        return out;
+    }
     
     
     

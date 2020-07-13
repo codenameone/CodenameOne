@@ -120,15 +120,12 @@ public class Simulator {
                     files.add(jar);
                 }
             }
-            setLibraryPath(System.getProperty("java.library.path")+File.pathSeparator+cef.getAbsolutePath()+File.separator+"macos64");
-            System.out.println("Class path now: "+System.getProperty("java.class.path"));
         }
         
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
             System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jmf.getAbsolutePath());
             files.add(jmf);
-            setLibraryPath(System.getProperty("java.library.path")+File.pathSeparator+jmf.getAbsolutePath());
         }
         
         String implementation = System.getProperty("cn1.javase.implementation", "");
@@ -213,15 +210,4 @@ public class Simulator {
 
         } 
     }
-    
-    public static void setLibraryPath(String path) throws Exception {
-        System.setProperty("java.library.path", path);
-
-        //set sys_paths to null so that java.library.path will be reevalueted next time it is needed
-        final Field sysPathsField = ClassLoader.class.getDeclaredField("sys_paths");
-        sysPathsField.setAccessible(true);
-        sysPathsField.set(null, null);
-    }
-    
 }
-

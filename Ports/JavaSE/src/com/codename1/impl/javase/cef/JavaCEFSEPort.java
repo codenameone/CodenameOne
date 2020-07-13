@@ -44,7 +44,7 @@ import javax.swing.JFrame;
 public class JavaCEFSEPort extends JavaSEPort {
     
     private static boolean cefExists;
-
+    
     @Override
     public void init(Object m) {
         super.init(m);
