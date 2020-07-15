@@ -63,48 +63,115 @@ import java.util.Vector;
 public class JSONParser implements JSONParseCallback {
 
     /**
-     * Indicates that the parser will generate long objects and not just doubles for numeric values
-     * @return the useLongsDefault
+     * Checks whether JSONParser instances will use longs to represent numeric values by default. This is just a 
+     * global default setting.  You should use {@link #isUseLongsInstance() } to check the status for a particular
+     * JSONParser object.
+     * 
+     * @return the useLongsDefault 
+     * @deprecated Use {@link #isUseLongsInstance() } to check whether the current JSONParser uses longs.
      */
     public static boolean isUseLongs() {
         return useLongsDefault;
     }
+    
+    /**
+     * Checks to see if this parser generates long objects and not just doubles for numeric values.
+     * @return 
+     */
+    public boolean isUseLongsInstance() {
+        return useLongs;
+    }
 
     /**
-     * Indicates that the parser will generate long objects and not just doubles for numeric values
+     * Indicates that the parser will generate long objects and not just doubles for numeric values.
+     * 
+     * <p><strong>Warning:</strong>  This method will affect ALL JSONParser instances in the application.  Prefer to use {@link #setUseLongsInstance(boolean) }
+     * to only affect the behaviour of the particular JSONParser instance.</p>
      * @param aUseLongsDefault the useLongsDefault to set
+     * @deprecated Use {@link #setUseLongsInstance(boolean) }
      */
     public static void setUseLongs(boolean aUseLongsDefault) {
         useLongsDefault = aUseLongsDefault;
     }
+    
+    /**
+     * Sets the current JSONParser instance to use longs instead of doubles for numeric values.  Prefer this to the static {@link #setUseLongs(boolean) }
+     * so that it doesn't disrupt libraries that may depend on JSONParser.
+     * @param longs True to use 
+     * @since 7.0
+     */
+    public void setUseLongsInstance(boolean longs) {
+        useLongs = longs;
+    }
 
     /**
-     * Indicates that the parser will include null values in the parsed output
-     * @return the includeNullsDefault
+     * Checks the default setting for {@link #isIncludeNullsInstance() }.
+     * @return the includeNullsDefault The global default setting for {@link #isIncludeNullsInstance() }.
+     * @deprecated Use {@link #isIncludeNullsInstance() } instead.
      */
     public static boolean isIncludeNulls() {
         return includeNullsDefault;
     }
 
     /**
-     * Indicates that the parser will include null values in the parsed output
+     * Sets the global default settings for {@link #isIncludeNullsInstance() }.
      * @param aIncludeNullsDefault the includeNullsDefault to set
+     * @deprecated Use {@link #setIncludeNullsInstance(boolean) } instead.
      */
     public static void setIncludeNulls(boolean aIncludeNullsDefault) {
         includeNullsDefault = aIncludeNullsDefault;
     }
+    
+    /**
+     * Sets whether to include null values in parsed content.
+     * @param include True to include null values in parsed content.
+     * @since 7.0
+     */
+    public void setIncludeNullsInstance(boolean include) {
+        includeNulls = include;
+    }
+    
+    /**
+     * Checks whether this parser will include null values in parsed content.
+     * 
+     * @return True if null values are included in parsed content.
+     * @since 7.0
+     */
+    public boolean isIncludeNullsInstance() {
+        return includeNulls;
+    }
 
     /**
-     * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     * Global default setting for {@link #isUseBooleanInstance() }.
      * @return the useBooleanDefault
+     * @deprecated Use {@link #isUseBooleanInstance() } instead.
      */
     public static boolean isUseBoolean() {
         return useBooleanDefault;
     }
-
+    
     /**
      * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     * @return True if the parser will generate Boolean objects and not just Strings for boolean values.
+     * @since 7.0
+     */
+    public boolean isUseBooleanInstance() {
+        return useBoolean;
+    }
+    
+    /**
+     * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     * @param useBoolean True to generate Boolean objects and not just Strings for boolean values.
+     * @since 7.0
+     */
+    public void setUseBooleanInstance(boolean useBoolean) {
+        this.useBoolean = useBoolean;
+    }
+
+    /**
+     * Sets the global default value for {@link #isUseBooleanInstance() }
      * @param aUseBooleanDefault the useBooleanDefault to set
+     * @deprecated Use {@link #setUseBooleanInstance(boolean) } instead.
      */
     public static void setUseBoolean(boolean aUseBooleanDefault) {
         useBooleanDefault = aUseBooleanDefault;
@@ -136,12 +203,29 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private static boolean useLongsDefault;
+    private boolean useLongs = useLongsDefault;
+    private static boolean useLongs(JSONParseCallback callback) {
+        if (callback instanceof JSONParser) {
+            return ((JSONParser)callback).isUseLongs();
+        }
+        return useLongsDefault;
+    }
     
     /**
      * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
      */
     private static boolean useBooleanDefault;
+    private boolean useBoolean = useBooleanDefault;
+    private static boolean useBoolean(JSONParseCallback callback) {
+        if (callback instanceof JSONParser) {
+            return ((JSONParser)callback).isUseBoolean();
+        }
+        return useBooleanDefault;
+    }
     private static boolean includeNullsDefault;
+    private boolean includeNulls = includeNullsDefault;
+    
+    
     private boolean modern;
     private Map<String, Object> state;
     private java.util.List<Object> parseStack;
@@ -271,7 +355,7 @@ public class JSONParser implements JSONParseCallback {
                             char a2 = (char) rc.read(i);
                             char a3 = (char) rc.read(i);
                             if (a1 == 'r' && a2 == 'u' && a3 == 'e') {
-                                if(useBooleanDefault) {
+                                if(useBoolean(callback)) {
                                     callback.booleanToken(true);
                                 } else {
                                     callback.stringToken("true");
@@ -299,7 +383,7 @@ public class JSONParser implements JSONParseCallback {
                             char b3 = (char) rc.read(i);
                             char b4 = (char) rc.read(i);
                             if (b1 == 'a' && b2 == 'l' && b3 == 's' && b4 == 'e') {
-                                if(useBooleanDefault) {
+                                if(useBoolean(callback)) {
                                     callback.booleanToken(false);
                                 } else {
                                     callback.stringToken("false");
@@ -330,7 +414,7 @@ public class JSONParser implements JSONParseCallback {
                             if (currentToken.length() > 0) {
                                 try {
                                     String ct = currentToken.toString();
-                                    if(useLongsDefault) {
+                                    if(useLongs(callback)) {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
@@ -364,7 +448,7 @@ public class JSONParser implements JSONParseCallback {
                             if (currentToken.length() > 0) {
                                 try {
                                     String ct = currentToken.toString();
-                                    if(useLongsDefault) {
+                                    if(useLongs(callback)) {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
@@ -402,7 +486,7 @@ public class JSONParser implements JSONParseCallback {
                             if (currentToken.length() > 0) {
                                 try {
                                     String ct = currentToken.toString();
-                                    if(useLongsDefault) {
+                                    if(useLongs(callback)) {
                                         if(ct.indexOf('.') > -1) {
                                             callback.numericToken(Double.parseDouble(ct));
                                         } else {
@@ -633,7 +717,7 @@ public class JSONParser implements JSONParseCallback {
             if (currentKey == null) {
                 currentKey = tok;
             } else {
-                if (tok != null || isIncludeNulls()) {
+                if (tok != null || isIncludeNullsInstance()) {
                     getStackHash().put(currentKey, tok);
                 }
                 currentKey = null;
