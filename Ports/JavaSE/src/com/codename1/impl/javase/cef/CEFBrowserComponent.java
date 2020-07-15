@@ -14,6 +14,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.EventQueue;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -110,9 +111,11 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
         //args.add("--allow-file-access-from-files");
+        args.add("--enable-media-stream");
         args.add("--device-scale-factor=4");
         args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
+        args.add("--enable-usermedia-screen-capturing");
         return args.toArray(new String[args.size()]);
     }
     
@@ -157,6 +160,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         BrowserNavigationCallback navigationCallback = new BrowserNavigationCallback() {
             @Override
             public boolean shouldNavigate(String url) {
+                //System.out.println("in shouldNavigate "+url);
                 return parent.shouldNavigate(url);
             }
             
@@ -233,8 +237,18 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
     @Override
     public void setPage(String html, String baseUrl) {
-        String url = "data:text/html,"+com.codename1.io.Util.encodeUrl(html);
-        setURL(url);
+        //String url = "data:text/html,"+com.codename1.io.Util.encodeUrl(html);
+        try {
+            byte[] bytes = html.getBytes("UTF-8");
+            StreamWrapper stream = new StreamWrapper(new ByteArrayInputStream(bytes), "text/html" , bytes.length);
+            
+            String id = BrowserPanel.getStreamRegistry().registerStream(stream);
+            
+            String url = "https://cn1app/streams/"+id;
+            setURL(url);
+        } catch (Exception ex) {
+            setURL("data:text/html,"+com.codename1.io.Util.encodeUrl(html));
+        }
     }
 
     @Override
