@@ -30,11 +30,13 @@ import com.codename1.io.Externalizable;
 import com.codename1.io.IOProgressListener;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Storage;
+import com.codename1.io.gzip.GZConnectionRequest;
 import com.codename1.l10n.DateFormat;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.ParseException;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.properties.PropertyBusinessObject;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
@@ -43,8 +45,11 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
+import com.codename1.util.EasyThread;
 import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
 import com.codename1.util.SuccessCallback;
+import com.codename1.util.Wrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -61,6 +66,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.Random;
 import java.util.Vector;
 
 /**
@@ -74,6 +80,7 @@ public class Util {
 
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
+    private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis()); 
 
     static {
         register("EncodedImage", EncodedImage.class);
@@ -2021,5 +2028,382 @@ public class Util {
         }
 
         return "application/octet-stream"; // unknown file type
+    }
+    
+    /**
+     * Returns -1 if the content length is unknown, a value greater than 0 if
+     * the Content-Length is known.
+     *
+     * @param url
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url) {
+        return getFileSizeWithoutDownload(url, false);
+    }
+
+    /**
+     * Returns -2 if the server doesn't accept partial downloads (and if
+     * checkPartialDownloadSupport is true), -1 if the content length is unknow,
+     * a value greater than 0 if the Content-Length is known.
+     *
+     * @param url
+     * @param checkPartialDownloadSupport if true returns -2 if the server
+     * doesn't accept partial downloads.
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url, final boolean checkPartialDownloadSupport) {
+        // documentation about the headers: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        // code discussed here: https://stackoverflow.com/a/62130371
+        final Wrapper<Long> result = new Wrapper<Long>(0l);
+        ConnectionRequest cr = new GZConnectionRequest() {
+            @Override
+            protected void readHeaders(Object connection) throws IOException {
+                String acceptRanges = getHeader(connection, "Accept-Ranges");
+                if (checkPartialDownloadSupport && (acceptRanges == null || !acceptRanges.equals("bytes"))) {
+                    // Log.p("The partial downloads of " + url + " are not supported.", Log.WARNING);
+                    result.set(-2l);
+                } else {
+                    String contentLength = getHeader(connection, "Content-Length");
+                    if (contentLength != null) {
+                        result.set(Long.parseLong(contentLength));
+                    } else {
+                        // Log.p("The Content-Length of " + url + " is unknown.", Log.WARNING);
+                        result.set(-1l);
+                    }
+                }
+            }
+        };
+        cr.setUrl(url);
+        cr.setHttpMethod("HEAD");
+        cr.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return result.get();
+    }
+    
+    /**
+     * <p>
+     * Safely download the given URL to the Storage or to the FileSystemStorage:
+     * this method is resistant to network errors and capable of resume the
+     * download as soon as network conditions allow and in a completely
+     * transparent way for the user; note that in the global network error
+     * handling, there must be an automatic
+     * <pre>.retry()</pre>, as in the code example below.</p>
+     * <p>
+     * This method is useful if the server correctly returns Content-Length and
+     * if it supports partial downloads: if not, it works like a normal
+     * download.</p>
+     * <p>
+     * Pros: always allows you to complete downloads, even if very heavy (e.g.
+     * 100MB), even if the connection is unstable (network errors) and even if
+     * the app goes temporarily in the background (on some platforms the
+     * download will continue in the background, on others it will be
+     * temporarily suspended).</p>
+     * <p>
+     * Cons: since this method is based on splitting the download into small
+     * parts (512kbytes is the default), this approach causes many GET requests
+     * that slightly slow down the download and cause more traffic than normally
+     * needed.</p>
+     * <p>
+     * Usage example:</p>
+     * <script src="https://gist.github.com/jsfan3/554590a12c3102a3d77e17533e7eca98.js"></script>
+     * 
+     *
+     * @param url
+     * @param fileName must be a valid Storage file name or FileSystemStorage
+     * file path
+     * @param percentageCallback invoked (in EDT) during the download to notify
+     * the progress (from 0 to 100); it can be null if you are not interested in
+     * monitoring the progress
+     * @param filesavedCallback invoked (in EDT) only when the download is
+     * finished; if null, no action is taken
+     * @throws IOException
+     */
+    public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
+        // Code discussion here: https://stackoverflow.com/a/62137379/1277576
+        String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + "partialDownloads";
+        if (!FileSystemStorage.getInstance().isDirectory(partialDownloadsDir)) {
+            FileSystemStorage.getInstance().mkdir(partialDownloadsDir);
+        }
+        final String uniqueId = url.hashCode() + "" + downloadUrlSafelyRandom.nextInt(); // do its best to be unique if there are parallel downloads
+        final String partialDownloadPath = partialDownloadsDir + FileSystemStorage.getInstance().getFileSystemSeparator() + uniqueId;
+        final boolean isStorage = fileName.indexOf("/") < 0; // as discussed here: https://stackoverflow.com/a/57984257
+        final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support
+        final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download
+        final Wrapper<Long> downloadedTotalBytes = new Wrapper<Long>(0l);
+        final OutputStream out;
+        if (isStorage) {
+            out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
+        } else {
+            out = FileSystemStorage.getInstance().openOutputStream(fileName);
+        }
+        final EasyThread mergeFilesThread = EasyThread.start("mergeFilesThread"); // Codename One thread that supports crash protection and similar Codename One features.
+
+        final ConnectionRequest cr = new GZConnectionRequest();
+        cr.setUrl(url);
+        cr.setPost(false);
+        if (fileSize > splittingSize) {
+            // Which byte should the download start from?
+            cr.addRequestHeader("Range", "bytes=0-" + splittingSize);
+            cr.setDestinationFile(partialDownloadPath);
+        } else {
+            Util.cleanup(out);
+            if (isStorage) {
+                cr.setDestinationStorage(fileName);
+            } else {
+                cr.setDestinationFile(fileName);
+            }
+        }
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                mergeFilesThread.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            // We append the just saved partial download to the fileName, if it exists
+                            if (FileSystemStorage.getInstance().exists(partialDownloadPath)) {
+                                InputStream in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
+                                Util.copyNoClose(in, out, 8192);
+                                Util.cleanup(in);
+                                // before deleting the file, we check and update how much data we have actually downloaded
+                                downloadedTotalBytes.set(downloadedTotalBytes.get() + FileSystemStorage.getInstance().getLength(partialDownloadPath));
+                                FileSystemStorage.getInstance().delete(partialDownloadPath);
+                            }
+                            // Is the download finished?
+                            if (downloadedTotalBytes.get() > fileSize) {
+                                throw new IllegalStateException("More content has been downloaded than the file length, check the code.");
+                            }
+                            if (fileSize <= 0 || downloadedTotalBytes.get() == fileSize) {
+                                // yes, download finished
+                                Util.cleanup(out);
+                                if (filesavedCallback != null) {
+                                    CN.callSerially(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            filesavedCallback.completed(fileName);
+                                        }
+                                    });
+                                }
+                            } else {
+                                // no, it's not finished, we repeat the request after updating the "Range" header
+                                cr.addRequestHeader("Range", "bytes=" + downloadedTotalBytes.get() + "-" + (Math.min(downloadedTotalBytes.get() + splittingSize, fileSize)));
+                                NetworkManager.getInstance().addToQueue(cr);
+                            }
+
+                        } catch (IOException ex) {
+                            Log.p("Error in appending splitted file to output file", Log.ERROR);
+                            Log.e(ex);
+                            Log.sendLogAsync();
+                        }
+                    }
+                });
+            }
+        });
+        NetworkManager.getInstance().addToQueue(cr);
+        NetworkManager.getInstance().addProgressListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                if (cr == evt.getConnectionRequest() && fileSize > 0) {
+                    // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
+                    if (percentageCallback != null) {
+                        CN.callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                percentageCallback.completed((int) ((long) downloadedTotalBytes.get() * 100 / fileSize));
+                            }
+                        });
+                    }
+                }
+            }
+        });
+    }
+    
+       /**
+     * <p>
+     * Creates a new UUID, that is a 128-bit number used to identify information
+     * in computer systems. UUIDs aim to be unique for practical purposes.</p>
+     *
+     * <p>
+     * This implementation uses the system clock and some device info as seeds
+     * for random data, that are enough for practical usage. More specifically,
+     * two instances of Random, instantiated with different seeds, are used. The
+     * first seed corresponds to the timestamp in which the first object of the
+     * static class UUID is created, the second seed is a number (long type)
+     * that identifies the current installation of the app and is assumed to be
+     * as different as possible from other installations of the app. A unique
+     * identifier (long type) associated with the current app installation can
+     * be specified by the developer via the Preference "CustomDeviceId__$" (as
+     * in the following example) BEFORE the generation of the first UIID, or -
+     * if it is not specified - it is obtained from an internal Codename One
+     * implementation; in the worst case, if an identifier has not been
+     * specified by the developer and Codename One is unable to distinguish the
+     * current installation of the app from other installations, an internal
+     * algorithm will be used that will generate a number based on some hardware
+     * and software characteristics of the device: the number thus generated
+     * will be the same on identical models of the same device and with the same
+     * version of the operating system, but will vary between different models.
+     * Even in the worst case scenario, the probability that two app
+     * installations with identical device identifiers will generate the first
+     * UIID in the same timestamp is very low.</p>
+     *
+     * <p>
+     * As a tip, consider that any alphanumeric text string (corresponding for
+     * example to a username) can be converted into a long type number,
+     * considering this string as a number based on 36, provided it does not
+     * exceed 12 characters. This suggestion is applied in the following
+     * example.</p>
+     *
+     * <p>
+     * Code example:</p>
+     * <script src="https://gist.github.com/jsfan3/2fdc5fae2b723cba40e65faab923e552.js"></script>
+     *
+     * @return a pseudo-random Universally Unique Identifier in its canonical
+     * textual representation
+     */
+    public static String getUUID() {
+        return new Util.UUID().toString();
+    }
+
+    /**
+     * Creates a custom UUID, from the given two <code>long</code> values.
+     *
+     * @param time the upper 64 bits
+     * @param clockSeqAndNode the lower 64 bits
+     *
+     * @return a Universally Unique Identifier in its canonical textual
+     * representation
+     */
+    public static String getUUID(long time, long clockSeqAndNode) {
+        return new Util.UUID(time, clockSeqAndNode).toString();
+    }
+
+    /**
+     * This class represents an UUID according to the DCE Universal Token
+     * Identifier specification.
+     * <p>
+     * All you need to know:
+     * <pre>
+     * UUID u = new UUID().toString();
+     * </pre>
+     */
+    static class UUID {
+
+        /*
+         * UUID - an implementation of the UUID specification for Codename One
+         * by Francesco Galgani
+         *
+         * You can use this class as you want (public-domain license).
+         */
+        private static final char[] DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+        private static final Random randomTime = new Random(System.currentTimeMillis());
+        private static final Random randomClockSeqAndNode = new Random(getUniqueDeviceID());
+
+        private long time = 0l;
+        private long clockSeqAndNode = 0l;
+
+        /**
+         * Constructor for UUID, it uses the system clock and some device info
+         * as seeds for random data, that are enough for practical usage.
+         */
+        public UUID() {
+            this.time = randomTime.nextLong();
+            this.clockSeqAndNode = randomClockSeqAndNode.nextLong();
+        }
+
+        /**
+         * Constructs a UUID from two <code>long</code> values.
+         *
+         * @param time the upper 64 bits
+         * @param clockSeqAndNode the lower 64 bits
+         */
+        public UUID(long time, long clockSeqAndNode) {
+            this.time = time;
+            this.clockSeqAndNode = clockSeqAndNode;
+        }
+
+        /**
+         * Returns this UUID as a String.
+         *
+         * @return a String, never <code>null</code>
+         */
+        @Override
+        public final String toString() {
+            return toCanonicalForm();
+        }
+
+        private String toCanonicalForm() {
+            String out = "";
+            out = append(out, (int) (time >> 32)) + '-'
+                    + append(out, (short) (time >> 16)) + '-'
+                    + append(out, (short) time) + '-'
+                    + append(out, (short) (clockSeqAndNode >> 48)) + '-'
+                    + append(out, clockSeqAndNode, 12);
+            return out;
+        }
+
+        private static String append(String a, short in) {
+            return append(a, (long) in, 4);
+        }
+
+        private static String append(String a, int in) {
+            return append(a, (long) in, 8);
+        }
+
+        private static String append(String a, long in, int length) {
+            int lim = (length << 2) - 4;
+            while (lim >= 0) {
+                a += (DIGITS[(byte) (in >> lim) & 0x0f]);
+                lim -= 4;
+            }
+            return a;
+        }
+
+        private static long getUniqueDeviceID() {
+            long id = Preferences.get("CustomDeviceId__$", (long) -1);
+            if (id == -1) {
+                id = Preferences.get("DeviceId__$", (long) -1);
+            }
+            if (id == -1) {
+                id = generateLongFromDeviceInfo();
+            }
+            return id;
+        }
+
+        /**
+         * Generates a long number using some device info: the same type of
+         * device (a specific model of a specific brand, with the same OS
+         * version) will always produce the same number, while different devices
+         * will most likely produce different numbers.
+         *
+         * @return
+         */
+        private static long generateLongFromDeviceInfo() {
+            long random = CN.getDeviceDensity()
+                    * CN.getDisplayHeight()
+                    * CN.getDisplayWidth()
+                    * CN.convertToPixels(10)
+                    * Long.parseLong(sanitizeString(CN.getPlatformName()), 36)
+                    * Long.parseLong(sanitizeString(CN.getProperty("User-Agent", "1")), 36)
+                    * Long.parseLong(sanitizeString(CN.getProperty("OSVer", "1")), 36);
+            return random;
+        }
+
+        /**
+         * Removes all non-alphanumeric characters from a string and returns the
+         * first 10 characters.
+         *
+         * @param input
+         * @return
+         */
+        private static String sanitizeString(String input) {
+            String result = "";
+            for (char myChar : input.toCharArray()) {
+                if ((myChar >= '0' && myChar <= '9') || (myChar >= 'a' && myChar <= 'z') || (myChar >= 'A' && myChar <= 'Z')) {
+                    result += myChar;
+                }
+            }
+            return result.substring(0, Math.min(10, result.length())).toUpperCase();
+        }
+
     }
 }

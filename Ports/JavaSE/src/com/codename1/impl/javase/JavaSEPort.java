@@ -153,6 +153,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.text.AttributedString;
@@ -167,17 +168,7 @@ import java.util.UUID;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.scene.Group;
-import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
-import javafx.scene.media.MediaPlayer;
-import javafx.scene.media.MediaPlayer.Status;
-import javafx.scene.media.MediaView;
-import javafx.scene.web.WebView;
-import javafx.util.Duration;
+
 import javax.net.ssl.HttpsURLConnection;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
@@ -222,6 +213,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private Boolean darkMode;
 
     /**
      * @return the fullScreen
@@ -347,16 +339,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isInFullScreenMode() {
         return fullScreen;
     }
+
+    @Override
+    public Boolean isDarkMode() {
+        return darkMode;
+    }
+
     
     
-    
-    
-    
-    boolean takingScreenshot;
+    public boolean takingScreenshot;
     private static boolean fullScreen;
-    float screenshotActualZoomLevel;
+    public float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
-    static double retinaScale = 1.0;
+    public static double retinaScale = 1.0;
     
     static JMenuItem pause;
     
@@ -613,7 +608,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static void setAppHomeDir(String aAppHomeDir) {
         appHomeDir = aAppHomeDir;
     }
-    private TestRecorder testRecorder;
+    protected TestRecorder testRecorder;
     private Hashtable contacts;
     private static boolean designMode;
     
@@ -676,8 +671,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean useNativeInput = true;
     private static boolean simulateAndroidKeyboard = false;
     private static boolean scrollableSkin = false;
-    private JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
-    private JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
+    protected JScrollBar hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
+    protected JScrollBar vSelector = new JScrollBar(Scrollbar.VERTICAL);
     static final int GAME_KEY_CODE_FIRE = -90;
     static final int GAME_KEY_CODE_UP = -91;
     static final int GAME_KEY_CODE_DOWN = -92;
@@ -691,7 +686,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static EventDispatcher formChangeListener;
     private static boolean autoAdjustFontSize = true;
     private static Object defaultInitTarget;
-    float zoomLevel = 1;
+    public float zoomLevel = 1;
     private File storageDir;
     // skin related variables
     private boolean portrait = true;
@@ -714,7 +709,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
-    private static boolean fxExists = false;
+    protected static boolean fxExists = false;
     private JFrame window;
     private long lastIdleTime;
     private static boolean showEDTWarnings = true;
@@ -978,7 +973,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return landscapeSkinHotspots;
     }
 
-    java.awt.Rectangle getScreenCoordinates() {
+    public java.awt.Rectangle getScreenCoordinates() {
         if (portrait) {
             return portraitScreenCoordinates;
         }
@@ -1179,13 +1174,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
     
-    class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
+    public int getCanvasX() {
+        return canvas.x;
+    }
+    
+    public int getCanvasY() {
+        return canvas.y;
+    }
+    
+    protected class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
         private java.awt.Dimension forcedSize;
         private boolean releaseLock;
-        int x, y;
+        public int x, y;
 
         C() {
             super(null);
@@ -1554,6 +1557,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 AffineTransform t= g2d.getTransform();
                 //t.translate(-t.getTranslateX(), -t.getTranslateY());
                 t.scale(1/t.getScaleX(), 1/t.getScaleY());
+                //System.out.println("Updating graphics scale to "+zoomLevel);
                 t.scale(zoomLevel, zoomLevel);
                 g2d.setTransform(t);
             }
@@ -2135,6 +2139,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 requestFocus();
+                
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
 
                 if (units * lastUnits < 0 || Math.abs(units) - Math.abs(lastUnits) > 100) {
@@ -2228,10 +2233,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
     }
-    boolean cn1GrabbedDrag=false;
-    C canvas;
+    protected boolean cn1GrabbedDrag=false;
+    public C canvas;
 
-    protected java.awt.Container getCanvas() {
+    public java.awt.Container getCanvas() {
         return canvas;
     }
 
@@ -3187,6 +3192,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             simulatorMenu.add(testRecorderMenu);
+
+            JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
+            simulatorMenu.add(darkLightModeMenu);
+            final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
+            final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
+            final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
+            ButtonGroup group = new ButtonGroup();
+            group.add(darkMode);
+            group.add(lightMode);
+            group.add(unsupportedMode);
+            darkMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = true;
+                }
+            });
+            
+            lightMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = false;
+                }
+            });
+
+            unsupportedMode.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JavaSEPort.this.darkMode = null;
+                }
+            });
 
             manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
@@ -4326,12 +4361,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 d.setProperty("package_name", mainClass);
             }
         }
-        try {
-            Class.forName("javafx.embed.swing.JFXPanel");
-            Platform.setImplicitExit(false);
-            fxExists = true;
-        } catch (Throwable ex) {
-        }
+        
 
 
         String hide = System.getProperty("hideMenu", "false");
@@ -4907,7 +4937,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fText = text;
             editingInProgress.invokeAfter(new Runnable() {
                 public void run() {
-                    editString(cmp, maxSize, constraint, fText, keyCode);
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            editString(cmp, maxSize, constraint, fText, keyCode);
+                        }
+                    });
+                    
                 }
             });
             editingInProgress.endEditing();
@@ -6044,7 +6079,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
     
-    boolean drawingNativePeer;
+    public boolean drawingNativePeer;
     public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
         drawingNativePeer = true;
     
@@ -6069,7 +6104,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
+        if (cmp instanceof Peer) {
+            Peer peer = (Peer)cmp;
+            if (peer.peerBuffer != null) {
+                // PeerBuffer is used in cases like CEF where the peer component is rendered
+                // using a BufferedImage and the pixels are piped directly from that 
+                // Native CEF callback - no swing paint() involvement
+                Graphics2D nativeGraphics = getGraphics(graphics);
+                
+                int tx = cmp.getAbsoluteX();
+                int ty = cmp.getAbsoluteY();
+                double scale = 1/zoomLevel;
+                if (isScreenGraphics(nativeGraphics)) {
+                    nativeGraphics.scale(scale, scale);
+                }
+                nativeGraphics.translate(tx/scale, ty/scale);
+                peer.peerBuffer.paint(nativeGraphics, jcmp);
+                nativeGraphics.translate(-tx/scale, -ty/scale);
+                if (isScreenGraphics(nativeGraphics)) {
+                    nativeGraphics.scale(1/scale, 1/scale);
+                }
+                return;
+            }
+        }
         if (cmp.getClientProperty("__buffer") != null) {
+            // Swing peer components have an internal BufferedImage where they are 
+            // rendered to on the swing paint() thread.  Then the image is drawn
+            // to the CN1 graphics context.  This differs from the peerBuffer approach
+            // in that the 
             BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
             Graphics2D nativeGraphics = getGraphics(graphics);
             nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
@@ -7883,7 +7945,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    Graphics2D getGraphics(Object nativeG) {
+    public Graphics2D getGraphics(Object nativeG) {
         if (nativeG instanceof Graphics2D) {
             Graphics2D g2d = (Graphics2D) nativeG;
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -7896,6 +7958,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D g2d = canvas.getGraphics2D();
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
+    }
+    
+    public boolean isScreenGraphics(Graphics2D g) {
+        return g == canvas.getGraphics2D();
     }
 
     /**
@@ -7951,7 +8017,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     
-    class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
+    public static class CN1JPanel extends JPanel {
+        
+        double zoom_;
 
         @Override
         public void revalidate() {
@@ -7967,6 +8035,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         protected void processMouseEvent(MouseEvent e) {
             //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
             if (!sendToCn1(e)) {
+                if (isFocusable() && !hasFocus()) {
+                    if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+                        requestFocus();
+                    }
+                }
                 super.processMouseEvent(e);
             }
             
@@ -8002,35 +8075,35 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Component cmp = f.getComponentAt(cn1X, cn1Y);
                     //if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
-                        e = SwingUtilities.convertMouseEvent(this, e, canvas);
+                        e = SwingUtilities.convertMouseEvent(this, e, instance.canvas);
                         switch (e.getID()) {
                             case MouseEvent.MOUSE_CLICKED:
-                                canvas.mouseClicked(e);
+                                instance.canvas.mouseClicked(e);
                                 break;
                             case MouseEvent.MOUSE_DRAGGED:
-                                canvas.mouseDragged(e);
+                                instance.canvas.mouseDragged(e);
                                 break;
                             case MouseEvent.MOUSE_MOVED:
-                                canvas.mouseMoved(e);
+                                instance.canvas.mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
                                 // Mouse pressed in native component - passed to lightweight cmp
                                 if (!(cmp instanceof PeerComponent)) {
-                                    cn1GrabbedDrag = true;
+                                    instance.cn1GrabbedDrag = true;
                                 }
-                                canvas.mousePressed(e);
+                                instance.canvas.mousePressed(e);
                                 break;
                             case MouseEvent.MOUSE_RELEASED:
-                                cn1GrabbedDrag = false;
-                                canvas.mouseReleased(e);
+                                instance.cn1GrabbedDrag = false;
+                                instance.canvas.mouseReleased(e);
                                 break;
                             case MouseEvent.MOUSE_WHEEL:
-                                canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                instance.canvas.mouseWheelMoved((MouseWheelEvent)e);
                                 break;
                                 
                         }
                         //return true;
-                        if (cn1GrabbedDrag) {
+                        if (instance.cn1GrabbedDrag) {
                             return true;
                         }
                         if (cmp instanceof PeerComponent) {
@@ -8041,7 +8114,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             if (e.getID() == MouseEvent.MOUSE_RELEASED) {
-                cn1GrabbedDrag = false;
+                instance.cn1GrabbedDrag = false;
                 peerGrabbedDrag = false;
             } else if (e.getID() == MouseEvent.MOUSE_PRESSED) {
                 peerGrabbedDrag = true;
@@ -8050,7 +8123,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         private int getCN1X(MouseEvent e) {
-            if (canvas == null) {
+            if (instance.canvas == null) {
                 int out = e.getXOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -8067,7 +8140,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return out;
             }
-            java.awt.Rectangle screenCoords = getScreenCoordinates();
+            java.awt.Rectangle screenCoords = instance.getScreenCoordinates();
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
@@ -8085,11 +8158,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     x += pt.x;
                 }
             }
-            return (int)((x - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
+            
+            double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
+            //return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom) / zoom);
+            return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
         }
 
         private int getCN1Y(MouseEvent e) {
-            if (canvas == null) {
+            if (instance.canvas == null) {
                 int out = e.getYOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -8106,7 +8182,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return out;
             }
-            java.awt.Rectangle screenCoords = getScreenCoordinates();
+            java.awt.Rectangle screenCoords = instance.getScreenCoordinates();
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
@@ -8124,11 +8200,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     y += pt.y;
                 }
             }
-            return (int)((y - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
+            double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
+            return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
+            //return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom) / zoom );
         }
         
-        public CN1JFXPanel() {
-            final CN1JFXPanel panel = this;
+        public void setZoom(double zoom) {
+            zoom_ = zoom;
+        }
+        
+        public CN1JPanel() {
+            final CN1JPanel panel = this;
             
             /*
             panel.addMouseListener(new MouseListener() {
@@ -8189,65 +8271,50 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
     }
+    
+    
 
     @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
-        final AsyncResource<Media> out = new AsyncResource<Media>();
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
-            return out;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
-            return out;
-        }
+        throw new UnsupportedOperationException("Not implemented");
         
-        if(uriAddress.startsWith("file:")) {
-            uriAddress = unfile(uriAddress);
-        }
-        final String uri = uriAddress;
-        if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            System.out.println(msg);
-            out.error(new IOException(msg));
-            return out;
-        }
-        java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof JFrame)) {
-            cnt = cnt.getParent();
-            if (cnt == null) {
-                out.error(new RuntimeException("Could not find canvas.  Cannot create media"));
-                return out;
-            }
-        }
-
-        final java.awt.Container c = cnt;
-
-        //final Media[] media = new Media[1];
-        final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        //mediaContainer = m;
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
-                        String mimeType = "video/mp4";
-                        new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion, out);
-                        return;
-                    }
-
-                   new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion, out);
-                } catch (Exception ex) {
-                    out.error(ex);
-                }
-            }
-        });
-        return out;
+    }
+    
+    public String getMimetype(File file) throws IOException {
+       return Files.probeContentType(file.toPath());
     }
     
     
+    public String guessSuffixForMimetype(String mimeType) {
+        String suffix = "";
+        if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
+            suffix = ".mp3";
+        } else if (mimeType.contains("wav")) {
+            suffix = ".wav";
+        }
+        if (mimeType.contains("aiff")) {
+            suffix = ".aiff";
+        }
+        if (mimeType.contains("amr")) {
+            suffix = ".amr";
+        }
+        if (mimeType.contains("aiff")) {
+            suffix = ".aiff";
+        }
+        if (mimeType.contains("3gpp")) {
+            suffix = ".3gp";
+        }
+        if (mimeType.contains("mp4") || mimeType.contains("mpeg4")) {
+            suffix = ".mp4";
+        }
+        if (mimeType.contains("h264")) {
+            suffix = ".h264";
+        }
+        if (mimeType.equals("video/mpeg")) {
+            suffix = ".mpeg";
+        }
+        return suffix;
+    }
     
     /**
      * Plays the sound in the given URI which is partially platform specific.
@@ -8287,49 +8354,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
-        final AsyncResource<Media> out = new AsyncResource<Media>();
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));
-            return out;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-             out.error(new IOException("android.permission.WRITE_EXTERNAL_STORAGE is required to play media"));
-            return out;
-        }
+        throw new UnsupportedOperationException("Not implemented");
         
-        if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
-            //System.out.println(msg);
-            out.error(new IOException(msg));
-            return out;
-        }
-        java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof JFrame)) {
-            cnt = cnt.getParent();
-            if (cnt == null) {
-                return null;
-            }
-        }
-        final java.awt.Container c = cnt;
-
-        //final Media[] media = new Media[1];
-        //final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        //mediaContainer = m;
-
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion, out);
-                } catch (Exception ex) {
-                    out.error(ex);
-                }
-            }
-        });
-
-        return out;
     }
     
     /**
@@ -8354,22 +8380,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 throw new IOException(t);
             }
-        }
-    }
-
-    @Override
-    public void addCompletionHandler(Media media, Runnable onCompletion) {
-        super.addCompletionHandler(media, onCompletion);
-        if (media instanceof CodenameOneMediaPlayer) {
-            ((CodenameOneMediaPlayer)media).addCompletionHandler(onCompletion);
-        }
-    }
-
-    @Override
-    public void removeCompletionHandler(Media media, Runnable onCompletion) {
-        super.removeCompletionHandler(media, onCompletion); 
-        if (media instanceof CodenameOneMediaPlayer) {
-            ((CodenameOneMediaPlayer)media).removeCompletionHandler(onCompletion);
         }
     }
 
@@ -9191,7 +9201,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         new File(unfile(directory)).mkdirs();
     }
     
-    private String unfile(String file) {
+    protected String unfile(String file) {
         
         if(!exposeFilesystem){
             if(!file.startsWith("file:/")){
@@ -9991,866 +10001,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     
-    private static boolean isPlayable(String filename) {
-        try {
-            javafx.scene.media.Media media = new javafx.scene.media.Media(filename);
-        } catch (javafx.scene.media.MediaException e) {
-            if (e.getType() == javafx.scene.media.MediaException.Type.MEDIA_UNSUPPORTED) {
-                return false;
-            }
-        }
-        return true;
-    }
     
     
     
-    class CodenameOneMediaPlayer extends AbstractMedia {
-        private java.util.Timer endMediaPoller;
-        private Runnable onCompletion;
-        private List<Runnable> completionHandlers;
-        private javafx.scene.media.MediaPlayer player;
-//        private MediaPlayer player;
-        private boolean realized = false;
-        private boolean isVideo;
-        private javafx.embed.swing.JFXPanel videoPanel;
-        private JFrame frm;
-        private boolean playing = false;
-        private boolean nativePlayerMode;
-        private AsyncResource<Media> _callback;
-        
-        /**
-         * This is a callback for the JavaFX media player that is supposed to fire
-         * when the media is paused.  Unfortunately this is unreliable as the status
-         * events seem to stop working after the first time it is paused.  
-         * We use a poller (the endMediaPoller timer) to track the status of the video
-         * so that the change listeners are fired.  This really sucks!
-         */
-        private Runnable onPaused = new Runnable() {
-            public void run() {
-                if (endMediaPoller != null) {
-                    endMediaPoller.cancel();
-                    endMediaPoller = null;
-                }
-                stopEndMediaPoller();
-                playing = false;
+    
 
-                fireMediaStateChange(State.Paused);
-            }
-        };
-        /**
-         * This is a callback for the JavaFX media player that is supposed to fire
-         * when the media is paused.  Unfortunately this is unreliable as the status
-         * events seem to stop working after the first time it is paused.  
-         * We use a poller (the endMediaPoller timer) to track the status of the video
-         * so that the change listeners are fired.  This really sucks!
-         */
-        private Runnable onPlaying = new Runnable() {
-            @Override
-            public void run() {
-                playing = true;
-                startEndMediaPoller();
-                fireMediaStateChange(State.Playing);
-            }
-            
-        };
-        
-        /**
-         * This is a callback for the JavaFX media player that is supposed to fire
-         * when the media is paused.  Unfortunately this is unreliable as the status
-         * events seem to stop working after the first time it is paused.  
-         * We use a poller (the endMediaPoller timer) to track the status of the video
-         * so that the change listeners are fired.  This really sucks!
-         */
-        private Runnable onError = new Runnable() {
-            public void run() {
-                if (_callback != null && !_callback.isDone()) {
-                    _callback.error(player.errorProperty().get());
-                    return;
-                } else {
-                    Log.e(player.errorProperty().get());
-                }
-                fireMediaError(createMediaException(player.errorProperty().get()));
-                if (!playing) {
-                    stopEndMediaPoller();
-                    fireMediaStateChange(State.Playing);
-                    fireMediaStateChange(State.Paused);
-                }
-
-            }
-        };
-        
-        public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
-            _callback = callback;
-            if (onCompletion != null) {
-                addCompletionHandler(onCompletion);
-            }
-            
-            this.onCompletion = new Runnable() {
-
-                @Override
-                public void run() {
-                    if (callback != null && !callback.isDone()) {
-                        callback.complete(CodenameOneMediaPlayer.this);
-                    }
-                    stopEndMediaPoller();
-                    playing = false;
-                    
-                    fireMediaStateChange(State.Paused);
-                    fireCompletionHandlers();
-                }
-                
-            };
-            this.isVideo = isVideo;
-            this.frm = f;
-            try {
-                if (uri.startsWith("file:")) {
-                    uri = unfile(uri);
-                }
-                File fff = new File(uri);
-                if(fff.exists()) {
-                    uri = fff.toURI().toURL().toExternalForm();
-                }
-                if (isVideo && !isPlayable(uri)) {
-                    // JavaFX doesn't seem to support .mov files.  But if you simply rename it
-                    // to .mp4, then it will play it  (if it is mpeg4).
-                    // So this will improve .mov files from failing to 100% of the time
-                    // to only half of the time (when it isn't an mp4)
-                    File temp = File.createTempFile("mtmp", ".mp4");
-                    temp.deleteOnExit();
-                    FileOutputStream out = new FileOutputStream(temp);
-                    byte buf[] = new byte[1024];
-                    int len = 0;
-                    InputStream stream = new URL(uri).openStream();
-                    while ((len = stream.read(buf, 0, buf.length)) > -1) {
-                        out.write(buf, 0, len);
-                    }
-                    stream.close();
-                    uri = temp.toURI().toURL().toExternalForm();
-                }
-                
-                player = new MediaPlayer(new javafx.scene.media.Media(uri));
-                
-                player.setOnReady(new Runnable() {
-                    public void run() {
-                        if (callback != null && !callback.isDone()) {
-                            callback.complete(CodenameOneMediaPlayer.this);
-                        }
-                    }
-                });
-
-                installFxCallbacks();
-                if (isVideo) {
-                    videoPanel = fx;
-                }
-                
-
-            } catch (Exception ex) {
-                if (callback != null && !callback.isDone()) {
-                    callback.error(ex);
-                } else {
-                    ex.printStackTrace();
-                    throw new RuntimeException(ex);
-                }
-            }
-        }
-
-        private com.codename1.media.AsyncMedia.MediaException createMediaException(javafx.scene.media.MediaException ex) {
-            MediaErrorType type;
-            switch (ex.getType()) {
-                case MEDIA_CORRUPTED:
-                    type = MediaErrorType.Decode;
-                    break;
-                case MEDIA_INACCESSIBLE:
-                case MEDIA_UNAVAILABLE:
-                    type = MediaErrorType.Network;
-                    break;
-                case MEDIA_UNSUPPORTED:
-                    type = MediaErrorType.SrcNotSupported;
-                    break;
-                case MEDIA_UNSPECIFIED:
-                    type = MediaErrorType.Unknown;
-                    break;
-                case OPERATION_UNSUPPORTED:
-                    type = MediaErrorType.SrcNotSupported;
-                    break;
-                case PLAYBACK_ERROR:
-                    type = MediaErrorType.Decode;
-                    break;
-                case PLAYBACK_HALTED:
-                    type = MediaErrorType.Aborted;
-                    break;
-                //case UNKNOWN:
-                default:
-                    type = MediaErrorType.Unknown;
-                    break;
-                    
-            }
-            return new com.codename1.media.AsyncMedia.MediaException(type, ex);
-        }
-        
-        /**
-         * This starts a timer which checks the status of media every Xms so that it can fire
-         * status change events and on completion events.  The JavaFX media player has onPlaying,
-         * onPaused, etc.. status events of its own that seem to not work in many cases, so we
-         * need to use this timer to poll for the status.  That really sucks!!
-         */
-        private void startEndMediaPoller() {
-            stopEndMediaPoller();
-            endMediaPoller = new java.util.Timer();
-            endMediaPoller.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    
-                    // Check if the media is playing but we haven't updated our status.
-                    // If so, we change our status to playing, and fire a state change event.
-                    if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
-                        Platform.runLater(new Runnable() {
-                            // State tracking on the fx thread to avoid race conditions.
-                            public void run() {
-                                if (!playing && player.getStatus() == MediaPlayer.Status.PLAYING) {
-                                    playing = true;
-                                    fireMediaStateChange(State.Playing);
-                                }
-                            }
-                            
-                        });
-                        
-                    } else if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
-                        stopEndMediaPoller();
-                        Platform.runLater(new Runnable() {
-                            public void run() {
-                                if (playing && player.getStatus() != MediaPlayer.Status.PLAYING) {
-                                    
-                                    playing = false;
-                                    fireMediaStateChange(State.Paused);
-                                }
-                            }
-                            
-                        });
-                    }
-                    double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
-                    if (playing && diff < 0.01) {
-                        Platform.runLater(new Runnable() {
-                            public void run() {
-                                double diff = player.getTotalDuration().toMillis() - player.getCurrentTime().toMillis();
-                                if (playing && diff < 0.01) {
-                                    Runnable completionCallback = CodenameOneMediaPlayer.this.onCompletion;
-                                    if (completionCallback != null) {
-                                        completionCallback.run();
-                                    }
-                                }
-                            }
-                        });
-                    }
-                }
-
-            }, 100, 100);
-        }
-        
-        /**
-         * Stop the media state poller. This is called when the media is paused.
-         */
-        private void stopEndMediaPoller() {
-            if (endMediaPoller != null) {
-                endMediaPoller.cancel();
-                endMediaPoller = null;
-            }
-        }
-        
-        public CodenameOneMediaPlayer(InputStream stream, String mimeType, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
-            String suffix = "";
-            if (mimeType.contains("mp3") || mimeType.contains("audio/mpeg")) {
-                suffix = ".mp3";
-            } else if (mimeType.contains("wav")) {
-                suffix = ".wav";
-            }
-            if (mimeType.contains("aiff")) {
-                suffix = ".aiff";
-            }
-            if (mimeType.contains("amr")) {
-                suffix = ".amr";
-            }
-            if (mimeType.contains("aiff")) {
-                suffix = ".aiff";
-            }
-            if (mimeType.contains("3gpp")) {
-                suffix = ".3gp";
-            }
-            if (mimeType.contains("mp4") || mimeType.contains("mpeg4")) {
-                suffix = ".mp4";
-            }
-            if (mimeType.contains("h264")) {
-                suffix = ".h264";
-            }
-            if (mimeType.equals("video/mpeg")) {
-                suffix = ".mpeg";
-            }
-
-            File temp = File.createTempFile("mtmp", suffix);
-            temp.deleteOnExit();
-            FileOutputStream out = new FileOutputStream(temp);
-            byte buf[] = new byte[1024];
-            int len = 0;
-            while ((len = stream.read(buf, 0, buf.length)) > -1) {
-                out.write(buf, 0, len);
-            }
-            stream.close();
-
-            if (onCompletion != null) {
-                addCompletionHandler(onCompletion);
-                
-            }
-            this.onCompletion = new Runnable() {
-
-                @Override
-                public void run() {
-                    
-                    if (callback != null && !callback.isDone()) {
-                        callback.complete(CodenameOneMediaPlayer.this);
-                    }
-                    stopEndMediaPoller();
-                    playing = false;
-                    
-                    fireMediaStateChange(State.Paused);
-                    fireCompletionHandlers();
-                }
-            };
-            this.isVideo = mimeType.contains("video");
-            this.frm = f;
-            try {
-                player = new MediaPlayer(new javafx.scene.media.Media(temp.toURI().toString()));
-                player.setOnReady(new Runnable() {
-                    public void run() {
-                        if (callback != null) {
-                            callback.complete(CodenameOneMediaPlayer.this);
-                        }
-                    }
-                });
-                installFxCallbacks();
-                if (isVideo) {
-                    videoPanel = fx;
-                }
-                
-
-            } catch (Exception ex) {
-                if (callback != null) {
-                    callback.error(ex);
-                } else {
-                    ex.printStackTrace();
-                    throw new RuntimeException(ex);
-                }
-            }
-        }
-
-        
-        private void fireCompletionHandlers() {
-            if (completionHandlers != null && !completionHandlers.isEmpty()) {
-                
-                Display.getInstance().callSerially(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
-                            List<Runnable>  toRun;
-
-                            synchronized(CodenameOneMediaPlayer.this) {
-                                toRun = new ArrayList<Runnable>(completionHandlers);
-                            }
-                            for (Runnable r : toRun) {
-                                r.run();
-                            }
-                        }
-                    }
-
-                });
-            }
-        }
-        
-        public void addCompletionHandler(Runnable onCompletion) {
-            synchronized(this) {
-                if (completionHandlers == null) {
-                    completionHandlers = new ArrayList<Runnable>();
-                }
-
-                completionHandlers.add(onCompletion);
-            }
-        }
-
-        public void removeCompletionHandler(Runnable onCompletion) {
-            if (completionHandlers != null) {
-                synchronized(this) {
-                    completionHandlers.remove(onCompletion);
-                }
-            }
-        }
-        
-        public void cleanup() {
-            pause();
-        }
-
-        public void prepare() {
-        }
-        
-        @Override
-        protected void playImpl() {
-            
-            if (isVideo && nativePlayerMode) {
-                // To simulate native player mode, we will show a form with the player.
-                final Form currForm = Display.getInstance().getCurrent();
-                Form playerForm = new Form("Video Player", new com.codename1.ui.layouts.BorderLayout()) {
-
-                    @Override
-                    protected void onShow() {
-                        Platform.runLater(new Runnable() {
-                            public void run() {
-                                playInternal();
-                            }
-
-                        });
-                    }
-                    
-                };
-                com.codename1.ui.Toolbar tb = new com.codename1.ui.Toolbar();
-                playerForm.setToolbar(tb);
-                tb.setBackCommand("Back", new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
-                    public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                        pauseInternal();
-                        currForm.showBack();
-                    }
-                });
-                
-                Component videoComponent = getVideoComponent();
-                if (videoComponent.getComponentForm() != null) {
-                    videoComponent.remove();
-                }
-                playerForm.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, videoComponent);
-                playerForm.show();
-                return;
-                
-            }
-            playInternal();
-            
-        }
-
-        private void playInternal() {
-            
-            installFxCallbacks();
-            player.play();
-            startEndMediaPoller();
-        }
-        
-        private void pauseInternal() {
-            player.pause();
-            
-            
-        
-        }
-        
-        /**
-         * Installs listeners for the javafx media player.  Unfortunately these are
-         * incredibly unreliable.  onPlaying only first the first time it plays.  OnPaused
-         * also stops firing after the first pause.  onEndOfMedia sometimes fires but not
-         * other times.  We use the endOfMediaPoller timer as a backup to test for status
-         * changes.
-         */
-        private void installFxCallbacks() {
-            
-            player.setOnPlaying(onPlaying);
-            player.setOnPaused(onPaused);
-            player.setOnError(onError);
-            player.setOnEndOfMedia(onCompletion);
-           
-        }
-        
-        @Override
-        protected void pauseImpl() {
-            if(player.getStatus() == Status.PLAYING) {
-                pauseInternal();
-            }
-            //playing = false;
-            
-        }
-
-        public int getTime() {
-            return (int) player.getCurrentTime().toMillis();
-        }
-
-        public void setTime(final int time) {
-           player.seek(new Duration(time));
-            
-        }
-
-        public int getDuration() {
-            int d = (int) player.getStopTime().toMillis();
-            if(d == 0){
-                return -1;
-            }
-            return d;
-        }
-
-        public void setVolume(int vol) {
-            player.setVolume(((double) vol / 100d));
-        }
-
-        public int getVolume() {
-            return (int) player.getVolume() * 100;
-        }
-
-        @Override
-        public Component getVideoComponent() {
-            if (videoPanel != null) {
-                final Component[] retVal = new Component[1];
-                Platform.runLater(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        retVal[0] = new VideoComponent(frm, videoPanel, player);
-                    }
-                });
-                Display.getInstance().invokeAndBlock(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        while (retVal[0] == null) {
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        }
-                    }
-                });
-                return retVal[0];
-            }
-            System.out.println("Video Playing is not supported on this platform");
-            Label l = new Label("Video");
-            l.getStyle().setAlignment(Component.CENTER);
-            return l;
-        }
-
-        public boolean isVideo() {
-            return isVideo;
-        }
-
-        public boolean isFullScreen() {
-            return false;
-        }
-
-        public void setFullScreen(boolean fullScreen) {
-        }
-
-        @Override
-        public boolean isPlaying() {
-            return playing;
-        }
-
-        @Override
-        public void setNativePlayerMode(boolean nativePlayer) {
-            nativePlayerMode = nativePlayer;
-        }
-
-        @Override
-        public boolean isNativePlayerMode() {
-            return nativePlayerMode;
-        }
-
-        public void setVariable(String key, Object value) {
-        }
-
-        public Object getVariable(String key) {
-            return null;
-        }
-    }
-
-    /**
-     * Video peer component.
-     * 
-     * In contrast to the BrowserComponent and Peer (other peer components),
-     * the native peer supports hi-resolution retina displays.  This was possible
-     * on this component, but no browser component, or other components in general
-     * because videos don't need to respond to pointer events.  Thus the rendered
-     * dimensions and location (on the CN1 pipeline) may be different the size and 
-     * position of the actual component on the screen (even though in all cases
-     * we hide the actual component).
-     */
-    class VideoComponent extends PeerComponent {
-
-        private javafx.embed.swing.JFXPanel vid;
-        private JFrame frm;
-        
-        // Container that holds the video
-        private JPanel cnt = new JPanel();
-        private MediaView v;
-        private boolean init = false;
-        private Rectangle bounds = new Rectangle();
-        
-        // AWT paints to this buffered image
-        // CN1 reads from the buffered image to paint in its own pipeline.
-        BufferedImage buf;
-
-        // Gets the buffered image that AWT paints to and CN1 reads from
-        private BufferedImage getBuffer() {
-            if (buf == null || buf.getWidth() != cnt.getWidth() || buf.getHeight() != cnt.getHeight()) {
-
-                buf = new BufferedImage((int)(cnt.getWidth()), (int)(cnt.getHeight()), BufferedImage.TYPE_INT_ARGB);
-            }
-            return buf;
-        }
-
-        
-        
-        
-        
-        /**
-         * Paints the native component to the buffer
-         */
-        private void paintOnBuffer() {
-            
-            // We need to synchronize on the peer component
-            // drawNativePeer will also synchronize on this
-            // This prevents simulataneous reads and writes to/from the
-            // buffered image.
-            if (EventQueue.isDispatchThread()) {
-                // Only run this on the AWT event dispatch thread
-                // to avoid deadlocks
-                synchronized(VideoComponent.this) {
-                    paintOnBufferImpl();
-                }
-            } else if (!Display.getInstance().isEdt()){
-                // I can only imagine bad things 
-                try {
-                    EventQueue.invokeAndWait(new Runnable() {
-                        public void run() {
-                            paintOnBuffer();
-                        }
-                    });
-                } catch (Throwable t) {
-                    t.printStackTrace();
-                }
-            }
-        }
-        
-        private void paintOnBufferImpl() {
-            final BufferedImage buf = getBuffer();
-            Graphics2D g2d = buf.createGraphics();
-            AffineTransform t = g2d.getTransform();
-            double tx = t.getTranslateX();
-            double ty = t.getTranslateY();
-            vid.paint(g2d);
-            g2d.dispose();
-            VideoComponent.this.putClientProperty("__buffer", buf);
-        }
-        
-        public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
-            super(null);
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-                    
-                    
-                    
-                    cnt = new JPanel() {
-                        
-                        @Override
-                        public void paint(java.awt.Graphics g) {
-                            paintOnBuffer();
-                            
-                            // After we paint to the buffer we need to 
-                            // tell CN1 to paint the buffer to its pipeline.
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    VideoComponent.this.repaint();
-                                }
-                            });
-                            
-                        }
-
-                        @Override
-                        protected void paintChildren(java.awt.Graphics g) {
-                            // Not sure if this is necessary
-                            // but we don't want any painting to occur
-                            // on regular pipeline
-                        }
-
-                        @Override
-                        protected void paintBorder(java.awt.Graphics g) {
-                            // Not sure if this is necessary but we don't
-                            // want any painting to occur on regular pipeline
-                        }
-                        
-                        
-                        
-                    };
-
-                    cnt.setOpaque(false);
-                    vid.setOpaque(false);
-                    cnt.setLayout(new BorderLayout());
-                    cnt.add(BorderLayout.CENTER, vid);
-                    cnt.setVisible(false);
-                }
-            });
-
-            Group root = new Group();
-            
-            v = new MediaView(player);
-            final Runnable oldOnReady = player.getOnPlaying();
-            player.setOnPlaying(new Runnable() {
-                public void run() {
-                    if (oldOnReady != null) oldOnReady.run();
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            if (VideoComponent.this.getParent() != null) {
-                                VideoComponent.this.getParent().revalidate();
-                            }
-                        }
-                    });
-                }
-            });
-            
-            root.getChildren().add(v);
-            vid.setScene(new Scene(root));
-
-            this.vid = vid;
-            this.frm = frm;
-            
-        }
-
-        @Override
-        protected void initComponent() {
-            bounds.setBounds(0,0,0,0);
-            super.initComponent();
-        }
-
-        @Override
-        protected void deinitialize() {
-            super.deinitialize();
-            if (testRecorder != null) {
-                testRecorder.dispose();
-                testRecorder = null;
-            }
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-                    vid.setScene(null);
-                    vid.removeAll();
-                    cnt.remove(vid);
-                    frm.remove(cnt);
-                    frm.repaint();
-                    
-                    //mediaContainer = null;
-                }
-            });
-            
-        }
-
-        protected void setLightweightMode(final boolean l) {
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-
-                    if (!l) {
-                        if (!init) {
-                            init = true;
-                            cnt.setVisible(true);
-                            frm.add(cnt, 0);
-                            
-                            frm.repaint();
-                        } else {
-                            cnt.setVisible(false);
-                        }
-                    } else {
-                        if (init) {
-                            cnt.setVisible(false);
-                        }
-                    }
-                }
-            });
-
-        }
-
-        @Override
-        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            com.codename1.ui.geom.Dimension out = new com.codename1.ui.geom.Dimension((int)(vid.getPreferredSize().width), (int)(vid.getPreferredSize().height));
-            return out;
-        }
-
-        @Override
-        public void paint(final Graphics g) {
-            if (init) {
-                
-                onPositionSizeChange();
-                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
-                
-                EventQueue.invokeLater(new Runnable() {
-                    public void run() {
-                        paintOnBuffer();
-                    }
-                });
-                
-                
-            }else{
-                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
-                    setLightweightMode(false);
-                }
-            }
-        }
-        
-        
-        @Override
-        protected void onPositionSizeChange() {
-            final int x = getAbsoluteX();
-            final int y = getAbsoluteY();
-            final int w = getWidth();
-            final int h = getHeight();
-
-            int screenX = 0;
-            int screenY = 0;
-            if(getScreenCoordinates() != null) {
-                screenX = getScreenCoordinates().x;
-                screenY = getScreenCoordinates().y;
-            }
-            
-            // NOTE:  For the VideoComponent we make the size the actual
-            // pixel size of the light-weight peer even though, on retina,
-            // this means that the native component is twice the height and
-            // width of the native peer.  We can do this here because
-            // the video component doesn't have any interactivity 
-            // that constrains us to keep the same real position on the screen
-            // as our render position is.  THis is not the case for WebBrowser
-            // 
-            bounds.setBounds((int) ((x + screenX + canvas.x)),
-                    (int) ((y + screenY + canvas.y)),
-                    (int) (w),
-                    (int) (h));
-            
-            if(!bounds.equals(cnt.getBounds())){
-                Platform.runLater(new Runnable() {
-
-                    @Override
-                    public void run() {
-
-                        v.setFitWidth(w );
-                        v.setFitHeight(h);
-                        
-                        SwingUtilities.invokeLater(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                cnt.setBounds(bounds);
-                                cnt.doLayout();
-                                paintOnBuffer();
-                                
-                            }
-                        });
-                    }
-                });
-            }
-
-        }
-    }
+   
 
     public InputStream getResourceAsStream(Class cls, String resource) {
         if (!resource.startsWith("/")) {
@@ -11510,113 +10666,38 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isNativeBrowserComponentSupported() {
-        return fxExists && !blockNativeBrowser;
-        //return false;
+        return false;
     }
-    private boolean useWKWebViewChecked;
+    protected boolean useWKWebViewChecked;
     
-    public PeerComponent createBrowserComponent(final Object parent) {
-        boolean useWKWebView = "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "false"));
-        if (useWKWebView) {
-            if (!useWKWebViewChecked) {
-                useWKWebViewChecked = true;
-                Map<String, String> m = Display.getInstance().getProjectBuildHints();
-                if(m != null) {
-                    if(!m.containsKey("ios.useWKWebView")) {
-                        Display.getInstance().setProjectBuildHint("ios.useWKWebView", "true");
-                    }
-                }
-            }
-        }
-        java.awt.Container cnt = canvas.getParent();
-        while (!(cnt instanceof JFrame)) {
-            cnt = cnt.getParent();
-            if (cnt == null) {
-                return null;
-            }
-        }
-        final java.awt.Container c = cnt;
-
-        final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel webContainer = new CN1JFXPanel();
-        final SEBrowserComponent[] bc = new SEBrowserComponent[1];
-        
-        
-
-        final SEBrowserComponent bcc = new SEBrowserComponent();
-        Platform.setImplicitExit(false);
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                StackPane root = new StackPane();
-                final WebView webView = new WebView();
-                root.getChildren().add(webView);
-                webContainer.setScene(new Scene(root));
-                
-                // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                JPanel parentPanel =  ((JPanel)canvas.getParent());
-                
-                bcc.SEBrowserComponent_init(
-                        JavaSEPort.this, 
-                        parentPanel, 
-                        webContainer, 
-                        webView, 
-                        (BrowserComponent) parent, 
-                        hSelector, 
-                        vSelector
-                );
-                
-                SwingUtilities.invokeLater(new Runnable() {
-                    public void run() {
-                        bc[0] = bcc;
-                        synchronized (bc) {
-                            bc.notify();
-                        }
-                    }
-                });
-                
-            }
-        });
-        if (bc[0] == null && err[0] == null) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                synchronized (bc) {
-                    while (bc[0] == null && err[0] == null) {
-                        try {
-                            bc.wait(20);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
-                }
-            }
-        });
-        }
-        
-        return bc[0];
-    }
+    
+    
+    
 
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
-        ((SEBrowserComponent) browserPeer).setProperty(key, value);
+        ((IBrowserComponent) browserPeer).setProperty(key, value);
     }
 
     public String getBrowserTitle(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).getTitle();
+        return ((IBrowserComponent) browserPeer).getTitle();
     }
 
     public String getBrowserURL(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).getURL();
+        return ((IBrowserComponent) browserPeer).getURL();
     }
 
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
-        ((SEBrowserComponent) browserPeer).execute(javaScript);
+        ((IBrowserComponent) browserPeer).execute(javaScript);
     }
 
+    
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent browserPeer) {
+        return ((IBrowserComponent) browserPeer).supportsExecuteAndReturnString();
+    }
+    
     @Override
     public String browserExecuteAndReturnString(PeerComponent browserPeer, String javaScript) {
-        return ((SEBrowserComponent) browserPeer).executeAndReturnString(javaScript);
+        return ((IBrowserComponent) browserPeer).executeAndReturnString(javaScript);
     }
 
     @Override
@@ -11655,21 +10736,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             url = this.getClass().getResource(url).toExternalForm();
         }
         final String theUrl = url;
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).setURL(theUrl);
+                ((IBrowserComponent) browserPeer).setURL(theUrl);
             }
         });
     }
 
     public void browserStop(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).stop();
+                ((IBrowserComponent) browserPeer).stop();
             }
         });
     }
@@ -11680,11 +10761,11 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param browserPeer browser instance
      */
     public void browserReload(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).reload();
+                ((IBrowserComponent) browserPeer).reload();
             }
         });
     }
@@ -11696,68 +10777,57 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @return true if back should work
      */
     public boolean browserHasBack(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).hasBack();
+        return ((IBrowserComponent) browserPeer).hasBack();
     }
 
     public boolean browserHasForward(PeerComponent browserPeer) {
-        return ((SEBrowserComponent) browserPeer).hasForward();
+        return ((IBrowserComponent) browserPeer).hasForward();
     }
 
     public void browserBack(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).back();
+                ((IBrowserComponent) browserPeer).back();
             }
         });
     }
 
     public void browserForward(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).forward();
+                ((IBrowserComponent) browserPeer).forward();
             }
         });
     }
 
     public void browserClearHistory(final PeerComponent browserPeer) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).clearHistory();
+                ((IBrowserComponent) browserPeer).clearHistory();
             }
         });
     }
 
     public void setBrowserPage(final PeerComponent browserPeer, final String html, final String baseUrl) {
-        Platform.runLater(new Runnable() {
+        ((IBrowserComponent)browserPeer).runLater(new Runnable() {
 
             @Override
             public void run() {
-                ((SEBrowserComponent) browserPeer).setPage(html, baseUrl);
+                ((IBrowserComponent) browserPeer).setPage(html, baseUrl);
             }
         });
     }
 
-    private void browserExposeInJavaScriptImpl(final PeerComponent browserPeer, final Object o, final String name) {
-        ((SEBrowserComponent) browserPeer).exposeInJavaScript(o, name);
-    }
+
+    
     public void browserExposeInJavaScript(final PeerComponent browserPeer, final Object o, final String name) {
-        if (Platform.isFxApplicationThread()) {
-            browserExposeInJavaScriptImpl(browserPeer, o, name);
-            return;
-        }
-        Platform.runLater(new Runnable() {
-
-            @Override
-            public void run() {
-                browserExposeInJavaScriptImpl(browserPeer, o, name);
-            }
-        });
+        
     }
 
     public Purchase getInAppPurchase() {
@@ -12647,7 +11717,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
     
-    class Peer extends PeerComponent {
+    public static class Peer extends PeerComponent {
         
         // Container that will hold the native peer component.
         // Wrapping the component in a container allows us to
@@ -12664,6 +11734,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private boolean matchCN1Style;
         
+        
+        private PeerComponentBuffer peerBuffer;
+        
         // Buffered image that will be drawn to by AWT and read from
         // by CN1
         BufferedImage buf;
@@ -12677,16 +11750,25 @@ public class JavaSEPort extends CodenameOneImplementation {
          * @see #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) 
          */
         private BufferedImage getBuffer() {
-            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / zoomLevel) {
+            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / instance.zoomLevel) {
 
-                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / zoomLevel), (int)(cnt.getHeight() * retinaScale / zoomLevel), BufferedImage.TYPE_INT_ARGB);
+                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / instance.zoomLevel), (int)(cnt.getHeight() * retinaScale / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
             }
             return buf;
         }
         
+        public void setPeerComponentBuffer(PeerComponentBuffer buf) {
+            if (peerBuffer != null) {
+                peerBuffer.setPeer(null);
+            }
+            buf.setPeer(this);
+            peerBuffer = buf;
+        }
+                
+        
         /**
          * Paints the native peer onto a buffered image and stores the image
-         * in the peer to be later drawn by drawNativePeer (in the CN1 pipeline).
+         * in the peer to be later drawn by {@link #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) } (in the CN1 pipeline).
          * 
          * THis method should be called only on the AWT dispatch thread.
          */
@@ -12823,7 +11905,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
             Graphics2D g2d = buf.createGraphics();
-            g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+            g2d.scale(retinaScale / instance.zoomLevel, retinaScale / instance.zoomLevel);
 
             cmp.paintAll(g2d);
             g2d.dispose();
@@ -12854,7 +11936,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             allowSetCntBounds = false;
         }
         
-        Peer(JFrame f, java.awt.Component c) {
+        public Peer(JFrame f, java.awt.Component c) {
             super(null);
             this.frm = f;
             this.cmp = c;
@@ -12871,6 +11953,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     cnt = new JPanel() {
                         @Override
                         public void paint(java.awt.Graphics g) {
+                            if (peerBuffer != null) {
+                                //peerBuffer.paint((Graphics2D)g, cnt);
+                                // If we are using a peer buffer, we won't *actually* paint the 
+                                // component because the peer buffer will be painted
+                                // in the CN1 paint cycle on the CN1 context
+                                return;
+                            }
                             paintOnBuffer();
                             
                             // We need to tell CN1 to repaint now
@@ -12913,9 +12002,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void deinitialize() {
             super.deinitialize();
-            if (testRecorder != null) {
-                testRecorder.dispose();
-                testRecorder = null;
+            if (instance.testRecorder != null) {
+                instance.testRecorder.dispose();
+                instance.testRecorder = null;
             }
             SwingUtilities.invokeLater(new Runnable() {
 
@@ -12954,15 +12043,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / zoomLevel), 
-                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / zoomLevel));
+            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / instance.zoomLevel), 
+                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
         }
 
         @Override
         public void paint(final Graphics g) {
             if (init) {
                 onPositionSizeChange();
-                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                if (peerBuffer != null) {
+                    // Peer buffers are kept "painted" on their own
+                    // we don't need to initiate any further calls to paintOnBuffer or such.
+                    return;
+                }
+                
                 
                 // Tell AWT to do a repaint so that we know we have the latest.
                 EventQueue.invokeLater(new Runnable() {
@@ -12977,7 +12072,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
                 
             }else{
-                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                if(getComponentForm() != null && getComponentForm() == instance.getCurrentForm()){
                     setLightweightMode(false);
                 }
             }
@@ -13006,15 +12101,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int y = getAbsoluteY();
             final int w = getWidth();
             final int h = getHeight();
-
-            if (lastZoom == zoomLevel && x == lastX && y == lastY && w == lastW && h == lastH) {
+            double zoom_ = instance.zoomLevel;
+            if (lastZoom == zoom_ && x == lastX && y == lastY && w == lastW && h == lastH) {
                 return;
             }
             final int screenX;
             final int screenY;
-            if (getScreenCoordinates() != null) {
-                screenX = getScreenCoordinates().x;
-                screenY = getScreenCoordinates().y;
+            if (instance.getScreenCoordinates() != null) {
+                screenX = instance.getScreenCoordinates().x;
+                screenY = instance.getScreenCoordinates().y;
             } else {
                 screenX = 0;
                 screenY = 0;
@@ -13024,23 +12119,37 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastY = y;
             lastW = w;
             lastH = h;
-            lastZoom = zoomLevel;
+            lastZoom = instance.zoomLevel;
             final double zoom = lastZoom;
 
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
-                    setCntBounds(
-                            (int) ((x + screenX + canvas.x) * zoom / retinaScale),
-                            (int) ((y + screenY + canvas.y) * zoom / retinaScale),
-                            (int) (w * zoom / retinaScale),
-                            (int) (h * zoom / retinaScale)
-                    );
+                    if (peerBuffer == null) {
+                        double scale = zoom/retinaScale;
+                        setCntBounds(
+                                (int) ((x + screenX + instance.canvas.x) * scale),
+                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) (w * scale),
+                                (int) (h * scale)
+                        );
+                    } else {
+                        double scale = zoom/retinaScale;
+                        setCntBounds(
+                                (int) ((x + screenX + instance.canvas.x) * scale),
+                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) (w * scale),
+                                (int) (h * scale)
+                        );
+                    }
+                    
                     cnt.doLayout();
                     if (cmp instanceof Container) {
                         ((Container)cmp).doLayout();
                     }
-                    paintOnBuffer();
+                    if (peerBuffer != null) {
+                        paintOnBuffer();
+                    }
                 }
             };
             if (SwingUtilities.isEventDispatchThread()) {
@@ -13453,13 +12562,11 @@ public class JavaSEPort extends CodenameOneImplementation {
      * provides its own WebView implementation because Apple login doesn't seem to work
      * in JavaFX's webview.
      */
-    private BrowserWindowFactory browserWindowFactory = new BrowserWindowFactory() {
-         @Override
-         public AbstractBrowserWindowSE createBrowserWindow(String startURL) {
-             return new FXBrowserWindowSE(startURL);
-         }
-
-    };
+    private BrowserWindowFactory browserWindowFactory = createBrowserWindowFactory();
+    
+    protected BrowserWindowFactory createBrowserWindowFactory() {
+        return null;
+    }
    
     /**
      * Gets the factory used for creating BrowserWindows.

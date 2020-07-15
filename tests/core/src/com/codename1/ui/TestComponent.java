@@ -19,6 +19,17 @@ import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.maps.Coord;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.NavigationCommand;
+import com.codename1.ui.Toolbar;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -46,7 +57,7 @@ public class TestComponent extends AbstractTest {
         //testIOSThreadsError35();
         getComponentAt_int_int();
         List_shouldRenderSelection();
-        testSimpleDateFormat();
+        
         testCookies();
         testCookiesInBrowserComponent();
         
@@ -79,7 +90,22 @@ public class TestComponent extends AbstractTest {
         getComponentAt_int_int_label();
         getComponentAt_int_int_container();
         getComponentAt_int_int_browsercomponent();
+        getComponentAt_int_int_nested_focusable_container();
+        getComponentAt_int_int_outside_bounds();
+        getComponentAt_int_int_layered();
 
+    }
+    
+    private void getComponentAt_int_int_layered() {
+        Container cnt = new Container(new LayeredLayout());
+        Label l = new Label("Hello");
+        cnt.add(l);
+        cnt.add(new Container(new LayeredLayout()));
+        cnt.setWidth(500);
+        cnt.setHeight(500);
+        cnt.doLayout();
+        Component found = cnt.getComponentAt(250, 250);
+        assertEqual(l, found);
     }
 
     private void List_shouldRenderSelection() {
@@ -127,6 +153,52 @@ public class TestComponent extends AbstractTest {
         assertEqual(l, middleComponent, "Found wrong component");
 
 
+    }
+    
+    private void getComponentAt_int_int_outside_bounds() {
+        Container cnt = new Container();
+        cnt.setWidth(100);
+        cnt.setHeight(100);
+        Component found = cnt.getComponentAt(1000, 1000);
+        assertEqual(found, cnt, "getComponentAt() outside of the bounds of the container should just return the container itself.");
+    }
+    
+    private void getComponentAt_int_int_nested_focusable_container() {
+        log("Testing getComponentAt(x, y) with layered nesting");
+        int w = Display.getInstance().getDisplayWidth();
+        int h = Display.getInstance().getDisplayHeight();
+
+        Form f = new Form("My Form", new BorderLayout());
+        Container bottom = new Container() {
+
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(w, h);
+            }
+            
+        };
+        bottom.setGrabsPointerEvents(true);
+        bottom.setName("Bottom");
+        
+        Container top = new Container(new BorderLayout());
+        top.setFocusable(true);
+        
+        Label content = new Label("Hello");
+        
+        content.setName("Content");
+        top.add(BorderLayout.CENTER, content);
+        top.setName("Top");
+        Container wrapper = new Container(new LayeredLayout());
+        wrapper.add(bottom).add(top);
+        
+        
+        
+        f.add(BorderLayout.CENTER, wrapper);
+
+        f.show();
+        TestUtils.waitForFormTitle("My Form", 2000);
+        Component middleComponent = f.getComponentAt(w/2, h/2);
+        assertEqual(top, middleComponent, "Found wrong component");
     }
     
     
@@ -227,6 +299,10 @@ public class TestComponent extends AbstractTest {
     }
 
     private void getComponentAt_int_int_browsercomponent() {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+    		System.out.println("This platform doesn't support the native browser component.  Skipping the getComponentAt_int_int_browsercomponent test");
+    		return;
+    	}
         int w = Display.getInstance().getDisplayWidth();
         int h = Display.getInstance().getDisplayHeight();
         Form mapDemo = new Form("Maps", new LayeredLayout());
@@ -402,6 +478,10 @@ public class TestComponent extends AbstractTest {
     }
 
     private void testCookiesInBrowserComponent() throws IOException {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+            System.out.println("Skipping testCookiesInBrowserComponent() because this platform doesn't support a native browser component");
+            return;
+    	}
         Cookie.clearCookiesFromStorage();
         Form f = new Form("CookiesInBrowser");
         String formName = "CookiesInBrowser";
@@ -529,6 +609,9 @@ public class TestComponent extends AbstractTest {
     }
     // Test for https://github.com/codenameone/CodenameOne/issues/2267
     private void testBrowserComponent2267() {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+    		return;
+    	}
         Form hi = new Form();
         String formName = "testBrowserComponent2267";
         hi.setName(formName);
@@ -709,53 +792,7 @@ public class TestComponent extends AbstractTest {
 
     }
     
-    public void testSimpleDateFormat() {
-        
-        try {
-            SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
-            format.parse("mon, 20-nov-2017 19:49:58 gmt");
-            format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
-            format.parse("mon 20-nov-2017 19:49:58 gmt");
-            
-            format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
-            java.util.Date dt = format.parse("tue 21-nov-2017 17:04:27 gmt");
-            if (Display.getInstance().isSimulator()) {
-                java.text.SimpleDateFormat format0 = new java.text.SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z", java.util.Locale.US);
-                java.util.Date dt0 = format0.parse("tue 21-nov-2017 17:04:27 gmt");
-                TestUtils.assertEqual(dt0, dt, "SimpleDateFormat gives different result than java.text version on tue 21-nov-2017 17:04:27 gmt with format \"EEE, dd-MMM-yyyy HH:mm:ss z\"");
-            }
-            TestUtils.assertBool(dt.getTime() / 1000L == 1511283867L, "Incorrect date for simple date format parse");
-            
-            format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
-            com.codename1.l10n.ParseException pex = null;
-            try {
-                format.parse("tue 21-nov-2017 17:04:27 gmt");
-            } catch (com.codename1.l10n.ParseException pex2)
-            {
-                pex = pex2;
-            }
-            TestUtils.assertTrue(pex!=null, "Parsing date with wrong format should give parse exception");
-            
-            format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z");
-            dt = format.parse("sun, 22 nov 2037 13:20:46 -0000");
-            //2142508846
-            //Log.p("Difference = "+(dt.getTime() - 2142508846000L));
-            TestUtils.assertEqual(dt.getTime()/1000L,  2142508846L, "Failed to parse RFC822 datetime.  "+dt);
-            
-            String dateStr = "sun 22 nov 2037 13:20:46 -0000";
-            format = new SimpleDateFormat("EEE dd MMM yyyy HH:mm:ss Z");
-            dt = format.parse("sun 22 nov 2037 13:20:46 -0000");
-            
-            TestUtils.assertEqual(dt.getTime()/1000L,  2142508846L, "Failed to parse RFC822 datetime no comma.  "+dt);
-        } catch (Throwable t) {
-            Log.e(t);
-            throw new RuntimeException("Failed to parse date mon 20-nov-2017 19:49:58 gmt: "+t.getMessage());
-            
-        }
-        
-        
-        
-    }
+   
     
     public void testIOSThreadsError35() {
         if ("ios".equals(Display.getInstance().getPlatformName()) && !Display.getInstance().isSimulator()) {

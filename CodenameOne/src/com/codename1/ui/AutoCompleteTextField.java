@@ -215,6 +215,16 @@ public class AutoCompleteTextField extends TextField {
             popup.setEnabled(v);
             f.revalidate();
         }
+        if (v && popup.getComponentCount() > 0) {
+            int popupHeight = calcPopupHeight((List)popup.getComponentAt(0));
+            popup.setHeight(popupHeight);
+            dontCalcSize = false;                        
+            popup.forceRevalidate();
+            dontCalcSize = true;
+        }
+        if (f != null) {
+            f.revalidate();
+        }
         if(f != null) {
             dontCalcSize = false;
             f.revalidate();

@@ -35,6 +35,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
@@ -88,6 +89,10 @@ public class BrowserComponent extends Container {
     private boolean nativeScrolling = true;
     private boolean ready = false;
     private boolean fireCallbacksOnEdt=true;
+    
+    PeerComponent getInternal() {
+        return internal;
+    }
     
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
@@ -518,7 +523,7 @@ public class BrowserComponent extends Container {
      */
     public BrowserComponent() {
         setUIID("BrowserComponent");
-        
+        putClientProperty("BrowserComponent.useWKWebView", "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true")));
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, placeholder);
         CN.callSerially(new Runnable() {
@@ -596,6 +601,71 @@ public class BrowserComponent extends Container {
             addWebEventListener(onStart, l);
         }
         return this;
+    }
+    
+    /**
+     * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
+     * ready once it has received the start or load event from at least one page.  Default timeout is 5000ms.
+     * @return AsyncResouce that will complete when the browser component is ready.
+     * @since 7.0
+     */
+    public AsyncResource<BrowserComponent> ready() {
+        return ready(5000);
+    }
+    
+    /**
+     * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
+     * ready once it has received the start or load event from at least one page.
+     * @return AsyncResouce that will complete when the browser component is ready.
+     * @param timeout Timeout in milliseconds to wait. 
+     * @since 7.0
+     */
+    public AsyncResource<BrowserComponent> ready(int timeout) {
+        final AsyncResource<BrowserComponent> out = new AsyncResource<BrowserComponent>();
+        
+        if (ready) {
+            out.complete(this);
+        } else {
+            class LoadWrapper {
+                Timer timer;
+                ActionListener l;
+            }
+            final LoadWrapper w = new LoadWrapper();
+            if (timeout > 0) {
+                
+                w.timer = CN.setTimeout(timeout, new Runnable(){
+                    public void run() {
+                        w.timer = null;
+                        if (w.l != null) {
+                            removeWebEventListener(onStart, w.l);
+                            removeWebEventListener(onLoad, w.l);
+                        }
+                        if (!out.isDone()) {
+                            out.error(new RuntimeException("Timeout exceeded waiting for browser component to be ready"));
+                        }
+                    }
+
+                });
+            }
+            w.l = new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    w.l = null;
+                    if (w.timer != null) {
+                        w.timer.cancel();
+                        w.timer = null;
+                    }
+                    removeWebEventListener(onStart, this);
+                    removeWebEventListener(onLoad, this);
+                    
+                    if (!out.isDone()) {
+                        out.complete(BrowserComponent.this);
+                    }
+                }
+            };
+            addWebEventListener(onStart, w.l);
+            addWebEventListener(onLoad, w.l);
+        }
+        return out;
     }
 
     /**
@@ -1028,7 +1098,12 @@ public class BrowserComponent extends Container {
                 });
             }
         }
-        return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
+            return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        } else {
+            return executeAndWait("callback.onSuccess(eval(${0}))", new Object[]{javaScript}).toString();
+            
+        }
     }
     
     /**
@@ -1608,7 +1683,8 @@ public class BrowserComponent extends Container {
                 .append("function doCallback(val) { ")
                 //.append("cn1application.log('in doCallback');")
                 .append("  var url = BASE_URL + encodeURIComponent(JSON.stringify(val));")
-                .append("  if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
+                .append("  if (window.cefQuery) { window.cefQuery({request:'shouldNavigate:'+url, onSuccess: function(response){}, onFailure:function(error_code, error_message) { console.log(error_message)}});}")
+                .append("  else if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
                 .append("} ")
                 .append("var result = {value:null, type:null, errorMessage:null, errorCode:0, callbackId:").append(callbackId).append("};")
                 .append("var callback = {")
@@ -1646,7 +1722,9 @@ public class BrowserComponent extends Container {
                             }
                         }
                         if (key != null) {
-                            returnValueCallbacks.remove(key);
+                            if (jsCallbacks == null || !jsCallbacks.contains(callback)) {
+                                returnValueCallbacks.remove(key);
+                            }
                             if (callback instanceof Callback) {
                                 ((Callback)callback).onError(BrowserComponent.this, new RuntimeException("Javascript execution timeout"), 1, "Javascript execution timeout");
                             } else {

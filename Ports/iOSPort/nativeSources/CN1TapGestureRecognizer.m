@@ -93,6 +93,14 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if(touchesArray == nil) {
         touchesArray = [[NSMutableArray alloc] init];
     }
+    // Very rare, but sometimes we end up with orphaned touches and they 
+    // cause the app to appear to lock up because release events aren't handled 
+    // as long as their in the queue.  We need to clear this out.
+    for (UITouch* tc in touchesArray) {
+        if ([tc phase] == UITouchPhaseEnded) {
+            [touchesArray removeObject:tc];
+        }
+    }
     UITouch* touch = [touches anyObject];
     if (touch != nil) {
         pressedView = touch.view;

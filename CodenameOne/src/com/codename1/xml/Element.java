@@ -253,6 +253,19 @@ public class Element implements Iterable<Element> {
     }
 
     /**
+     * Compares a name to a tag. Returns true if the tag has that name, or if tagName = '*'.
+     * @param tagName The tag name to compare, or '*' to match any tag.
+     * @param tag The element whose tag we are comparing.
+     * @return True if tagName='*' or if the tagName matches the tag name of tag.
+     */
+    private static boolean cmpTagName(String tagName, Element tag) {
+        if ("*".equals(tagName)) {
+            return true;
+        }
+        return tagName.equalsIgnoreCase(tag.getTagName());
+    }
+    
+    /**
      * Returns an Element's child by a tag name
      *
      * @param name The child's tag name
@@ -266,7 +279,7 @@ public class Element implements Iterable<Element> {
         Element found=null;
         while ((found==null) && (i<children.size())) {
             Element child=(Element)children.get(i);
-            if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {
+            if ((!child.textElement) && cmpTagName(name, child)) {
                 found=child;
             } else {
                 i++;
@@ -313,7 +326,7 @@ public class Element implements Iterable<Element> {
                 if (depth>1) {
                     child.getDescendantsByTagNameInternal(v, name,depth-1);
                 }
-                if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {
+                if ((!child.textElement) && cmpTagName(name, child)) {
                     v.addElement(child);
                 }
                 i++;
@@ -330,7 +343,7 @@ public class Element implements Iterable<Element> {
                 if (depth>1) {
                     child.getDescendantsByTagNameAndAttributeInternal(v, name, attribute, depth-1);
                 }
-                if ((!child.textElement) && (child.getTagName().equalsIgnoreCase(name))) {
+                if ((!child.textElement) && cmpTagName(name, child)) {
                     String a = child.getAttribute(attribute);
                     if(a != null && a.length() > 0) {
                         v.addElement(child);
@@ -356,7 +369,7 @@ public class Element implements Iterable<Element> {
             throw new IllegalArgumentException("Depth must be 1 or higher");
         }
         if (children==null) {
-            return null;
+            return new Vector();
         }
         Vector v=new Vector();
         getDescendantsByTagNameAndAttributeInternal(v, name, attributeName, depth);
@@ -375,11 +388,11 @@ public class Element implements Iterable<Element> {
         if (depth<1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
         }
-        if (children==null) {
-            return null;
-        }
+        
         Vector v=new Vector();
-        getDescendantsByTagNameInternal(v, name, depth);
+        if(children != null) {
+            getDescendantsByTagNameInternal(v, name, depth);
+        }
         return v;
     }
 
@@ -446,7 +459,7 @@ public class Element implements Iterable<Element> {
             throw new IllegalArgumentException("Depth must be 1 or higher");
         }
         if (children==null) {
-            return null;
+            return new Vector();
         }
         if ((!caseSensitive) && (text!=null)) {
             text=text.toLowerCase();

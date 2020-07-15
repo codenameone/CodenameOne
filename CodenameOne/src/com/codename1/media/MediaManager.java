@@ -82,7 +82,7 @@ public class MediaManager {
      * @return The AudioBuffer or null if no buffer exists at that path.
      * @since 7.0
      */
-    public static synchronized AudioBuffer getAudioBuffer(String path) {
+    public static AudioBuffer getAudioBuffer(String path) {
         return getAudioBuffer(path, false, 256);
     }
     
@@ -96,7 +96,7 @@ public class MediaManager {
      * @return The audio buffer or null if no buffer exists at that path and the {@literal create} flag is {@literal false}.
      * @since 7.0
      */
-    public static synchronized AudioBuffer getAudioBuffer(String path, boolean create, int size) {
+    public static AudioBuffer getAudioBuffer(String path, boolean create, int size) {
         AudioBuffer buf = null;
         if (create && !audioBuffers.containsKey(path)) {
             buf = new AudioBuffer(size);
@@ -116,7 +116,7 @@ public class MediaManager {
      * @param path The path to the buffer.
      * @since 7.0
      */
-    public static synchronized void releaseAudioBuffer(String path) {
+    public static void releaseAudioBuffer(String path) {
         AudioBuffer buf = audioBuffers.get(path);
         if (buf != null) {
             int refCount = buf.release();
@@ -131,7 +131,7 @@ public class MediaManager {
      * @since 7.0
      * @deprecated Prefer to use {@link #releaseAudioBuffer(java.lang.String) }
      */
-    public static synchronized void deleteAudioBuffer(String path) {
+    public static void deleteAudioBuffer(String path) {
        audioBuffers.remove(path);
     }
     

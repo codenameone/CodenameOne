@@ -20,8 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase;
+package com.codename1.impl.javase.fx;
 
+import com.codename1.impl.javase.AbstractBrowserWindowSE;
 import com.codename1.io.Log;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.events.ActionEvent;

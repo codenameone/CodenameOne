@@ -59,4 +59,38 @@ public class TextComponentPassword extends TextComponent {
                 }
             });
     }
+
+    
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponentPassword label(String text) {
+        return (TextComponentPassword)super.label(text); 
+    }
+    
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponentPassword labelAndHint(String text) {
+        return (TextComponentPassword)super.labelAndHint(text);
+    }
+    
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponentPassword hint(String hint) {
+        return (TextComponentPassword)super.hint(hint);
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponentPassword hint(Image hint) {
+        return (TextComponentPassword)super.hint(hint);
+    }
 }

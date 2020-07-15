@@ -4357,6 +4357,10 @@ public abstract class CodenameOneImplementation {
         browserExecute(internal, javaScript);
         return null;
     }
+    
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent internal) {
+        return false;
+    }
 
     /**
      * Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
@@ -5404,6 +5408,39 @@ public abstract class CodenameOneImplementation {
         
     }
     
+    private BrowserComponent sharedJavascriptContext;
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public final BrowserComponent getSharedJavscriptContext() {
+        if (sharedJavascriptContext == null) {
+            sharedJavascriptContext = createSharedJavascriptContext();
+        }
+        return sharedJavascriptContext;
+    }
+    
+    /**
+     * Creates a shared javascript context.  This can be overridden by ports to 
+     * return a special browser component. On the Javascript port it returns a special component
+     * that encapsulates the browser environment that the application is running in.
+     * @since 7.0
+     * @return A shared BrowserComponent
+     * 
+     */
+    protected BrowserComponent createSharedJavascriptContext() {
+        BrowserComponent out = new BrowserComponent();
+        out.setPage("<!doctype html><html><body></body></html>", null);
+        
+        return out;
+    }
     
     /**
      * Captures a audio and notifies with the raw data when available
@@ -8443,4 +8480,13 @@ public abstract class CodenameOneImplementation {
         
     }
 
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */
+    public Boolean isDarkMode() {
+        return null;
+    }
 }

@@ -81,33 +81,35 @@ public class FileSystemTests extends AbstractTest {
         } catch (IOException fex) {
             throw new RuntimeException("Failed to open stream for url "+hello, fex);
         }
+        if (BrowserComponent.isNativeBrowserSupported()) {
+        	BrowserComponent bc = new BrowserComponent();
+		
+			Res res = new Res();
+		
+			bc.addWebEventListener("onLoad", e->{
+				Log.p("URL: "+bc.getURL());
+				if (!"Hello World".equals(bc.getTitle())) {
+					res.error = new RuntimeException("Incorrect page title.  Should be Hello World but was "+bc.getTitle());
+				}
+				JavascriptContext ctx = new JavascriptContext(bc);
+				Log.p("Inner html: "+ctx.get("document.getElementById('hello').innerHTML"));
+				synchronized(res) {
+					res.complete = true;
+					res.notifyAll();
+				}
+			});
+			bc.setURL(hello.toURL().toString());
+		
+			while (!res.complete) {
+				Display.getInstance().invokeAndBlock(()->{
+					Util.sleep(100);
+				});
+			}
+			if (res.error != null) {
+				assertNull(res.error, res.error.getMessage());
+			}
+		}
         
-        BrowserComponent bc = new BrowserComponent();
-        
-        Res res = new Res();
-        
-        bc.addWebEventListener("onLoad", e->{
-            Log.p("URL: "+bc.getURL());
-            if (!"Hello World".equals(bc.getTitle())) {
-                res.error = new RuntimeException("Incorrect page title.  Should be Hello World but was "+bc.getTitle());
-            }
-            JavascriptContext ctx = new JavascriptContext(bc);
-            Log.p("Inner html: "+ctx.get("document.getElementById('hello').innerHTML"));
-            synchronized(res) {
-                res.complete = true;
-                res.notifyAll();
-            }
-        });
-        bc.setURL(hello.toURL().toString());
-        
-        while (!res.complete) {
-            Display.getInstance().invokeAndBlock(()->{
-                Util.sleep(100);
-            });
-        }
-        if (res.error != null) {
-            assertNull(res.error, res.error.getMessage());
-        }
     }
     
     @Override

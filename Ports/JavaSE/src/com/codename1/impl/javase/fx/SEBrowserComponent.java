@@ -20,8 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase;
+package com.codename1.impl.javase.fx;
 
+import com.codename1.impl.javase.IBrowserComponent;
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
@@ -45,7 +47,7 @@ import javafx.concurrent.Worker.State;
 import javafx.event.EventHandler;
 
 import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebErrorEvent;
+//import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JFrame;
@@ -64,7 +66,7 @@ import javax.swing.SwingUtilities;
  * 
  * @author Chen
  */
-public class SEBrowserComponent extends PeerComponent {
+public class SEBrowserComponent extends PeerComponent implements IBrowserComponent{
     private static boolean firstTime = true;
     private WebView web;
     private javafx.embed.swing.JFXPanel panel;
@@ -213,7 +215,7 @@ public class SEBrowserComponent extends PeerComponent {
         }
         
     }
-    
+    /*
     private static EventHandler<WebErrorEvent> createOnErrorHandler() {
         return new EventHandler<WebErrorEvent>() {
             @Override
@@ -222,7 +224,7 @@ public class SEBrowserComponent extends PeerComponent {
             }
         };
     }
-    
+    */
     
     private static void init(SEBrowserComponent self, BrowserComponent p) {
         final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<>(self);
@@ -431,7 +433,7 @@ public class SEBrowserComponent extends PeerComponent {
             t.printStackTrace();
         }
         
-        we.setOnError(createOnErrorHandler());
+        //we.setOnError(createOnErrorHandler());
         
         init(this, p);
         
@@ -450,6 +452,7 @@ public class SEBrowserComponent extends PeerComponent {
      * @param js
      * @return
      */
+    @Override
     public String executeAndReturnString(final String js){
         if (isFXThread()) {
             try {
@@ -514,6 +517,7 @@ public class SEBrowserComponent extends PeerComponent {
         return Platform.isFxApplicationThread();
     }
     
+    @Override
     public void execute(final String js) {
         if (isFXThread()) {
             executeImpl(js);
@@ -728,8 +732,8 @@ public class SEBrowserComponent extends PeerComponent {
                 
                 frm.doLayout();
                 cnt.setBounds(
-                    (int) ((x + screenX + instance.canvas.x) * zoom / JavaSEPort.retinaScale),
-                    (int) ((y + screenY + instance.canvas.y) * zoom / JavaSEPort.retinaScale),
+                    (int) ((x + screenX + instance.getCanvasX()) * zoom / JavaSEPort.retinaScale),
+                    (int) ((y + screenY + instance.getCanvasY()) * zoom / JavaSEPort.retinaScale),
                     (int) (w * zoom / JavaSEPort.retinaScale),
                     (int) (h * zoom / JavaSEPort.retinaScale)
                 );
@@ -764,56 +768,66 @@ public class SEBrowserComponent extends PeerComponent {
         return r.y;
     }
     
-    void setProperty(String key, Object value) {
+    @Override
+    public void setProperty(String key, Object value) {
         if(key.equalsIgnoreCase("User-Agent")) {
-            web.getEngine().setUserAgent((String)value);
+            //web.getEngine().setUserAgent((String)value);
         }
     }
 
-    String getTitle() {
+    @Override
+    public String getTitle() {
         return web.getEngine().getTitle();
     }
 
-    String getURL() {
+    @Override
+    public String getURL() {
         return web.getEngine().getLocation();
     }
 
-    void setURL(String url) {
+    @Override
+    public void setURL(String url) {
         web.getEngine().load(url);
     }
 
-    void stop() {
+    @Override
+    public void stop() {
     }
 
-    void reload() {
+    @Override
+    public void reload() {
         web.getEngine().reload();
     }
 
-    boolean hasBack() {
+    public boolean hasBack() {
         return web.getEngine().getHistory().getCurrentIndex() > 0;
     }
 
-    boolean hasForward() {
+    public boolean hasForward() {
         return web.getEngine().getHistory().getCurrentIndex() < web.getEngine().getHistory().getMaxSize() - 1;
     }
 
-    void back() {
+    @Override
+    public void back() {
         web.getEngine().getHistory().go(-1);
     }
 
-    void forward() {
+    public void forward() {
         web.getEngine().getHistory().go(1);
     }
 
-    void clearHistory() {
+    @Override
+    public void clearHistory() {
     }
 
-    void setPage(String html, String baseUrl) {
+    @Override
+    public void setPage(String html, String baseUrl) {
         web.getEngine().loadContent(html);
         repaint();
     }
 
-    void exposeInJavaScript(Object o, String name) {
+    @Override
+    public void exposeInJavaScript(Object o, String name) {
     }
 
     @Override
@@ -855,5 +869,18 @@ public class SEBrowserComponent extends PeerComponent {
         
         
     }
+
+    @Override
+    public void runLater(Runnable r) {
+        Platform.runLater(r);
+    }
+
+    @Override
+    public boolean supportsExecuteAndReturnString() {
+        return true;
+    }
+    
    
+    
+    
 }

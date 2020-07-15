@@ -319,10 +319,7 @@ public class InteractionDialog extends Container {
             getParent().setWidth(getWidth());
             getParent().setHeight(getHeight());
             
-            getLayeredPane(f).animateLayout(400);
-            
-
-            
+            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         }
     }
     
@@ -377,7 +374,7 @@ public class InteractionDialog extends Container {
                 getParent().setWidth(getWidth());
                 getParent().setHeight(getHeight());
             }
-            getLayeredPane(f).animateLayout(400);
+            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         } else {
             getLayeredPane(f).revalidate();
         }
@@ -421,7 +418,7 @@ public class InteractionDialog extends Container {
                         setWidth(1);
                         setHeight(1);
                     }
-                    p.animateUnlayoutAndWait(400, 100);
+                    p.animateUnlayoutAndWait(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 100);
                 }
                 Container pp = getLayeredPane(f);
                 remove();
@@ -503,7 +500,7 @@ public class InteractionDialog extends Container {
                 }
                 
                 if(animateShow) {
-                    p.animateUnlayout(400, 255, new Runnable() {
+                    p.animateUnlayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 255, new Runnable() {
                         public void run() {
                             if(p.getParent() != null) {
                                 Container pp = getLayeredPane(f);
@@ -618,8 +615,6 @@ public class InteractionDialog extends Container {
         }
     }
     
-    
-    
     /**
      * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
      * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
@@ -628,6 +623,19 @@ public class InteractionDialog extends Container {
      * @param c the context component which is used to position the dialog and can also be pointed at
      */
     public void showPopupDialog(Component c) {
+        showPopupDialog(c, Display.getInstance().isPortrait());
+    }    
+    
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param c the context component which is used to position the dialog and can also be pointed at
+     * @param bias biases the dialog to appear above/below or to the sides.
+     *          This is ignored if there isn't enough space
+     */
+    public void showPopupDialog(Component c, boolean bias) {
         Form f = c== null ? null : c.getComponentForm();
         if (f != null) {
             if (!formMode && !f.getContentPane().contains(c)) {
@@ -640,7 +648,7 @@ public class InteractionDialog extends Container {
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
         setOwner(c);
-        showPopupDialog(componentPos);
+        showPopupDialog(componentPos, bias);
     }
     
     /**
@@ -651,6 +659,19 @@ public class InteractionDialog extends Container {
      * @param rect the screen rectangle to which the popup should point
      */
     public void showPopupDialog(Rectangle rect) {
+        showPopupDialog(rect, Display.getInstance().isPortrait());
+    }
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param rect the screen rectangle to which the popup should point
+     * @param bias biases the dialog to appear above/below or to the sides.
+     *          This is ignored if there isn't enough space
+     */
+    public void showPopupDialog(Rectangle rect, boolean bias) {
         Form f = Display.getInstance().getCurrent();
         Rectangle origRect = rect;
         rect = new Rectangle(rect);
@@ -675,7 +696,7 @@ public class InteractionDialog extends Container {
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
         // preferred size logic of the dialog won't work with large title borders
-        if((dialogTitle != null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", false)) {
+        if((dialogTitle != null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", true)) {
             boolean b = getTitle().length() > 0;
             titleArea.setVisible(b);
             getTitleComponent().setVisible(b);
@@ -683,19 +704,6 @@ public class InteractionDialog extends Container {
                 getTitleComponent().setPreferredSize(new Dimension(0,0));
                 getTitleComponent().getStyle().setBorder(null);
                 titleArea.setPreferredSize(new Dimension(0,0));
-                if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
-                    getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
-                    int titlePT = getTitleComponent().getStyle().getPaddingTop();
-                    byte[] pu = getContentPane().getStyle().getPaddingUnit();
-                    if(pu == null){
-                        pu = new byte[4]; 
-                   }
-                    pu[0] = Style.UNIT_TYPE_PIXELS;
-                    getContentPane().getStyle().setPaddingUnit(pu);
-                    int pop = Display.getInstance().convertToPixels(manager.getThemeConstant("popupNoTitleAddPaddingInt", 1), false);
-                    getContentPane().getStyle().setPadding(TOP, pop + cpPaddingTop + titlePT);
-                }
             }
         }
 
@@ -747,7 +755,7 @@ public class InteractionDialog extends Container {
         int x = 0;
         int y = 0;
 
-        boolean showPortrait = Display.getInstance().isPortrait();
+        boolean showPortrait = bias;
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
@@ -759,8 +767,9 @@ public class InteractionDialog extends Container {
                 showPortrait = true;
             }
         }
+                
+        
         if(showPortrait) {
-            
             if(width < availableWidth) {
                 int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
 
@@ -778,24 +787,31 @@ public class InteractionDialog extends Container {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, availableHeight - y);
+                padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                padOrientation(contentPaneStyle, TOP, -1);
             } else if (rect.getY() > availableHeight / 2){
                 // popup upwards
                 int height = Math.min(prefHeight, rect.getY());
                 y = rect.getY() - height;
+                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
+                padOrientation(contentPaneStyle, BOTTOM, -1);
             } else if (rect.getY() < availableHeight / 2) {
                 // popup over aligned with top of rect, but inset a few mm
                 y = rect.getY() + CN.convertToPixels(3);
                 
                 int height = Math.min(prefHeight, availableHeight - y);
+                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                padOrientation(contentPaneStyle, BOTTOM, -1);
             } else {
                 // popup over aligned with bottom of rect but inset a few mm
                 y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
                 int height = prefHeight;
+                padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
-                
+                padOrientation(contentPaneStyle, TOP, -1);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
@@ -812,7 +828,6 @@ public class InteractionDialog extends Container {
                     }
                 }
             }
-            
             
             if(prefWidth <  availableWidth - rect.getX() - rect.getWidth()) {
                 // popup right
@@ -832,10 +847,17 @@ public class InteractionDialog extends Container {
                 show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
             }
         }
-
-        /*if(restoreArrow) {
-            contentPaneStyle.getBorder().clearImageBorderSpecialTile();
-        }*/
+    }
+    
+    
+    private void padOrientation(Style s, int orientation, int padding) {
+        byte[] b = s.getPaddingUnit();
+        byte unit = b == null ? Style.UNIT_TYPE_PIXELS : s.getPaddingUnit()[orientation];
+        if(unit != Style.UNIT_TYPE_DIPS) {
+            padding = Display.getInstance().convertToPixels(padding);
+        }
+        s.setPadding(orientation, s.getPaddingValue(isRTL(), 
+                orientation) + padding);
     }
 
     /**

@@ -29,19 +29,16 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
-import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.SelectableIconHolder;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextHolder;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>
@@ -53,7 +50,7 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container implements ActionSource, SelectableIconHolder {
+public class SpanButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
 
     private int gap = Label.getDefaultGap();
     private Button actualButton;

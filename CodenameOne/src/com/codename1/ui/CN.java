@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Hashtable;
+import java.util.Timer;
 
 /**
  * This is a global context static class designed for static import, this class allows us to write more 
@@ -737,7 +738,25 @@ public class CN extends  CN1Constants {
     public static boolean canDial() {
         return Display.impl.canDial();
     }
-        
+    
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public static Boolean isDarkMode() {
+        return Display.INSTANCE.isDarkMode();
+    }
+    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public static void setDarkMode(Boolean darkMode) {
+        Display.INSTANCE.setDarkMode(darkMode);
+    }
+    
     /**
      * <p>Opens the device gallery to pick an image or a video.<br>
      * The method returns immediately and the response is sent asynchronously
@@ -878,12 +897,23 @@ public class CN extends  CN1Constants {
         Display.impl.deregisterPush();
     }
 
+    /**
+     * Start a Codename One thread that supports crash protection and similar Codename One features.
+     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     * @param name the name for the thread
+     * @return a thread instance which must be explicitly started!
+     */
+    public static Thread createThread(Runnable r, String name) {
+        return Display.INSTANCE.createThread(r, name);
+    }
+    
     
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
      * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
+     * @deprecated confusing name, use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
      */
     public static Thread startThread(Runnable r, String name) {
         return Display.INSTANCE.startThread(r, name);
@@ -1502,6 +1532,47 @@ public class CN extends  CN1Constants {
         Display.INSTANCE.postMessage(message);
     }
     
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public static Timer setTimeout(int timeout, Runnable r) {
+        return Display.INSTANCE.setTimeout(timeout, r);
+    }
     
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public static Timer setInterval(int timeout, Runnable r) {
+        return Display.INSTANCE.setInterval(timeout, r);
+    }
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
+     * 
+     * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
+     * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
+     * 
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public static BrowserComponent getSharedJavascriptContext() {
+        return Display.impl.getSharedJavscriptContext();
+    }
 
 }

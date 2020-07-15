@@ -61,7 +61,7 @@ import java.util.ArrayList;
  *
  * @author Chen Fishbein
  */
-public class TextArea extends Component implements ActionSource {
+public class TextArea extends Component implements ActionSource, TextHolder {
     private EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
     

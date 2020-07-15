@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.io.Log;
+import com.codename1.media.AsyncMedia;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
@@ -438,7 +439,7 @@ public class MediaPlayer extends Container {
                     float dur = video.getDuration();
                     if(dur > 0) {
                         if (progress != null) {
-                            float pos = progress.getProgress();
+                            float pos = progress.getProgress(evt);
                             int t = (int)(pos / 100.0f * dur);
                             video.setTime(t);
                         }
@@ -479,7 +480,52 @@ public class MediaPlayer extends Container {
             });        
         }
         
-        final Button play = new Button();
+        final Button play = new Button() {
+            
+            private ActionListener<AsyncMedia.MediaStateChangeEvent> stateChangeListener = new ActionListener<AsyncMedia.MediaStateChangeEvent>() {
+                @Override
+                public void actionPerformed(AsyncMedia.MediaStateChangeEvent evt) {
+                    updateIconAndText();
+                }
+            };
+            
+            
+            private void updateIconAndText() {
+                if (video != null && video.isPlaying()) {
+                     if (getPauseIcon() != null) {
+                        this.setIcon(getPauseIcon());
+                    } else {
+                        this.setText("pause");
+                    }
+                } else {
+                    if(playIcon != null){
+                        this.setIcon(playIcon);
+                    }else{
+                        this.setText("play");
+                    }
+                }
+            }
+            
+            @Override
+            protected void initComponent() {
+                super.initComponent();
+                updateIconAndText();
+                
+                if (video != null) {
+                    MediaManager.getAsyncMedia(video).addMediaStateChangeListener(stateChangeListener);
+                }
+            }
+
+            @Override
+            protected void deinitialize() {
+                if (video != null) {
+                    MediaManager.getAsyncMedia(video).removeMediaStateChangeListener(stateChangeListener);
+                }
+                super.deinitialize();
+            }
+            
+            
+        };
         play.setUIID("MediaPlayerPlay");
         if(playIcon != null){
             play.setIcon(playIcon);

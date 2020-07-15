@@ -132,7 +132,6 @@ public class UIManager {
      * This factory method allows creating a new UIManager instance, this is usefull where an application 
      * has some screens with different context
      * @return a new UIManager instance
-     * @see Formt#setUIManager(UIManager) 
      */
     public static UIManager createInstance() {
         return new UIManager();
@@ -398,6 +397,10 @@ public class UIManager {
         themeProps.put("sel#transparency", "255");
         themeProps.put("dis#fgColor", disabledColor);
 
+        Boolean darkModeBoolean = (Boolean)themeProps.get("@darkModeBool");
+        boolean darkMode = darkModeBoolean  != null && darkModeBoolean .booleanValue() &&
+                CN.isDarkMode() != null && CN.isDarkMode().booleanValue();
+
         Font thinFont = Font.getDefaultFont();
         Font lightFont = thinFont;
         Font italic = Font.createSystemFont(Font.FACE_SYSTEM,
@@ -422,7 +425,13 @@ public class UIManager {
         themeProps.put("BackCommandLandscape.derive", "BackCommand");
         themeProps.put("TitleLandscape.derive", "Title");
         themeProps.put("StatusBarLandscape.derive", "StatusBar");
-        
+        String foreground = "0";
+        String background = "ffffff";
+        if(darkMode) {
+            foreground = "ffffff";
+            background = "0";
+        }
+
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
             themeProps.put("TextFieldSearch.derive", "Title");
             themeProps.put("TextFieldSearch.align", leftAlign);
@@ -463,7 +472,11 @@ public class UIManager {
         
         if (installedTheme == null || !installedTheme.containsKey("ToastBar.derive")) {
             themeProps.put("ToastBar.margin", "0,0,0,0");
-            themeProps.put("ToastBar.bgColor", "0");
+            if(darkMode) {
+                themeProps.put("ToastBar.bgColor", "dddddd");
+            } else {
+                themeProps.put("ToastBar.bgColor", "0");
+            }
             themeProps.put("ToastBar.transparency", "200");
             themeProps.put("ToastBar.bgType", new Byte(Style.BACKGROUND_NONE));
             themeProps.put("ToastBar.border", Border.createEmpty());
@@ -485,24 +498,14 @@ public class UIManager {
         }
         
         if (installedTheme == null || !installedTheme.containsKey("Sheet.derive")) {
-            /*
-            .setBackgroundType(Style.BACKGROUND_NONE)
-                    .setBgImage(null)
-                    .setBgColor(0xffffff)
-                    .setBgTransparency(0xff)
-
-                    .setBorder(RoundRectBorder.create()
-                            //.topOnlyMode(true)
-
-                            .bottomLeftMode(false)
-                            .bottomRightMode(false)
-                            .cornerRadius(2f)
-                    );
-            */
             themeProps.put("Sheet.padding", "0,0,0,0");
             themeProps.put("Sheet.margin", "0,0,0,0");
             themeProps.put("Sheet.bgType", new Byte(Style.BACKGROUND_NONE));
-            themeProps.put("Sheet.bgColor", "FFFFFF");
+            if(darkMode) {
+                themeProps.put("Sheet.bgColor", "333333");
+            } else {
+                themeProps.put("Sheet.bgColor", "FFFFFF");
+            }
             themeProps.put("Sheet.transparency", "255");
             themeProps.put("Sheet.border", RoundRectBorder.create()
                             //.topOnlyMode(true)
@@ -513,15 +516,7 @@ public class UIManager {
             themeProps.put("Sheet.sel#derive", "Sheet");
             themeProps.put("Sheet.press#derive", "Sheet");
             themeProps.put("Sheet.dis#derive", "Sheet");
-            
-            /*
-            $(this.title).selectAllStyles()
-                    .setFgColor(0x0)
-                    .setBgTransparency(0x0)
-                    .setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD))
-                    .setAlignment(Component.CENTER);
-            */
-            themeProps.put("SheetTitle.fgColor", "0");
+            themeProps.put("SheetTitle.fgColor", foreground);
             themeProps.put("SheetTitle.transparency", "0");
             themeProps.put("SheetTitle.font", bold);
             themeProps.put("SheetTitle.align", centerAlign);
@@ -529,26 +524,17 @@ public class UIManager {
             themeProps.put("SheetTitle.press#derive", "SheetTitle");
             themeProps.put("SheetTitle.dis#derive", "SheetTitle");
             
-            /*
-            $(titleBar).selectAllStyles() 
-                    .setBgTransparency(0x0)
-                    .setBorder(Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
-            */
-            
             themeProps.put("SheetTitleBar.transparency", "0");
             themeProps.put("SheetTitleBar.border", Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));
             themeProps.put("SheetTitleBar.sel#derive", "SheetTitleBar");
             themeProps.put("SheetTitleBar.press#derive", "SheetTitleBar");
             themeProps.put("SheetTitleBar.dis#derive", "SheetTitleBar");
-            
-            /*
-            $(backButton).selectAllStyles()
-                    .setFgColor(0x333333)
-                    .setBgTransparency(0)
-                    .setBorder(Border.createEmpty());
-            */
-            
-            themeProps.put("SheetBackButton.fgColor", "333333");
+
+            if(darkMode) {
+                themeProps.put("SheetBackButton.fgColor", "999999");
+            } else {
+                themeProps.put("SheetBackButton.fgColor", "333333");
+            }
             themeProps.put("SheetBackButton.transparency", "0");
             themeProps.put("SheetBackButton.border", Border.createEmpty());
             themeProps.put("SheetBackButton.sel#derive", "SheetBackButton");
@@ -708,11 +694,28 @@ public class UIManager {
                 cornerRadius(2f).
                 shadowOpacity(60).shadowSpread(3.0f));
             themeProps.put("PopupDialog.transparency", "255");
-            themeProps.put("PopupDialog.bgColor", "ffffff");
+            themeProps.put("PopupDialog.bgColor", background);
             themeProps.put("PopupDialog.padding", "4,4,4,4");
             themeProps.put("PopupDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
         }        
        
+        if (installedTheme == null || !installedTheme.containsKey("TooltipDialog.derive")) {
+            themeProps.put("TooltipDialog.derive", "Dialog");
+            themeProps.put("TooltipDialog.border", RoundRectBorder.create().
+                cornerRadius(2f));
+            themeProps.put("TooltipDialog.transparency", "255");
+            themeProps.put("TooltipDialog.bgColor", "dddddd");
+            themeProps.put("TooltipDialog.padding", "4,4,4,4");
+            themeProps.put("TooltipDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+        }        
+       
+        if (installedTheme == null || !installedTheme.containsKey("Tooltip.derive")) {
+            themeProps.put("Tooltip.derive", "Label");
+            themeProps.put("Tooltip.fgColor", "0");
+            themeProps.put("Tooltip.align", centerAlign);
+            themeProps.put("TooltipDialog.padding", "2,2,2,2");
+            themeProps.put("TooltipDialog.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+        }        
         
         if(installedTheme == null || !installedTheme.containsKey("DialogContentPane.derive")) {
             themeProps.put("DialogContentPane.margin", "0,0,0,0");
@@ -745,7 +748,7 @@ public class UIManager {
 
         if(installedTheme == null || !installedTheme.containsKey("HorizontalScrollThumb.derive")) {
             themeProps.put("HorizontalScrollThumb.padding", "0,0,0,0");
-            themeProps.put("HorizontalScrollThumb.bgColor", "0");
+            themeProps.put("HorizontalScrollThumb.bgColor", foreground);
             themeProps.put("HorizontalScrollThumb.margin", "0,0,0,0");
         }
 
@@ -782,11 +785,11 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("ScrollThumb.derive")) {
             themeProps.put("ScrollThumb.padding", "0,0,0,0");
             themeProps.put("ScrollThumb.margin", "0,0,0,0");
-            themeProps.put("ScrollThumb.bgColor", "0");
+            themeProps.put("ScrollThumb.bgColor", foreground);
         }
 
         if(installedTheme == null || !installedTheme.containsKey("SliderFull.derive")) {
-            themeProps.put("SliderFull.bgColor", "0");
+            themeProps.put("SliderFull.bgColor", foreground);
         }
         themeProps.put("SliderFull.sel#derive", "SliderFull");
 
@@ -1012,7 +1015,7 @@ public class UIManager {
             themeProps.put("PullToRefresh.margin", "0,0,0,0");
             themeProps.put("PullToRefresh.align", centerAlign);
             themeProps.put("PullToRefresh.transparency", "0");
-            themeProps.put("PullToRefresh.fgColor", "0");
+            themeProps.put("PullToRefresh.fgColor", foreground);
        }
     
         if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.derive")) {
@@ -1105,7 +1108,7 @@ public class UIManager {
             themeProps.put("Badge.press#align", centerAlign);
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionText.derive")) {
-            themeProps.put("FloatingActionText.bgColor", "ffffff");
+            themeProps.put("FloatingActionText.bgColor", background);
             themeProps.put("FloatingActionText.fgColor", "a0a0a0");
             themeProps.put("FloatingActionText.align", rightAlign);
         }
@@ -1153,11 +1156,6 @@ public class UIManager {
         }
         
         if (installedTheme == null || !installedTheme.containsKey("Spinner3DOverlay.bgColor")) {
-            //themeProps.put("Spinner3DOverlay.border", Border.createCompoundBorder(
-            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)),
-            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)), Border.createEmpty(), Border.createEmpty()
-            //));
-            
             themeProps.put("Spinner3DOverlay.transparency", "255");
             themeProps.put("Spinner3DOverlay.bgColor", "efeff4");
             themeProps.put("Spinner3DOverlay.fgColor", "abb8b7");

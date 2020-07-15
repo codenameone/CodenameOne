@@ -67,6 +67,7 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
@@ -383,6 +384,8 @@ public final class Display extends CN1Constants {
     private long[] dragPathTime;
     private int dragPathOffset = 0;
     private int dragPathLength = 0;
+    
+    private Boolean darkMode;
 
      /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
@@ -713,8 +716,26 @@ public final class Display extends CN1Constants {
     }
 
     
+    /**
+     * Returns true if the platform is in dark mode, null is returned for
+     * unknown status
+     * 
+     * @return true in case of dark mode
+     */    
+    public Boolean isDarkMode() {
+        if(darkMode != null) {
+            return darkMode;
+        }
+        return impl.isDarkMode();
+    }
     
-    
+    /**
+     * Override the default dark mode setting
+     * @param darkMode can be set to null to reset to platform default
+     */
+    public void setDarkMode(Boolean darkMode) {
+        this.darkMode = darkMode;
+    }
     
     private class EdtException extends RuntimeException {
         private Throwable cause;
@@ -4451,11 +4472,23 @@ hi.show();}</pre></noscript>
         impl.setPollingFrequency(freq);
     }
     
+
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
      * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
+     */
+    public Thread createThread(Runnable r, String name) {
+        return new CodenameOneThread(r, name);
+    }
+
+    /**
+     * Start a Codename One thread that supports crash protection and similar Codename One features.
+     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     * @param name the name for the thread
+     * @return a thread instance which must be explicitly started!
+     * @deprecated confusing name use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
      */
     public Thread startThread(Runnable r, String name) {
         return new CodenameOneThread(r, name);
@@ -4870,4 +4903,62 @@ hi.show();}</pre></noscript>
         return impl.captureScreen();
     }
 
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     * @param timeout The timeout in milliseconds.
+     * @param r The task to run.
+     * @return The Timer object that can be used to cancel the task.
+     * @since 7.0
+     * @see #setInterval(int, java.lang.Runnable) 
+     */
+    public Timer setTimeout(int timeout, final Runnable r) {
+        
+        Timer t = new Timer();
+        t.schedule(new TimerTask() {
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, (long)timeout);
+        return t;
+    }
+    
+    /**
+     * Convenience method to schedule a task to run on the EDT after {@literal period}ms
+     * repeating every {@literal period}ms.
+     * @param period The delay and repeat in milliseconds.
+     * @param r The runnable to run on the EDT.
+     * @return The timer object which can be used to cancel the task.
+     * @since 7.0
+     * @see #setTimeout(int, java.lang.Runnable) 
+     */
+    public Timer setInterval(int period, final Runnable r) {
+        Timer t = new Timer();
+        t.schedule(new TimerTask(){
+            public void run() {
+                CN.callSerially(r);
+            }
+        }, period, period);
+        
+        
+        return t;
+    }
+    
+    /**
+     * Gets a reference to an application-wide shared Javascript context that can be used for running
+     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
+     * same context in which the application itself is running, so it gives you the ability to interact 
+     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
+     * 
+     * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
+     * 
+     * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
+     * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
+     * 
+     * @return A shared BrowserComponent
+     * @since 7.0
+     */
+    public BrowserComponent getSharedJavascriptContext() {
+        return impl.getSharedJavscriptContext();
+    }
+    
 }

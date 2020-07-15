@@ -3931,6 +3931,23 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_END();
     });
 }
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, *)) {
+        return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    } else {
+        return JAVA_FALSE;
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, *)) {
+        return JAVA_TRUE;
+    } else {
+        return JAVA_FALSE;
+    }
+}
+
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif

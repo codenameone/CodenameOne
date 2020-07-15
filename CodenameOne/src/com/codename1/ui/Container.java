@@ -2585,6 +2585,8 @@ public class Container extends Component implements Iterable<Component>{
         return null;  
     }
     
+    
+    
     /**
      * Returns a Component at coordinate {@literal (x, y)}.
      * 
@@ -2602,7 +2604,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public Component getComponentAt(int x, int y) {
         if (!contains(x, y) || !isVisible()) {
-            return null;
+            return this;
         }
         int startIter = 0;
         int count = getComponentCount();
@@ -2623,36 +2625,109 @@ public class Container extends Component implements Iterable<Component>{
         }
         boolean overlaps = getActualLayout().isOverlapSupported();
         Component component = null;
+        Component top = null;
+        
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y) && cmp.isVisible()) {
-                
                 component = cmp;
+                boolean isPotentialCandidate = cmp.respondsToPointerEvents();
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
                     if(c != null){
-                        component = c;
+                        if (top == null) {
+                            if (c.respondsToPointerEvents() || !(c instanceof Container)) {
+                                top = c;
+                            }
+                        }
+                        if (c != cmp) {
+                            Component tmp = c;
+                            if (cmp.isFocusable()) {
+                                isPotentialCandidate = true;
+                                boolean found = false;
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.isFocusable()) {
+                                        // We found a focusable child
+                                        // so we will use that.
+                                        c = tmp;
+                                        found = true;
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                                if (!found) {
+                                    // Since the container is focusable 
+                                    // and none of its children are focusable
+                                    // we will prefer to take the container over
+                                    // its children here.
+                                    c = cmp;
+                                }
+                            
+                            } else if (cmp.respondsToPointerEvents()){
+                                isPotentialCandidate = true;
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.respondsToPointerEvents()) {
+                                        // We found a child that also responds to
+                                        // pointer events so we will use that.
+                                        c = tmp;
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                                
+                            
+                            } else {
+                                // In this last case, the parent doesn't respond to pointer events
+                                // so all we want to know is if any of the children respond to pointer events
+                                // so we know if it will be eligible to be returned in the case of an overlapping
+                                // layout.
+                                while (tmp != cmp && tmp != null) {
+                                    if (tmp.respondsToPointerEvents()) {
+                                        isPotentialCandidate = true;
+                                        
+                                        break;
+                                    }
+                                    tmp = tmp.getParent();
+                                }
+                            }
+                            component = c;
+                            
+                        }
+                        
+                    } else {
+                        // No children found here 
+                        if (top == null) {
+                            if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                                top = cmp;
+                            }
+                        }
+                    }
+                } else {
+                    if (top == null) {
+                        if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
+                            top = cmp;
+                        }
                     }
                 }
-                if (!overlaps || component.respondsToPointerEvents()) {
+                if (!overlaps) {
+                    
                     return component;
-                } else if (cmp != component) {
-                    // Check if there is anything between component and cmp that grabs pointer events
-                    // if so - we stop the chain
-                    Container tmp = component.getParent();
-                    while (tmp != cmp && tmp != null) {
-                        if (tmp.respondsToPointerEvents()) {
-                            return component;
-                        }
-                        tmp = tmp.getParent();
-                    }
-                    if (cmp.respondsToPointerEvents()) {
+                    
+                } else {
+                    if (isPotentialCandidate) {
                         return component;
                     }
                     
                 }
+                
             }
         }
+        if (component == null || (!component.respondsToPointerEvents() && top != null)) {
+            if (top != null) {
+                return top;
+            }
+        }
+            
         if (component != null){
             return component;
         }

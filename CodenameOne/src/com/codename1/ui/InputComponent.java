@@ -52,6 +52,8 @@ import java.util.ArrayList;
  * <li>{@code textComponentFieldUIID} sets the UIID of the text field to something other than {@code TextField} 
  *      which is useful for platforms such as iOS where the look of the text field is different within the text component
  * </ol>
+ * <li>{@code inputComponentErrorMultilineBool} sets the error label to multiline when activated
+ * </li>
  * <p>
  * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with 
  * validation errors
@@ -64,6 +66,7 @@ import java.util.ArrayList;
  * @author Shai Almog
  */
 public abstract class InputComponent extends Container {
+    private static boolean multiLineErrorMessage;
     private Boolean onTopMode;
     private final Button lbl = new Button("", "Label") {
             @Override
@@ -71,17 +74,13 @@ public abstract class InputComponent extends Container {
                 return true;
             }
         };
-    private final Label errorMessage = new Label("", "ErrorLabel") {
-        public void setText(String s) {
-            super.setText(s);
-            descriptionMessage.setVisible(s.length() == 0);
-        } 
-    };
+    private TextHolder errorMessageImpl = createErrorLabel();
     private final Label descriptionMessage = new Label("", "DescriptionLabel");
 
     static Boolean guiBuilderMode;
     
     Button action;
+    private boolean actionAsButton;
     
     /**
      * Protected constructor for subclasses to override
@@ -116,13 +115,41 @@ public abstract class InputComponent extends Container {
     Label getLabel() {
         return lbl;
     }
+
+    /**
+     * Can be overriden by subclasses to support custom error label components
+     * @return Component instance such as JLabel, TextArea etc. usually with the 
+     * {@code ErrorLabel} UIID
+     */
+    protected TextHolder createErrorLabel() {
+        if(multiLineErrorMessage && isOnTopMode()) {
+            TextArea errorLabel = new TextArea() {
+                @Override
+                protected Dimension calcPreferredSize() {
+                    if(getText() == null || getText().length() == 0) {
+                        return new Dimension();
+                    }
+                    return super.calcPreferredSize(); 
+                }
+                
+            };
+            errorLabel.setRows(1);
+            errorLabel.setActAsLabel(true);
+            errorLabel.setGrowByContent(true);
+            errorLabel.setFocusable(false);
+            errorLabel.setEditable(false);
+            errorLabel.setUIID("ErrorLabel");
+            return errorLabel;
+        }
+        return new Label("", "ErrorLabel");
+    }
     
     /**
      * Returns the internal error message implementation
      * @return the label
      */
-    Label getErrorMessage() {
-        return errorMessage;
+    Component getErrorMessage() {
+        return (Component)errorMessageImpl;
     }
 
     /**
@@ -148,28 +175,34 @@ public abstract class InputComponent extends Container {
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
-                int w = max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW(), descriptionMessage.getOuterPreferredW());
+                int w = max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), getErrorMessage().getOuterPreferredW(), descriptionMessage.getOuterPreferredW());
                 int h = getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() + 
-                    Math.max(errorMessage.getOuterPreferredH(), descriptionMessage.getOuterPreferredH());
+                    Math.max(getErrorMessage().getOuterPreferredH(), descriptionMessage.getOuterPreferredH());
                 return new Dimension(w + getStyle().getHorizontalPadding(), 
                          h + getStyle().getVerticalPadding()
                 );
             } else {
                 return new Dimension(
-                        Math.max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), errorMessage.getOuterPreferredW()) + getStyle().getHorizontalPadding(),
-                        errorMessage.getOuterPreferredH() + Math.max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
+                        Math.max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), getErrorMessage().getOuterPreferredW()) + getStyle().getHorizontalPadding(),
+                        getErrorMessage().getOuterPreferredH() + Math.max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()
                 );
             }
         }
         return super.calcPreferredSize();
     }
     
-    void addEditorAction() {
+    private void addEditorAction() {
         if(action != null) {
-            add(BorderLayout.CENTER, LayeredLayout.encloseIn(
-                getEditor(),
-                FlowLayout.encloseRightMiddle(action)
-            ));
+            if(actionAsButton) {
+                add(BorderLayout.CENTER, BorderLayout.centerEastWest(
+                        getEditor(),
+                        action, null));
+            } else {
+                add(BorderLayout.CENTER, LayeredLayout.encloseIn(
+                    getEditor(),
+                    FlowLayout.encloseRightMiddle(action)
+                ));
+            }
         } else {
             add(BorderLayout.CENTER, getEditor());
         }
@@ -183,12 +216,12 @@ public abstract class InputComponent extends Container {
                 add(BorderLayout.NORTH, lbl);
                 addEditorAction();
                 add(BorderLayout.SOUTH, 
-                    LayeredLayout.encloseIn(errorMessage, descriptionMessage));
+                    LayeredLayout.encloseIn(getErrorMessage(), descriptionMessage));
             } else {
                 setLayout(new BorderLayout());
                 addEditorAction();
                 add(BorderLayout.WEST, lbl);
-                add(BorderLayout.SOUTH, errorMessage);
+                add(BorderLayout.SOUTH, getErrorMessage());
             }
         }
     }
@@ -208,7 +241,7 @@ public abstract class InputComponent extends Container {
             }
             lbl.remove();
             descriptionMessage.remove();
-            errorMessage.remove();
+            getErrorMessage().remove();
             constructUI();
         }
     }
@@ -281,17 +314,19 @@ public abstract class InputComponent extends Container {
         String col = getUIManager().getThemeConstant("textComponentErrorColor", null);
         if(errorMessage == null || errorMessage.length() == 0) {
             // no need for double showing of error
-            if(this.errorMessage.getText().length() == 0) {
+            if(this.errorMessageImpl.getText().length() == 0) {
                 return this;
             }
             // clear the error mode
-            this.errorMessage.setText("");
+            this.errorMessageImpl.setText("");
             if(col != null) {
                 lbl.setUIID(lbl.getUIID());
                 getEditor().setUIID(getEditor().getUIID());
             }
+            descriptionMessage.setVisible(true);
         } else {
-            this.errorMessage.setText(errorMessage);
+            descriptionMessage.setVisible(false);
+            this.errorMessageImpl.setText(errorMessage);
             if(col != null) {
                 int val = Integer.parseInt(col, 16);
                 lbl.getAllStyles().setFgColor(val);
@@ -339,6 +374,70 @@ public abstract class InputComponent extends Container {
         if(action == null) {
             action = new Button("", "InputComponentAction");
         }
+    }
+    
+    /**
+     * Sets the UIID for the action button
+     * @param uiid a custom UIID for the action
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionUIID(String uiid) {
+        initAction();
+        action.setUIID(uiid);
+        return this;
+    }
+    
+    /**
+     * UIID for the action button
+     * @return the UIID
+     */
+    public String getActionUIID() {
+        initAction();
+        return action.getUIID();
+    }
+    
+    /**
+     * Indicates the action should behave as a button next to the component
+     * and not layered on top of the text component. This is useful for UI
+     * in the style of a browse button next to a text field.
+     * @param asButton true so the action will act like a button
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionAsButton(boolean asButton) {
+        initAction();
+        this.actionAsButton = asButton;
+        return this;
+    }
+    
+    /**
+     * Indicates the action should behave as a button next to the component
+     * and not layered on top of the text component. This is useful for UI
+     * in the style of a browse button next to a text field.
+     * @return true if the action acts as a button
+     */
+    public boolean isActionAsButton() {
+        return actionAsButton;
+    }
+
+    /**
+     * Provides the text of the action button
+     * @param text the text that should appear on the action button
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     */
+    public InputComponent actionText(String text) {
+        initAction();
+        action.setText(text);
+        return this;
+    }
+    
+    /**
+     * Provides the text of the action button
+     * 
+     * @return the text of the action
+     */
+    public String getActionText() {
+        initAction();
+        return action.getText();
     }
     
     /**
@@ -394,5 +493,26 @@ public abstract class InputComponent extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * True if error messages should be multiline by default. This can be
+     * set via the theme constant {@code inputComponentErrorMultilineBool}
+     * 
+     * @return the multiLineErrorMessage
+     */
+    public static boolean isMultiLineErrorMessage() {
+        return multiLineErrorMessage;
+    }
+
+    /**
+     * True if error messages should be multiline by default. This can be
+     * set via the theme constant {@code inputComponentErrorMultilineBool}
+     * 
+     * @param aMultiLineErrorMessage the multiLineErrorMessage to set
+     */
+    public static void setMultiLineErrorMessage(
+            boolean aMultiLineErrorMessage) {
+        multiLineErrorMessage = aMultiLineErrorMessage;
     }
 }

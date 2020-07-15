@@ -79,6 +79,13 @@ import java.util.Collection;
  * <tr><td>{@literal switchThumbInsetMM}</td><td>An inset to use when rendering the thumb that will cause it to be inset from the edge of the track. In the iOS native theme, this is 0.25</td></tr>
  * </table>
  * 
+ * <p>
+ * <strong>IMPORTANT:</strong> when changing the UIID of the switch the constants
+ * above implicitly change to match the new UIID with the same convetion. So if 
+ * your UIID is {@code MySwitch} then a theme constant will become: 
+ * {@code myswitchTrackScaleY}. Notice that the whole UIID is lower cased...
+ * </p>
+ * 
  * <p><strong>CSS used in the Android native theme:</strong></p>
  * <pre>{@code
 #Constants {
@@ -158,15 +165,27 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private boolean animationLock;
 
     private int valign = CENTER;
+
     /**
      * Default constructor
      */
     public Switch() {
-        setUIID("Switch");
+        this("Switch");
+    }
+
+    /**
+     * This constructor should be used when customizing theme constants
+     * for a different UIID
+     * @param uiid accepts an alternate UIID for switch which might be 
+     * necessary for theme constants 
+     */
+    public Switch(String uiid) {
+        setUIID(uiid);
         setOpaque(false);
         initialize();
     }
 
+    
     private int getFontSize() {
         Font f = getUnselectedStyle().getFont();
         if (f == null) {
@@ -214,35 +233,43 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     private double getTrackScaleY() {
-        return Double.parseDouble(getUIManager().getThemeConstant("switchTrackScaleY", "0.9"));
+        return Double.parseDouble(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackScaleY", "0.9"));
     }
     
     private double getThumbScaleY() {
-        return Double.parseDouble(getUIManager().getThemeConstant("switchThumbScaleY", "1.5"));
+        return Double.parseDouble(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "ThumbScaleY", "1.5"));
     }
     
     private double getTrackScaleX() {
-        return Double.parseDouble(getUIManager().getThemeConstant("switchTrackScaleX", "3"));
+        return Double.parseDouble(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackScaleX", "3"));
     }
     
     private int getTrackOnOutlineWidth() {
-        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().getThemeConstant("switchTrackOnOutlineWidthMM", "0")));
+        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackOnOutlineWidthMM", "0")));
     }
     
     private int getTrackOnOutlineColor() {
-        return Integer.parseInt(getUIManager().getThemeConstant("switchTrackOnOutlineColor", "0"), 16);
+        return Integer.parseInt(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackOnOutlineColor", "0"), 16);
     }
     
     private int getTrackOffOutlineWidth() {
-        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().getThemeConstant("switchTrackOffOutlineWidthMM", "0")));
+        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackOffOutlineWidthMM", "0")));
     }
     
     private int getTrackOffOutlineColor() {
-        return Integer.parseInt(getUIManager().getThemeConstant("switchTrackOffOutlineColor", "0"), 16);
+        return Integer.parseInt(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "TrackOffOutlineColor", "0"), 16);
     }
     
     private int getThumbInset() {
-        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().getThemeConstant("switchThumbInsetMM", "0")));
+        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
+                getThemeConstant(getUIID().toLowerCase() + "ThumbInsetMM", "0")));
     }
     
     private Image getTrackOnImage() {
@@ -341,12 +368,18 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         trackOnImage = null;
         trackOffImage = null;
         trackDisabledImage = null;
-        setThumbOnImage(UIManager.getInstance().getThemeImageConstant("switchThumbOnImage"));
-        setThumbOffImage(UIManager.getInstance().getThemeImageConstant("switchThumbOffImage"));
-        setThumbDisabledImage(UIManager.getInstance().getThemeImageConstant("switchThumbDisabledImage"));
-        setTrackOnImage(UIManager.getInstance().getThemeImageConstant("switchOnTrackImage"));
-        setTrackOffImage(UIManager.getInstance().getThemeImageConstant("switchOffTrackImage"));
-        setTrackDisabledImage(UIManager.getInstance().getThemeImageConstant("switchDisabledTrackImage"));
+        setThumbOnImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "ThumbOnImage"));
+        setThumbOffImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "ThumbOffImage"));
+        setThumbDisabledImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "ThumbDisabledImage"));
+        setTrackOnImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "OnTrackImage"));
+        setTrackOffImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "OffTrackImage"));
+        setTrackDisabledImage(UIManager.getInstance().
+                getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
     }
 
     private static Image createRoundThumbImage(int pxDim, int color, int shadowSpread, int thumbInset) {
