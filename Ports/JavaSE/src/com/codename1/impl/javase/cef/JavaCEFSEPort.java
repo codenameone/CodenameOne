@@ -580,7 +580,7 @@ public class JavaCEFSEPort extends JavaSEPort {
         
         StreamWrapper stream = new StreamWrapper(inputStream, mimeType , -1);
         String id = BrowserPanel.getStreamRegistry().registerStream(stream);
-        String uriAddress = InputStreamSchemeHandler.getURL(id);
+        String uriAddress = "https://cn1app/streams/"+id;
         try {
             new CodenameOneMediaPlayer(uriAddress, mimeType.startsWith("video/"), (JFrame)cnt, onCompletion, out);
         } catch (IOException ex) {
@@ -626,7 +626,7 @@ public class JavaCEFSEPort extends JavaSEPort {
                     StreamWrapper stream = new StreamWrapper(fis, getMimetype(f), f.length());
                     String id = BrowserPanel.getStreamRegistry().registerStream(stream);
                     //uriAddress = InputStreamSchemeHandler.getURL(id);
-                    uriAddress = "client://tests/streams/"+id;
+                    uriAddress = "https://cn1app/streams/"+id;
                     //new CodenameOneMediaPlayer(stream, ((JFrame)cnt), onCompletion, out);
                 } catch (IOException ex) {
                     out.error(ex);
@@ -652,7 +652,22 @@ public class JavaCEFSEPort extends JavaSEPort {
         }
         return out;
     }
-    
+
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion); 
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).removeCompletionHandler(onCompletion);
+        }
+    }
     
     
     
