@@ -3233,6 +3233,15 @@ public class Form extends Container {
                 
                 cmp = LeadUtil.leadParentImpl(cmp);
                 cmp.initDragAndDrop(x, y);
+                if (!cmp.isDragAndDropInitialized()) {
+                    Container draggableCnt = cmp.getParent();
+                    while (draggableCnt != null && !draggableCnt.isDraggable()) {
+                        draggableCnt = draggableCnt.getParent();
+                    }
+                    if (draggableCnt != null && draggableCnt.isDraggable() && !(draggableCnt instanceof Form)) {
+                        draggableCnt.initDragAndDrop(x, y);
+                    }
+                }
                 if (isCurrentlyScrolling(cmp)) {
                     dragStopFlag = true;
                     cmp.clearDrag();

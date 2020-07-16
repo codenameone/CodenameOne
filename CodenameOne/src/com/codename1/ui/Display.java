@@ -862,6 +862,10 @@ public final class Display extends CN1Constants {
      * the paint and key handling events
      */
     public void callSerially(Runnable r){
+        // otherwise this will fail in an odd locaiton. Better it fails here...
+        if(r == null) {
+            throw new NullPointerException();
+        }
         if(codenameOneRunning) {
             synchronized(lock) {
                 pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
