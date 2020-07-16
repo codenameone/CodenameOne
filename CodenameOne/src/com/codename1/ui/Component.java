@@ -4321,7 +4321,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if the pointer responds to pointer events.
      */
     public boolean respondsToPointerEvents() {
-        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents());
+        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents() || isDraggable());
     }
     
     private boolean pointerReleaseMaterialPullToRefresh() {
