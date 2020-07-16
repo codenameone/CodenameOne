@@ -59,6 +59,11 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private int currentDay;
     private int currentMonth;
     
+    private int hourOfDay;
+    private int minuteOfDay;
+    private int secondsOfDay;
+    private int millisOfDay;
+
     private boolean monthDayYear = true;
     private boolean numericMonths = false;
 
@@ -592,6 +597,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         cld.set(Calendar.DAY_OF_MONTH, getCurrentDay());
         cld.set(Calendar.MONTH, getCurrentMonth() - 1);
         cld.set(Calendar.YEAR, getCurrentYear());
+        
+        cld.set(Calendar.HOUR_OF_DAY,hourOfDay);
+        cld.set(Calendar.MINUTE,minuteOfDay);
+        cld.set(Calendar.SECOND,secondsOfDay);
+        cld.set(Calendar.MILLISECOND, millisOfDay);
+
         return cld.getTime();
     }
 
@@ -603,8 +614,11 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
         setCurrentMonth(cld.get(Calendar.MONTH)+1);
         setCurrentYear(cld.get(Calendar.YEAR));
-        
-        
+        //keep time of day when editing the date
+        hourOfDay=cld.get(Calendar.HOUR_OF_DAY);
+        minuteOfDay=cld.get(Calendar.MINUTE);
+        secondsOfDay=cld.get(Calendar.SECOND);
+        millisOfDay=cld.get(Calendar.MILLISECOND);
     }
 
     @Override

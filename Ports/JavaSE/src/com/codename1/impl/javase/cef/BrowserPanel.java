@@ -162,7 +162,7 @@ public abstract class BrowserPanel extends CN1JPanel {
             
             CefApp.addAppHandler(new AppHandler(args));
         } else {
-            myApp = CefApp.getInstance();
+            myApp = CefApp.getInstance(args);
         }
 
         //    By calling the method createClient() the native part

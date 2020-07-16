@@ -34,6 +34,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
     private final Container owner_;
     //private BrowserComponent browserComponent_;
     private BrowserNavigationCallback navigationCallback_;
+    
 
     public RequestHandler(Container owner, BrowserNavigationCallback navigationCallback) {
         owner_ = owner;
@@ -45,10 +46,10 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
             boolean user_gesture, boolean is_redirect) {
         
         if (navigationCallback_ != null) {
-            System.out.println("in onBeforeBrowse "+request.getURL());
+            
             boolean res = navigationCallback_.shouldNavigate(request.getURL());
-            System.out.println("Allowed to browse? "+res);
             if (!res) {
+                
                 return res;
             }
         }
@@ -95,6 +96,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
         // This test extracts the value of the test form.
         // (see "Show Form" entry within BrowserMenuBar)
         // and sends its value as HTTP-GET request to Google.
+        
         if (request.getMethod().equalsIgnoreCase("POST")
                 && request.getURL().equals("http://www.google.com/")) {
             String forwardTo = "http://www.google.com/#q=";
@@ -144,7 +146,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
         // the non existing domain "foo.bar" is handled by the ResourceHandler implementation
         // E.g. if you try to load the URL http://www.foo.bar, you'll be forwarded
         // to the ResourceHandler class.
-        if (request.getURL().endsWith("foo.bar/")) {
+        if (request.getURL().startsWith("https://cn1app/")) {
             return new ResourceHandler();
         }
 

@@ -24,7 +24,6 @@ public class MessageRouterHandler extends CefMessageRouterHandlerAdapter {
         if (request.startsWith("shouldNavigate:")) {
             
             String url = request.substring(request.indexOf(":")+1);
-            System.out.println("In shouldNavigate callback with url: "+url);
             if (navigationCallback_ != null) {
                 boolean res = navigationCallback_.shouldNavigate(url);
                 callback.success(""+res);
