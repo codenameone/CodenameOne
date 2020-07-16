@@ -635,7 +635,7 @@ public class TableLayout extends Layout {
                                 conX = left + leftMargin + columnPositions[spanEndPos];
                                 
                             }
-                            conW = w - leftMargin - componentStyle.getMarginLeft(parent.isRTL());
+                            conW = w - leftMargin - componentStyle.getMarginRight(parent.isRTL());
                         } else {
                             conW = columnSizes[c] - leftMargin - componentStyle.getMarginRight(parent.isRTL());
                         }

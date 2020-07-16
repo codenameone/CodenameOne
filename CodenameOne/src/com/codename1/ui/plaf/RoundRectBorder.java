@@ -168,6 +168,17 @@ public class RoundRectBorder extends Border {
     /**
      * Change the size of the arrow used for component tracking.
      * @param size Size of arrow in millimeters.
+     * @return a border instance
+     * @since 7.0
+     */
+    public RoundRectBorder arrowSize(float size) {
+        this.arrowSize = size;
+        return this;
+    }
+    
+    /**
+     * Change the size of the arrow used for component tracking.
+     * @param size Size of arrow in millimeters.
      * @since 7.0
      */
     public void setArrowSize(float size) {

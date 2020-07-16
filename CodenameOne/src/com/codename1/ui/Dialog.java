@@ -486,14 +486,14 @@ public class Dialog extends Form {
      * @return the style of the dialog
      */
     public Style getDialogStyle(){
-        return super.getContentPane().getStyle();
+        return super.getContentPane().getUnselectedStyle();
     }
 
     /**
      * Initialize the default transition for the dialogs overriding the forms
      * transition
      * 
-     * @param laf the default transition for the dialog
+     * @param uim the UIManager instance
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
