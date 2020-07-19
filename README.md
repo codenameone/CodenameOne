@@ -1,11 +1,21 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 
-[![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
 ## Write Once Run Anywhere Native Mobile Apps for Java and Kotlin Developers
 
 [Codename One](https://www.codenameone.com/) is a mobile first cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
 It's a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder/css), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
+
+![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=plastic)
+![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?style=plastic)
+![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=red&style=plastic)
+<!-- [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
+![GitHub language count](https://img.shields.io/github/languages/codenameone/CodenameOne?style=plastic)
+
+<p>
+<a href="https://twitter.com/CodenameOne"><img src="https://img.shields.io/badge/twitter-%231DA1F2.svg?&style=for-the-badge&logo=twitter&logoColor=white" height=25></a> 
+<a href="https://medium.com/CodenameOne"><img src="https://img.shields.io/badge/medium-%2312100E.svg?&style=for-the-badge&logo=medium&logoColor=white" height=25></a> 
+<a href="https://dev.to/codenameone"><img src="https://img.shields.io/badge/DEV.TO-%230A0A0A.svg?&style=for-the-badge&logo=dev-dot-to&logoColor=white" height=25></a> -->
 
 Codename One is the only platform that...
 
@@ -17,6 +27,7 @@ Codename One is the only platform that...
 - Has full control over every pixel on the screen! Just override paint and draw or use a glass pane to draw anywhere...
 - Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
 - Supports seamless Continuous Integration out of the box
+
 
 Here are some concrete benefits you can get with Codename One:
 
