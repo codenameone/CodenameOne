@@ -27,6 +27,7 @@ import static com.codename1.ui.CN.WEST;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.IconHolder;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -574,5 +575,80 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
     
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     */
+    public void setMaterialIcon(char c) {
+        icon.setMaterialIcon(c);
+    }
+    
+     /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
+     * @param c one of the constants from the font
+     */
+    public void setFontIcon(Font font, char c) {
+        icon.setFontIcon(font, c);
+    }
+    
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     * @param size the size of the icon in millimeters
+     */
+    public void setMaterialIcon(char c, float size) {
+        icon.setMaterialIcon(c, size);
+    }
+    
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
+     * @param c one of the constants from the font
+     * @param size the size of the icon in millimeters
+     */
+    public void setFontIcon(Font font, char c, float size) {
+        icon.setFontIcon(font, c, size);
+    }
+    
+    /**
+     * Returns the material icon assigned to this component or 0 if not applicable
+     * @return the material icon
+     */
+    public char getMaterialIcon() {
+        return icon.getMaterialIcon();
+    }
+    
+    /**
+     * Returns the font icon assigned to this component or 0 if not applicable
+     * @return the material icon
+     */
+    public char getFontIcon() {
+        return icon.getFontIcon();
+    }
+    
+    /**
+     * Returns the material icon size assigned to this component or 0/-1 if 
+     * not applicable
+     * @return the material icon size
+     */
+    public float getMaterialIconSize() {
+        return icon.getMaterialIconSize();
+    }
+    
+    /**
+     * Returns the icon size assigned to this component or 0/-1 if 
+     * not applicable
+     * @return the icon size
+     */
+    public float getFontIconSize() {
+        return icon.getFontIconSize();
+    }
+    
+    /**
+     * Returns the font for the icon font or null if not font set
+     * @return the material icon size
+     */
+    public Font getIconFont() {
+        return icon.getIconFont();
+    }
     
 }
