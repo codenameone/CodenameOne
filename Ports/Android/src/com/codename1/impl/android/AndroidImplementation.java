@@ -7353,11 +7353,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
+                    com.codename1.io.Log.p("Media player error: " + mp + " what: " + what + " extra: " + extra);
                     errorListeners.fireActionEvent(new MediaErrorEvent(Video.this, createMediaException(extra)));
                     fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
-                    
-                    return false;
+                    return true;
                 }
             });
 

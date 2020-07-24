@@ -68,7 +68,7 @@ public class LayoutTests extends AbstractTest {
 
         // NOTE:  We give a relative error grace of 1.0 because of the way that 
         // Layered layout calculates insets.  Since it uses floating point arithmetic
-        // internallay, it is possible that widths will be off by +- 1.
+        // internally, it is possible that widths will be off by +- 1.
         assertEqual(prefH, l.getHeight(), 1.0);
         assertEqual(prefW, l.getWidth(), 1.0);
 

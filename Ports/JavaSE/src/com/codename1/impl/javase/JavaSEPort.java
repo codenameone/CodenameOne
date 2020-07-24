@@ -1547,6 +1547,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     });
 
                 }    
+            } else {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        flushGraphics();
+                    }
+                });
             }
             
         }
@@ -2012,8 +2018,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     setSize((int)topSize.getWidth(), (int)topSize.getHeight());
                     canvas.setForcedSize(new Dimension(getWidth(), getHeight()));
                     
-                    final int newW = getWidth();
-                    final int newH = getHeight();
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             
@@ -2023,14 +2027,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                             if (f != null) {
                                 f.revalidate();
                             }
-                            EventQueue.invokeLater(new Runnable() {
-                                public void run() {
-                                    getParent().repaint();
-                                }
-                            });
                         }
                     });
-                    getParent().repaint();
                     return;
                 } 
                 
@@ -2051,15 +2049,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
                                     JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
-                                    try {
-                                        Thread.sleep(1000);                                            
-                                    } catch (Exception e) {
-                                    }
                                     g2dInstance = null;
                                     Form f = Display.getInstance().getCurrent();
                                     if (f != null) {
                                         f.forceRevalidate();
                                     }
+                                    
+                                    // probably not necessary
                                     new Thread(new Runnable() {
                                         @Override
                                         public void run() {
@@ -2081,7 +2077,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         
                     }
                     
-                }, 2000);
+                }, 200);
             }
         }
 
@@ -12428,18 +12424,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             textCmp,
                                             componentPoint.x,
                                             componentPoint.y);
-                    componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
-                    target.dispatchEvent(new MouseWheelEvent(target,
-                                                             e.getID(),
-                                                             e.getWhen(),
-                                                             e.getModifiers(),
-                                                             componentPoint.x,
-                                                             componentPoint.y,
-                                                             e.getClickCount(),
-                                                             e.isPopupTrigger(),
-                                                             e.getScrollType(),
-                                                             e.getScrollAmount(),
-                                                             e.getWheelRotation()));
+                    try {
+                        componentPoint = SwingUtilities.convertPoint(textCmp, componentPoint, target);
+                        target.dispatchEvent(new MouseWheelEvent(target,
+                                                                 e.getID(),
+                                                                 e.getWhen(),
+                                                                 e.getModifiers(),
+                                                                 componentPoint.x,
+                                                                 componentPoint.y,
+                                                                 e.getClickCount(),
+                                                                 e.isPopupTrigger(),
+                                                                 e.getScrollType(),
+                                                                 e.getScrollAmount(),
+                                                                 e.getWheelRotation()));
+                    } catch(Exception err) {
+                        // swallow this exception, it happens during scroll wheel
+                        // and I don't think there's much we can do about it
+                    }
                     return;
                 }
             }
