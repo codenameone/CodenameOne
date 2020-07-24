@@ -339,7 +339,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             });
             return;
         }
-        panel.getBrowser().executeJavaScript(js, getURL(), 0);
+        panel.getBrowser().executeJavaScript(js, js, 0);
     }
 
     @Override
