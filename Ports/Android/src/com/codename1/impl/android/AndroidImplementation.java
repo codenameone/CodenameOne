@@ -4635,12 +4635,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         });
                         
-                        if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false")) ) {
-                            wv.setWebContentsDebuggingEnabled(true); 
+                        if (android.os.Build.VERSION.SDK_INT >= 19) {
+                            if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false"))) {
+                                wv.setWebContentsDebuggingEnabled(true);
+                            }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
+                        if (android.os.Build.VERSION.SDK_INT >= 17) {
+                            wv.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                        }
                         bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
                         lock.notify();
                     } catch (Throwable t) {
