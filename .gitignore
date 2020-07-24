@@ -64,4 +64,4 @@ node_modules
 **/build-impl.xml
 **/genfiles.properties
 **/private/private.properties
-
+.idea/
