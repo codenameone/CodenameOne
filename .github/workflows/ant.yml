@@ -19,11 +19,23 @@ jobs:
     - name: Build with Ant
       run: xvfb-run ant test-javase
 
+
+    - name: Fetch JavaDoc Source Embed
+    - uses: actions/download-artifact@v2
+      with:
+        name: JavaDocSourceEmbed-1.0-SNAPSHOT.jar
+  
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
-        
-    - name: Upload CodenameOne JAR
+
+    - name: Upload updatedLibs.zip
       uses: actions/upload-artifact@v2
       with:
-        name: CodenameOne.jar
-        path: CodenameOne/dist/CodenameOne.jar
+        name: updatedLibs.zip
+        path: updatedLibs.zip
+
+    - name: Upload JavaDoc Zip
+      uses: actions/upload-artifact@v2
+      with:
+        name: CodenameOne_SRC.zip
+        path: build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
