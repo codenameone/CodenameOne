@@ -19,9 +19,8 @@ jobs:
     - name: Build with Ant
       run: xvfb-run ant test-javase
 
-
     - name: Fetch JavaDoc Source Embed
-    - uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v2
       with:
         name: JavaDocSourceEmbed-1.0-SNAPSHOT.jar
   
