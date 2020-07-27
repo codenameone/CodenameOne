@@ -33,8 +33,7 @@ jobs:
 
     - name: Build JavaDoc
       run: |
-        ls
-        find . -name "JavaDocSourceEmbed*"
+        unzip -v master.zip
         rm -Rf CodenameOne/dist/javadoc
         rm -Rf CodenameOne/build/tempJavaSources
         mkdir CodenameOne/build/tempJavaSources
