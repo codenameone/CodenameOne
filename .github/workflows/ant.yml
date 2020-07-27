@@ -24,7 +24,7 @@ jobs:
       with:
         owner: codenameone
         repo: JavaDocSourceEmbed
-        name: JavaDocSourceEmbed.jar
+        file: JavaDocSourceEmbed.jar
         token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
             
     - name: Build Release
