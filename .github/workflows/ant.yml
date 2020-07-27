@@ -33,7 +33,7 @@ jobs:
         rm -Rf CodenameOne/dist/javadoc
         rm -Rf CodenameOne/build/tempJavaSources
         mkdir CodenameOne/build/tempJavaSources
-        java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar CodenameOne/src CodenameOne/build/tempJavaSources
+        java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
         /usr/bin/find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
         cd CodenameOne/dist/javadoc && zip -r ../../../javadoc.zip * && cd ../../..
 
