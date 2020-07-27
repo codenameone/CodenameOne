@@ -25,6 +25,7 @@ jobs:
         owner: codenameone
         repo: JavaDocSourceEmbed
         file: JavaDocSourceEmbed.jar
+        tag: latest
         token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
             
     - name: Build Release
