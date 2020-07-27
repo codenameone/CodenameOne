@@ -29,7 +29,8 @@ jobs:
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
     - name: Build JavaDoc
-      run: rm -Rf CodenameOne/dist/javadoc
+      run: |
+        rm -Rf CodenameOne/dist/javadoc
         rm -Rf CodenameOne/build/tempJavaSources
         mkdir CodenameOne/build/tempJavaSources
         java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar CodenameOne/src CodenameOne/build/tempJavaSources
