@@ -20,7 +20,7 @@ jobs:
       run: xvfb-run ant test-javase
 
     - name: Fetch JavaDoc Source Embed
-      uses: actions/download-artifact@v2
+      uses: i3h/download-release-asset@v1
       with:
         owner: codenameone
         repo: JavaDocSourceEmbed
