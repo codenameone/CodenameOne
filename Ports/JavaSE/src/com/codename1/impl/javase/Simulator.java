@@ -113,8 +113,11 @@ public class Simulator {
             cefSupported = true;
             System.out.println("Adding CEF to classpath");
             String cn1LibPath = System.getProperty("cn1.library.path", ".");
-            String nativeDir = isMac ? "macos64" : isWindows ? "win64" : "linux64";
+            String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win64") : "linux64";
             System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
+            
+            // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
+            System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
             for (File jar : cef.listFiles()) {
                 if (jar.getName().endsWith(".jar")) {
                     files.add(jar);

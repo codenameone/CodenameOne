@@ -10,18 +10,16 @@ import com.codename1.impl.javase.JavaSEPort.CN1JPanel;
 import com.codename1.impl.javase.PeerComponentBuffer;
 import com.codename1.ui.CN;
 */
-import com.codename1.impl.javase.cef.CEFUIPlatform;
 import org.cef.CefClient;
 import org.cef.callback.CefDragData;
 import org.cef.handler.CefRenderHandler;
 
 import java.awt.Component;
 import java.awt.Cursor;
-import java.awt.Dimension;
-import java.awt.Graphics;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.IllegalComponentStateException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.dnd.DropTarget;
@@ -152,7 +150,12 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             @Override
             public void boundsChanged(int x, int y, int w, int h) {
                 browser_rect_.setBounds(x, y, w, h);
-                screenPoint_ = component_.getLocationOnScreen();
+                try {
+                    screenPoint_ = component_.getLocationOnScreen();
+                } catch (IllegalComponentStateException ex) {
+                    System.err.println("Failed to get location on screen:"+ex.getMessage());
+                    screenPoint_ = new Point(0,0);
+                }
                 wasResized(w, h);
             }
 

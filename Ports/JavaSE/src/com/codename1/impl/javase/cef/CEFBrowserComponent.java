@@ -93,6 +93,9 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         if (isMac) {
             String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator;
             return cefRoot + "macos64";
+        } else if (isWindows) {
+            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator+"lib"+File.separator;
+            return cefRoot + "win64";
         } else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
@@ -106,7 +109,13 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
             args.add("--touch-events=enabled");
             args.add("--disable-gpu");
-            
+        } else if (isWindows) {
+            // no extra stuff here
+            //args.add(String.format("--browser-subprocess-path=%s\\jcef_helper.exer", getLibPath()));
+            args.add("--touch-events=enabled");
+            args.add("--disable-gpu");
+            args.add("--disable-software-rasterizer");
+            args.add("--disable-gpu-compositing");
         } else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
@@ -116,6 +125,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         args.add("--enable-usermedia-screen-capturing");
+        
         return args.toArray(new String[args.size()]);
     }
     
