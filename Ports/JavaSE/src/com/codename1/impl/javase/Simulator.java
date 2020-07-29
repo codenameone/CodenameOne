@@ -110,18 +110,24 @@ public class Simulator {
         boolean fxOnSystemPath = fxSupported;
         File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         if (cef.exists()) {
-            cefSupported = true;
-            System.out.println("Adding CEF to classpath");
-            String cn1LibPath = System.getProperty("cn1.library.path", ".");
-            String bitSuffix = is64Bit ? "64" : "32";
-            String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("linux"+bitSuffix);
-            System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
+            if (isUnix && !is64Bit) {
+                System.out.println("Found CEF, but not using because CEF is only supported on 64 bit platforms.  Try running inside a 64 bit JVM");
+            } else {
+                
             
-            // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
-            System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
-            for (File jar : cef.listFiles()) {
-                if (jar.getName().endsWith(".jar")) {
-                    files.add(jar);
+                cefSupported = true;
+                System.out.println("Adding CEF to classpath");
+                String cn1LibPath = System.getProperty("cn1.library.path", ".");
+                String bitSuffix = is64Bit ? "64" : "32";
+                String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("lib" + File.separator + "linux"+bitSuffix);
+                System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
+
+                // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
+                System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
+                for (File jar : cef.listFiles()) {
+                    if (jar.getName().endsWith(".jar")) {
+                        files.add(jar);
+                    }
                 }
             }
         }
