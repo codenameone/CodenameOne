@@ -259,16 +259,33 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
         component_.setFocusable(true);
         component_.addFocusListener(new FocusListener() {
+            private boolean inFocusGained, inFocusLost;
             @Override
             public void focusLost(FocusEvent e) {
-                setFocus(false);
+                if (inFocusLost) return;
+                inFocusLost = true;
+                try {
+                    setFocus(false);
+                } finally {
+                    inFocusLost = false;
+                }
             }
 
             @Override
             public void focusGained(FocusEvent e) {
-                // Dismiss any Java menus that are currently displayed.
-                MenuSelectionManager.defaultManager().clearSelectedPath();
-                setFocus(true);
+                if (inFocusGained) {
+                    return;
+                }
+                inFocusGained = true;
+                try {
+                    // Dismiss any Java menus that are currently displayed.
+                    MenuSelectionManager.defaultManager().clearSelectedPath();
+
+                    setFocus(true);
+                } finally {
+                    inFocusGained = false;
+                }
+                
             }
         });
 
