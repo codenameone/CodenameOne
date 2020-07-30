@@ -41,7 +41,7 @@ jobs:
         echo "Analyzing packages"
         find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | grep -v /impl/ > tmp.packages
         echo "Running JavaDoc"
-        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
+        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API" || true
         echo "Zipping JavaDoc bundle"
         cd CodenameOne/dist/javadoc
         zip -r ../../../javadoc.zip *
