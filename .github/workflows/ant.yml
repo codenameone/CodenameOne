@@ -38,8 +38,10 @@ jobs:
         mkdir -p CodenameOne/build/tempJavaSources
         echo "Running JavaDocSourceEmbed"
         java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
+        echo "Analyzing packages"
+        find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | grep -v /impl/ > tmp.packages
         echo "Running JavaDoc"
-        /usr/bin/find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
+        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
         echo "Zipping JavaDoc bundle"
         cd CodenameOne/dist/javadoc
         zip -r ../../../javadoc.zip *
