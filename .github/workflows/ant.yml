@@ -20,13 +20,10 @@ jobs:
       run: xvfb-run ant test-javase
 
     - name: Fetch JavaDoc Source Embed
-      uses: i3h/download-release-asset@v1
+      uses: carlosperate/download-file-action@v1.0.3
       with:
-        owner: codenameone
-        repo: JavaDocSourceEmbed
-        file: JavaDocSourceEmbed.jar
-        tag: latest
-        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        file-url: ${{ secrets.JAVADOC_SOURCE_EMBED_URL }}
+        file-name: JavaDocSourceEmbed.jar
             
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
@@ -41,19 +38,8 @@ jobs:
         /usr/bin/find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
         cd CodenameOne/dist/javadoc && zip -r ../../../javadoc.zip * && cd ../../..
 
-
-    - name: Upload updatedLibs.zip to ART
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.ART_IP }}
-        username: ${{ secrets.ART_USER }}
-        password: ${{ secrets.ART_AUTH }}
-        port: 22
-        source: updatedLibs.zip
-        target: ${{ secrets.ART_DIR }}
-        strip_components: 1
-
     - name: Upload JavaDoc Zip to ART
+      if: github.ref == 'refs/heads/master'
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.ART_IP }}
@@ -61,5 +47,18 @@ jobs:
         password: ${{ secrets.ART_AUTH }}
         port: 22
         source: javadoc.zip
-        target: ${{ secrets.ART_DIR }}
+        target: ${{ secrets.ART_DIR }}/core
+        rm: true
+        strip_components: 1
+
+    - name: Upload updatedLibs.zip to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: updatedLibs.zip
+        target: ${{ secrets.ART_DIR }}/core
         strip_components: 1
