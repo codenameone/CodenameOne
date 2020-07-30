@@ -34,8 +34,8 @@ jobs:
         rm -Rf CodenameOne/dist/javadoc
         rm -Rf CodenameOne/build/tempJavaSources
         echo "Creating JavaDoc Dir"
-        mkdir CodenameOne/build
-        mkdir CodenameOne/build/tempJavaSources
+        mkdir -p CodenameOne/build
+        mkdir -p CodenameOne/build/tempJavaSources
         echo "Running JavaDocSourceEmbed"
         java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
         echo "Running JavaDoc"
