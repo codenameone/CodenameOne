@@ -20,29 +20,54 @@ jobs:
       run: xvfb-run ant test-javase
 
     - name: Fetch JavaDoc Source Embed
-      uses: actions/download-artifact@v2
+      uses: carlosperate/download-file-action@v1.0.3
       with:
-        name: JavaDocSourceEmbed.jar
-  
+        file-url: ${{ secrets.JAVADOC_SOURCE_EMBED_URL }}
+        file-name: JavaDocSourceEmbed.jar
+            
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
     - name: Build JavaDoc
-      run: rm -Rf CodenameOne/dist/javadoc
+      run: |
+        echo "Deleting old/temporary files"
+        rm -Rf CodenameOne/dist/javadoc
         rm -Rf CodenameOne/build/tempJavaSources
-        mkdir CodenameOne/build/tempJavaSources
-        java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar CodenameOne/src CodenameOne/build/tempJavaSources
-        /usr/bin/find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API"
-        cd CodenameOne/dist/javadoc && zip -r ../../../javadoc.zip * && cd ../../..
+        echo "Creating JavaDoc Dir"
+        mkdir -p CodenameOne/build
+        mkdir -p CodenameOne/build/tempJavaSources
+        echo "Running JavaDocSourceEmbed"
+        java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
+        echo "Analyzing packages"
+        find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | grep -v /impl/ > tmp.packages
+        echo "Running JavaDoc"
+        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API" || true
+        echo "Zipping JavaDoc bundle"
+        cd CodenameOne/dist/javadoc
+        zip -r ../../../javadoc.zip *
+        cd ../../..
 
-    - name: Upload updatedLibs.zip
-      uses: actions/upload-artifact@v2
+    - name: Upload JavaDoc Zip to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
       with:
-        name: updatedLibs.zip
-        path: updatedLibs.zip
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: javadoc.zip
+        target: ${{ secrets.ART_DIR }}/core
+        rm: true
+        strip_components: 1
 
-    - name: Upload JavaDoc Zip
-      uses: actions/upload-artifact@v2
+    - name: Upload updatedLibs.zip to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
       with:
-        name: CodenameOne_SRC.zip
-        path: build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: CodenameOne/updatedLibs.zip
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1

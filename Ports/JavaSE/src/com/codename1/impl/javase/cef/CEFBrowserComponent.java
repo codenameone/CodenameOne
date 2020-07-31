@@ -36,6 +36,26 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static boolean isWindows = isWindows();
     private static boolean isMac = isMac();
     private static boolean isUnix = isUnix();
+    private static final boolean is64Bit = is64Bit();
+    private static final String ARCH = System.getProperty("os.arch");
+    private static final boolean is64Bit() {
+        
+        String model = System.getProperty("sun.arch.data.model",
+                                          System.getProperty("com.ibm.vm.bitmode"));
+        if (model != null) {
+            return "64".equals(model);
+        }
+        if ("x86-64".equals(ARCH)
+            || "ia64".equals(ARCH)
+            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
+            || "sparcv9".equals(ARCH)
+            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
+            || "amd64".equals(ARCH)
+            || "aarch64".equals(ARCH)) {
+            return true;
+        }
+        return false;
+    }
     static {
         
        CefBrowserFactory.setInstance(new CN1CefBrowserFactory());
@@ -90,10 +110,20 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         if (out != null) {
             return out;
         }
+        
         if (isMac) {
             String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator;
             return cefRoot + "macos64";
-        } else {
+        } else if (isWindows) {
+            String bitSuffix = is64Bit ? "64" : "32";
+            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator+"lib"+File.separator;
+            return cefRoot + "win"+bitSuffix;
+        } else if (isUnix && is64Bit) {
+            
+            String bitSuffix = is64Bit ? "64" : "32";
+            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator+"lib"+File.separator;
+            return cefRoot + "linux"+bitSuffix;
+        }else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
     }
@@ -104,18 +134,32 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
             args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
             args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
-            args.add("--touch-events=enabled");
             args.add("--disable-gpu");
+        } else if (isWindows) {
+            // no extra stuff here
+            //args.add(String.format("--browser-subprocess-path=%s\\jcef_helper.exer", getLibPath()));
             
+            args.add("--disable-gpu");
+            args.add("--disable-software-rasterizer");
+            args.add("--disable-gpu-compositing");
+        } else if (isUnix) {
+            // no extra stuff here
+            //args.add(String.format("--browser-subprocess-path=%s\\jcef_helper.exer", getLibPath()));
+            
+            args.add("--disable-gpu");
+            args.add("--disable-software-rasterizer");
+            args.add("--disable-gpu-compositing");
         } else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
         }
         //args.add("--allow-file-access-from-files");
+        args.add("--touch-events=enabled");
         args.add("--enable-media-stream");
         args.add("--device-scale-factor=4");
         args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         args.add("--enable-usermedia-screen-capturing");
+        System.out.println("CEF Args: "+args);
         return args.toArray(new String[args.size()]);
     }
     
