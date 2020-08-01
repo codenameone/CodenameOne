@@ -347,7 +347,7 @@ public class TestComponent extends AbstractTest {
     }
 
     private void testCookies() throws IOException {
-        /*Cookie.clearCookiesFromStorage();
+        Cookie.clearCookiesFromStorage();
         String baseUrl = "https://solutions.weblite.ca/cn1tests/cookie";
         String clearCookiesUrl = baseUrl +"/reset.php";
         String setCookiesUrl = baseUrl + "/set.php";
@@ -433,7 +433,7 @@ public class TestComponent extends AbstractTest {
         TestUtils.assertTrue(req.getResponseCode() == 200, "Unexpected response code.  Expected 200 but found "+req.getResponseCode());
         TestUtils.assertTrue(t[0] == null, t[0] != null ? ("Exception was thrown getting URL "+t[0].getMessage()):"");
 
-*/
+
     }
 
     private static class BrowserStatus {
