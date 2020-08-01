@@ -2895,14 +2895,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        //these keys/values are from the Application Resources (strings values)
-        try {
-            int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
-            if (id != 0) {
-                String val = getContext().getResources().getString(id);
-                return val;
+        if(!key.startsWith("android.permission")) {
+            //these keys/values are from the Application Resources (strings values)
+            try {
+                int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
+                if (id != 0) {
+                    String val = getContext().getResources().getString(id);
+                    return val;
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         return System.getProperty(key, super.getProperty(key, defaultValue));
     }
