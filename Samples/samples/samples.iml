@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/SwitchScrollWheelingIssue" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BrowserWindowSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/RADChatRoomTest3" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/WebPushTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AndroidTextFieldTests2905" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SharedJavascriptContextSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CSSVariablesSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BrowserComponentCrashJDK11" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TestNativePlayerMode2972" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/GoogleLoginSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CheckboxTest2900" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BindButtonStateTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SpanLabelTest2897" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DraggableContainingSpanLabel" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TextFieldHintStylingTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SetLoopTest2969" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DraggableTabsSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SSLCertificatePinningSample2" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SSLCertificatePinningSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CompoundAnimationSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ShapeDonutSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AudioBufferSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/InfiniteProgressWithMessage" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AffineTransformTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SpanLabelIconAlignmentTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ButtonLongPointerPress" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FlowLayoutRTLTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SocketSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/UIFragmentSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DialogPositioningSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SpanLabelTest2980" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SwipableContainerTest2766" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ExecuteAndReturnStringTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/NativeControlsSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LeftPaddingCSSTest3091" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SendMessageSample2756" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LongPointerPressTest3049" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TextFieldCaretColorTest2780" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AudioRecorderComponentSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SearchCommandTextHintSample2953" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AndroidLineAboveTitleTest2966" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FullScreenWithBrowserComponentSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/JavascriptCapturePhotoSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CSSMediaQueriesSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ArrayTests2768" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ImageGalleryMultiCrashIOS2926" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/NullPointerOnEDTSample2992" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/WKWebViewTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LandscapeToolbarHiddenSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CodeScannerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CookiesTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/WebSocketReconnectTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AsyncResourceSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/GradientAlphaTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BadgesSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SQLExplorerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FileChooserSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ToolbarRTLTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DragFinishedListenerTest3056" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/OpenGalleryTest2793" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CSSFontFaceTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CameraKitSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/GradientTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/UnitTests" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AsyncStackTracesTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AutoCapitalizationTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AccordionSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TabIteratorSample2775" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TestParparTranspileError2922" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SwitchTest2644" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/NestedTabsTest3023" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TestCSSRegression3077" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LayeredLayoutTest2751" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/InterFormContainerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SetBrowserURLWithJarUrlSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/RadioButtonLeadComponentTest3105" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ListFilesTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/MySample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SimpleDateFormatTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/InfiniteContainerSafeAreaTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BrowserComponentPostMessageSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TestTextComponentPassword2976" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TextComponentSample2745" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AutocompleteAsyncTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SwitchListSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CaptureAudioSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DropListenerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/HelloWorldCSS" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AutocompleteSample2788" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ShapeClipTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ScaleImageLabelTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LeadComponentScrollingTest3079" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/JailbreakDetectionSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/RTLLayoutAndPadding" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/RadarChartSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/PasswordManagerTestCase2741" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AddComponentToRightBarSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/VerticalAlignTTFFontTest2798" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CameraKitTest2867" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/PickerUnresponsiveTest3051" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TabsAnimationSample2957" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/IOS13RegressionTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/MediaRecorderSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CSSBorderTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AsyncMediaSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AutocompleteInTabsTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/VideoPlayerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ZoomOutImageSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/RoundRectBorderTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LeadComponentDropListenerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SafeAreasSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CameraKitPickerTest7" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ImageViewerSample2778" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DnDRegression3048" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TestIOSWebView3062" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/GoogleMapsAddMarkerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SpanLabelTestAllStyles2891" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/NestedFormWithSwipeableTabsTest2776" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LinearGradientSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ProgressAnimationsSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/BrowserNavigationCallbackTest2939" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SetPageURLHierarchyTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SheetSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FingerprintScannerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LeadComponentSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TextSelectionSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TextAreaSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LocationSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SideMenuTest3086" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ProfileAvatarViewSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SpanLabelLayeredLayoutPreferredSizeTest3000" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/PickerTest3071" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/SafeModeOverflowMenuTest3103" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/StringPickerSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/TabsWithSpanLabelsTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/UnicodeFontsSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/LoadingTextAnimationSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/JavascriptScrollingTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/AutocompleteOverrideFilterSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/MultiListTest" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FadeOutTransitionSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CreateMediaRecorderSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DateFormatTest2772" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/CircleProgressSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/DeviceCalendarSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/WebSocketsSample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/FillShapeTest" isTestSource="false" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="CodenameOne1" level="project" />
+    <orderEntry type="library" name="dist" level="project" />
+    <orderEntry type="library" name="JavaSEWithSVGSupport" level="project" />
+    <orderEntry type="library" name="Android" level="project" />
+    <orderEntry type="library" name="JavaAPI" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient6" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient1" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient4" level="project" />
+    <orderEntry type="library" name="BlackBerryOS_4_2" level="project" />
+    <orderEntry type="library" name="lib2" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient3" level="project" />
+    <orderEntry type="library" name="DeviceCalendarSample" level="project" />
+    <orderEntry type="library" name="CodenameOne" level="project" />
+    <orderEntry type="library" name="BlackBerryOS_5" level="project" />
+    <orderEntry type="library" name="CLDC11" level="project" />
+    <orderEntry type="library" name="lib3" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient" level="project" />
+    <orderEntry type="library" name="dist1" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient5" level="project" />
+    <orderEntry type="library" name="J2ME" level="project" />
+    <orderEntry type="library" name="JavaSE" level="project" />
+    <orderEntry type="library" name="CodeNameOneBuildClient2" level="project" />
+    <orderEntry type="library" name="demos" level="project" />
+    <orderEntry type="library" name="CLDC111" level="project" />
+    <orderEntry type="module" module-name="CLDC11" />
+    <orderEntry type="module" module-name="Android" />
+    <orderEntry type="module" module-name="impl" />
+    <orderEntry type="module" module-name="core" />
+    <orderEntry type="module" module-name="CodenameOneDesigner" />
+    <orderEntry type="module" module-name="CodenameOne" />
+    <orderEntry type="module" module-name="JavaSE" />
+    <orderEntry type="module" module-name="JavaAPI" />
+    <orderEntry type="module" module-name="build2" />
+    <orderEntry type="module" module-name="iOSPort" />
+  </component>
+</module>

@@ -2895,14 +2895,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        //these keys/values are from the Application Resources (strings values)
-        try {
-            int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
-            if (id != 0) {
-                String val = getContext().getResources().getString(id);
-                return val;
+        if(!key.startsWith("android.permission")) {
+            //these keys/values are from the Application Resources (strings values)
+            try {
+                int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
+                if (id != 0) {
+                    String val = getContext().getResources().getString(id);
+                    return val;
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         return System.getProperty(key, super.getProperty(key, defaultValue));
     }
@@ -4635,12 +4637,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         });
                         
-                        if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false")) ) {
-                            wv.setWebContentsDebuggingEnabled(true); 
+                        if (android.os.Build.VERSION.SDK_INT >= 19) {
+                            if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false"))) {
+                                wv.setWebContentsDebuggingEnabled(true);
+                            }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
+                        if (android.os.Build.VERSION.SDK_INT >= 17) {
+                            wv.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                        }
                         bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
                         lock.notify();
                     } catch (Throwable t) {
@@ -7353,11 +7360,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
+                    com.codename1.io.Log.p("Media player error: " + mp + " what: " + what + " extra: " + extra);
                     errorListeners.fireActionEvent(new MediaErrorEvent(Video.this, createMediaException(extra)));
                     fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
-                    
-                    return false;
+                    return true;
                 }
             });
 

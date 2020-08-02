@@ -403,7 +403,12 @@ public class AutoCompleteTextField extends TextField {
             units[Component.TOP] = Style.UNIT_TYPE_PIXELS;
             popup.getAllStyles().setMarginUnit(units);
         }
-        popup.getAllStyles().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
+        
+        int leftMargin = isRTL() ?
+                Math.max(0, f.getWidth() - getAbsoluteX() - getWidth()) :
+                Math.max(0, getAbsoluteX());
+        
+        popup.getAllStyles().setMargin(LEFT, leftMargin);        
         
         int popupHeight = calcPopupHeight(l);
         

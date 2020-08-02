@@ -1690,7 +1690,7 @@ public class BrowserComponent extends Container {
                 .append("var callback = {")
                 .append("  onSucess: function(val) { this.onSuccess(val);}, ")
                 .append("  onSuccess: function(val) { result.value = val; result.type = typeof(val); if (val !== null && typeof val === 'object') {result.value = val.toString();} doCallback(result);}, ")
-                .append("  onError: function(message, code) { result.errorMessage = message; result.errorCode = code; doCallback(result);}")
+                .append("  onError: function(message, code) { if (message instanceof Error) {result.errorMessage = message.message; result.errorCode = 0;} else {result.errorMessage = message; result.errorCode = code;} doCallback(result);}")
                 .append("};")
                 
                 .append("try { ").append(js).append("} catch (e) {try {callback.onError(e.message, 0);} catch (e2) {callback.onError('Unknown error', 0);}}")

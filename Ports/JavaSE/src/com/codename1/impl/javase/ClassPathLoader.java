@@ -118,9 +118,10 @@ class ClassPathLoader extends ClassLoader {
         
     }
 
+    
+    
     @Override
     protected String findLibrary(String libname) {
-       
         String out = super.findLibrary(libname);
         if (out == null) {
             for (String libDir : System.getProperty("cn1.library.path", "").split(File.pathSeparator)) {
@@ -144,6 +145,10 @@ class ClassPathLoader extends ClassLoader {
                     }
                 } else {
                     File f = new File(libDir, libname + ".so");
+                    if (f.exists()) {
+                        return f.getAbsolutePath();
+                    }
+                    f = new File(libDir, "lib" + libname + ".so");
                     if (f.exists()) {
                         return f.getAbsolutePath();
                     }
