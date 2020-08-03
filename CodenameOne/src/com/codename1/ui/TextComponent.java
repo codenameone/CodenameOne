@@ -45,6 +45,8 @@ import com.codename1.ui.layouts.LayeredLayout;
  * <li>{@code textComponentErrorColor} a hex RGB color which defaults to null in which case this has no effect. 
  *      When defined this will change the color of the border and label to the given color to match the material design
  *      styling.
+ * <li>{@code textComponentErrorLineBorderBool} when set to {@code false}, this will prevent the text component from
+ * applying an underline border when there is a validation error. Defaults to {@code true}.
  * <li>{@code textComponentOnTopBool} toggles the on top mode see {@link #onTopMode(boolean)}
  * <li>{@code textComponentAnimBool} toggles the animation mode see {@link #focusAnimation(boolean)}
  * <li>{@code textComponentFieldUIID} sets the UIID of the text field to something other than {@code TextField} 
