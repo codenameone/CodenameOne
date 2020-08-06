@@ -287,4 +287,13 @@ public class EasyThread {
          */
         void onError(EasyThread t, T callback, Throwable error);
     }
+    
+    /**
+     * Changes the priority of this EasyThread.
+     *
+     * @param newPriority priority to set this thread to
+     */
+    public final void setPriority(int newPriority) {
+        t.setPriority(newPriority);
+    }
 }
