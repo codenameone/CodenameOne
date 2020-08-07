@@ -104,6 +104,7 @@ public class FlowLayout extends Layout{
     public FlowLayout(int orientation, int valign) {
         this.orientation = orientation;
         this.valign = valign;
+        vAlignByRow = valign != Component.TOP;
     }
 
     /**
