@@ -71,3 +71,63 @@ jobs:
         source: CodenameOne/updatedLibs.zip
         target: ${{ secrets.ART_DIR }}/core
         strip_components: 1
+
+    - name: Upload iOS Port to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/iOSPort.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload iOS Native to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/nativeios.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload zoozIosSources.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/zoozIosSources.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload CodenameOne.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: CodenameOne/dist/CodenameOne.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload Android.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: /Ports/Android/dist/Android.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
