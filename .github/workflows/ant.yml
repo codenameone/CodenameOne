@@ -134,6 +134,6 @@ jobs:
         username: ${{ secrets.ART_USER }}
         password: ${{ secrets.ART_AUTH }}
         port: 22
-        source: /Ports/Android/dist/Android.jar
+        source: Ports/Android/dist/Android.jar
         target: ${{ secrets.ART_DIR }}/core
         strip_components: 1
