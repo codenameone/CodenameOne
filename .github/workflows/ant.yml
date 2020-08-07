@@ -28,6 +28,12 @@ jobs:
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
+    - name: Build iOS Port
+      run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
+
+    - name: Build Android Port
+      run: ant -noinput -buildfile Ports/Android/build.xml jar
+
     - name: Build JavaDoc
       run: |
         echo "Deleting old/temporary files"
