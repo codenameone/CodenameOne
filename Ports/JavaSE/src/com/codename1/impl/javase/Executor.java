@@ -305,20 +305,27 @@ public class Executor {
     
     public static void startApp(){
         if(c != null && app != null){
-            try {
-                Method start = c.getMethod("start", new Class[0]);
-                if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
-                    System.err.println("ERROR: the start method can't declare a throws clause");
-                    System.exit(1);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method start = c.getMethod("start", new Class[0]);
+                        if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                            System.err.println("ERROR: the start method can't declare a throws clause");
+                            System.exit(1);
+                        }
+                        start.invoke(app, new Object[0]);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
                 }
-                start.invoke(app, new Object[0]);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            } 
-        }
-    
+               
+            });
+        }    
     }
 
+    
+    
     public static void registerForPush(final String key){
         if(c != null && app != null){
             Display.getInstance().callSerially(new Runnable() {
