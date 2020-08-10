@@ -110,7 +110,7 @@ public class TextComponent extends InputComponent {
             super.focusLostInternal();
             if(isInitialized() && isFocusAnimation()) {
                 getLabel().setFocus(false);
-                if(getText().length() == 0 && getLabel().isVisible()) {
+                if(getText().length() == 0 && getLabel().isVisible() && isOnTopMode()) {
                     final Label text = new Label(getLabel().getText(), getLabel().getUIID());
                     final Label placeholder = new Label();
                     Component.setSameSize(placeholder, getLabel());
