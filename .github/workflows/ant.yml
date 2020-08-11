@@ -137,3 +137,15 @@ jobs:
         source: Ports/Android/dist/Android.jar
         target: ${{ secrets.ART_DIR }}/core
         strip_components: 1
+
+    - name: Upload CLDC11.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/CLDC11/dist/CLDC11.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
