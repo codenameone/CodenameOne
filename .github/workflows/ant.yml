@@ -1,10 +1,6 @@
 name: Java CI
 
-on:   
-  push:
-  pull_request:
-    branches:
-      - master
+on: [push]
 
 jobs:
   build-linux-jdk8-fx:
