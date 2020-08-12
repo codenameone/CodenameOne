@@ -1,6 +1,9 @@
 name: Java CI
 
-on: [push]
+on: 
+  push:
+    branches:
+      - master
 
 jobs:
   build-linux-jdk8-fx:
