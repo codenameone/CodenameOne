@@ -45,6 +45,7 @@ jobs:
       run: ant -noinput -buildfile Ports/Android/build.xml jar
 
     - name: Build JavaDoc
+      if: github.ref == 'refs/heads/master'
       run: |
         echo "Deleting old/temporary files"
         rm -Rf CodenameOne/dist/javadoc
