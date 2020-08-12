@@ -737,7 +737,7 @@ public class RequestBuilder {
      * @return Response Object
      */
     public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
-        return getAsPropertyList(type, "root")
+        return getAsPropertyList(type, "root");
     }
 
     public String getRequestUrl() {
