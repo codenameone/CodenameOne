@@ -1,6 +1,9 @@
 name: Java CI
 
-on: [push]
+on: 
+  push:
+    branches:
+      - master
 
 jobs:
   build-linux-jdk8-fx:
@@ -28,7 +31,20 @@ jobs:
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
+    - name: Build iOS Port
+      run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
+
+    - name: Build iOS VM API
+      run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
+
+    - name: Build iOS VM
+      run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
+
+    - name: Build Android Port
+      run: ant -noinput -buildfile Ports/Android/build.xml jar
+
     - name: Build JavaDoc
+      if: github.ref == 'refs/heads/master'
       run: |
         echo "Deleting old/temporary files"
         rm -Rf CodenameOne/dist/javadoc
@@ -69,5 +85,101 @@ jobs:
         password: ${{ secrets.ART_AUTH }}
         port: 22
         source: CodenameOne/updatedLibs.zip
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload iOS Port to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/iOSPort.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload iOS Native to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/nativeios.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload zoozIosSources.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/iOSPort/dist/zoozIosSources.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload CodenameOne.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: CodenameOne/dist/CodenameOne.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload Android.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/Android/dist/Android.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload CLDC11.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: Ports/CLDC11/dist/CLDC11.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload JavaAPI.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: vm/JavaAPI/dist/JavaAPI.jar
+        target: ${{ secrets.ART_DIR }}/core
+        strip_components: 1
+
+    - name: Upload ByteCodeTranslator.jar to ART
+      if: github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ART_IP }}
+        username: ${{ secrets.ART_USER }}
+        password: ${{ secrets.ART_AUTH }}
+        port: 22
+        source: vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar
         target: ${{ secrets.ART_DIR }}/core
         strip_components: 1

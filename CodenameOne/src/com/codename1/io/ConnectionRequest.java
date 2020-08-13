@@ -204,13 +204,15 @@ public class ConnectionRequest implements IOProgressListener {
      * MANUAL means that the developer is responsible for the actual caching but the system
      * will not do a request on a resource that's already "fresh"
      * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
-     * a 404 error if data isn't available
+     * a 404 error if data isn't available. OFFLINE_FIRST works the same way as offline but
+     * if data isn't available locally it will try to connect to the server
      */
     public static enum CachingMode {
         OFF,
         MANUAL,
         SMART,
-        OFFLINE
+        OFFLINE,
+        OFFLINE_FIRST
     }
     
     /**
@@ -743,16 +745,18 @@ public class ConnectionRequest implements IOProgressListener {
         if(shouldStop()) {
             return true;
         }
-        if(cacheMode == CachingMode.OFFLINE) {
+        if(cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = getCachedData();
             if(is != null) {
                 readResponse(is);
                 Util.cleanup(is);
+                return true;
             } else {
-                responseCode = 404;
-                throw new IOException("File unavilable in cache");
+                if(cacheMode == CachingMode.OFFLINE) {
+                    responseCode = 404;
+                    throw new IOException("File unavilable in cache");
+                }
             }
-            return true;
         }
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;

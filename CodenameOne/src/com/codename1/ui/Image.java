@@ -36,6 +36,7 @@ import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 
 /**
@@ -1215,17 +1216,14 @@ public class Image implements ActionSource {
      * of an image returned from the camera or from the gallery, preserving the
      * original format (jpeg or png); it detects the Exif Orientation Tag, if
      * available (all the possible Exif Orientation Tag values are
-     * supported).</p>
+     * supported); transparency is not preserved.</p>
      * <p>
-     * However, rotating and/or flipping an hi-res image is very inefficient,
-     * that's why you should consider to pass a maxSize value as small as
-     * possible: it makes this method working faster.</p>
-     * <p>
-     * If there is no rotation or flipping, or if the capturedImage has a format
-     * different from jpeg and png, the image is only copied or scaled if
-     * necessary.<br>Note that this method doesn't rely on the file extension,
-     * but on the mime type of the capturedImage, since some devices don't give
-     * appropriate extension to images returned from the gallery.</p>
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.<br>Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.</p>
      * <p>
      * You can test all the possible orientation values downloading the images
      * from the repository
@@ -1237,9 +1235,41 @@ public class Image implements ActionSource {
      *
      * @param capturedImage is the FileSystemStorage path of a captured photo,
      * usually inside a temporary directory
-     * @param rotatedImage is the FileSystemStorage path in which the capture
+     * @return the rotated and/or flipped image
+     */
+    public static Image exifRotation(String capturedImage) throws IOException {
+        return exifRotation(capturedImage, null, -1);
+    }
+    
+    /**
+     * <p>
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported); transparency is not preserved.</p>
+     * <p>
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.<br>Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.</p>
+     * <p>
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * <a href="https://github.com/recurser/exif-orientation-examples">EXIF
+     * Orientation-flag example images</a></p>
+     * <p>
+     * Code example:</p>
+     * <script src="https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js"></script>
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     * usually inside a temporary directory
+     * @param rotatedImage is the FileSystemStorage path in which the rotated
      * photo is stored, normally this should be inside the
-     * FileSystemStorage.getAppHomePath().
+     * FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+     * save the rotated image to the FileSystemStorage.
      * @return the rotated and/or flipped image
      */
     public static Image exifRotation(String capturedImage, String rotatedImage) throws IOException {
@@ -1252,17 +1282,18 @@ public class Image implements ActionSource {
      * of an image returned from the camera or from the gallery, preserving the
      * original format (jpeg or png); it detects the Exif Orientation Tag, if
      * available (all the possible Exif Orientation Tag values are
-     * supported).</p>
+     * supported); transparency is not preserved.</p>
      * <p>
      * However, rotating and/or flipping an hi-res image is very inefficient,
      * that's why you should consider to pass a maxSize value as small as
      * possible: it makes this method working faster.</p>
      * <p>
-     * If there is no rotation or flipping, or if the capturedImage has a format
-     * different from jpeg and png, the image is only copied or scaled if
-     * necessary.<br>Note that this method doesn't rely on the file extension,
-     * but on the mime type of the capturedImage, since some devices don't give
-     * appropriate extension to images returned from the gallery.</p>
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.<br>Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.</p>
      * <p>
      * You can test all the possible orientation values downloading the images
      * from the repository
@@ -1274,9 +1305,10 @@ public class Image implements ActionSource {
      *
      * @param capturedImage is the FileSystemStorage path of a captured photo,
      * usually inside a temporary directory
-     * @param rotatedImage is the FileSystemStorage path in which the capture
+     * @param rotatedImage is the FileSystemStorage path in which the rotated
      * photo is stored, normally this should be inside the
-     * FileSystemStorage.getAppHomePath().
+     * FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+     * save the rotated image to the FileSystemStorage.
      * @param maxSize is the maximum value of the width and height of the
      * rotated images, that is scaled if necessary, keeping the ratio.
      * @return the com.codename1.ui.Image
@@ -1292,7 +1324,9 @@ public class Image implements ActionSource {
         if (!isJpeg && !isPNG) {
             // Only jpeg and png images are supported, but some devices can return also different formats from the gallery (like gif).
             // In this case, we simply copy the file.
-            Util.copy(fss.openInputStream(capturedImage), fss.openOutputStream(rotatedImage));
+            if (rotatedImage != null) {
+                Util.copy(fss.openInputStream(capturedImage), fss.openOutputStream(rotatedImage));
+            }
             return EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));
         } else if (isJpeg) {
             format = ImageIO.FORMAT_JPEG;
@@ -1301,55 +1335,66 @@ public class Image implements ActionSource {
         }
         int orientation = getExifOrientationTag(fss.openInputStream(capturedImage));
         Image img = EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));
+        img.lock();
         if (maxSize > 0 && (img.getWidth() > maxSize || img.getHeight() > maxSize)) {
             // Tested that scaling the image before rotating is a lot more efficient than rotating before scaling
-            img = img.scaledSmallerRatio(maxSize, maxSize);
+            Image scaled = img.scaledSmallerRatio(maxSize, maxSize);
+            img.unlock();
+            img = scaled;
+            img.lock();
         }
+        Image result, temp;
         switch (orientation) {
             case 0:
             case 1:
-                // no rotation
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return img;
+                // no rotation (but the image may have been scaled)
+                result = img;
+                break;
             case 2:
                 // action required: flip horizontally
-                img = img.flipHorizontally(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                result = img.flipHorizontally(false);
+                break;
             case 3:
                 //  action required: rotate 180 degrees
-                img = img.rotate180Degrees(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                result = img.rotate180Degrees(false);
+                break;
             case 4:
                 //  action required: flip vertically
-                img = img.flipVertically(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                result = img.flipVertically(false);
+                break;
             case 5:
                 //  action required: rotate 270 degrees
-                img = img.rotate270Degrees(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                result = img.rotate270Degrees(false);
+                break;
             case 6:
                 //  action required: rotate 90 degrees
-                img = img.rotate90Degrees(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                result = img.rotate90Degrees(false);
+                break;
             case 7:
                 //  action required: flip horizontally and rotate 90 degrees
-                img = img.flipHorizontally(true).rotate90Degrees(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                temp = img.flipHorizontally(false);
+                temp.lock();
+                result = temp.rotate90Degrees(false);
+                temp.unlock();
+                break;
             case 8:
                 //  action required: flip horizontally and rotate 270 degrees
-                img = img.rotate270Degrees(true);
-                ImageIO.getImageIO().save(img, fss.openOutputStream(rotatedImage), format, 0.9f);
-                return EncodedImage.create(fss.openInputStream(rotatedImage), (int) fss.getLength(rotatedImage));
+                temp = img.flipHorizontally(false);
+                temp.lock();
+                result = temp.rotate270Degrees(false);
+                temp.unlock();
+                break;
             default:
                 // this never should happen
                 throw new IllegalStateException("Unsupported rotation");
         }
+        img.unlock();
+        if (rotatedImage != null) {
+            OutputStream out = fss.openOutputStream(rotatedImage);
+            ImageIO.getImageIO().save(result, out, format, 0.9f);
+            Util.cleanup(out);
+        }
+        return EncodedImage.createFromImage(result, isJpeg);
     }
 
     /**
