@@ -2385,11 +2385,23 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
         dispatch_sync(dispatch_get_main_queue(), ^{
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
+            config.mediaTypesRequiringUserActionForPlayback=WKAudiovisualMediaTypeNone;
+            config.suppressesIncrementalRendering = YES;
+            UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+            WKUserContentController* userContentController = [[WKUserContentController alloc] init];
+            NSString *bootstrapSource = @"window.cn1application = window.cn1application || {};\
+            window.cn1application.shouldNavigate = function(url) {\
+                window.webkit.messageHandlers.cn1.postMessage({'shouldNavigate' : url});\
+            };";
+            WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+            [userContentController addUserScript:bootstrapScript];
+            [userContentController addScriptMessageHandler:del name:@"cn1"];
+            config.userContentController = userContentController;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
-            UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+            
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
             
@@ -2624,10 +2636,10 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
             dispatch_async(dispatch_get_main_queue(), ^{
                 POOL_BEGIN();
                 WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-            
-                [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
+                [w evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
                     if (error != nil) {
-                        NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                        NSLog(@"evaluateJavaScript2 error : %@ : %@", error.localizedDescription, js);
                     }
                 }];
                 POOL_END();

@@ -105,6 +105,7 @@ extern int connections;
 
 
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+    //NSLog(@"Firing navigation callback: %@", navigationAction.request.URL.absoluteString );
     JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG navigationAction.request.URL.absoluteString.UTF8String));
     if(result) {
         decisionHandler(WKNavigationActionPolicyAllow);
@@ -128,6 +129,16 @@ extern int connections;
     if(connections < 1) {
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
     }
+}
+
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message
+{
+    NSDictionary* jsonEntry = message.body;
+    NSString* url = [jsonEntry objectForKey:@"shouldNavigate"];
+    if (url != nil) {
+        JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url));
+    }
+    //NSLog(@"user content controller received message %@", jsonEntry);
 }
 
 #endif
