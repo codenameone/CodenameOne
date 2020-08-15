@@ -570,7 +570,8 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setChunkedStreamingMode(connection, chunkedStreamingLen);
         }
         
-        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART)) {
+        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART
+                || cacheMode == CachingMode.OFFLINE_FIRST)) {
             String msince = Preferences.get("cn1MSince" + createRequestURL(), null);
             if(msince != null) {
                 impl.setHeader(connection, "If-Modified-Since", msince);
@@ -920,7 +921,8 @@ public class ConnectionRequest implements IOProgressListener {
             }
             responseContentType = getHeader(connection, "Content-Type");
             
-            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL) {
+            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL
+                    || cacheMode == CachingMode.OFFLINE_FIRST) {
                 String last = getHeader(connection, "Last-Modified");
                 String etag = getHeader(connection, "ETag");
                 Preferences.set("cn1MSince" + createRequestURL(), last);
@@ -942,7 +944,8 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                     ((BufferedInputStream)input).setYield(getYield());
                 }
-                if(!post && cacheMode == CachingMode.SMART && destinationFile == null && destinationStorage == null) {
+                if(!post && (cacheMode == CachingMode.SMART || cacheMode = CachingMode.OFFLINE_FIRST)
+                        && destinationFile == null && destinationStorage == null) {
                     byte[] d = Util.readInputStream(input);
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
                     os.write(d);
