@@ -944,7 +944,7 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                     ((BufferedInputStream)input).setYield(getYield());
                 }
-                if(!post && (cacheMode == CachingMode.SMART || cacheMode = CachingMode.OFFLINE_FIRST)
+                if(!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
                         && destinationFile == null && destinationStorage == null) {
                     byte[] d = Util.readInputStream(input);
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
