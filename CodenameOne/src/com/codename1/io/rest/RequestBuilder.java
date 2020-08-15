@@ -658,7 +658,7 @@ public class RequestBuilder {
      * @param root the root element's key of the structured content
      * @return returns the Connection Request object so it can be killed if necessary
      */
-    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type, String root) {
+    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type, final String root) {
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -737,7 +737,7 @@ public class RequestBuilder {
      * @return Response Object
      */
     public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
-        return getAsPropertyList(type, "root")
+        return getAsPropertyList(type, "root");
     }
 
     public String getRequestUrl() {
