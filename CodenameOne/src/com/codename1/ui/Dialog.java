@@ -40,40 +40,52 @@ import java.util.Hashtable;
 import java.util.Map;
 
 /**
- * <p>A dialog is a form that occupies a part of the screen and appears as a modal
- * entity to the developer. Dialogs allow us to prompt users for information and
- * rely on the information being available on the next line after the show method.</p>
- * <p>Modality indicates that a dialog will block the calling thread even if the
- * calling thread is the EDT. Notice that a dialog will not release the block
- * until dispose is called even if show() from another form is called! Events are still performed thanks
- * to the {@link com.codename1.ui.Display#invokeAndBlock(java.lang.Runnable)} capability of the 
- * <code>Display</code> class.</p>
- * <p>To determine the size of the dialog use the show method that accepts 4 integer
- * values, notice that these values accept margin from the four sides rather than x, y, width
- * and height values!</p>
- * <p>It's important to style a <code>Dialog</code> using {@link Dialog#getDialogStyle()} or 
- * {@link Dialog#setDialogUIID(java.lang.String)} methods rather than styling the dialog object directly.</p>
  * <p>
- * The <code>Dialog</code> class also includes support for popup dialog which is a dialog type that is positioned
- * next to a component or screen area and points an arrow at that location. 
+ * A dialog is a form that occupies a part of the screen and appears as a modal
+ * entity to the developer. Dialogs allow us to prompt users for information and
+ * rely on the information being available on the next line after the show
+ * method.</p>
+ * <p>
+ * Modality indicates that a dialog will block the calling thread even if the
+ * calling thread is the EDT. Notice that a dialog will not release the block
+ * until dispose is called even if show() from another form is called! Events
+ * are still performed thanks to the
+ * {@link com.codename1.ui.Display#invokeAndBlock(java.lang.Runnable)}
+ * capability of the <code>Display</code> class.</p>
+ * <p>
+ * To determine the size of the dialog use the show method that accepts 4
+ * integer values, notice that these values accept margin from the four sides
+ * rather than x, y, width and height values!</p>
+ * <p>
+ * It's important to style a <code>Dialog</code> using
+ * {@link Dialog#getDialogStyle()} or
+ * {@link Dialog#setDialogUIID(java.lang.String)} methods rather than styling
+ * the dialog object directly.</p>
+ * <p>
+ * The <code>Dialog</code> class also includes support for popup dialog which is
+ * a dialog type that is positioned next to a component or screen area and
+ * points an arrow at that location.
  * </p>
- * 
- * <p>Typical dialog usage looks like this:</p>
+ *
+ * <p>
+ * Typical dialog usage looks like this:</p>
  * <script src="https://gist.github.com/codenameone/bbf5378aec028230ce93.js"></script>
- * 
- * <p>See this sample for showing a dialog at the bottom of the screen:</p>
+ *
+ * <p>
+ * See this sample for showing a dialog at the bottom of the screen:</p>
  * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-dialog-modal-south.png" alt="Dialog South" />
  *
  * @author Shai Almog
- * @see Display#invokeAndBlock(java.lang.Runnable) 
+ * @see Display#invokeAndBlock(java.lang.Runnable)
  */
 public class Dialog extends Form {
 
     /**
-     * The default pointer out of bounds dispose behavior, notice that
-     * this only applies to dialogs and not popup dialogs where this is
-     * always true by default
+     * The default pointer out of bounds dispose behavior, notice that this only
+     * applies to dialogs and not popup dialogs where this is always true by
+     * default
+     *
      * @return the defaultDisposeWhenPointerOutOfBounds
      */
     public static boolean isDefaultDisposeWhenPointerOutOfBounds() {
@@ -81,15 +93,17 @@ public class Dialog extends Form {
     }
 
     /**
-     * The default pointer out of bounds dispose behavior, notice that
-     * this only applies to dialogs and not popup dialogs where this is
-     * always true by default
-     * @param aDefaultDisposeWhenPointerOutOfBounds the defaultDisposeWhenPointerOutOfBounds to set
+     * The default pointer out of bounds dispose behavior, notice that this only
+     * applies to dialogs and not popup dialogs where this is always true by
+     * default
+     *
+     * @param aDefaultDisposeWhenPointerOutOfBounds the
+     * defaultDisposeWhenPointerOutOfBounds to set
      */
     public static void setDefaultDisposeWhenPointerOutOfBounds(
-        boolean aDefaultDisposeWhenPointerOutOfBounds) {
-        defaultDisposeWhenPointerOutOfBounds =
-            aDefaultDisposeWhenPointerOutOfBounds;
+            boolean aDefaultDisposeWhenPointerOutOfBounds) {
+        defaultDisposeWhenPointerOutOfBounds
+                = aDefaultDisposeWhenPointerOutOfBounds;
     }
     /**
      * Indicates whether the dialog has been disposed
@@ -101,7 +115,7 @@ public class Dialog extends Form {
      * icon if none are explicitly set
      */
     public static final int TYPE_NONE = 0;
-    
+
     /**
      * Constant indicating the type of alert to indicate the sound to play or
      * icon if none are explicitly set
@@ -136,7 +150,8 @@ public class Dialog extends Form {
      */
     private Command lastCommandPressed;
     /**
-     * Indicates that this is a menu preventing getCurrent() from ever returning this class
+     * Indicates that this is a menu preventing getCurrent() from ever returning
+     * this class
      */
     private boolean menu;
     private int dialogType;
@@ -148,39 +163,39 @@ public class Dialog extends Form {
     private String position;
 
     /**
-     * Indicates whether Codename One should try to automatically adjust a showing dialog size
-     * when a screen size change event occurs
+     * Indicates whether Codename One should try to automatically adjust a
+     * showing dialog size when a screen size change event occurs
      */
     private static boolean autoAdjustDialogSize = true;
 
     /**
      * Default screen orientation position for the upcoming dialog. By default
-     * the dialog will be shown at hardcoded coordinates, this method allows us 
-     * to pack the dialog appropriately in one of the border layout based locations
-     * see BorderLayout for futher details.
+     * the dialog will be shown at hardcoded coordinates, this method allows us
+     * to pack the dialog appropriately in one of the border layout based
+     * locations see BorderLayout for futher details.
      */
     private static String defaultDialogPosition;
 
     /**
      * Default screen orientation position for the upcoming dialog. By default
      * the dialog will be shown at hardcoded coordinates, this method allows us
-     * to pack the dialog appropriately in one of the border layout based locations
-     * see BorderLayout for futher details.
+     * to pack the dialog appropriately in one of the border layout based
+     * locations see BorderLayout for futher details.
      */
     private String dialogPosition = defaultDialogPosition;
 
     /**
-     * Allows a developer to indicate his interest that the dialog should no longer
-     * scroll on its own but rather rely on the scrolling properties of internal 
-     * scrollable containers. This flag only affects the static show methods within
-     * this class.
+     * Allows a developer to indicate his interest that the dialog should no
+     * longer scroll on its own but rather rely on the scrolling properties of
+     * internal scrollable containers. This flag only affects the static show
+     * methods within this class.
      */
     private static boolean disableStaticDialogScrolling;
 
     /**
-     * Determines whether the execution of a command on this dialog implicitly 
-     * disposes the dialog. This defaults to true which is a sensible default for
-     * simple dialogs.
+     * Determines whether the execution of a command on this dialog implicitly
+     * disposes the dialog. This defaults to true which is a sensible default
+     * for simple dialogs.
      */
     private boolean autoDispose = true;
 
@@ -193,55 +208,60 @@ public class Dialog extends Form {
      * The default type for dialogs
      */
     private static int defaultDialogType = TYPE_INFO;
-    
+
     /**
-     * Places commands as buttons at the bottom of the standard static dialogs rather than
-     * as softbuttons. This is especially appropriate for devices such as touch devices and
-     * devices without the common softbuttons (e.g. blackberries). 
-     * The default value is false
+     * Places commands as buttons at the bottom of the standard static dialogs
+     * rather than as softbuttons. This is especially appropriate for devices
+     * such as touch devices and devices without the common softbuttons (e.g.
+     * blackberries). The default value is false
      */
     private static boolean commandsAsButtons = true;
 
-    
     /**
-     * The default pointer out of bounds dispose behavior, notice that 
-     * this only applies to dialogs and not popup dialogs where this is 
-     * always true by default
+     * The default pointer out of bounds dispose behavior, notice that this only
+     * applies to dialogs and not popup dialogs where this is always true by
+     * default
      */
     private static boolean defaultDisposeWhenPointerOutOfBounds = false;
     private boolean disposeWhenPointerOutOfBounds = defaultDisposeWhenPointerOutOfBounds;
     private boolean pressedOutOfBounds;
-    
+
     /**
-     * Returns true if the dialog was disposed automatically due to device rotation
+     * Returns true if the dialog was disposed automatically due to device
+     * rotation
      */
     private boolean disposedDueToRotation;
     private Label dialogTitle;
     private Container dialogContentPane;
 
     /**
-     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
-     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * Indicates if we want to enforce directional bias for the popup dialog. If
+     * null this field is ignored but if its set to a value it biases the system
+     * towards a fixed direction for the popup dialog.
      */
     private Boolean popupDirectionBiasPortrait;
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
      * only should be used
      */
     private static float defaultBlurBackgroundRadius = -1;
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
      * only should be used
      */
     private float blurBackgroundRadius = defaultBlurBackgroundRadius;
-    
+
+    private boolean isUIIDByPopupPosition;
+
     /**
      * Constructs a Dialog with a title
-     * 
+     *
      * @param title the title of the dialog
      */
     public Dialog(String title) {
@@ -251,7 +271,7 @@ public class Dialog extends Form {
 
     /**
      * Constructs a Dialog with a title
-     * 
+     *
      * @param title the title of the dialog
      * @param lm the layout for the dialog
      */
@@ -259,8 +279,7 @@ public class Dialog extends Form {
         this(lm);
         setTitle(title);
     }
-    
-    
+
     /**
      * Disabling ad padding for dialogs
      */
@@ -268,8 +287,8 @@ public class Dialog extends Form {
     }
 
     /**
-     * Constructs a Dialog 
-     * 
+     * Constructs a Dialog
+     *
      */
     public Dialog() {
         this("Dialog", "DialogTitle");
@@ -277,13 +296,13 @@ public class Dialog extends Form {
 
     /**
      * Constructs a Dialog with a layout
-     * 
+     *
      * @param lm the layout manager
      */
     public Dialog(Layout lm) {
         this("Dialog", "DialogTitle", lm);
     }
-    
+
     Dialog(String dialogUIID, String dialogTitleUIID) {
         super();
         initImpl(dialogUIID, dialogTitleUIID, null);
@@ -303,7 +322,7 @@ public class Dialog extends Form {
         lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
-        if(lm != null) {
+        if (lm != null) {
             dialogContentPane = new Container(lm);
         } else {
             dialogContentPane = new Container();
@@ -322,10 +341,9 @@ public class Dialog extends Form {
         setSmoothScrolling(false);
         deregisterAnimated(this);
     }
-    
+
     /**
-     * Overriden to disable the toolbar in dialogs <br>
-     * {@inheritDoc}
+     * Overriden to disable the toolbar in dialogs <br> {@inheritDoc}
      */
     @Override
     protected final void initGlobalToolbar() {
@@ -391,7 +409,6 @@ public class Dialog extends Form {
         dialogContentPane.removeComponent(cmp);
     }
 
-
     /**
      * {@inheritDoc}
      */
@@ -416,7 +433,7 @@ public class Dialog extends Form {
     void updateIcsIconCommandBehavior() {
         // don't set the app icon to the dialog title
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -443,7 +460,6 @@ public class Dialog extends Form {
         return super.getContentPane();
     }
 
-
     /**
      * {@inheritDoc}
      */
@@ -452,13 +468,12 @@ public class Dialog extends Form {
         dialogTitle = title;
     }
 
-
     /**
      * Simple setter to set the Dialog Style
-     * 
+     *
      * @param style
      */
-    public void setDialogStyle(Style style){
+    public void setDialogStyle(Style style) {
         super.getContentPane().setUnselectedStyle(style);
     }
 
@@ -467,7 +482,7 @@ public class Dialog extends Form {
      *
      * @param uiid the id for the dialog
      */
-    public void setDialogUIID(String uiid){
+    public void setDialogUIID(String uiid) {
         super.getContentPane().setUIID(uiid);
     }
 
@@ -476,23 +491,23 @@ public class Dialog extends Form {
      *
      * @return the uiid of the dialog
      */
-    public String getDialogUIID(){
+    public String getDialogUIID() {
         return super.getContentPane().getUIID();
     }
 
     /**
      * Simple getter to get the Dialog Style
-     * 
+     *
      * @return the style of the dialog
      */
-    public Style getDialogStyle(){
+    public Style getDialogStyle() {
         return super.getContentPane().getUnselectedStyle();
     }
 
     /**
      * Initialize the default transition for the dialogs overriding the forms
      * transition
-     * 
+     *
      * @param uim the UIManager instance
      */
     protected void initLaf(UIManager uim) {
@@ -502,41 +517,48 @@ public class Dialog extends Form {
     }
 
     /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
-     * of an alert/dialog box. This method will block the calling thread even if the
-     * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
-     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
-     * 
+     * This method shows the form as a modal alert allowing us to produce a
+     * behavior of an alert/dialog box. This method will block the calling
+     * thread even if the calling thread is the EDT. Notice that this method
+     * will not release the block until dispose is called even if show() from
+     * another form is called!
+     * <p>
+     * Modal dialogs Allow the forms "content" to "hang in mid air" this is
+     * especially useful for dialogs where you would want the underlying form to
+     * "peek" from behind the form.
+     *
      * @param top space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the
+     * form
      * @param left space in pixels between the left of the screen and the form
      * @param right space in pixels between the right of the screen and the form
-     * @param includeTitle whether the title should hang in the top of the screen or
-     * be glued onto the content pane
+     * @param includeTitle whether the title should hang in the top of the
+     * screen or be glued onto the content pane
      * @return the last command pressed by the user if such a command exists
-     * @deprecated use the version that doesn't accept the include title, the includeTitle 
-     * feature is no longer supported
+     * @deprecated use the version that doesn't accept the include title, the
+     * includeTitle feature is no longer supported
      */
     public Command show(int top, int bottom, int left, int right, boolean includeTitle) {
         return show(top, bottom, left, right, includeTitle, true);
     }
 
     /**
-     * <p>This method shows the form as a modal alert allowing us to produce a behavior
-     * of an alert/dialog box. This method will block the calling thread even if the
-     * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!</p>
-     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. </p>
+     * <p>
+     * This method shows the form as a modal alert allowing us to produce a
+     * behavior of an alert/dialog box. This method will block the calling
+     * thread even if the calling thread is the EDT. Notice that this method
+     * will not release the block until dispose is called even if show() from
+     * another form is called!</p>
+     * <p>
+     * Modal dialogs Allow the forms "content" to "hang in mid air" this is
+     * especially useful for dialogs where you would want the underlying form to
+     * "peek" from behind the form. </p>
      * See this sample for showing a dialog at the bottom of the screen:
      * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
-     * 
+     *
      * @param top space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the
+     * form
      * @param left space in pixels between the left of the screen and the form
      * @param right space in pixels between the right of the screen and the form
      * @return the last command pressed by the user if such a command exists
@@ -544,34 +566,38 @@ public class Dialog extends Form {
     public Command show(int top, int bottom, int left, int right) {
         return show(top, bottom, left, right, false, true);
     }
-    
+
     /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
-     * of an alert/dialog box. This method will block the calling thread even if the
-     * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
-     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
-     * 
+     * This method shows the form as a modal alert allowing us to produce a
+     * behavior of an alert/dialog box. This method will block the calling
+     * thread even if the calling thread is the EDT. Notice that this method
+     * will not release the block until dispose is called even if show() from
+     * another form is called!
+     * <p>
+     * Modal dialogs Allow the forms "content" to "hang in mid air" this is
+     * especially useful for dialogs where you would want the underlying form to
+     * "peek" from behind the form.
+     *
      * @param top space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the
+     * form
      * @param left space in pixels between the left of the screen and the form
      * @param right space in pixels between the right of the screen and the form
-     * @param includeTitle whether the title should hang in the top of the screen or
-     * be glued onto the content pane
-     * @param modal indicates the dialog should be modal set to false for modeless dialog
-     * which is useful for some use cases
+     * @param includeTitle whether the title should hang in the top of the
+     * screen or be glued onto the content pane
+     * @param modal indicates the dialog should be modal set to false for
+     * modeless dialog which is useful for some use cases
      * @return the last command pressed by the user if such a command exists
-     * @deprecated use showAtPosition, the includeTitle flag is no longer supported
+     * @deprecated use showAtPosition, the includeTitle flag is no longer
+     * supported
      */
     public Command show(int top, int bottom, int left, int right, boolean includeTitle, boolean modal) {
         this.top = top;
         this.bottom = bottom;
-        if(isRTL()){
+        if (isRTL()) {
             this.left = right;
-            this.right = left;            
-        }else{
+            this.right = left;
+        } else {
             this.left = left;
             this.right = right;
         }
@@ -584,29 +610,32 @@ public class Dialog extends Form {
     }
 
     /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
-     * of an alert/dialog box. This method will block the calling thread even if the
-     * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
-     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
-     * 
+     * This method shows the form as a modal alert allowing us to produce a
+     * behavior of an alert/dialog box. This method will block the calling
+     * thread even if the calling thread is the EDT. Notice that this method
+     * will not release the block until dispose is called even if show() from
+     * another form is called!
+     * <p>
+     * Modal dialogs Allow the forms "content" to "hang in mid air" this is
+     * especially useful for dialogs where you would want the underlying form to
+     * "peek" from behind the form.
+     *
      * @param top space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the
+     * form
      * @param left space in pixels between the left of the screen and the form
      * @param right space in pixels between the right of the screen and the form
-     * @param modal indicates the dialog should be modal set to false for modeless dialog
-     * which is useful for some use cases
+     * @param modal indicates the dialog should be modal set to false for
+     * modeless dialog which is useful for some use cases
      * @return the last command pressed by the user if such a command exists
      */
     public Command showAtPosition(int top, int bottom, int left, int right, boolean modal) {
         this.top = top;
         this.bottom = bottom;
-        if(isRTL()){
+        if (isRTL()) {
             this.left = right;
-            this.right = left;            
-        }else{
+            this.right = left;
+        } else {
             this.left = left;
             this.right = right;
         }
@@ -623,11 +652,11 @@ public class Dialog extends Form {
      */
     void initTitleBarStatus() {
     }
-    
+
     /**
-     * Indicates the time (in milliseconds) afterwhich the dialog will be disposed 
-     * implicitly
-     * 
+     * Indicates the time (in milliseconds) afterwhich the dialog will be
+     * disposed implicitly
+     *
      * @param time a milliseconds time used to dispose the dialog
      */
     public void setTimeout(long time) {
@@ -637,16 +666,17 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
      * @param okText the text to appear in the command dismissing the dialog
-     * @param cancelText optionally null for a text to appear in the cancel command
-     * for canceling the dialog
-     * @return true if the ok command was pressed or if cancelText is null. False otherwise.
+     * @param cancelText optionally null for a text to appear in the cancel
+     * command for canceling the dialog
+     * @return true if the ok command was pressed or if cancelText is null.
+     * False otherwise.
      */
     public static boolean show(String title, String text, int type, Image icon, String okText, String cancelText) {
         return show(title, text, type, icon, okText, cancelText, 0);
@@ -656,11 +686,11 @@ public class Dialog extends Form {
      * {@inheritDoc}
      */
     void sizeChangedInternal(int w, int h) {
-        if(disposeOnRotation) {
+        if (disposeOnRotation) {
             disposedDueToRotation = true;
             dispose();
             Form frm = getPreviousForm();
-            if(frm != null){
+            if (frm != null) {
                 frm.sizeChangedInternal(w, h);
             }
             return;
@@ -668,15 +698,15 @@ public class Dialog extends Form {
         autoAdjust(w, h);
         super.sizeChangedInternal(w, h);
         Form frm = getPreviousForm();
-        if(frm != null){
+        if (frm != null) {
             frm.sizeChangedInternal(w, h);
-        }        
+        }
     }
 
     /**
-     * Auto adjust size of the dialog.
-     * This method is triggered from a sizeChanged event.
-     * 
+     * Auto adjust size of the dialog. This method is triggered from a
+     * sizeChanged event.
+     *
      * @param w width of the screen
      * @param h height of the screen
      */
@@ -685,20 +715,22 @@ public class Dialog extends Form {
             growOrShrinkImpl(w, h);
         }
     }
-    
+
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
      * @param okText the text to appear in the command dismissing the dialog
-     * @param cancelText optionally null for a text to appear in the cancel command
-     * for canceling the dialog
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
-     * @return true if the ok command was pressed or if cancelText is null. False otherwise.
+     * @param cancelText optionally null for a text to appear in the cancel
+     * command for canceling the dialog
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
+     * @return true if the ok command was pressed or if cancelText is null.
+     * False otherwise.
      */
     public static boolean show(String title, String text, int type, Image icon, String okText, String cancelText, long timeout) {
         Command[] cmds;
@@ -713,15 +745,16 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @return the command pressed by the user
      */
     public static Command show(String title, String text, Command[] cmds, int type, Image icon, long timeout) {
@@ -730,16 +763,18 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
-     * @param defaultCommand command to be assigned as the default command or null
+     * @param defaultCommand command to be assigned as the default command or
+     * null
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @return the command pressed by the user
      */
     public static Command show(String title, String text, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout) {
@@ -748,15 +783,16 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @param transition the transition installed when the dialog enters/leaves
      * @return the command pressed by the user
      */
@@ -766,27 +802,29 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
-     * @param defaultCommand command to be assigned as the default command or null
+     * @param defaultCommand command to be assigned as the default command or
+     * null
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @param transition the transition installed when the dialog enters/leaves
      * @return the command pressed by the user
      */
     public static Command show(String title, String text, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
-        Map<String, String> h =  UIManager.getInstance().getBundle();
-        if(h != null && text != null) {
+        Map<String, String> h = UIManager.getInstance().getBundle();
+        if (h != null && text != null) {
             Object o = h.get(text);
-            if(o != null) {
-                text = (String)o;
+            if (o != null) {
+                text = (String) o;
             }
-        } 
+        }
         TextArea t = new TextArea(text, 3, 30);
         t.setUIID("DialogBody");
         t.setEditable(false);
@@ -795,13 +833,14 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal prompt dialog with the given title and text.
-     * 
+     *
      * @param title The title for the dialog optionally null;
      * @param text the text displayed in the dialog
      * @param okText the text to appear in the command dismissing the dialog
-     * @param cancelText optionally null for a text to appear in the cancel command
-     * for canceling the dialog
-     * @return true if the ok command was pressed or if cancelText is null. False otherwise.
+     * @param cancelText optionally null for a text to appear in the cancel
+     * command for canceling the dialog
+     * @return true if the ok command was pressed or if cancelText is null.
+     * False otherwise.
      */
     public static boolean show(String title, String text, String okText, String cancelText) {
         return show(title, text, defaultDialogType, null, okText, cancelText);
@@ -809,8 +848,8 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body component placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
@@ -823,8 +862,8 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body text placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
@@ -840,13 +879,13 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body component placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
      * @return the command pressed by the user
@@ -857,34 +896,36 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body component placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @return the command pressed by the user
      */
     public static Command show(String title, Component body, Command[] cmds, final int type, Image icon, long timeout) {
         return show(title, body, cmds, type, icon, timeout, null);
     }
-    
+
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body component placed in the center of the dialog
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 infinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 infinite time is used
      * @param transition the transition installed when the dialog enters/leaves
      * @return the command pressed by the user
      */
@@ -897,15 +938,17 @@ public class Dialog extends Form {
     }
 
     /**
-     * Places the given commands in the dialog command area, this is very useful for touch devices.
+     * Places the given commands in the dialog command area, this is very useful
+     * for touch devices.
      *
      * @param cmds the commands to place
-     * @deprecated this method shouldn't be invoked externally, it should have been private
+     * @deprecated this method shouldn't be invoked externally, it should have
+     * been private
      */
     public void placeButtonCommands(Command[] cmds) {
         buttonCommands = cmds;
         Container buttonArea;
-        if(getUIManager().isThemeConstant("dlgCommandGridBool", false)) {
+        if (getUIManager().isThemeConstant("dlgCommandGridBool", false)) {
             buttonArea = new Container(new GridLayout(1, cmds.length));
         } else {
             buttonArea = new Container(new FlowLayout(CENTER));
@@ -913,28 +956,28 @@ public class Dialog extends Form {
         buttonArea.setUIID("DialogCommandArea");
         String uiid = getUIManager().getThemeConstant("dlgButtonCommandUIID", null);
         addButtonBar(buttonArea);
-        if(cmds.length > 0) {
+        if (cmds.length > 0) {
             String lineColor = getUIManager().getThemeConstant("dlgInvisibleButtons", null);
-            if(cmds.length > 3) {
+            if (cmds.length > 3) {
                 lineColor = null;
             }
             int largest = Integer.parseInt(getUIManager().getThemeConstant("dlgCommandButtonSizeInt", "0"));
-            for(int iter = 0 ; iter < cmds.length ; iter++) {
+            for (int iter = 0; iter < cmds.length; iter++) {
                 Button b = new Button(cmds[iter]);
-                if(uiid != null) {
+                if (uiid != null) {
                     b.setUIID(uiid);
                 }
-                
+
                 // special case for dialog butons uppercase on Android
-                if(Button.isCapsTextDefault()) {
+                if (Button.isCapsTextDefault()) {
                     b.setCapsText(true);
                 }
-                
+
                 largest = Math.max(b.getPreferredW(), largest);
-                if(lineColor != null && lineColor.length() > 0) {
+                if (lineColor != null && lineColor.length() > 0) {
                     int color = Integer.parseInt(lineColor, 16);
                     Border brd = null;
-                    if(iter < cmds.length - 1) {
+                    if (iter < cmds.length - 1) {
                         brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, Border.createLineBorder(1, color));
                     } else {
                         brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, null);
@@ -944,9 +987,9 @@ public class Dialog extends Form {
                     b.getPressedStyle().setBorder(brd);
                 }
                 buttonArea.addComponent(b);
-                
+
             }
-            for(int iter = 0 ; iter < cmds.length ; iter++) {
+            for (int iter = 0; iter < cmds.length; iter++) {
                 buttonArea.getComponentAt(iter).setPreferredW(largest);
             }
             buttonArea.getComponentAt(0).requestFocus();
@@ -957,16 +1000,16 @@ public class Dialog extends Form {
      * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
-        if(commandsAsButtons) {
-            if(MenuBar.isLSK(keyCode)) {
-                if(buttonCommands != null && buttonCommands.length > 0) {
-                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0],ActionEvent.Type.KeyRelease));
+        if (commandsAsButtons) {
+            if (MenuBar.isLSK(keyCode)) {
+                if (buttonCommands != null && buttonCommands.length > 0) {
+                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0], ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
-            if(MenuBar.isRSK(keyCode)) {
-                if(buttonCommands != null && buttonCommands.length > 1) {
-                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1],ActionEvent.Type.KeyRelease));
+            if (MenuBar.isRSK(keyCode)) {
+                if (buttonCommands != null && buttonCommands.length > 1) {
+                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1], ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
@@ -976,17 +1019,19 @@ public class Dialog extends Form {
 
     /**
      * Shows a modal dialog with the given component as its "body" placed in the
-     * center. 
-     * 
+     * center.
+     *
      * @param title title for the dialog
      * @param body component placed in the center of the dialog
-     * @param defaultCommand command to be assigned as the default command or null
+     * @param defaultCommand command to be assigned as the default command or
+     * null
      * @param cmds commands that are added to the form any click on any command
      * will dispose the form
-     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO, 
+     * @param type the type of the alert one of TYPE_WARNING, TYPE_INFO,
      * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
      * @param icon the icon for the dialog, can be null
-     * @param timeout a timeout after which null would be returned if timeout is 0 inifinite time is used
+     * @param timeout a timeout after which null would be returned if timeout is
+     * 0 inifinite time is used
      * @param transition the transition installed when the dialog enters/leaves
      * @return the command pressed by the user
      */
@@ -997,21 +1042,21 @@ public class Dialog extends Form {
         dialog.setTransitionOutAnimator(transition);
         dialog.lastCommandPressed = null;
         dialog.setLayout(new BorderLayout());
-        if(cmds != null) {
-            if(commandsAsButtons) {
+        if (cmds != null) {
+            if (commandsAsButtons) {
                 dialog.placeButtonCommands(cmds);
             } else {
-                for(int iter = 0 ; iter < cmds.length ; iter++) {
+                for (int iter = 0; iter < cmds.length; iter++) {
                     dialog.addCommand(cmds[iter]);
                 }
             }
 
             // maps the first command to back
-            if(cmds.length == 1 || cmds.length == 2) {
+            if (cmds.length == 1 || cmds.length == 2) {
                 dialog.setBackCommand(cmds[0]);
             }
         }
-        if(defaultCommand != null) {
+        if (defaultCommand != null) {
             dialog.setDefaultCommand(defaultCommand);
         }
         dialog.addComponent(BorderLayout.CENTER, body);
@@ -1021,13 +1066,13 @@ public class Dialog extends Form {
         if (timeout != 0) {
             dialog.setTimeout(timeout);
         }
-        if(body.isScrollable() || disableStaticDialogScrolling){
+        if (body.isScrollable() || disableStaticDialogScrolling) {
             dialog.setScrollable(false);
         }
         dialog.show();
         return dialog.lastCommandPressed;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -1042,14 +1087,14 @@ public class Dialog extends Form {
         disposedDueToRotation = false;
         setLightweightMode(false);
         onShowCompleted();
-        if(isDisposed()) {
+        if (isDisposed()) {
             disposeImpl();
         }
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
+            showListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Show));
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -1065,30 +1110,30 @@ public class Dialog extends Form {
     }
 
     /**
-     * The default version of show modal shows the dialog occupying the center portion
-     * of the screen.
+     * The default version of show modal shows the dialog occupying the center
+     * portion of the screen.
      */
     public void show() {
         showImpl(false);
     }
 
     /**
-     * The default version of show modal shows the dialog occupying the center portion
-     * of the screen.
+     * The default version of show modal shows the dialog occupying the center
+     * portion of the screen.
      */
     private void showImpl(boolean reverse) {
-        if(modal && Display.isInitialized() && Display.getInstance().isMinimized()){
+        if (modal && Display.isInitialized() && Display.getInstance().isMinimized()) {
             Log.p("Modal dialogs cannot be displayed on a minimized app");
             return;
         }
         // this behavior allows a use case where dialogs of various sizes are layered
         // one on top of the other
         setDisposed(false);
-        if(top > -1) {
+        if (top > -1) {
             show(top, bottom, left, right, includeTitle, modal);
         } else {
-            if(modal) {
-                if(getDialogPosition() == null) {
+            if (modal) {
+                if (getDialogPosition() == null) {
                     super.showModal(reverse);
                 } else {
                     showPacked(getDialogPosition(), true);
@@ -1100,18 +1145,18 @@ public class Dialog extends Form {
     }
 
     /**
-     * Shows a modeless dialog which is useful for some simpler use cases such as
-     * progress indication etc...
+     * Shows a modeless dialog which is useful for some simpler use cases such
+     * as progress indication etc...
      */
     public void showModeless() {
         // this behavior allows a use case where dialogs of various sizes are layered 
         // one on top of the other
         modal = false;
         setDisposed(false);
-        if(top > -1) {
+        if (top > -1) {
             show(top, bottom, left, right, includeTitle, false);
         } else {
-            if(getDialogPosition() == null) {
+            if (getDialogPosition() == null) {
                 showDialog(false, false);
             } else {
                 showPacked(getDialogPosition(), false);
@@ -1120,7 +1165,7 @@ public class Dialog extends Form {
     }
 
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
-        if(Display.isInitialized() && Display.getInstance().isMinimized()){
+        if (Display.isInitialized() && Display.getInstance().isMinimized()) {
             Log.p("Modal dialogs cannot be displayed on a minimized app");
             return;
         }
@@ -1128,9 +1173,9 @@ public class Dialog extends Form {
         this.bottom = bottom;
         this.left = left;
         this.right = right;
-        
+
         // hide the title if no text is there to allow the styles of the dialog title to disappear
-        if(dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
+        if (dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = dialogTitle.getText().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
@@ -1139,33 +1184,40 @@ public class Dialog extends Form {
     }
 
     /**
-     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
-     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the PopupDialog style by default.
+     * A popup dialog is shown with the context of a component and its
+     * selection, it is disposed seamlessly if the back button is pressed or if
+     * the user touches outside its bounds. It can optionally provide an arrow
+     * in the theme to point at the context component. The popup dialog has the
+     * PopupDialog style by default.
      *
-     * @param c the context component which is used to position the dialog and can also be pointed at
-     * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
+     * @param c the context component which is used to position the dialog and
+     * can also be pointed at
+     * @return the command that might have been triggered by the user within the
+     * dialog if commands are placed in the dialog
      */
     public Command showPopupDialog(Component c) {
         Rectangle componentPos = c.getSelectedRect();
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
-        
+
         return showPopupDialog(componentPos);
     }
-    
+
     /**
-     * A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
-     * or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the PopupDialog style by default.
+     * A popup dialog is shown with the context of a component and its
+     * selection, it is disposed seamlessly if the back button is pressed or if
+     * the user touches outside its bounds. It can optionally provide an arrow
+     * in the theme to point at the context component. The popup dialog has the
+     * PopupDialog style by default.
      *
      * @param rect the screen rectangle to which the popup should point
-     * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
+     * @return the command that might have been triggered by the user within the
+     * dialog if commands are placed in the dialog
      */
     public Command showPopupDialog(Rectangle rect) {
-        if(getDialogUIID().equals("Dialog")) {
+        if (getDialogUIID().equals("Dialog")) {
             setDialogUIID("PopupDialog");
-            if(getTitleComponent().getUIID().equals("DialogTitle")) {
+            if (getTitleComponent().getUIID().equals("DialogTitle")) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
             getContentPane().setUIID("PopupContentPane");
@@ -1174,7 +1226,7 @@ public class Dialog extends Form {
         disposeOnRotation = true;
         disposeWhenPointerOutOfBounds = true;
         Command backCommand = null;
-        if(getBackCommand() == null) {
+        if (getBackCommand() == null) {
             backCommand = new Command("Back");
             setBackCommand(backCommand);
         }
@@ -1187,22 +1239,22 @@ public class Dialog extends Form {
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
         // preferred size logic of the dialog won't work with large title borders
-        if(dialogTitle != null && manager.isThemeConstant("hideEmptyTitleBool", false)) {
+        if (dialogTitle != null && manager.isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = getTitle().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
-            if(!b && manager.isThemeConstant("shrinkPopupTitleBool", true)) {
-                getTitleComponent().setPreferredSize(new Dimension(0,0));
+            if (!b && manager.isThemeConstant("shrinkPopupTitleBool", true)) {
+                getTitleComponent().setPreferredSize(new Dimension(0, 0));
                 getTitleComponent().getStyle().setBorder(null);
-                getTitleArea().setPreferredSize(new Dimension(0,0));
-                if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
+                getTitleArea().setPreferredSize(new Dimension(0, 0));
+                if (getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
                     int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
                     int titlePT = getTitleComponent().getStyle().getPaddingTop();
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
-                    if(pu == null){
-                        pu = new byte[4]; 
-                   }
+                    if (pu == null) {
+                        pu = new byte[4];
+                    }
                     pu[0] = Style.UNIT_TYPE_PIXELS;
                     getContentPane().getStyle().setPaddingUnit(pu);
                     int pop = Display.getInstance().convertToPixels(manager.getThemeConstant("popupNoTitleAddPaddingInt", 1), false);
@@ -1217,32 +1269,32 @@ public class Dialog extends Form {
         Style contentPaneStyle = getDialogStyle();
 
         boolean restoreArrow = false;
-        if(manager.isThemeConstant(getDialogUIID()+ "ArrowBool", false)) {
+        if (manager.isThemeConstant(getDialogUIID() + "ArrowBool", false)) {
             Image t = manager.getThemeImageConstant(getDialogUIID() + "ArrowTopImage");
             Image b = manager.getThemeImageConstant(getDialogUIID() + "ArrowBottomImage");
             Image l = manager.getThemeImageConstant(getDialogUIID() + "ArrowLeftImage");
             Image r = manager.getThemeImageConstant(getDialogUIID() + "ArrowRightImage");
             Border border = contentPaneStyle.getBorder();
-            if(border != null) {
+            if (border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
                 restoreArrow = true;
             }
         } else {
             Border border = contentPaneStyle.getBorder();
-            if(border != null) {
+            if (border != null) {
                 border.setTrackComponent(rect);
             }
         }
         int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
-        if(contentPaneStyle.getBorder() != null) {
+        if (contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
-        
+
         prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();
-        
-        int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
+
+        int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
         int width = Math.min(availableWidth, prefWidth);
         int x = 0;
@@ -1250,93 +1302,104 @@ public class Dialog extends Form {
         Command result;
 
         boolean showPortrait;
-        if(popupDirectionBiasPortrait != null) {
+        if (popupDirectionBiasPortrait != null) {
             showPortrait = popupDirectionBiasPortrait.booleanValue();
         } else {
             showPortrait = Display.getInstance().isPortrait();
         }
 
         // if we don't have enough space then disregard device orientation
-        if(showPortrait) {
-            if(availableHeight < (availableWidth - rect.getWidth()) / 2) {
+        if (showPortrait) {
+            if (availableHeight < (availableWidth - rect.getWidth()) / 2) {
                 showPortrait = false;
             }
         } else {
-            if(availableHeight / 2 > availableWidth - rect.getWidth()) {
+            if (availableHeight / 2 > availableWidth - rect.getWidth()) {
                 showPortrait = true;
             }
         }
-        if(showPortrait) {
-            if(width < availableWidth) {
+        if (showPortrait) {
+            if (width < availableWidth) {
                 int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;
 
                 // if the ideal position is less than 0 just use 0
-                if(idealX > 0) {
+                if (idealX > 0) {
                     // if the idealX is too far to the right just align to the right
-                    if(idealX + width > availableWidth) {
+                    if (idealX + width > availableWidth) {
                         x = availableWidth - width;
                     } else {
                         x = idealX;
                     }
                 }
             }
-            if(rect.getY() < availableHeight / 2) {
+            if (rect.getY() < availableHeight / 2) {
                 // popup downwards
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneDownwards");
+                }
                 y = rect.getY() + rect.getSize().getHeight();
                 int height = Math.min(prefHeight, availableHeight - y);
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup upwards
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneUpwards");
+                }
                 int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
                 y = rect.getY() - height;
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
-            if(height < availableHeight) {
+            if (height < availableHeight) {
                 int idealY = rect.getY() - height / 2 + rect.getSize().getHeight() / 2;
 
                 // if the ideal position is less than 0 just use 0
-                if(idealY > 0) {
+                if (idealY > 0) {
                     // if the idealY is too far up just align to the top
-                    if(idealY + height > availableHeight) {
+                    if (idealY + height > availableHeight) {
                         y = availableHeight - height;
                     } else {
                         y = idealY;
                     }
                 }
             }
-            
-            
-            if(prefWidth > rect.getX()) {
+
+            if (prefWidth > rect.getX()) {
                 // popup right
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneRight");
+                }
                 x = rect.getX() + rect.getSize().getWidth();
-                if(x + prefWidth > availableWidth){
+                if (x + prefWidth > availableWidth) {
                     x = availableWidth - prefWidth;
                 }
-                
+
                 width = Math.min(prefWidth, availableWidth - x);
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             } else {
                 // popup left
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneLeft");
+                }
                 width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
                 x = rect.getX() - width;
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             }
         }
 
-        if(restoreArrow) {
+        if (restoreArrow) {
             contentPaneStyle.getBorder().clearImageBorderSpecialTile();
         }
-        
-        if(result == backCommand) {
+
+        if (result == backCommand) {
             return null;
         }
         return result;
     }
 
     private int calcMenuHeight() {
-        if(getSoftButtonCount() > 1) {
+        if (getSoftButtonCount() > 1) {
             Component menuBar = getSoftButton(0).getParent();
             Style menuStyle = menuBar.getStyle();
             return menuBar.getPreferredH() + menuStyle.getVerticalMargins();
@@ -1346,10 +1409,12 @@ public class Dialog extends Form {
 
     /**
      * Convenience method to show a dialog sized to match its content.
-     * 
-     * @param position one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.
+     *
+     * @param position one of the values from the BorderLayout class e.g.
+     * BorderLayout.CENTER, BorderLayout.NORTH etc.
      * @param modal whether the dialog should be modal or modaless
-     * @return the command selected if the dialog is modal and disposed via a command
+     * @return the command selected if the dialog is modal and disposed via a
+     * command
      */
     public Command showPacked(String position, boolean modal) {
         return showPackedImpl(position, modal, false);
@@ -1357,10 +1422,12 @@ public class Dialog extends Form {
 
     /**
      * Convenience method to show a dialog stretched to one of the sides
-     * 
-     * @param position one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+     *
+     * @param position one of the values from the BorderLayout class except for
+     * center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
      * @param modal whether the dialog should be modal or modaless
-     * @return the command selected if the dialog is modal and disposed via a command
+     * @return the command selected if the dialog is modal and disposed via a
+     * command
      */
     public Command showStretched(String position, boolean modal) {
         return showPackedImpl(position, modal, true);
@@ -1368,10 +1435,12 @@ public class Dialog extends Form {
 
     /**
      * Convenience method to show a dialog stretched to one of the sides
-     * 
-     * @param position one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+     *
+     * @param position one of the values from the BorderLayout class except for
+     * center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
      * @param modal whether the dialog should be modal or modaless
-     * @return the command selected if the dialog is modal and disposed via a command
+     * @return the command selected if the dialog is modal and disposed via a
+     * command
      * @deprecated due to typo use showStretched instead
      */
     public Command showStetched(String position, boolean modal) {
@@ -1379,9 +1448,9 @@ public class Dialog extends Form {
     }
 
     /**
-     * Returns the preferred size of the dialog, this allows developers to position a dialog
-     * manually in arbitrary positions.
-     * 
+     * Returns the preferred size of the dialog, this allows developers to
+     * position a dialog manually in arbitrary positions.
+     *
      * @return the preferred size of this dialog
      */
     public Dimension getDialogPreferredSize() {
@@ -1391,109 +1460,112 @@ public class Dialog extends Form {
         int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
-        if(contentPaneStyle.getBorder() != null) {
+        if (contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
         return new Dimension(prefWidth, prefHeight);
     }
-    
+
     /**
      * Convenience method to show a dialog sized to match its content.
-     * 
-     * @param position one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.
+     *
+     * @param position one of the values from the BorderLayout class e.g.
+     * BorderLayout.CENTER, BorderLayout.NORTH etc.
      * @param modal whether the dialog should be modal or modaless
-     * @return the command selected if the dialog is modal and disposed via a command
+     * @return the command selected if the dialog is modal and disposed via a
+     * command
      */
     private Command showPackedImpl(String position, boolean modal, boolean stretch) {
-        if(getTitle() == null) {
+        if (getTitle() == null) {
             setTitle("");
         }
         this.position = position;
         int height = Display.getInstance().getDisplayHeight();
         int width = Display.getInstance().getDisplayWidth();
-        if(top > -1){
+        if (top > -1) {
             refreshTheme();
         }
         Component contentPane = super.getContentPane();
-        if(dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
+        if (dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = getTitle().length() > 0;
             getTitleArea().setVisible(b);
             getTitleComponent().setVisible(b);
-        } 
+        }
         Style contentPaneStyle = contentPane.getStyle();
-        
+
         revalidate();
 
         int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
-        if(contentPaneStyle.getBorder() != null) {
+        if (contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
         int topBottom = Math.max(0, (height - prefHeight) / 2);
         int leftRight = Math.max(0, (width - prefWidth) / 2);
-        
-        if(position.equals(BorderLayout.CENTER)) {
+
+        if (position.equals(BorderLayout.CENTER)) {
             show(topBottom, topBottom, leftRight, leftRight, true, modal);
             return lastCommandPressed;
-        } 
-        if(position.equals(BorderLayout.EAST)) {
-            if(stretch) {
+        }
+        if (position.equals(BorderLayout.EAST)) {
+            if (stretch) {
                 show(0, 0, Math.max(0, width - prefWidth), 0, true, modal);
             } else {
                 show(topBottom, topBottom, Math.max(0, width - prefWidth), 0, true, modal);
             }
             return lastCommandPressed;
-        } 
-        if(position.equals(BorderLayout.WEST)) {
-            if(stretch) {
+        }
+        if (position.equals(BorderLayout.WEST)) {
+            if (stretch) {
                 show(0, 0, 0, Math.max(0, width - prefWidth), true, modal);
             } else {
                 show(topBottom, topBottom, 0, Math.max(0, width - prefWidth), true, modal);
             }
             return lastCommandPressed;
-        } 
-        if(position.equals(BorderLayout.NORTH)) {
-            if(stretch) {
+        }
+        if (position.equals(BorderLayout.NORTH)) {
+            if (stretch) {
                 show(0, Math.max(0, height - prefHeight), 0, 0, true, modal);
             } else {
                 show(0, Math.max(0, height - prefHeight), leftRight, leftRight, true, modal);
             }
             return lastCommandPressed;
-        } 
-        if(position.equals(BorderLayout.SOUTH)) {
-            if(stretch) {
+        }
+        if (position.equals(BorderLayout.SOUTH)) {
+            if (stretch) {
                 show(Math.max(0, height - prefHeight), 0, 0, 0, true, modal);
             } else {
                 show(Math.max(0, height - prefHeight), 0, leftRight, leftRight, true, modal);
             }
             return lastCommandPressed;
-        } 
+        }
         throw new IllegalArgumentException("Unknown position: " + position);
     }
 
     /**
-     * Closes the current form and returns to the previous form, releasing the 
-     * EDT in the process 
+     * Closes the current form and returns to the previous form, releasing the
+     * EDT in the process
      */
     public void dispose() {
-        if(isDisposed()){
+        if (isDisposed()) {
             return;
         }
         setDisposed(true);
 
         // the dispose parent method might send us back to the form while the command
         // within the dialog might be directing us to another form causing a "blip"
-        if(!menu) {
+        if (!menu) {
             super.dispose();
         }
     }
 
     /**
-     * Shows a modal dialog and returns the command pressed within the modal dialog
-     * 
+     * Shows a modal dialog and returns the command pressed within the modal
+     * dialog
+     *
      * @return last command pressed in the modal dialog
      */
     public Command showDialog() {
@@ -1501,11 +1573,11 @@ public class Dialog extends Form {
         show();
         return lastCommandPressed;
     }
-    
+
     /**
      * Invoked to allow subclasses of form to handle a command from one point
      * rather than implementing many command instances
-     * 
+     *
      * @param cmd the action command
      */
     protected void actionCommand(Command cmd) {
@@ -1521,10 +1593,10 @@ public class Dialog extends Form {
         // EDT is released which also releases the Cancel for dialog B to keep processing...
         // Cancel for dialog B proceeds in the event chain reaching this method....
         // lastCommandPressed can be overrwritten if this check isn't made!!!
-        if(!autoDispose || lastCommandPressed == null) {
+        if (!autoDispose || lastCommandPressed == null) {
             lastCommandPressed = cmd;
         }
-        if(menu || (autoDispose && cmd.isDisposesDialog())) {
+        if (menu || (autoDispose && cmd.isDisposesDialog())) {
             dispose();
         }
     }
@@ -1537,7 +1609,7 @@ public class Dialog extends Form {
         return false;
     }
 
-    private boolean isTimedOut(){
+    private boolean isTimedOut() {
         if (time != 0 && System.currentTimeMillis() >= time) {
             time = 0;
             dispose();
@@ -1548,14 +1620,16 @@ public class Dialog extends Form {
     }
 
     /**
-     * Indicates that this is a menu preventing getCurrent() from ever returning this class
+     * Indicates that this is a menu preventing getCurrent() from ever returning
+     * this class
      */
     boolean isMenu() {
         return menu;
     }
 
     /**
-     * Indicates that this is a menu preventing getCurrent() from ever returning this class
+     * Indicates that this is a menu preventing getCurrent() from ever returning
+     * this class
      */
     void setMenu(boolean menu) {
         this.menu = menu;
@@ -1570,7 +1644,6 @@ public class Dialog extends Form {
         }
     }
 
-    
     /**
      * Allows us to indicate disposed state for dialogs
      */
@@ -1586,22 +1659,21 @@ public class Dialog extends Form {
     }
 
     /**
-     * Determines whether the execution of a command on this dialog implicitly 
-     * disposes the dialog. This defaults to true which is a sensible default for
-     * simple dialogs.
-     * 
+     * Determines whether the execution of a command on this dialog implicitly
+     * disposes the dialog. This defaults to true which is a sensible default
+     * for simple dialogs.
+     *
      * @return true if this dialog disposes on any command
      */
     public boolean isAutoDispose() {
         return autoDispose;
     }
 
-
     /**
-     * Determines whether the execution of a command on this dialog implicitly 
-     * disposes the dialog. This defaults to true which is a sensible default for
-     * simple dialogs.
-     * 
+     * Determines whether the execution of a command on this dialog implicitly
+     * disposes the dialog. This defaults to true which is a sensible default
+     * for simple dialogs.
+     *
      * @param autoDispose true if this dialog disposes on any command
      */
     public void setAutoDispose(boolean autoDispose) {
@@ -1610,45 +1682,46 @@ public class Dialog extends Form {
 
     /**
      * Default screen orientation position for the upcoming dialog. By default
-     * the dialog will be shown at hardcoded coordinates, this method allows us 
-     * to pack the dialog appropriately in one of the border layout based locations
-     * see BorderLayout for futher details.
-     * 
+     * the dialog will be shown at hardcoded coordinates, this method allows us
+     * to pack the dialog appropriately in one of the border layout based
+     * locations see BorderLayout for futher details.
+     *
      * @param p for dialogs on the sceen using BorderLayout orientation tags
      */
     public static void setDefaultDialogPosition(String p) {
         defaultDialogPosition = p;
     }
-    
+
     /**
      * Default screen orientation position for the upcoming dialog. By default
-     * the dialog will be shown at hardcoded coordinates, this method allows us 
-     * to pack the dialog appropriately in one of the border layout based locations
-     * see BorderLayout for futher details.
-     * 
-     * @return position for dialogs on the sceen using BorderLayout orientation tags
+     * the dialog will be shown at hardcoded coordinates, this method allows us
+     * to pack the dialog appropriately in one of the border layout based
+     * locations see BorderLayout for futher details.
+     *
+     * @return position for dialogs on the sceen using BorderLayout orientation
+     * tags
      */
     public static String getDefaultDialogPosition() {
         return defaultDialogPosition;
     }
 
     /**
-     * The type of the dialog can be one of TYPE_WARNING, TYPE_INFO, 
-     * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
-     * 
-     * @return can be one of TYPE_WARNING, TYPE_INFO, 
-     * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+     * The type of the dialog can be one of TYPE_WARNING, TYPE_INFO, TYPE_ERROR,
+     * TYPE_CONFIRMATION or TYPE_ALARM
+     *
+     * @return can be one of TYPE_WARNING, TYPE_INFO, TYPE_ERROR,
+     * TYPE_CONFIRMATION or TYPE_ALARM
      */
     public int getDialogType() {
         return dialogType;
     }
 
     /**
-     * The type of the dialog can be one of TYPE_WARNING, TYPE_INFO, 
-     * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
-     * 
-     * @param dialogType can be one of TYPE_WARNING, TYPE_INFO, 
-     * TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+     * The type of the dialog can be one of TYPE_WARNING, TYPE_INFO, TYPE_ERROR,
+     * TYPE_CONFIRMATION or TYPE_ALARM
+     *
+     * @param dialogType can be one of TYPE_WARNING, TYPE_INFO, TYPE_ERROR,
+     * TYPE_CONFIRMATION or TYPE_ALARM
      */
     public void setDialogType(int dialogType) {
         this.dialogType = dialogType;
@@ -1656,7 +1729,7 @@ public class Dialog extends Form {
 
     /**
      * The default type for dialogs
-     * 
+     *
      * @param d the default type for the dialog
      */
     public static void setDefaultDialogType(int d) {
@@ -1665,7 +1738,7 @@ public class Dialog extends Form {
 
     /**
      * The default type for dialogs
-     * 
+     *
      * @return the default type for the dialog
      */
     public static int getDefaultDialogType() {
@@ -1673,30 +1746,32 @@ public class Dialog extends Form {
     }
 
     /**
-     * Indicates whether Codename One should try to automatically adjust a showing dialog size
-     * when a screen size change event occurs
+     * Indicates whether Codename One should try to automatically adjust a
+     * showing dialog size when a screen size change event occurs
      *
-     * @param a true to indicate that Codename One should make a "best effort" to resize the dialog
+     * @param a true to indicate that Codename One should make a "best effort"
+     * to resize the dialog
      */
     public static void setAutoAdjustDialogSize(boolean a) {
         autoAdjustDialogSize = a;
     }
-    
+
     /**
-     * Indicates whether Codename One should try to automatically adjust a showing dialog size
-     * when a screen size change event occurs
+     * Indicates whether Codename One should try to automatically adjust a
+     * showing dialog size when a screen size change event occurs
      *
-     * @return true to indicate that Codename One should make a "best effort" to resize the dialog
+     * @return true to indicate that Codename One should make a "best effort" to
+     * resize the dialog
      */
     public static boolean isAutoAdjustDialogSize() {
         return autoAdjustDialogSize;
     }
 
     /**
-     * Allows a developer to indicate his interest that the dialog should no longer
-     * scroll on its own but rather rely on the scrolling properties of internal
-     * scrollable containers. This flag only affects the static show methods within
-     * this class.
+     * Allows a developer to indicate his interest that the dialog should no
+     * longer scroll on its own but rather rely on the scrolling properties of
+     * internal scrollable containers. This flag only affects the static show
+     * methods within this class.
      *
      * @param d indicates whether scrolling should be active or not
      */
@@ -1705,10 +1780,10 @@ public class Dialog extends Form {
     }
 
     /**
-     * Allows a developer to indicate his interest that the dialog should no longer
-     * scroll on its own but rather rely on the scrolling properties of internal
-     * scrollable containers. This flag only affects the static show methods within
-     * this class.
+     * Allows a developer to indicate his interest that the dialog should no
+     * longer scroll on its own but rather rely on the scrolling properties of
+     * internal scrollable containers. This flag only affects the static show
+     * methods within this class.
      *
      * @return true if scrolling should be activated, false otherwise
      */
@@ -1716,12 +1791,11 @@ public class Dialog extends Form {
         return disableStaticDialogScrolling;
     }
 
-
     /**
-     * Places commands as buttons at the bottom of the standard static dialogs rather than
-     * as softbuttons. This is especially appropriate for devices such as touch devices and
-     * devices without the common softbuttons (e.g. blackberries).
-     * The default value is false
+     * Places commands as buttons at the bottom of the standard static dialogs
+     * rather than as softbuttons. This is especially appropriate for devices
+     * such as touch devices and devices without the common softbuttons (e.g.
+     * blackberries). The default value is false
      *
      * @param c true to place commands as buttons and not as softbutton keys
      */
@@ -1730,10 +1804,10 @@ public class Dialog extends Form {
     }
 
     /**
-     * Places commands as buttons at the bottom of the standard static dialogs rather than
-     * as softbuttons. This is especially appropriate for devices such as touch devices and
-     * devices without the common softbuttons (e.g. blackberries).
-     * The default value is false
+     * Places commands as buttons at the bottom of the standard static dialogs
+     * rather than as softbuttons. This is especially appropriate for devices
+     * such as touch devices and devices without the common softbuttons (e.g.
+     * blackberries). The default value is false
      *
      * @return true if commands are placed as buttons and not as softbutton keys
      */
@@ -1742,9 +1816,9 @@ public class Dialog extends Form {
     }
 
     /**
-     * This flag indicates if the dialog should be disposed if a pointer 
+     * This flag indicates if the dialog should be disposed if a pointer
      * released event occurred out of the dialog content.
-     * 
+     *
      * @param disposeWhenPointerOutOfBounds
      */
     public void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
@@ -1755,23 +1829,22 @@ public class Dialog extends Form {
      * This flag indicates if the dialog should be disposed if a pointer
      * released event occurred out of the dialog content.
      *
-     * @return  true if the dialog should dispose
+     * @return true if the dialog should dispose
      */
     public boolean isDisposeWhenPointerOutOfBounds() {
         return disposeWhenPointerOutOfBounds;
     }
 
-    
     /**
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
-        if(disposeWhenPointerOutOfBounds && 
-                pressedOutOfBounds &&
-                !getTitleComponent().containsOrOwns(x, y) && 
-                !getContentPane().containsOrOwns(x, y) && 
-                !getMenuBar().containsOrOwns(x, y)){
+        if (disposeWhenPointerOutOfBounds
+                && pressedOutOfBounds
+                && !getTitleComponent().containsOrOwns(x, y)
+                && !getContentPane().containsOrOwns(x, y)
+                && !getMenuBar().containsOrOwns(x, y)) {
             dispose();
         }
     }
@@ -1781,28 +1854,31 @@ public class Dialog extends Form {
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
-        if(!getTitleComponent().containsOrOwns(x, y) && 
-                !getContentPane().containsOrOwns(x, y) && 
-                !getMenuBar().containsOrOwns(x, y)){
+        if (!getTitleComponent().containsOrOwns(x, y)
+                && !getContentPane().containsOrOwns(x, y)
+                && !getMenuBar().containsOrOwns(x, y)) {
             pressedOutOfBounds = true;
-        }else{
-            pressedOutOfBounds = false;        
+        } else {
+            pressedOutOfBounds = false;
         }
     }
 
     /**
-     * Returns true if a dialog that was disposed did it because of a pointer out of bounds
+     * Returns true if a dialog that was disposed did it because of a pointer
+     * out of bounds
+     *
      * @return true when a dialog was disposed due to pointer out of bounds.
      */
     public boolean wasDisposedDueToOutOfBoundsTouch() {
         return pressedOutOfBounds;
     }
-    
+
     /**
-     * Screen orientation position for the upcoming dialog. By default
-     * the dialog will be shown at hardcoded coordinates, this method allows us
-     * to pack the dialog appropriately in one of the border layout based locations
+     * Screen orientation position for the upcoming dialog. By default the
+     * dialog will be shown at hardcoded coordinates, this method allows us to
+     * pack the dialog appropriately in one of the border layout based locations
      * see BorderLayout for futher details.
+     *
      * @return the dialogPosition
      */
     public String getDialogPosition() {
@@ -1810,21 +1886,22 @@ public class Dialog extends Form {
     }
 
     /**
-     * Screen orientation position for the upcoming dialog. By default
-     * the dialog will be shown at hardcoded coordinates, this method allows us
-     * to pack the dialog appropriately in one of the border layout based locations
+     * Screen orientation position for the upcoming dialog. By default the
+     * dialog will be shown at hardcoded coordinates, this method allows us to
+     * pack the dialog appropriately in one of the border layout based locations
      * see BorderLayout for futher details.
+     *
      * @param dialogPosition the dialogPosition to set
      */
     public void setDialogPosition(String dialogPosition) {
         this.dialogPosition = dialogPosition;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     void repaint(Component cmp) {
-        if(getParent() != null){
+        if (getParent() != null) {
             super.repaint(cmp);
             return;
         }
@@ -1900,17 +1977,17 @@ public class Dialog extends Form {
             int oldH = getHeight();
             if (oldW != w || oldH != h) {
                 // try to preserve the old size of the dialog if we still have room for it...
-                if(prefWidth <= w && prefHeight <= h) {
+                if (prefWidth <= w && prefHeight <= h) {
                     float oldLeftRightDistRatio = 1;
-                    if(left + right != 0) {
-                        oldLeftRightDistRatio = ((float)left) / ((float)left + right);
+                    if (left + right != 0) {
+                        oldLeftRightDistRatio = ((float) left) / ((float) left + right);
                     }
                     float oldTopBottomDistRatio = 1;
-                    if(left + right != 0) {
-                        oldTopBottomDistRatio = ((float)top) / ((float)top + bottom);
+                    if (left + right != 0) {
+                        oldTopBottomDistRatio = ((float) top) / ((float) top + bottom);
                     }
-                    top = Math.max(0, (int)((h - prefHeight) * oldTopBottomDistRatio));
-                    left = Math.max(0, (int)((w - prefWidth) * oldLeftRightDistRatio));
+                    top = Math.max(0, (int) ((h - prefHeight) * oldTopBottomDistRatio));
+                    left = Math.max(0, (int) ((w - prefWidth) * oldLeftRightDistRatio));
                     bottom = Math.max(0, (h - prefHeight) - top);
                     right = Math.max(0, (w - prefWidth) - left);
 
@@ -1945,8 +2022,10 @@ public class Dialog extends Form {
     }
 
     /**
-     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
-     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * Indicates if we want to enforce directional bias for the popup dialog. If
+     * null this field is ignored but if its set to a value it biases the system
+     * towards a fixed direction for the popup dialog.
+     *
      * @return the popupDirectionBiasPortrait
      */
     public Boolean getPopupDirectionBiasPortrait() {
@@ -1954,8 +2033,10 @@ public class Dialog extends Form {
     }
 
     /**
-     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
-     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * Indicates if we want to enforce directional bias for the popup dialog. If
+     * null this field is ignored but if its set to a value it biases the system
+     * towards a fixed direction for the popup dialog.
+     *
      * @param popupDirectionBiasPortrait the popupDirectionBiasPortrait to set
      */
     public void setPopupDirectionBiasPortrait(Boolean popupDirectionBiasPortrait) {
@@ -1963,7 +2044,9 @@ public class Dialog extends Form {
     }
 
     /**
-     * Returns true if the dialog was disposed automatically due to device rotation
+     * Returns true if the dialog was disposed automatically due to device
+     * rotation
+     *
      * @return the disposedDueToRotation value
      */
     public boolean wasDisposedDueToRotation() {
@@ -1971,9 +2054,11 @@ public class Dialog extends Form {
     }
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
      * only should be used
+     *
      * @return the blurBackgroundRadius
      */
     public float getBlurBackgroundRadius() {
@@ -1981,9 +2066,12 @@ public class Dialog extends Form {
     }
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
-     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme
+     * constant: {@code dialogBlurRadiusInt}
+     *
      * @param blurBackgroundRadius the blurBackgroundRadius to set
      */
     public void setBlurBackgroundRadius(float blurBackgroundRadius) {
@@ -1991,9 +2079,11 @@ public class Dialog extends Form {
     }
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
      * only should be used
+     *
      * @return the defaultBlurBackgroundRadius
      */
     public static float getDefaultBlurBackgroundRadius() {
@@ -2001,10 +2091,14 @@ public class Dialog extends Form {
     }
 
     /**
-     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
-     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
-     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
-     * @param aDefaultBlurBackgroundRadius the defaultBlurBackgroundRadius to set
+     * Dialog background can be blurred using a Gaussian blur effect, this sets
+     * the radius of the Gaussian blur. -1 is a special case value that
+     * indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme
+     * constant: {@code dialogBlurRadiusInt}
+     *
+     * @param aDefaultBlurBackgroundRadius the defaultBlurBackgroundRadius to
+     * set
      */
     public static void setDefaultBlurBackgroundRadius(float aDefaultBlurBackgroundRadius) {
         defaultBlurBackgroundRadius = aDefaultBlurBackgroundRadius;
@@ -2015,7 +2109,7 @@ public class Dialog extends Form {
      * {@inheritDoc}
      */
     void initDialogBgPainter(Painter p, Form previousForm) {
-        if(getBlurBackgroundRadius() > 0 && Display.impl.isGaussianBlurSupported()) {
+        if (getBlurBackgroundRadius() > 0 && Display.impl.isGaussianBlurSupported()) {
             Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());
             Graphics g = img.getGraphics();
             previousForm.paintComponent(g, true);
@@ -2025,5 +2119,18 @@ public class Dialog extends Form {
         } else {
             super.initDialogBgPainter(p, previousForm);
         }
+    }
+
+    /**
+     * Allows to use the UIIDs "PopupContentPaneDownwards",
+     * "PopupContentPaneUpwards", "PopupContentPaneRight",
+     * "PopupContentPaneLeft" (instead of the default UIID "PopupContentPane")
+     * to style the PopupDialog more accurately based on the position of the
+     * dialog popup compared to the context component.
+     *
+     * @param b to enable
+     */
+    public void setUIIDByPopupPosition(boolean b) {
+        this.isUIIDByPopupPosition = b;
     }
 }
