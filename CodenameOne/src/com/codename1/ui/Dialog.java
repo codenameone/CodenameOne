@@ -2040,7 +2040,7 @@ public class Dialog extends Form {
         }
     }
     
-        /**
+    /**
      * Allows to use the UIIDs "PopupContentPaneDownwards",
      * "PopupContentPaneUpwards", "PopupContentPaneRight",
      * "PopupContentPaneLeft" (instead of the default UIID "PopupContentPane")
