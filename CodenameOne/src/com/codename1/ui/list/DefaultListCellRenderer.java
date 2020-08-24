@@ -135,7 +135,11 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
             Image i = ((Command)value).getIcon();
             if(i == null) {
                 if(((Command)value).getMaterialIcon() != 0) {
-                    setMaterialIcon(((Command)value).getMaterialIcon());
+                    if(((Command)value).getIconFont()!=null) {
+                        setFontIcon(((Command)value).getIconFont(),((Command)value).getMaterialIcon());
+                    } else {
+                        setMaterialIcon(((Command)value).getMaterialIcon());
+                    }
                 } else {
                     setIcon(null);
                 }
