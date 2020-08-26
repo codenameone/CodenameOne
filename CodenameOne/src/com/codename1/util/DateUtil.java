@@ -242,14 +242,30 @@ public class DateUtil {
                 (int)(cal.getTime().getTime() - calStartOfDay.getTime().getTime())
         );
     }
-    
+
     /**
      * Checks whether the given date is in daylight savings time for the given date.
-     * @param date
-     * @return 
+     *
+     * @param date the date to check
+     *
+     * @return True if date is in daylight savings time
      */
     public boolean inDaylightTime(Date date) {
         return tz.useDaylightTime() && getOffset(date.getTime()) != tz.getRawOffset();
+    }
+
+    /**
+     * Checks if two times are on the same year using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same year.
+     * @since 7.0
+     */
+    public boolean isSameYear(Calendar c1, Calendar c2) {
+
+        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR);
     }
 
     /**
@@ -267,7 +283,22 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR);
+        return isSameYear(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same month using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same month.
+     * @since 7.0
+     */
+    public boolean isSameMonth(Calendar c1, Calendar c2) {
+
+        return isSameYear(c1, c2)
+                && c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH);
     }
 
     /**
@@ -285,8 +316,22 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return isSameYear(d1, d2)
-                && c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH);
+        return isSameMonth(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same day using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same day.
+     * @since 7.0
+     */
+    public boolean isSameDay(Calendar c1, Calendar c2) {
+
+        return isSameMonth(c1, c2)
+                && c1.get(Calendar.DATE) == c2.get(Calendar.DATE);
     }
 
     /**
@@ -304,8 +349,22 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return isSameMonth(d1, d2)
-                && c1.get(Calendar.DATE) == c2.get(Calendar.DATE);
+        return isSameDay(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same hour using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same hour.
+     * @since 7.0
+     */
+    public boolean isSameHour(Calendar c1, Calendar c2) {
+
+        return isSameDay(c1, c2)
+                && c1.get(Calendar.HOUR_OF_DAY) == c2.get(Calendar.HOUR_OF_DAY);
     }
 
     /**
@@ -323,8 +382,22 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return isSameDay(d1, d2)
-                && c1.get(Calendar.HOUR_OF_DAY) == c2.get(Calendar.HOUR_OF_DAY);
+        return isSameHour(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same minute using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same minute.
+     * @since 7.0
+     */
+    public boolean isSameMinute(Calendar c1, Calendar c2) {
+
+        return isSameHour(c1, c2)
+                && c1.get(Calendar.MINUTE) == c2.get(Calendar.MINUTE);
     }
 
     /**
@@ -342,8 +415,22 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return isSameHour(d1, d2)
-                && c1.get(Calendar.MINUTE) == c2.get(Calendar.MINUTE);
+        return isSameMinute(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same second using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same second.
+     * @since 7.0
+     */
+    public boolean isSameSecond(Calendar c1, Calendar c2) {
+
+        return isSameMinute(c1, c2)
+                && c1.get(Calendar.SECOND) == c2.get(Calendar.SECOND);
     }
 
     /**
@@ -361,8 +448,21 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return isSameMinute(d1, d2)
-                && c1.get(Calendar.SECOND) == c2.get(Calendar.SECOND);
+        return isSameSecond(c1, c2);
+    }
+
+    /**
+     * Checks if two times are on the same time using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     *
+     * @return True if the two times are on the same time.
+     * @since 7.0
+     */
+    public boolean isSameTime(Calendar c1, Calendar c2) {
+
+        return c1.getTime().getTime() == c2.getTime().getTime();
     }
 
     /**
@@ -380,7 +480,7 @@ public class DateUtil {
         Calendar c2 = Calendar.getInstance(tz);
         c2.setTime(d2);
 
-        return c1.getTime().getTime() == c2.getTime().getTime();
+        return isSameTime(c1, c2);
     }
 
     /**
@@ -451,7 +551,7 @@ public class DateUtil {
                             else {
                                 int years = Math.round(time_elapsed / 31207680);
                                 if (years == 1) {
-                                    return "A year ago";
+                                    return "1 year ago";
                                 } else {
                                     return years + " years ago";
                                 }
