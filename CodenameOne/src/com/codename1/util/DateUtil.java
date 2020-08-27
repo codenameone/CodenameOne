@@ -96,12 +96,12 @@ public class DateUtil {
      *               <li>{@code Calendar.YEAR}
      *
      * @return <ul>
-     * <li>-1 - if first date is earlier.
-     * <li>1 - if first date is later.
-     * <li>0 - if they are the same.
+     * <li>< 0 - if first date is earlier.
+     * <li>> 0 - if first date is later.
+     * <li>== 0 - if they are the equal.
      * @since 7.0
      */
-    public static int compareBy(Date d1, Date d2, int field) {
+    public static long compareBy(Date d1, Date d2, int field) {
         if (d1 == null) return d2 == null ? 0 : -1;
         if (d2 == null) return 1;
 
@@ -181,12 +181,7 @@ public class DateUtil {
                 break;
         }
 
-        if (c1.getTime().getTime() < c2.getTime().getTime()) {
-            return -1;
-        } else if (c1.getTime().getTime() > c2.getTime().getTime()) {
-            return 1;
-        }
-        return 0;
+        return (c1.getTime().getTime() - c2.getTime().getTime());
     }
 
     /**
@@ -475,12 +470,7 @@ public class DateUtil {
      * @since 7.0
      */
     public boolean isSameTime(Date d1, Date d2) {
-        Calendar c1 = Calendar.getInstance(tz);
-        c1.setTime(d1);
-        Calendar c2 = Calendar.getInstance(tz);
-        c2.setTime(d2);
-
-        return isSameTime(c1, c2);
+        return d1.getTime() == d2.getTime();
     }
 
     /**
