@@ -116,6 +116,31 @@ public class DateUtil {
     public static Comparator<Date> compareByDateField(final long field) {
         return new Comparator<Date>() {
             public int compare(Date object1, Date object2) {
+
+                if (field == DateUtil.YEAR) {
+                    Calendar cal = Calendar.getInstance();
+
+                    cal.setTime(object1);
+                    int y1 = cal.get(Calendar.YEAR);
+
+                    cal.setTime(object2);
+                    int y2 = cal.get(Calendar.YEAR);
+
+                    return y1 - y2;
+                }
+
+                if (field == DateUtil.MONTH) {
+                    Calendar cal = Calendar.getInstance();
+
+                    cal.setTime(object1);
+                    int m1 = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);
+
+                    cal.setTime(object2);
+                    int m2 = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);
+
+                    return m1 - m2;
+                }
+
                 long d1 = object1.getTime() / field;
                 long d2 = object2.getTime() / field;
 
