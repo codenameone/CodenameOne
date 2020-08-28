@@ -23,16 +23,26 @@
 package com.codename1.util;
 
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.TimeZone;
 
 /**
  * Utility class for working with dates and timezones.
- * @author shannah
+ * @author shannah, Diamond
  */
 public class DateUtil {
+
     private final TimeZone tz;
-    
+
+    public static final long MILLISECOND = 1L;
+    public static final long SECOND = 1000 * MILLISECOND;
+    public static final long MINUTE = 60 * SECOND;
+    public static final long HOUR = 60 * MINUTE;
+    public static final long DAY = 24 * HOUR;
+    public static final long MONTH = 2629800000L;
+    public static final long YEAR = 31557600000L;
+
     /**
      * Constructor for timezone.
      * @param tz Timezone
@@ -81,107 +91,37 @@ public class DateUtil {
     }
 
     /**
-     * Compares two dates by the specified field.
+     * Compares two dates or sorts multiple dates by the granularity of a specific field.
+     * <p>Compare dates:<br/>
+     * {@code compareByDateField(DateUtil.MONTH).compare(date1, date2)}</p>
+     * <p>Sort dates:<br/>
+     * {@code dateList.sort(compareByDateField(DateUtil.MONTH))}</p>
      *
-     * @param d1    The first date to compare
-     * @param d2    The second date to compare
      * @param field One of the fields:
      *              <ul>
-     *               <li>{@code Calendar.MILLISECOND}
-     *               <li>{@code Calendar.SECOND}
-     *               <li>{@code Calendar.MINUTE}
-     *               <li>{@code Calendar.HOUR} or  {@code Calendar.HOUR_OF_DAY}
-     *               <li>{@code Calendar.DATE}
-     *               <li>{@code Calendar.MONTH}
-     *               <li>{@code Calendar.YEAR}
+     *               <li>{@code DateUtil.MILLISECOND}
+     *               <li>{@code DateUtil.SECOND}
+     *               <li>{@code DateUtil.MINUTE}
+     *               <li>{@code DateUtil.HOUR}
+     *               <li>{@code DateUtil.DATE}
+     *               <li>{@code DateUtil.MONTH}
+     *               <li>{@code DateUtil.YEAR}
      *
      * @return <ul>
      * <li>< 0 - if first date is earlier.
      * <li>> 0 - if first date is later.
-     * <li>== 0 - if they are the equal.
+     * <li>== 0 - if they are equal.
      * @since 7.0
      */
-    public static long compareBy(Date d1, Date d2, int field) {
-        if (d1 == null) return d2 == null ? 0 : -1;
-        if (d2 == null) return 1;
+    public static Comparator<Date> compareByDateField(final long field) {
+        return new Comparator<Date>() {
+            public int compare(Date object1, Date object2) {
+                long d1 = object1.getTime() / field;
+                long d2 = object2.getTime() / field;
 
-        Calendar c1 = Calendar.getInstance();
-        c1.setTime(d1);
-
-        Calendar c2 = Calendar.getInstance();
-        c2.setTime(d2);
-
-        switch (field) {
-            case Calendar.YEAR:
-                c1.set(Calendar.MONTH, 0);
-                c1.set(Calendar.DATE, 0);
-                c1.set(Calendar.HOUR, 0);
-                c1.set(Calendar.HOUR_OF_DAY, 0);
-                c1.set(Calendar.MINUTE, 0);
-                c1.set(Calendar.SECOND, 0);
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.MONTH, 0);
-                c2.set(Calendar.DATE, 0);
-                c2.set(Calendar.HOUR, 0);
-                c2.set(Calendar.HOUR_OF_DAY, 0);
-                c2.set(Calendar.MINUTE, 0);
-                c2.set(Calendar.SECOND, 0);
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-            case Calendar.MONTH:
-                c1.set(Calendar.DATE, 0);
-                c1.set(Calendar.HOUR, 0);
-                c1.set(Calendar.HOUR_OF_DAY, 0);
-                c1.set(Calendar.MINUTE, 0);
-                c1.set(Calendar.SECOND, 0);
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.DATE, 0);
-                c2.set(Calendar.HOUR, 0);
-                c2.set(Calendar.HOUR_OF_DAY, 0);
-                c2.set(Calendar.MINUTE, 0);
-                c2.set(Calendar.SECOND, 0);
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-            case Calendar.DATE:
-                c1.set(Calendar.HOUR, 0);
-                c1.set(Calendar.HOUR_OF_DAY, 0);
-                c1.set(Calendar.MINUTE, 0);
-                c1.set(Calendar.SECOND, 0);
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.HOUR, 0);
-                c2.set(Calendar.HOUR_OF_DAY, 0);
-                c2.set(Calendar.MINUTE, 0);
-                c2.set(Calendar.SECOND, 0);
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-            case Calendar.HOUR:
-            case Calendar.HOUR_OF_DAY:
-                c1.set(Calendar.MINUTE, 0);
-                c1.set(Calendar.SECOND, 0);
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.MINUTE, 0);
-                c2.set(Calendar.SECOND, 0);
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-            case Calendar.MINUTE:
-                c1.set(Calendar.SECOND, 0);
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.SECOND, 0);
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-            case Calendar.SECOND:
-                c1.set(Calendar.MILLISECOND, 0);
-
-                c2.set(Calendar.MILLISECOND, 0);
-                break;
-        }
-
-        return (c1.getTime().getTime() - c2.getTime().getTime());
+                return (int) (d1 - d2);
+            }
+        };
     }
 
     /**
