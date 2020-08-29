@@ -108,8 +108,8 @@ public class DateUtil {
      *               <li>{@code DateUtil.YEAR}
      *
      * @return <ul>
-     * <li>< 0 - if first date is earlier.
-     * <li>> 0 - if first date is later.
+     * <li>&gt; 0 - if first date is earlier.
+     * <li>&lt; 0 - if first date is later.
      * <li>== 0 - if they are equal.
      * @since 7.0
      */
