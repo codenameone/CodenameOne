@@ -178,7 +178,11 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             setDisabledIcon(cmd.getDisabledIcon());
             setPressedIcon(cmd.getPressedIcon());
         } else {
-            setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+            if(cmd.getIconFont() != null) {
+                setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+            } else {
+                setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+            }
         }
         if(cmd.getIconGapMM() > -1) {
             setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
@@ -199,7 +203,11 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             setText(cmd.getCommandName());
             if(cmd.getIcon() == null) {
                 if(cmd.getMaterialIcon() != 0) {
-                    setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+                    if(cmd.getIconFont() != null) {
+                        setFontIcon(cmd.getIconFont(),cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+                    } else {
+                        setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+                    }
                 }
             } else {
                 setIcon(cmd.getIcon());
