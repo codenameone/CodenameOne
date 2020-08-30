@@ -73,6 +73,9 @@ public class RadarChart extends RoundChart {
         int right = x + width;
 
         int cLength = mDataset.getCategoriesCount();
+        if (cLength < 3){
+            return;
+        }
         String[] categories = mDataset.getCategories();
 
         int bottom = y + height - legendSize;
@@ -96,7 +99,7 @@ public class RadarChart extends RoundChart {
         float currentAngle = mRenderer.getStartAngle();
         float angle = 360f / cLength;
 
-// Draw web
+        // Draw web
         float centerX = (left + right) / 2, centerY = (top + bottom) / 2;
         for (int i = 0; i < cLength; i++) {
             paint.setColor(ColorUtil.GRAY);
@@ -112,21 +115,28 @@ public class RadarChart extends RoundChart {
             canvas.drawLine(centerX, centerY, centerX - (float) Math.sin(thisRad) * radius, centerY - (float) Math.cos(thisRad) * radius, paint);
 
             paint.setColor(ColorUtil.GRAY);
-            drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,
-                    shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),
+            if(cLength % 2 == 0){
+                drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,
+                    shortRadius, longRadius, currentAngle - angle / 2 , angle, left, right, mRenderer.getLabelsColor(),
                     paint, true, false);
+            }else{
+                drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,
+                        shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),
+                        paint, true, false);
+            }
 
             currentAngle += angle;
         }
 
 // Draw area
         int sLength = mDataset.getSeriesCount();
+        int alignment = cLength / 2;
         for (int i = 0; i < sLength; i++) {
             currentAngle = mRenderer.getStartAngle();
             paint.setColor(mRenderer.getSeriesRendererAt(i).getColor());
             for (int j = 0; j < cLength; j++) {
-                float thisValue = (float) mDataset.getValue(i, categories[j]);
-                float nextValue = (float) mDataset.getValue(i, categories[(j + 1) % sLength]);
+                float thisValue = (float) mDataset.getValue(i, categories[(j + alignment) % cLength]);
+                float nextValue = (float) mDataset.getValue(i, categories[(j + alignment + 1) % cLength]);
                 float thisRad = (float) Math.toRadians(90 - currentAngle);
                 float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));
                 float thisX = (float) (centerX - Math.sin(thisRad) * radius * thisValue);
