@@ -7523,7 +7523,7 @@ public class FontImage extends Image {
         g.setFont(fnt);
         int w = fnt.stringWidth(text);
         int h = Math.round(fnt.getPixelSize());
-        if (h <= 0) fnt.getHeight();
+        if (h <= 0) h = fnt.getHeight();
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         if (rotated != 0) {
             int tX = g.getTranslateX();
