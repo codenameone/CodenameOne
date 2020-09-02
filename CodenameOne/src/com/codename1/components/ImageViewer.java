@@ -321,6 +321,7 @@ public class ImageViewer extends Component {
         pressX = x;
         pressY = y;
         currentZoom = zoom;
+        getComponentForm().addComponentAwaitingRelease(this);
     }
 
     private Image getImageRight() {

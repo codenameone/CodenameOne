@@ -3312,14 +3312,14 @@ public class Form extends Container {
     }
     
     
-    public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
+    public <C extends Component> void addComponentAwaitingRelease(C c) {
       if(componentsAwaitingRelease == null) {
 	      componentsAwaitingRelease = new ArrayList<Component>();
 	  }
 	  componentsAwaitingRelease.add(c);
     }
 
-    public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
+    public <C extends Component> void removeComponentAwaitingRelease(C c) {
     	 if(componentsAwaitingRelease != null) {
              componentsAwaitingRelease.remove(c);
          }
