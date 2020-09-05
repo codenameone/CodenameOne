@@ -529,6 +529,14 @@ public class BrowserComponent extends Container {
         CN.callSerially(new Runnable() {
             public void run() {
                 PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);
+                if (c == null) {
+                    if (CN.isSimulator()) {
+                        Log.p("Failed to create the browser component.  Please ensure that you are either using a JDK that has JavaFX (e.g. ZuluFX), or that you have installed the Codename One CEF component.  See https://www.codenameone.com/blog/big-changes-jcef.html for more information");
+                    } else {
+                        Log.p("Failed to create browser component.  This platform may not support the native browser component");
+                    }
+                    return;
+                }
                 internal = c;
                 removeComponent(placeholder);
                 addComponent(BorderLayout.CENTER, internal);
