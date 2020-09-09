@@ -28,21 +28,21 @@ import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
-import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
-import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -71,7 +71,7 @@ public class Form extends Container {
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
-    private Container contentPane;
+    private final Container contentPane;
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
@@ -1791,7 +1791,7 @@ public class Form extends Container {
     /**
      * Indicate that cmp would no longer like to receive animation events
      * 
-     * @param cmp component that would no longer receive animation events
+     * @param mediaCmp component that would no longer receive animation events
      */
     void deregisterMediaComponent(Component mediaCmp) {
         mediaComponents.remove(mediaCmp);
@@ -2543,7 +2543,7 @@ public class Form extends Container {
     /**
      * Invoked by display to hide the menu during transition
      * 
-     * @see restoreMenu
+     * @see {@link #restoreMenu()}
      */
     void hideMenu() {
         menuBar.unInstallMenuBar();
@@ -2552,7 +2552,7 @@ public class Form extends Container {
     /**
      * Invoked by display to restore the menu after transition
      * 
-     * @see hideMenu
+     * @see {@link #hideMenu()}
      */
     void restoreMenu() {
         menuBar.installMenuBar();
@@ -3312,14 +3312,14 @@ public class Form extends Container {
     }
     
     
-    public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
+    public <C extends Component> void addComponentAwaitingRelease(C c) {
       if(componentsAwaitingRelease == null) {
 	      componentsAwaitingRelease = new ArrayList<Component>();
 	  }
 	  componentsAwaitingRelease.add(c);
     }
 
-    public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
+    public <C extends Component> void removeComponentAwaitingRelease(C c) {
     	 if(componentsAwaitingRelease != null) {
              componentsAwaitingRelease.remove(c);
          }
