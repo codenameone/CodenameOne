@@ -2385,7 +2385,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
         dispatch_sync(dispatch_get_main_queue(), ^{
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
-            config.mediaTypesRequiringUserActionForPlayback=WKAudiovisualMediaTypeNone;
+            if (@available(iOS 10, *)) {
+                config.mediaTypesRequiringUserActionForPlayback=WKAudiovisualMediaTypeNone;
+            }
             config.suppressesIncrementalRendering = YES;
             UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
             WKUserContentController* userContentController = [[WKUserContentController alloc] init];
