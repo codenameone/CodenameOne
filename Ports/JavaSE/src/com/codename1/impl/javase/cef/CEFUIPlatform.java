@@ -10,7 +10,8 @@ import com.codename1.ui.CN;
 import org.cef.browser.UIPlatform;
 
 /**
- *
+ * A class that allows us to abstract platform-specific functionality, such as running on the UI thread, and
+ * converting between dips and pixels.
  * @author shannah
  */
 public class CEFUIPlatform implements UIPlatform {
@@ -20,6 +21,10 @@ public class CEFUIPlatform implements UIPlatform {
         return JavaSEPort.instance.convertToPixels(dips, horizontal);
     }
 
+    /**
+     * Schedules runnable to run on the UI thread.
+     * @param r 
+     */
     @Override
     public void runLater(Runnable r) {
         CN.callSerially(r);
