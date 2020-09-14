@@ -158,7 +158,8 @@ public class Form extends Container {
     int initialPressX;
     int initialPressY;
     private EventDispatcher orientationListener;
-    private EventDispatcher sizeChangedListener;    
+    private EventDispatcher sizeChangedListener;   
+    private EventDispatcher pasteListener;
     private UIManager uiManager;
     private Component stickyDrag;
     private boolean dragStopFlag;
@@ -240,7 +241,49 @@ public class Form extends Container {
         super.setAllowEnableLayoutOnPaint(allow);
     }
     
+    /**
+     * Adds a listener to be notified when the user has initiated a paste event.  This will primarily
+     * occur only on desktop devices which allow the user to initiate a paste outside
+     * the UI of the app itself, either using a key code (Command/Ctrl V), or a menu (Edit &gt; Paste).
+     * 
+     * <p>The event will be fired after the paste action has updated the clipboard contents, so you can
+     * access the clipboard contents via {@link Display#getPasteDataFromClipboard() }.</p>
+     * 
+     * @param l Listener registered to receive paste events.
+     * @since 7.0
+     */
+    public void addPasteListener(ActionListener l) {
+        if (pasteListener == null) {
+            pasteListener = new EventDispatcher();
+        }
+        pasteListener.addListener(l);
+    }
     
+    /**
+     * Removes listener from being notified when the user has initiated a paste event.
+     * @param l Listener to unregister to receive paste events.
+     * @since 7.0
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void removePasteListener(ActionListener l) {
+        if (pasteListener == null) {
+            return;
+        }
+        pasteListener.removeListener(l);
+    }
+    
+    /**
+     * Fires a paste event to the paste listeners.  For internal use.
+     * @param l The paste event.  Includes no useful data currently.
+     * @since 7.0
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
+     * @see #removePasteListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void dispatchPaste(ActionEvent l) {
+        if (pasteListener != null) {
+            pasteListener.fireActionEvent(l);
+        }
+    }
     
     /**
      * Gets TextSelection support for this form.
