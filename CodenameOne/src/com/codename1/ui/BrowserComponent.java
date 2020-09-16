@@ -90,6 +90,10 @@ public class BrowserComponent extends Container {
     private boolean ready = false;
     private boolean fireCallbacksOnEdt=true;
     
+    PeerComponent getInternal() {
+        return internal;
+    }
+    
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
      */
@@ -525,6 +529,14 @@ public class BrowserComponent extends Container {
         CN.callSerially(new Runnable() {
             public void run() {
                 PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);
+                if (c == null) {
+                    if (CN.isSimulator()) {
+                        Log.p("Failed to create the browser component.  Please ensure that you are either using a JDK that has JavaFX (e.g. ZuluFX), or that you have installed the Codename One CEF component.  See https://www.codenameone.com/blog/big-changes-jcef.html for more information");
+                    } else {
+                        Log.p("Failed to create browser component.  This platform may not support the native browser component");
+                    }
+                    return;
+                }
                 internal = c;
                 removeComponent(placeholder);
                 addComponent(BorderLayout.CENTER, internal);
@@ -1094,7 +1106,12 @@ public class BrowserComponent extends Container {
                 });
             }
         }
-        return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
+            return Display.impl.browserExecuteAndReturnString(internal, javaScript);
+        } else {
+            return executeAndWait("callback.onSuccess(eval(${0}))", new Object[]{javaScript}).toString();
+            
+        }
     }
     
     /**
@@ -1674,13 +1691,14 @@ public class BrowserComponent extends Container {
                 .append("function doCallback(val) { ")
                 //.append("cn1application.log('in doCallback');")
                 .append("  var url = BASE_URL + encodeURIComponent(JSON.stringify(val));")
-                .append("  if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
+                .append("  if (window.cefQuery) { window.cefQuery({request:'shouldNavigate:'+url, onSuccess: function(response){}, onFailure:function(error_code, error_message) { console.log(error_message)}});}")
+                .append("  else if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if ("+isSimulator+") {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}")
                 .append("} ")
                 .append("var result = {value:null, type:null, errorMessage:null, errorCode:0, callbackId:").append(callbackId).append("};")
                 .append("var callback = {")
                 .append("  onSucess: function(val) { this.onSuccess(val);}, ")
                 .append("  onSuccess: function(val) { result.value = val; result.type = typeof(val); if (val !== null && typeof val === 'object') {result.value = val.toString();} doCallback(result);}, ")
-                .append("  onError: function(message, code) { result.errorMessage = message; result.errorCode = code; doCallback(result);}")
+                .append("  onError: function(message, code) { if (message instanceof Error) {result.errorMessage = message.message; result.errorCode = 0;} else {result.errorMessage = message; result.errorCode = code;} doCallback(result);}")
                 .append("};")
                 
                 .append("try { ").append(js).append("} catch (e) {try {callback.onError(e.message, 0);} catch (e2) {callback.onError('Unknown error', 0);}}")
@@ -1712,7 +1730,9 @@ public class BrowserComponent extends Container {
                             }
                         }
                         if (key != null) {
-                            returnValueCallbacks.remove(key);
+                            if (jsCallbacks == null || !jsCallbacks.contains(callback)) {
+                                returnValueCallbacks.remove(key);
+                            }
                             if (callback instanceof Callback) {
                                 ((Callback)callback).onError(BrowserComponent.this, new RuntimeException("Javascript execution timeout"), 1, "Javascript execution timeout");
                             } else {
@@ -2098,6 +2118,29 @@ public class BrowserComponent extends Container {
             putClientProperty("BrowserComponent.firebug", null);
         }
     }
+
+    @Override
+    public void putClientProperty(String key, Object value) {
+        super.putClientProperty(key, value);
+        // In Javascript we use an iframe, and normal behaviour is for the
+        // iframe to be added hidden to the DOM immediately on creation, but
+        // it is removed from the DOM on deinitialize() and added in initComponent().
+        // In some cases, e.g. WebRTC, removing from the DOM breaks things, so we
+        // need it to remain on the dom even after deinitialize().  This is necessary
+        // in case we reinitialize it afterward (e.g when displaying a dialog, it will
+        // deinitialize the form, and when we close the dialog it will reshow the form
+        // but the browser will be broken.
+        // Thie client property is a flag to tell the JS port not to remove the peer
+        // on deinitialize.
+        if ("HTML5Peer.removeOnDeinitialize".equals(key)) {
+            if (internal != null) {
+                internal.putClientProperty(key, value);
+            }
+        }
+        
+    }
+    
+    
     
     /**
      * Indicates if debug mode is set (might have no effect though)

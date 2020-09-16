@@ -102,6 +102,10 @@ public class FloatingActionButton extends Button {
 
     private List<FloatingActionButton> subMenu;
 
+    /**
+     * The UIID of the sub action texts can be overriden. It defaults to {@code FloatingActionText}
+     */
+    private String floatingActionTextUIID = "FloatingActionText";
     private String text;
     private int shadowOpacity = 100;
     private Dialog current;
@@ -387,7 +391,7 @@ public class FloatingActionButton extends Button {
             next.setPreferredW(getWidth());
             Container c = new Container(new BorderLayout());
             Label txt = new Label(next.text);
-            txt.setUIID("FloatingActionText");
+            txt.setUIID(floatingActionTextUIID);
             c.add(BorderLayout.CENTER, FlowLayout.encloseRight(txt));
             c.add(BorderLayout.EAST, next);
             con.add(c);
@@ -403,6 +407,20 @@ public class FloatingActionButton extends Button {
     protected void showPopupDialog(Dialog dialog) {
         dialog.setPopupDirectionBiasPortrait(Boolean.TRUE);
         dialog.showPopupDialog(this);
+    }
+
+    /**
+     * @return the floatingActionTextUIID
+     */
+    public String getFloatingActionTextUIID() {
+        return floatingActionTextUIID;
+    }
+
+    /**
+     * @param floatingActionTextUIID the floatingActionTextUIID to set
+     */
+    public void setFloatingActionTextUIID(String floatingActionTextUIID) {
+        this.floatingActionTextUIID = floatingActionTextUIID;
     }
 
 }

@@ -822,6 +822,8 @@ public final class CommonTransitions extends Transition {
                     return;
             }
         } catch(Throwable t) {
+            // end the transition now just to be safe
+            motion = null;
             Log.p("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
             Log.e(t);
         }

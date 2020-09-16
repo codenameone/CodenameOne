@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+//import com.codename1.impl.javase.fx.JavaFXLoader;
 import com.codename1.testing.JUnitXMLReporting;
 import com.codename1.testing.TestReporting;
 import java.io.DataInputStream;
@@ -243,19 +244,7 @@ public class TestRunner {
      * @param argv
      */
     public static void main(String[] argv) {
-        try {
-            if (JavaFXLoader.main(TestRunner.class, TestRunner.class, argv)) {
-                return;
-            }
-        } catch (JavaFXLoader.JavaFXNotLoadedException notLoaded) {
-            System.err.println("Your JDK doesn't appear to have JavaFX installed, and the loader failed to install it.  Please download the appropriate javafx-{platform}.zip file from https://github.com/codenameone/cn1-binaries, and extract it to $HOME/.codenameone/javafx");
-            notLoaded.printStackTrace();
-            System.exit(100);
-        } catch (InvocationTargetException ex) {
-            System.err.println("An exception occurred running the tests");
-            ex.printStackTrace();
-            System.exit(100);
-        }
+        
         new TestRunner().init(argv);
     }
 }

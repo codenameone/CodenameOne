@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.fx.JavaFXLoader;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -115,10 +116,6 @@ public class Executor {
     
     
     public static void main(Class launcherClass, final String[] argv) throws Exception {
-        if (JavaFXLoader.main(launcherClass, Executor.class, argv)) {
-            return;
-        }
-        
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
@@ -308,20 +305,27 @@ public class Executor {
     
     public static void startApp(){
         if(c != null && app != null){
-            try {
-                Method start = c.getMethod("start", new Class[0]);
-                if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
-                    System.err.println("ERROR: the start method can't declare a throws clause");
-                    System.exit(1);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method start = c.getMethod("start", new Class[0]);
+                        if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                            System.err.println("ERROR: the start method can't declare a throws clause");
+                            System.exit(1);
+                        }
+                        start.invoke(app, new Object[0]);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
                 }
-                start.invoke(app, new Object[0]);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            } 
-        }
-    
+               
+            });
+        }    
     }
 
+    
+    
     public static void registerForPush(final String key){
         if(c != null && app != null){
             Display.getInstance().callSerially(new Runnable() {

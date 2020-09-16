@@ -286,6 +286,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private boolean statusBarHidden;
     private boolean superPeerMode = true;
+    
+    
+    private ValueCallback<Uri> mUploadMessage;
+    public ValueCallback<Uri[]> uploadMessage;
 
     /**
      * Keeps track of running contexts.
@@ -2895,14 +2899,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        //these keys/values are from the Application Resources (strings values)
-        try {
-            int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
-            if (id != 0) {
-                String val = getContext().getResources().getString(id);
-                return val;
+        if(!key.startsWith("android.permission")) {
+            //these keys/values are from the Application Resources (strings values)
+            try {
+                int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
+                if (id != 0) {
+                    String val = getContext().getResources().getString(id);
+                    return val;
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         return System.getProperty(key, super.getProperty(key, defaultValue));
     }
@@ -4635,12 +4641,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         });
                         
-                        if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false")) ) {
-                            wv.setWebContentsDebuggingEnabled(true); 
+                        if (android.os.Build.VERSION.SDK_INT >= 19) {
+                            if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false"))) {
+                                wv.setWebContentsDebuggingEnabled(true);
+                            }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
+                        if (android.os.Build.VERSION.SDK_INT >= 17) {
+                            wv.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                        }
                         bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
                         lock.notify();
                     } catch (Throwable t) {
@@ -4977,6 +4988,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent browserPeer) {
+        return true;
+    }
 
     public boolean canForceOrientation() {
         return true;
@@ -5213,6 +5227,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
 
             web.setWebViewClient(new WebViewClient() {
+                
+                
+                
                 public void onLoadResource(WebView view, String url) {
                     if (Display.getInstance().getProperty("syncNativeCookies", "false").equals("true")) {
                         try {
@@ -5345,6 +5362,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
             web.setWebChromeClient(new WebChromeClient(){
+                // For 3.0+ Devices (Start)
+                // onActivityResult attached before constructor
+                protected void openFileChooser(ValueCallback uploadMsg, String acceptType)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType(acceptType);
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Browser"), FILECHOOSER_RESULTCODE);
+                }
+
+
+                // For Lollipop 5.0+ Devices
+                public boolean onShowFileChooser(WebView mWebView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams)
+                {
+                    if (uploadMessage != null) {
+                        uploadMessage.onReceiveValue(null);
+                        uploadMessage = null;
+                    }
+
+                    uploadMessage = filePathCallback;
+
+                    Intent intent = fileChooserParams.createIntent();
+                    try
+                    {
+                        AndroidNativeUtil.getActivity().startActivityForResult(intent, REQUEST_SELECT_FILE);
+                    } catch (ActivityNotFoundException e)
+                    {
+                        uploadMessage = null;
+                        Toast.makeText(getActivity().getApplicationContext(), "Cannot Open File Chooser", Toast.LENGTH_LONG).show();
+                        return false;
+                    }
+                    return true;
+                }
+
+                //For Android 4.1 only
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType(acceptType);
+                    
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(intent, "File Browser"), FILECHOOSER_RESULTCODE);
+                }
+
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("image/*");
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Chooser"), FILECHOOSER_RESULTCODE);
+                }
+
+                
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
@@ -7350,11 +7423,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
+                    com.codename1.io.Log.p("Media player error: " + mp + " what: " + what + " extra: " + extra);
                     errorListeners.fireActionEvent(new MediaErrorEvent(Video.this, createMediaException(extra)));
                     fireMediaStateChange(State.Paused);
                     fireCompletionHandlers();
-                    
-                    return false;
+                    return true;
                 }
             });
 
@@ -7721,6 +7794,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return filePath;
     }
     
+    
+    
+    
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 
@@ -7728,6 +7804,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
+
+        if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                if (requestCode == REQUEST_SELECT_FILE) {
+                    if (uploadMessage == null) {
+                        return;
+                    }
+                    uploadMessage.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, intent));
+                    uploadMessage = null;
+                }
+            }
+            else if (requestCode == FILECHOOSER_RESULTCODE) {
+                if (null == mUploadMessage) {
+                    return;
+                }
+            // Use MainActivity.RESULT_OK if you're implementing WebView inside Fragment
+            // Use RESULT_OK only if you're implementing WebView inside an Activity
+                Uri result = intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
+                mUploadMessage.onReceiveValue(result);
+                mUploadMessage = null;
+            }
+            else {
+
+                Toast.makeText(getActivity().getApplicationContext(), "Failed to Upload File", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
         
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {

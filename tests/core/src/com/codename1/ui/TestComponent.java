@@ -299,6 +299,10 @@ public class TestComponent extends AbstractTest {
     }
 
     private void getComponentAt_int_int_browsercomponent() {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+    		System.out.println("This platform doesn't support the native browser component.  Skipping the getComponentAt_int_int_browsercomponent test");
+    		return;
+    	}
         int w = Display.getInstance().getDisplayWidth();
         int h = Display.getInstance().getDisplayHeight();
         Form mapDemo = new Form("Maps", new LayeredLayout());
@@ -474,6 +478,10 @@ public class TestComponent extends AbstractTest {
     }
 
     private void testCookiesInBrowserComponent() throws IOException {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+            System.out.println("Skipping testCookiesInBrowserComponent() because this platform doesn't support a native browser component");
+            return;
+    	}
         Cookie.clearCookiesFromStorage();
         Form f = new Form("CookiesInBrowser");
         String formName = "CookiesInBrowser";
@@ -601,6 +609,9 @@ public class TestComponent extends AbstractTest {
     }
     // Test for https://github.com/codenameone/CodenameOne/issues/2267
     private void testBrowserComponent2267() {
+    	if (!BrowserComponent.isNativeBrowserSupported()) {
+    		return;
+    	}
         Form hi = new Form();
         String formName = "testBrowserComponent2267";
         hi.setName(formName);

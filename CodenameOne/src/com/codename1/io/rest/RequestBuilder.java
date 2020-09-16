@@ -655,68 +655,91 @@ public class RequestBuilder {
      * Callback. This fetches JSON data and parses it into a properties business object
      * @param callback writes the response to this callback
      * @param type the class of the business object returned
+     * @param root the root element's key of the structured content
      * @return returns the Connection Request object so it can be killed if necessary
-     */ 
-    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
+     */
+    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type, final String root) {
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
-                if(request.errorCode) {
+                if (request.errorCode) {
                     return;
                 }
                 Response res = null;
-                Map response = (Map)evt.getMetaData();
-                List<Map> lst = (List<Map>)response.get("root");
-                if(lst == null) {
+                Map response = (Map) evt.getMetaData();
+                List<Map> lst = (List<Map>) response.get(root);
+                if (lst == null) {
                     return;
                 }
                 try {
                     List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
-                    for(Map m : lst) {
-                        PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+                    for (Map m : lst) {
+                        PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
                         pb.getPropertyIndex().populateFromMap(m);
                         result.add(pb);
                     }
                     res = new Response(evt.getResponseCode(), result, evt.getMessage());
                     callback.completed(res);
-                } catch(Exception err) {
+                } catch (Exception err) {
                     Log.e(err);
                     throw new RuntimeException(err.toString());
                 }
             }
         });
         fetched = true;
-        CN.addToQueue(request);       
+        CN.addToQueue(request);
         return request;
     }
-    
+
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback. This fetches JSON data and parses it into a properties business object
+     * @param callback writes the response to this callback
+     * @param type the class of the business object returned
+     * @return returns the Connection Request object so it can be killed if necessary
+     */
+    public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type) {
+        return fetchAsPropertyList(callback, type, "root");
+    }
+
     /**
      * Executes the request synchronously
      * 
      * @param type the type of the business object to create
+     * @param root the root element's key of the structured content
      * @return Response Object
-     */ 
-    public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
+     */
+    public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type, String root) {
         ConnectionRequest request = createRequest(true);
         fetched = true;
         CN.addToQueueAndWait(request);
-        Map response = ((Connection)request).json;
+        Map response = ((Connection) request).json;
         try {
-            List<Map> lst = (List<Map>)response.get("root");
+            List<Map> lst = (List<Map>) response.get(root);
             List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
-            for(Map m : lst) {
-                PropertyBusinessObject pb = (PropertyBusinessObject)type.newInstance();
+            for (Map m : lst) {
+                PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
                 pb.getPropertyIndex().populateFromMap(m);
                 result.add(pb);
             }
             return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());
-        } catch(Exception err) {
+        } catch (Exception err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
     }
-    
+
+    /**
+     * Executes the request synchronously
+     *
+     * @param type the type of the business object to create
+     * @return Response Object
+     */
+    public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type) {
+        return getAsPropertyList(type, "root");
+    }
+
     public String getRequestUrl() {
         return this.url;
     }

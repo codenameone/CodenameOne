@@ -5,6 +5,8 @@
  */
 package com.codename1.impl.javase;
 
+
+import com.codename1.impl.javase.UnzipUtility;
 import com.codename1.io.Log;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -94,7 +96,7 @@ public class CN1Console {
         try {
             String url = GROOVY_URL;
             if (url == null) {
-                throw new RuntimeException("No JavaFX URL found for this platform");
+                throw new RuntimeException("No Groovy URL found for this platform");
             }
             File groovyDir = new File(GROOVY_HOME);
             if (groovyDir.exists()) {
@@ -127,7 +129,7 @@ public class CN1Console {
             }
             
         } catch (MalformedURLException ex) {
-            Logger.getLogger(JavaFXLoader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(CN1Console.class.getName()).log(Level.SEVERE, null, ex);
             throw new RuntimeException(ex);
         }
     }

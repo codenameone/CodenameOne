@@ -63,7 +63,7 @@ public class AsyncResource<V> extends Observable  {
         if (!cancelled) {
             cancelled = true;
             done = true;
-            error = new RuntimeException("Cancelled");
+            error = new CancellationException();
             setChanged();
         }
         return true;
@@ -178,8 +178,60 @@ public class AsyncResource<V> extends Observable  {
         public Throwable getCause() {
             return cause;
         }
+        
+        /**
+         * Returns true if this exception wraps a {@link CancellationException}, or another
+         * AsyncExecutionException that has {@link #isCancelled() } true.
+         * @return True if this exception was caused by cancelling an AsyncResource.
+         * @since 7.0
+         */
+        public boolean isCancelled() {
+            if (cause != null && cause.getClass() == CancellationException.class) {
+                return true;
+            }
+            if (cause != null && cause instanceof AsyncExecutionException) {
+                return ((AsyncExecutionException)cause).isCancelled();
+            }
+            return false;
+        }
+        
     }
 
+    /**
+     * Returns true if the provided throwable was caused by a cancellation of an AsyncResource.
+     * @param t The exception to check for a cancellation.
+     * @return True if the exception was caused by cancelling an AsyncResource.
+     * @since 7.0
+     */
+    public static boolean isCancelled(Throwable t) {
+        if (t == null) {
+            return false;
+        }
+        if (t instanceof AsyncExecutionException) {
+            return ((AsyncExecutionException)t).isCancelled();
+        } else if (t.getClass() == CancellationException.class) {
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Exception thrown when the AsyncResource is cancelled.  Use {@link AsyncResource#isCancelled(java.lang.Throwable) 
+     * to test a particular exception to see if it resulted from cancelling an AsyncResource as this will
+     * return turn true if the exception itself is a CancellationException, or if the exception was caused by
+     * a CancellationException.
+     * 
+     * @since 7.0
+     * @see #isCancelled(java.lang.Throwable) 
+     * 
+     */
+    public static class CancellationException extends RuntimeException {
+        public CancellationException() {
+            super("Cancelled");
+        }
+        
+        
+    }
 
     /**
      * Gets the resource if it is ready.  If it is not ready, then it will simply
@@ -522,7 +574,9 @@ public class AsyncResource<V> extends Observable  {
     
     /**
      * Combines ready() and except() into a single callback with 2 parameters.  
-     * @param onResult A callback that handles both the ready() case and the except() case.
+     * @param onResult A callback that handles both the ready() case and the except() case.  Use {@link #isCancelled(java.lang.Throwable) }
+     * to test the error parameter of {@link AsyncResult#onReady(java.lang.Object, java.lang.Throwable) } to see if 
+     * if was caused by a cancellation.
      * @since 7.0
      */
     public void onResult(final AsyncResult<V> onResult) {
@@ -538,5 +592,6 @@ public class AsyncResource<V> extends Observable  {
             }
         });
     }
+    
     
 }

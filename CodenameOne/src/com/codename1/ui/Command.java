@@ -38,6 +38,8 @@ public class Command implements ActionListener{
     private boolean disposesDialog = true;
     private Image icon;
     private char materialIcon;
+    private char fontIcon;
+    private Font iconFont;
     private Image pressedIcon;
     private Image rolloverIcon;
     private Image disabledIcon;
@@ -400,4 +402,19 @@ public class Command implements ActionListener{
     public void setMaterialIconSize(float materialIconSize) {
         this.materialIconSize = materialIconSize;
     }
+    
+    /**
+     * @return the set iconFont or null if none defined (meaning for material icons instead of the system default MaterialDesign font
+     */
+    public Font getIconFont() {
+        return iconFont;
+    }
+
+    /**
+     * @param iconFont use iconFont for material icons instead of the system default MaterialDesign font
+     */
+    public void setIconFont(Font iconFont) {
+        this.iconFont = iconFont;
+    }
+
 }

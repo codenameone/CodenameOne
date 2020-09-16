@@ -13,6 +13,7 @@ import com.codename1.ui.Toolbar;
 import java.io.IOException;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.AutoCompleteTextField;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.layouts.FlowLayout;
@@ -93,6 +94,9 @@ public class RTLLayoutAndPadding {
                 
                 .setBgColor(0x003366).setBorder(RoundBorder.create());
         hi.add(row);
+        
+        AutoCompleteTextField tf = new AutoCompleteTextField("Red", "Green", "Blue");
+        hi.add(FlowLayout.encloseIn(tf));
         hi.show();
     }
 
