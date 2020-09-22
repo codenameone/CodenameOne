@@ -2635,10 +2635,10 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
             }];
             POOL_END();
         } else {
+            NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
             dispatch_async(dispatch_get_main_queue(), ^{
                 POOL_BEGIN();
                 WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-                NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
                 [w evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
                     if (error != nil) {
                         NSLog(@"evaluateJavaScript2 error : %@ : %@", error.localizedDescription, js);
