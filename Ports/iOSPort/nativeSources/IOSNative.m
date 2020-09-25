@@ -2509,7 +2509,23 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
             WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-            [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
+            @try {
+                // This is an unofficial (unsupported) hack for allowing file access which is necessary
+                // for things like setURLHierarchy(). 
+                // It has been reported to sometimes not work, and throw an exception
+                // -[__NSCFConstantString
+                // charValue]: unrecognized selector sent to instance 0x99444c*
+                // 2020-09-22 17:08:04.200 OrdyxDisplay[637:204697] ** Terminating app due
+                // to uncaught exception 'NSInvalidArgumentException', reason:
+                // '-[__NSCFConstantString charValue]: unrecognized selector sent to instance
+                // 0x99444c'*
+                //
+                // Therefore we are wrapping it in a try/catch here to swallow the exception
+                [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
+            }
+            @catch (NSException *exception) {
+                NSLog(@"Setting the key 'allowFileAccessFromFileURLs' failed.  file:// URLs may not work correctly");
+            }
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             if ([str hasPrefix:@"http://"] || [str hasPrefix:@"https://"]) {
                 NSURL* nu = [NSURL URLWithString:str];
@@ -2635,10 +2651,10 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
             }];
             POOL_END();
         } else {
+            NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
             dispatch_async(dispatch_get_main_queue(), ^{
                 POOL_BEGIN();
                 WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-                NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
                 [w evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
                     if (error != nil) {
                         NSLog(@"evaluateJavaScript2 error : %@ : %@", error.localizedDescription, js);
