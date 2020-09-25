@@ -159,7 +159,7 @@ public class Font extends CN {
      * @return a font object
      */
     public static Font createTrueTypeFont(String fontName) {
-        if(!fontName.startsWith("native:")) {
+        if(Display.getInstance().isSimulator() && !fontName.startsWith("native:")) {
             throw new IllegalArgumentException("Only native: fonts are supported by this method. To load a TTF use createTrueTypeFont(String, String)");
         }
         return createTrueTypeFont(fontName, fontName);
