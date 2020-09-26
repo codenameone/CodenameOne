@@ -68,8 +68,27 @@ public class ExistInConstraint implements Constraint {
      * @param items        the array items the input value must exist in
      * @param errorMessage the default error message if the constraint fails
      */
+    public ExistInConstraint(List<String> items, String errorMessage) {
+        this(items, false, errorMessage);
+    }
+
+    /**
+     * Creates a new ExistIn constraint
+     *
+     * @param items        the array items the input value must exist in
+     * @param errorMessage the default error message if the constraint fails
+     */
     public ExistInConstraint(String[] items, String errorMessage) {
         this(items, false, errorMessage);
+    }
+
+    /**
+     * Creates a new ExistIn constraint
+     *
+     * @param items the array items the input value must exist in
+     */
+    public ExistInConstraint(List<String> items) {
+        this(items, false, null);
     }
 
     /**

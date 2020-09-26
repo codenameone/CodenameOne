@@ -68,8 +68,27 @@ public class NotExistInConstraint implements Constraint {
      * @param items        the array items the input value must not exist in
      * @param errorMessage the default error message if the constraint fails
      */
+    public NotExistInConstraint(List<String> items, String errorMessage) {
+        this(items, false, errorMessage);
+    }
+
+    /**
+     * Creates a new NotExistIn constraint
+     *
+     * @param items        the array items the input value must not exist in
+     * @param errorMessage the default error message if the constraint fails
+     */
     public NotExistInConstraint(String[] items, String errorMessage) {
         this(items, false, errorMessage);
+    }
+
+    /**
+     * Creates a new NotExistIn constraint
+     *
+     * @param items the array items the input value must not exist in
+     */
+    public NotExistInConstraint(List<String> items) {
+        this(items, false, null);
     }
 
     /**
