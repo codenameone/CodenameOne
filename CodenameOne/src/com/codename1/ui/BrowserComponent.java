@@ -2118,6 +2118,29 @@ public class BrowserComponent extends Container {
             putClientProperty("BrowserComponent.firebug", null);
         }
     }
+
+    @Override
+    public void putClientProperty(String key, Object value) {
+        super.putClientProperty(key, value);
+        // In Javascript we use an iframe, and normal behaviour is for the
+        // iframe to be added hidden to the DOM immediately on creation, but
+        // it is removed from the DOM on deinitialize() and added in initComponent().
+        // In some cases, e.g. WebRTC, removing from the DOM breaks things, so we
+        // need it to remain on the dom even after deinitialize().  This is necessary
+        // in case we reinitialize it afterward (e.g when displaying a dialog, it will
+        // deinitialize the form, and when we close the dialog it will reshow the form
+        // but the browser will be broken.
+        // Thie client property is a flag to tell the JS port not to remove the peer
+        // on deinitialize.
+        if ("HTML5Peer.removeOnDeinitialize".equals(key)) {
+            if (internal != null) {
+                internal.putClientProperty(key, value);
+            }
+        }
+        
+    }
+    
+    
     
     /**
      * Indicates if debug mode is set (might have no effect though)

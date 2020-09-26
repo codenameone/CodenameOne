@@ -1258,7 +1258,6 @@ public class Calendar extends Container implements ActionSource {
                     }
 
                     if (src == components[iter] || isContained) {
-                        System.out.println(src);
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
                                 if (SELECTED_DAY == dates[iter]) {

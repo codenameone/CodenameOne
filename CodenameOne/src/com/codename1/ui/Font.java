@@ -154,11 +154,14 @@ public class Font extends CN {
     
     /**
      * Shorthand for {@code createTrueTypeFont(name, name)} which is useful
-     * for cases such as native: fonts.
-     * @param fontName the native font name
+     * for cases such as native: fonts. If a TTF file is passed this method will throw an exception!
+     * @param fontName the native font name. Notice that TTF file names are prohibited
      * @return a font object
      */
     public static Font createTrueTypeFont(String fontName) {
+        if(Display.getInstance().isSimulator() && !fontName.startsWith("native:")) {
+            throw new IllegalArgumentException("Only native: fonts are supported by this method. To load a TTF use createTrueTypeFont(String, String)");
+        }
         return createTrueTypeFont(fontName, fontName);
     }
     

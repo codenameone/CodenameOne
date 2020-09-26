@@ -32,13 +32,27 @@ import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefLoadHandlerAdapter;
 
 /**
- *
+ * JPanel subclass that is designed to house a CEF instance.
  * @author shannah
  */
 public abstract class BrowserPanel extends CN1JPanel {
+    
+    /**
+     * Registry for InputStreams.  This is used for playing media or loading page content with InputStreams.
+     */
     private static StreamRegistry streamRegistry_ = new StreamRegistry();
+    
+    /**
+     * Flag to indicate when the browser is closed, so shouldn't be used anymore.
+     */
     private boolean isClosed_ = false;
+    
+    /**
+     * Reference to the CEF browser instance.
+     */
     private CefBrowser browser_ = null;
+    
+    
     private static int browserCount_ = 0;
     private Runnable afterParentChangedAction_ = null;
     private String title_ = null;
@@ -144,6 +158,8 @@ public abstract class BrowserPanel extends CN1JPanel {
             //    chromium or CEF related switches/attributes in
             //    the native world.
             CefSettings settings = new CefSettings();
+            //settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_VERBOSE;
+            //settings.log_file = "/tmp/cef.log";
             
             settings.windowless_rendering_enabled = osrEnabled;
             // try to load URL "about:blank" to see the background color
@@ -204,8 +220,6 @@ public abstract class BrowserPanel extends CN1JPanel {
         client_.addDisplayHandler(new CefDisplayHandlerAdapter() {
             @Override
             public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
-                //control_pane_.setAddress(browser, url);
-                System.out.println("Address changed to "+url);
                 url_ = url;
             }
             @Override
@@ -228,24 +242,11 @@ public abstract class BrowserPanel extends CN1JPanel {
             @Override
             public void onLoadingStateChange(CefBrowser browser, boolean isLoading,
                     boolean canGoBack, boolean canGoForward) {
-                //control_pane_.update(browser, isLoading, canGoBack, canGoForward);
-                //status_panel_.setIsInProgress(isLoading);
-                //if (browserComponent != null) {
                     if (isLoading) {
-                        //System.out.println("Firing onStart "+url_);
                         onStart(new ActionEvent(url_));
-                        
                     } else {
-                        //System.out.println("Firing onLoad "+url_);
-                        //String bootstrap = "if (!window.cn1application) window.cn1application={};"
-                        //        + "window.cn1application."
-                        
-                        //browser_.executeJavaScript("window.cn1application = ", url_, ERROR);
                         onLoad(new ActionEvent(url_));
-                        
-                       
                     }
-                //}
 
             }
 
@@ -269,7 +270,11 @@ public abstract class BrowserPanel extends CN1JPanel {
 
         // Create the browser.
         CN1CefBrowser.setComponentFactory(new CEFComponentFactory());
+        
+        // Set the UI platform (provides handling of platform specific stuff like running on UI thread
+        // and converting pixels to dips
         CN1CefBrowser.setUIPlatform(new CEFUIPlatform());
+        
         CefBrowser browser = client_.createBrowser(
                 startingURL, osrEnabled, transparentPaintingEnabled, null);
         ((CN1CefBrowser)browser).setPeerComponentBuffer(buffer);
@@ -349,7 +354,6 @@ public abstract class BrowserPanel extends CN1JPanel {
         browser_.getClient().addLifeSpanHandler(new CefLifeSpanHandlerAdapter() {
             @Override
             public void onAfterCreated(CefBrowser browser) {
-                //System.out.println("BrowserFrame.onAfterCreated id=" + browser.getIdentifier());
                 browserCount_++;
                 ready_ = true;
                 if (readyCallback != null) {
@@ -359,8 +363,6 @@ public abstract class BrowserPanel extends CN1JPanel {
 
             @Override
             public void onAfterParentChanged(CefBrowser browser) {
-                //System.out.println(
-                //        "BrowserFrame.onAfterParentChanged id=" + browser.getIdentifier());
                 if (afterParentChangedAction_ != null) {
                     SwingUtilities.invokeLater(afterParentChangedAction_);
                     afterParentChangedAction_ = null;
@@ -370,24 +372,20 @@ public abstract class BrowserPanel extends CN1JPanel {
             @Override
             public boolean doClose(CefBrowser browser) {
                 boolean result = browser.doClose();
-                //System.out.println("BrowserFrame.doClose id=" + browser.getIdentifier()
-                //        + " CefBrowser.doClose=" + result);
                 return result;
             }
 
             @Override
             public void onBeforeClose(CefBrowser browser) {
-                //System.out.println("BrowserFrame.onBeforeClose id=" + browser.getIdentifier());
+                
                 if (--browserCount_ == 0) {
-                    //System.out.println("BrowserFrame.onBeforeClose CefApp.dispose");
-                    //CefApp.getInstance().dispose();
+
                 }
             }
         });
     }
 
     public void removeBrowser(Runnable r) {
-        //System.out.println("BrowserFrame.removeBrowser");
         afterParentChangedAction_ = r;
         remove(browser_.getUIComponent());
         // The removeNotify() notification should be sent as a result of calling remove().

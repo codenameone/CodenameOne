@@ -157,6 +157,23 @@ public class AnalyticsService {
     }
     
     /**
+     * Decorates the ConnectionRequest to be sent to the server before the request is sent.
+     * This can be overridden to add additional request parameters to the service, and hence provide
+     * additional analytics data.
+     * 
+     * <p>If using Google Analytics, the current you can see the available POST parameters that
+     * the server accepts <a href="https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters">here</a>.</p>
+     * 
+     * @param page The page visited
+     * @param referer The page from which the user came.
+     * @param request The ConnectionRequest
+     * @since 7.0
+     */
+    protected void decorateVisitPageRequest(String page, String referer, ConnectionRequest request) {
+        
+    }
+    
+    /**
      * Subclasses should override this method to track page visits
      * @param page the page visited
      * @param referer the page from which the user came
@@ -194,6 +211,7 @@ public class AnalyticsService {
             req.addResponseCodeListener(onComplete);
             req.addExceptionListener(onComplete);
             lastRequest = req;
+            decorateVisitPageRequest(page, referer, req);
             NetworkManager.getInstance().addToQueue(req);
         } else {
             String url = Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "anal";
@@ -231,6 +249,7 @@ public class AnalyticsService {
             r.addResponseCodeListener(onComplete);
             r.addExceptionListener(onComplete);
             lastRequest = r;
+            decorateVisitPageRequest(page, referer, r);
             NetworkManager.getInstance().addToQueue(r);
         }
     }
