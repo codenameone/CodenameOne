@@ -548,7 +548,9 @@ public class Container extends Component implements Iterable<Component>{
         for(int iter = 0 ; iter < c.getComponentCount() ; iter++) {
             Component cu = c.getComponentAt(iter);
             boolean isContainer = (cu instanceof Container);
-            cu.setFocusable(false);
+            if (!cu.isBlockLead()) {
+                cu.setFocusable(false);
+            }
             if (isContainer) {
                 cu.hasLead = ((Container)cu).leadComponent != null || !cu.isBlockLead();
             } else {

@@ -238,6 +238,7 @@ public class Dialog extends Form {
      * only should be used
      */
     private float blurBackgroundRadius = defaultBlurBackgroundRadius;
+    private boolean isUIIDByPopupPosition;
     
     /**
      * Constructs a Dialog with a title
@@ -1282,11 +1283,17 @@ public class Dialog extends Form {
             }
             if(rect.getY() < availableHeight / 2) {
                 // popup downwards
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneDownwards");
+                }
                 y = rect.getY() + rect.getSize().getHeight();
                 int height = Math.min(prefHeight, availableHeight - y);
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup upwards
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneUpwards");
+                }
                 int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
                 y = rect.getY() - height;
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
@@ -1310,6 +1317,9 @@ public class Dialog extends Form {
             
             if(prefWidth > rect.getX()) {
                 // popup right
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneRight");
+                }
                 x = rect.getX() + rect.getSize().getWidth();
                 if(x + prefWidth > availableWidth){
                     x = availableWidth - prefWidth;
@@ -1319,6 +1329,9 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             } else {
                 // popup left
+                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                    getContentPane().setUIID("PopupContentPaneLeft");
+                }
                 width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
                 x = rect.getX() - width;
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
@@ -2025,5 +2038,18 @@ public class Dialog extends Form {
         } else {
             super.initDialogBgPainter(p, previousForm);
         }
+    }
+    
+    /**
+     * Allows to use the UIIDs "PopupContentPaneDownwards",
+     * "PopupContentPaneUpwards", "PopupContentPaneRight",
+     * "PopupContentPaneLeft" (instead of the default UIID "PopupContentPane")
+     * to style the PopupDialog more accurately based on the position of the
+     * dialog popup compared to the context component.
+     *
+     * @param b to enable
+     */
+    public void setUIIDByPopupPosition(boolean b) {
+        this.isUIIDByPopupPosition = b;
     }
 }

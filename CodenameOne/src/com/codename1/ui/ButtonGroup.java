@@ -131,7 +131,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @return true if a selection was made in the radio button group
      */
     public boolean isSelected() {
-        if(selectedIndex!= -1)
+        if(selectedIndex != -1)
             return true;
         return false;
     }
@@ -144,7 +144,16 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
     public int getSelectedIndex() {
         return selectedIndex;
     }
-    
+
+    /**
+     * Return the selected radio button within the group
+     *
+     * @return the selected radio button within the group
+     */
+    public RadioButton getSelected() {
+        return getRadioButton(selectedIndex);
+    }
+
     /**
      * Returns the radio button at the given group index
      * 
@@ -152,7 +161,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @return the radio button instance
      */
     public RadioButton getRadioButton(int index) {
-        if(index >=0 && index < getButtonCount())
+        if(index >= 0 && index < getButtonCount())
             return ((RadioButton)buttons.get(index));
         return null;
     }

@@ -7699,6 +7699,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openFileInputStream(String file) throws IOException {
         file = unfile(file);
+        if(!nativeInstance.fileExists(file)) {
+            throw new IOException("File not found: " + file);
+        }
         return new BufferedInputStream(new NSFileInputStream(file), file);
     }
 
