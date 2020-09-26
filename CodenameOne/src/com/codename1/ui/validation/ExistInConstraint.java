@@ -46,7 +46,7 @@ public class ExistInConstraint implements Constraint {
      * @param errorMessage  the default error message if the constraint fails
      */
     public ExistInConstraint(List<String> items, boolean caseSensitive, String errorMessage) {
-        this.items = new ArrayList<>(items);
+        this.items = new ArrayList(items);
         this.caseSensitive = caseSensitive;
         this.errorMessage = errorMessage;
     }
