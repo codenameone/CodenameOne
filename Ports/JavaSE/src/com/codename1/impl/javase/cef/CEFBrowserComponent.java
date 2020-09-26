@@ -155,8 +155,8 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         //args.add("--allow-file-access-from-files");
         args.add("--touch-events=enabled");
         args.add("--enable-media-stream");
-        args.add("--device-scale-factor=4");
-        args.add("--force-device-scale-factor=4");
+        //args.add("--device-scale-factor=4");
+        //args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         args.add("--enable-usermedia-screen-capturing");
         System.out.println("CEF Args: "+args);
