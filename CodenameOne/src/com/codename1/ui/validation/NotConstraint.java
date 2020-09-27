@@ -45,7 +45,8 @@ public class NotConstraint implements Constraint {
     /**
      * Creates a new NotConstraint
      *
-     * @param children the child constraints
+     * @param failMessage the default error message if the constraint fails
+     * @param children    the child constraints
      */
     public NotConstraint(String failMessage, Constraint... children) {
         this.failMessage = failMessage;
