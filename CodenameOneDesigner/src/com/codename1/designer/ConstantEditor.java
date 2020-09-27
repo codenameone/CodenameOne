@@ -105,7 +105,10 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("hideEmptyTitleBool", "Indicates that a title with no content should be hidden even if the border for the title occupies space");
         helpMap.put("hideLeftSideMenuBool","Hides the side menu icon that appears on the left side of the UI");
         helpMap.put("ignorListFocusBool", "Hide the focus component of the list when the list doesn't have focus");
+        helpMap.put("infiniteDefaultColor","Default color of the infinite progress animation when defaultMaterialDesignMode is true");
         helpMap.put("infiniteImage","The image used by the infinite progress component, the component will rotate it as needed");
+        helpMap.put("infiniteMaterialDesignSize","Default size of the infinite progress animation when defaultMaterialDesignMode is true.");
+        helpMap.put("infiniteMaterialImageSize","Default size of the infinite progress animation image when using FontImage.");
         helpMap.put("includeNativeBool", "True to derive from the platform native theme, false to create a blank theme that only uses the basic defaults.");
         helpMap.put("listItemGapInt ", "Builtin item gap in the list, this defaults to 2 which predated padding/margin in Codename One");
         helpMap.put("listLongPressBool","Defaults to true, indicates whether a list should handle long press events");
