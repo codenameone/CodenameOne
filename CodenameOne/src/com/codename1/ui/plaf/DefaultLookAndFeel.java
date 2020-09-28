@@ -30,6 +30,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.ComboBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.ComponentSelector.ComponentClosure;
@@ -693,9 +694,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         ListModel model = cb.getModel();
         ListCellRenderer renderer = cb.getRenderer();
         Object value = model.getItemAt(model.getSelectedIndex());
+        Image comboBoxImage = ((ComboBox)cb).getComboBoxImage() != null ? ((ComboBox)cb).getComboBoxImage() : comboImage;                
         int comboImageWidth;
-        if (comboImage != null) {
-            comboImageWidth = comboImage.getWidth();
+        if (comboBoxImage != null) {
+            comboImageWidth = comboBoxImage.getWidth();
         } else {
             comboImageWidth = style.getFont().getHeight();
         }
@@ -725,8 +727,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         	x += cb.getWidth() - comboImageWidth - rightPadding;
         }
 
-        if (comboImage != null) {
-            g.drawImage(comboImage, x, y + height / 2 - comboImage.getHeight() / 2);
+        if (comboBoxImage != null) {
+            g.drawImage(comboBoxImage, x, y + height / 2 - comboBoxImage.getHeight() / 2);
         } else {
             int color = g.getColor();
 
@@ -753,9 +755,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             g.translate(-1, -1);
             g.setColor(style.getFgColor());
             g.fillTriangle(x1, y1, x2, y2, x3, y3);
-            //g.setColor(style.getFgColor());
-            //g.fillTriangle(x1 + 2, y1 + 2, x2, y2 - 2, x3 - 2, y3 + 2);
-
             g.translate(-x, -y);
         }
 
@@ -1827,9 +1826,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public Dimension getComboBoxPreferredSize(List cb) {
         Dimension d = getListPreferredSize(cb);
-        if(comboImage != null) {
-            d.setWidth(d.getWidth() + comboImage.getWidth());
-            d.setHeight(Math.max(d.getHeight(), comboImage.getHeight()));
+        Image comboBoxImage = ((ComboBox)cb).getComboBoxImage() != null ? ((ComboBox)cb).getComboBoxImage() : comboImage;
+        if(comboBoxImage != null) {
+            d.setWidth(d.getWidth() + comboBoxImage.getWidth());
+            d.setHeight(Math.max(d.getHeight(), comboBoxImage.getHeight()));
         }
         return d;
     }

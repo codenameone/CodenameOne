@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.cloud.BindTarget;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
@@ -34,8 +33,6 @@ import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
-import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
@@ -83,8 +80,11 @@ import java.util.Vector;
  * @author Chen Fishbein
  */
 public class ComboBox<T> extends List<T> implements ActionSource {
+    
     private static boolean defaultActAsSpinnerDialog;
 
+    private Image comboBoxImage;
+    
     /**
      * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
      * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
@@ -164,6 +164,26 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             c.setUIID("ComboBoxFocus");
         }
     }
+
+    /**
+     * Sets the ComboBox drop down icon
+     * 
+     * @param comboBoxImage the drop down icon
+     */
+    public void setComboBoxImage(Image comboBoxImage) {
+        this.comboBoxImage = comboBoxImage;
+    }
+
+    /**
+     * Gets the ComboBox drop down icon
+     * 
+     * @return the drop down icon
+     */
+    public Image getComboBoxImage() {
+        return comboBoxImage;
+    }
+    
+    
 
     /**
      * {@inheritDoc}
