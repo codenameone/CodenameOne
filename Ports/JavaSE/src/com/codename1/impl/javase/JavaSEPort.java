@@ -3461,7 +3461,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/build-server.html"));
+                        Desktop.getDesktop().browse(new URI("https://cloud.codenameone.com/buildapp/index.html"));
                     } catch (Exception ex) {                        
                     }
                 }
