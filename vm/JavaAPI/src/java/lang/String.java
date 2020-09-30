@@ -458,7 +458,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * ) == ch is true. The String is searched backwards starting at the last character.
      */
     public int lastIndexOf(int ch){
-        for(int iter = count + offset - 1 ; iter > offset ; iter--) {
+        for(int iter = count + offset - 1 ; iter >= offset ; iter--) {
             if(value[iter] == ch) {
                 return iter - offset;
             }

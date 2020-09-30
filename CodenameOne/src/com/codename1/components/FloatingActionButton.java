@@ -314,6 +314,17 @@ public class FloatingActionButton extends Button {
         return LayeredLayout.encloseIn(cnt, conUpper);
     }
 
+    /**
+     * Removes the floating action button from its parent
+     */
+    public void unbind() {
+        Container cnt = getParent();
+        remove();
+        if(cnt != null) {
+            cnt.remove();
+        }
+    }
+
     @Override
     public void setText(String text) {
         if(isBadge) {
