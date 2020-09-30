@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -40,15 +40,15 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.WeakHashMap;
 
 /**
- * <p>Shows a "Washing Machine" infinite progress indication animation, to customize the image you can either 
+ * <p>Shows a "Washing Machine" infinite progress indication animation, to customize the image you can either
  * use the infiniteImage theme constant or the <code>setAnimation</code> method. The image is rotated
  * automatically so don't use an animated image or anything like that as it would fail with the rotation logic.</p>
- * 
+ *
  * <p>This class can be used in one of two ways either by embedding the component into the UI thru something
  * like this:
  * </p>
  * <script src="https://gist.github.com/codenameone/bddead645fcd8ee33e9c.js"></script>
- * 
+ *
  * <p>
  * Notice that this can be used within a custom dialog too.<br>
  * A second approach allows showing the infinite progress over the entire screen which blocks all input. This tints
@@ -56,7 +56,7 @@ import com.codename1.ui.util.WeakHashMap;
  * </p>
  *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/infinite-progress.png" alt="InfiniteProgress">
- * 
+ *
  * @author Shai Almog
  */
 public class InfiniteProgress extends Component {
@@ -124,20 +124,20 @@ public class InfiniteProgress extends Component {
     private int materialDesignColor = defaultMaterialDesignColor;
     private Motion materialLengthAngle;
     private boolean materialLengthDirection;
-    
+
     /**
      * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
      * number and to speed it up reduce it to 1. It can't be 0 or lower.
      */
     private int tickCount = 3;
-    
+
     /**
      * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
      * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
      */
     private int angleIncrease = 16;
-        
+
     /**
      * Default constructor to define the UIID
      */
@@ -146,7 +146,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code>
      * on the returned <code>Dialog</code>.
      *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
@@ -155,9 +155,9 @@ public class InfiniteProgress extends Component {
     public Dialog showInifiniteBlocking() {
         return showInfiniteBlocking();
     }
-    
+
     /**
-     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code>
      * on the returned <code>Dialog</code>.
      *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
@@ -170,7 +170,7 @@ public class InfiniteProgress extends Component {
         }
         if (f.getClientProperty("isInfiniteProgress") == null) {
             f.setTintColor(tintColor);
-        } 
+        }
         Dialog d = new Dialog();
         d.putClientProperty("isInfiniteProgress", true);
         d.setTintColor(0x0);
@@ -182,7 +182,7 @@ public class InfiniteProgress extends Component {
         d.showPacked(BorderLayout.CENTER, false);
         return d;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -205,10 +205,10 @@ public class InfiniteProgress extends Component {
         Form f = getComponentForm();
         if(f == null) {
             f = Display.getInstance().getCurrent();
-        } 
+        }
         f.deregisterAnimated(this);
     }
-    
+
     /**
      * Updates the progress animation.  This only updates if the InfiniteProgress is on the
      * currently displayed form and is visible.  If you need to update the progress animation
@@ -218,7 +218,7 @@ public class InfiniteProgress extends Component {
     public boolean animate() {
         return animate(false);
     }
-    
+
     /**
      * Updates the progress animation.
      * @param force If false, then the animation is only updated if the progress is visible and on
@@ -236,33 +236,47 @@ public class InfiniteProgress extends Component {
         boolean val = super.animate() || tick % tickCount == 0;
         tick++;
         if(val) {
-            angle += angleIncrease;            
+            angle += angleIncrease;
         }
         return val;
     }
-    
+
+    private int getMaterialDesignSize() {
+        float dipCount = Float.parseFloat(getUIManager().
+                getThemeConstant("infiniteMaterialDesignSize", "6.667f"));
+
+        return Display.getInstance().convertToPixels(dipCount);
+    }
+
+    private int getMaterialImageSize() {
+        float dipCount = Float.parseFloat(getUIManager().
+                getThemeConstant("infiniteMaterialImageSize", "7"));
+
+        return Display.getInstance().convertToPixels(dipCount);
+    }
+
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
-        if(materialDesignMode) { 
-            int size = Display.getInstance().convertToPixels(6.667f);
-            return new Dimension(getStyle().getHorizontalPadding() + size, 
+        if(materialDesignMode) {
+            int size = getMaterialDesignSize();
+            return new Dimension(getStyle().getHorizontalPadding() + size,
                 getStyle().getVerticalPadding() + size);
         }
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
             if(animation == null) {
-                int size = Display.getInstance().convertToPixels(7, true);
+                int size = getMaterialImageSize();
                 String f = getUIManager().getThemeConstant("infiniteDefaultColor", null);
                 int color = 0x777777;
                 if(f != null) {
                     color = Integer.parseInt(f, 16);
                 }
-                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW, 
-                        FontImage.getMaterialDesignFont(), 
+                FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW,
+                        FontImage.getMaterialDesignFont(),
                         color, size, size, 0);
-                
+
                 animation = fi.toImage();
             }
         }
@@ -270,7 +284,7 @@ public class InfiniteProgress extends Component {
             return new Dimension(100, 100);
         }
         Style s = getStyle();
-        return new Dimension(s.getHorizontalPadding() + animation.getWidth(), 
+        return new Dimension(s.getHorizontalPadding() + animation.getWidth(),
                 s.getVerticalPadding() + animation.getHeight());
     }
 
@@ -283,7 +297,7 @@ public class InfiniteProgress extends Component {
         }
         super.paint(g);
         if(materialDesignMode) {
-            int size = Display.getInstance().convertToPixels(6.667f);
+            int size = getMaterialDesignSize();
             int strokeWidth = Display.getInstance().convertToPixels(0.635f);
             g.setColor(materialDesignColor);
             g.setAlpha(255);
@@ -322,7 +336,7 @@ public class InfiniteProgress extends Component {
             g.drawImage(getAnimation(), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
             g.resetAffine();
         } else {*/
-        
+
         Image rotated;
         if(animation instanceof FontImage) {
             rotated = animation.rotate(v);
@@ -334,10 +348,10 @@ public class InfiniteProgress extends Component {
                 cache.put(v, rotated);
             }
         }
-        g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());            
+        g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());
         //}
     }
-    
+
     /**
      * @return the animation
      */
@@ -391,7 +405,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * The tinting color of the screen when the showInifiniteBlocking method is invoked
+     * The tinting color of the screen when the showInfiniteBlocking method is invoked
      * @return the tintColor
      */
     public int getTintColor() {
@@ -399,7 +413,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * The tinting color of the screen when the showInifiniteBlocking method is invoked
+     * The tinting color of the screen when the showInfiniteBlocking method is invoked
      * @param tintColor the tintColor to set
      */
     public void setTintColor(int tintColor) {
