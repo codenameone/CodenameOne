@@ -1119,7 +1119,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = own;
         while (threadStateData->threadBlockedByGC) {
-            usleep(1000);
+            usleep(100);
         }
         threadStateData->threadActive = JAVA_TRUE;
         
