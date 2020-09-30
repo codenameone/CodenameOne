@@ -534,10 +534,14 @@ void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(
 }
 
 
+extern long CN1_EDT_THREAD_ID;
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int]
     POOL_BEGIN();
+    if (CN1_EDT_THREAD_ID < 0) {
+        CN1_EDT_THREAD_ID = (long)threadStateData->threadId;
+    }
     Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl((void *)n1, n2, n3, n4, n5);
     POOL_END();
     //XMLVM_END_WRAPPER
