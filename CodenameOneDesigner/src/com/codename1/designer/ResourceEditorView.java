@@ -3231,7 +3231,7 @@ private boolean configureOptiPNG() {
 
 private void signupActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_signupActionPerformed
         try {
-            Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
+            Desktop.getDesktop().browse(new URI("https://cloud.codenameone.com/buildapp/index.html"));
         } catch (Exception ex) {
             ex.printStackTrace();
         }
