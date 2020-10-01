@@ -50,6 +50,15 @@ import java.util.HashMap;
  * of visual hierarchy we want by nesting Containers.
  * </p>
  * 
+ * <h3>Style Change Events</h3>
+ * 
+ * <p>Styles fire a change event for each style change that occurs.  {@link Component} listens to all changes events
+ * of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
+ * a {@link Container#revalidate() } call on the Style's Component's parent container, which is expensive.  You can disable this
+ * {@link Container#revalidate() } call by calling {@link CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will 
+ * likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
+ * to avoid regressions when the default is changed.</p>
+ * 
  * @see Container
  * @author Chen Fishbein
  */
@@ -304,7 +313,15 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
-    static boolean revalidateOnStyleChange;
+    
+    /**
+     * A flag to dictate whether style changes should trigger a revalidate() call
+     * on the component's parent.  Eventually we would like to phase this to be {@literal false}
+     * but for now, we'll leave it as {@literal true}.
+     * 
+     * Users can disable this with {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
+     */
+    static boolean revalidateOnStyleChange=true;
     
     // A flag to indicate whether to paint the component's background.
     // Setting this to false will cause the component's background to not be painted.
@@ -6240,6 +6257,11 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Invoked to indicate a change in a propertyName of a Style
+     * 
+     * <p><em>NOTE</em> By default this will trigger a call to {@link Container#revalidate() } on the parent
+     * container, which is expensive.  You can disable this behavior by calling {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
+     * The intention is to change this behavior so that the default is to "not" revalidate on style change, so we encourage you to 
+     * set this to "false" to ensure for future compatibility.</p>
      * 
      * @param propertyName the property name that was changed
      * @param source The changed Style object
