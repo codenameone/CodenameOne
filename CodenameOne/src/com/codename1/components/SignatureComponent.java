@@ -67,6 +67,20 @@ import com.codename1.ui.util.EventDispatcher;
  * 
  * <p>Source available <a href="https://github.com/codenameone/codenameone-demos/SignatureComponentDemo">here</a></p>.
  * 
+ * 
+ * <h2>Styles</h2>
+ * 
+ * <p>You can customize the styles of various aspects of the Signature component using the following Styles (UIIDs) in 
+ * the theme:</p>
+ * 
+ * <ul>
+ *    <li>{@literal SignatureButton}  - The style for the main signature component button.</li>
+ *    <li>{@literal SignatureButtonBox} - A style to specify the "X" and "Box" that is drawn around the signature in the button.</li>
+ *    <li>{@literal SignaturePanel} - The panel that the user actually draws the signature in.</li>
+ *    <li>{@literal SignaturePanelBox} - The box and "X" in the SignaturePanel.  Uses only the {@link Style#getFgColor() } property.</li>
+ *    <li>{@literal SignaturePanelSignature} - The signature that is drawn by the user.  Uses only the {@link Style#getFgColor()} property.</li> 
+ * </ul>
+ * 
  * @author shannah
  * @since 3.4
  */
@@ -181,12 +195,14 @@ public class SignatureComponent extends Container implements ActionSource {
     public SignatureComponent() {
         setLayout(new BorderLayout());
         xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
+        final Style signatureButtonBoxStyle = getUIManager().getComponentStyle("SignatureButtonBox");
         lead = new Button() {
-
+            
             @Override
             protected void paintBackground(Graphics g) {
                 super.paintBackground(g);
-                g.setColor(0x666666);
+                
+                g.setColor(signatureButtonBoxStyle.getFgColor());
                 Style s = getStyle();
                 g.drawRect(
                         getX()+s.getPaddingLeftNoRTL(), 
@@ -400,12 +416,16 @@ public class SignatureComponent extends Container implements ActionSource {
             private final Rectangle signatureRect = new Rectangle();
             private final Font xFont;
             private boolean initialized;
+            private Style signatureBoxStyle;
+            private Style signatureStyle;
             
             SignaturePanel() {
+                setUIID("SignaturePanel");
+                signatureBoxStyle = getUIManager().getComponentStyle("SignaturePanelBox");
+                signatureStyle = getUIManager().getComponentStyle("SignaturePanelSignature");
                 stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true)/2));
-                getAllStyles().setBgColor(0xffffff);
-                getAllStyles().setBgTransparency(255);
                 xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
+                
             }
 
             /**
@@ -429,7 +449,7 @@ public class SignatureComponent extends Container implements ActionSource {
             public void paint(Graphics g) {
                 super.paint(g);
                 
-                g.setColor(0x666666);
+                g.setColor(signatureBoxStyle.getFgColor());
                 calcSignatureRect(signatureRect);
                 g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
                 g.drawString("X", signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);
@@ -445,7 +465,7 @@ public class SignatureComponent extends Container implements ActionSource {
              * @param g 
              */
             private void paintSignature(Graphics g) {
-                g.setColor(0x0);
+                g.setColor(signatureStyle.getFgColor());
                 boolean oldAA = g.isAntiAliased();
                 g.setAntiAliased(true);
                 g.drawShape(path, stroke);
