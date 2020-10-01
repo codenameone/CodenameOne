@@ -304,6 +304,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
+    static boolean revalidateOnStyleChange;
     
     // A flag to indicate whether to paint the component's background.
     // Setting this to false will cause the component's background to not be painted.
@@ -6254,7 +6255,9 @@ public class Component implements Animation, StyleListener, Editable {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
-                parent.revalidate();
+                if (revalidateOnStyleChange) {
+                    parent.revalidate();
+                }
             }
         }
     }

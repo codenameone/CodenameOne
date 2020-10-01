@@ -3327,6 +3327,9 @@ public final class Display extends CN1Constants {
             String out = impl.getAppArg();
             return out == null ? defaultValue : out;
         }
+        if ("Component.revalidateOnStyleChange".equals(key)) {
+            return Component.revalidateOnStyleChange ? "true" : "false";
+        }
         if(localProperties != null) {
             String v = (String)localProperties.get(key);
             if(v != null) {
@@ -3355,6 +3358,9 @@ public final class Display extends CN1Constants {
         }
         if ("blockCopyPaste".equals(key)) {
             impl.blockCopyPaste("true".equals(value));
+        }
+        if ("Component.revalidateOnStyleChange".equals(key)) {
+            Component.revalidateOnStyleChange = "true".equalsIgnoreCase(value);
         }
         if(key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
