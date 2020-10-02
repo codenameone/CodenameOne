@@ -131,17 +131,17 @@ static void init_gc_thresholds() {
         // GC cycle immediately after the last one (200ms) (sort of like doubling up.
         // Kind of picking numbers out of the air here.  one fifth of free memory
         // seems alright.
-        CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = freemem / 5;
-        if (CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD < 1024 * 1024) {
-            CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = 1024 * 1024;
-        }
+        //CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = freemem / 5;
+        //if (CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD < 1024 * 1024) {
+        //    CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = 1024 * 1024;
+        //}
         
         // Set the threshold of total allocated memory before the high-frequency GC cycles
         // are started.
-        CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = freemem/2;
-        if (CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD < 10 * 1024 * 1024) {
-            CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = 10 * 1024 * 1024;
-        }
+        //CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = freemem/2;
+        //if (CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD < 10 * 1024 * 1024) {
+        //    CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = 10 * 1024 * 1024;
+        //}
         
         // GC will be triggered if the the number of allocations on any thread
         // reaches this threshold.  It is checked during malloc, so that
