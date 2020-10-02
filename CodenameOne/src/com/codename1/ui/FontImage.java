@@ -8050,15 +8050,16 @@ public class FontImage extends Image {
             if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
-                b.setRolloverIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
+                b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
             } else {
-                b.setRolloverIcon(null);
+                b.setRolloverPressedIcon(null);
             }
+            
             if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
-                b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(3, icons.length-1)], pre));
+                //b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(3, icons.length-1)], pre));
             } else {
                 b.setPressedIcon(null);
             }
