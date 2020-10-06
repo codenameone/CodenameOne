@@ -1974,9 +1974,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
                     }
-                });
-                
+                });                
             }
+
         }
         
         
@@ -2618,9 +2618,47 @@ public class JavaSEPort extends CodenameOneImplementation {
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
             
-            JMenu simulatorMenu = new JMenu("Simulate");
+            JMenu simulatorMenu = new JMenu("Simulator");
             simulatorMenu.setDoubleBuffered(true);
             simulatorMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            JMenu simulateMenu = new JMenu("Simulate");
+            simulateMenu.setDoubleBuffered(true);
+            simulateMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            JMenu toolsMenu = new JMenu("Tools");
+            toolsMenu.setDoubleBuffered(true);
+            toolsMenu.addMenuListener(new MenuListener(){
 
                 @Override
                 public void menuSelected(MenuEvent e) {
@@ -2646,7 +2684,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(zoomMenu);
 
             JMenu debugEdtMenu = new JMenu("Debug EDT");
-            simulatorMenu.add(debugEdtMenu);
+            toolsMenu.add(debugEdtMenu);
             
             zoomMenu.setEnabled(!desktopSkin);
 
@@ -2870,7 +2908,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
             JMenu networkDebug = new JMenu("Network");
-            simulatorMenu.add(networkDebug);
+            toolsMenu.add(networkDebug);
             
             JMenuItem networkMonitor = new JMenuItem("Network Monitor");
             networkMonitor.addActionListener(new ActionListener() {
@@ -3140,7 +3178,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Executor.startApp();
                 }
             });
-            simulatorMenu.add(appArg);
+            simulateMenu.add(appArg);
             
             JMenuItem locactionSim = new JMenuItem("Location Simulation");
             locactionSim.addActionListener(new ActionListener() {
@@ -3158,7 +3196,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     
                 }
             });
-            simulatorMenu.add(locactionSim);
+            simulateMenu.add(locactionSim);
             
             JMenuItem pushSim = new JMenuItem("Push Simulation");
             pushSim.addActionListener(new ActionListener() {
@@ -3171,10 +3209,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pushSimulation.setVisible(true);
                 }
             });
-            simulatorMenu.add(pushSim);
+            simulateMenu.add(pushSim);
 
-            simulatorMenu.add(componentTreeInspector);
-            simulatorMenu.add(scriptingConsole);
+            toolsMenu.add(componentTreeInspector);
+            toolsMenu.add(scriptingConsole);
             
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
@@ -3187,8 +3225,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            simulatorMenu.add(testRecorderMenu);
+            toolsMenu.add(testRecorderMenu);
 
+            /*
             JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
             simulatorMenu.add(darkLightModeMenu);
             final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
@@ -3218,13 +3257,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.darkMode = null;
                 }
             });
-
+            */
+            
             manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
             subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
             refundSupported = pref.getBoolean("refundSupported", true);
             JMenu purchaseMenu = new JMenu("In App Purchase");
-            simulatorMenu.add(purchaseMenu);
+            simulateMenu.add(purchaseMenu);
             final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
             manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
             final JCheckBoxMenuItem managedPurchaseSupportedMenu = new JCheckBoxMenuItem("Managed Purchase");
@@ -3278,7 +3318,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            simulatorMenu.add(performanceMonitor);
+            toolsMenu.add(performanceMonitor);
             
             JMenuItem clean = new JMenuItem("Clean Storage");
             clean.addActionListener(new ActionListener() {
@@ -3302,7 +3342,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 }
             });
-            simulatorMenu.add(clean);
+            toolsMenu.add(clean);
             
             
 
@@ -3329,28 +3369,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             
 
-            final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
-            simulatorMenu.add(touchFlag);
-            final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
-            simulatorMenu.add(nativeInputFlag);
-
-            final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
+            //final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
+            //simulatorMenu.add(touchFlag);
+            //final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
+            //simulatorMenu.add(nativeInputFlag);
+            //final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
             //simulatorMenu.add(simulateAndroidVKBFlag);
 
-            final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
-            simulatorMenu.add(scrollFlag);
-            scrollFlag.setEnabled(!desktopSkin);
-
-            final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
-            simulatorMenu.add(slowMotionFlag);
+            /*final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
+            toolsMenu.add(slowMotionFlag);
             slowMotionFlag.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent e) {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
-            });
+            });*/
+            
             final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
-            simulatorMenu.add(permFlag);
+            simulateMenu.add(permFlag);
             permFlag.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent e) {
@@ -3362,7 +3398,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             pause = new JMenuItem("Pause App");
-            simulatorMenu.add(pause);
+            simulateMenu.addSeparator();            
+            simulateMenu.add(pause);
             pause.addActionListener(new ActionListener() {
 
                 @Override
@@ -3534,6 +3571,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             if (showMenu) {
                 bar.add(simulatorMenu);
+                bar.add(simulateMenu);
+                bar.add(toolsMenu);
                 bar.add(skinMenu);
                 bar.add(helpMenu);
             }
@@ -3583,12 +3622,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             
-            simulateAndroidVKBFlag.addItemListener(new ItemListener() {
+            /*simulateAndroidVKBFlag.addItemListener(new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
                     simulateAndroidKeyboard = !simulateAndroidKeyboard;
                 }
-            });
+            });*/
             
             ItemListener zoomListener = new ItemListener() {
 
@@ -3633,10 +3672,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             zoomMenu.addItemListener(zoomListener);
             
-            scrollFlag.addItemListener(zoomListener);
-
-
-
             exit.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
