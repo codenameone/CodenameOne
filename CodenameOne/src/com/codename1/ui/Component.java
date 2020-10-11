@@ -987,8 +987,8 @@ public class Component implements Animation, StyleListener, Editable {
         
         int w = getWidth();
         int h = getHeight();
-        int x = getAbsoluteX();
-        int y = getAbsoluteY();
+        int x = getAbsoluteX() + scrollX;
+        int y = getAbsoluteY() + scrollY;
         if (init) {
             r.setBounds(x, y, w, h);
             if (w <= 0 || h <= 0) {
