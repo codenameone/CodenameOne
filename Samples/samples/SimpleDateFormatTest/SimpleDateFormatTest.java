@@ -70,14 +70,20 @@ public class SimpleDateFormatTest {
         Label longMonth = new Label();
         Label shortDate = new Label();
         Label longDate = new Label();
+        Label dateTime = new Label();
+        Label formattedString = new Label();
         Container result = new Container(BoxLayout.y());
         Button parse = new Button("Parse Date");
         Container resultWrapper = new Container(BoxLayout.y());
         
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("hh:mm a");
+
+        dateFormatter.format(new Date());
+        
         parse.addActionListener(evt->{
             try {
                 SimpleDateFormat inputFormat = new SimpleDateFormat(dateFormat.getText());
-                Date dt = inputFormat.parse(dateStringIn.getText());
+                Date dt = dateStringIn.getText().length() == 0 ? new Date() : inputFormat.parse(dateStringIn.getText());
                 
                 SimpleDateFormat shortMonthFormat = new SimpleDateFormat("MMM");
                 shortMonth.setText(shortMonthFormat.format(dt));
@@ -87,6 +93,8 @@ public class SimpleDateFormatTest {
                 
                 longDate.setText(L10NManager.getInstance().formatDateLongStyle(dt));
                 shortDate.setText(L10NManager.getInstance().formatDateShortStyle(dt));
+                dateTime.setText(L10NManager.getInstance().formatDateTime(dt));
+                formattedString.setText(inputFormat.format(dt));
                 resultWrapper.removeAll();
                 resultWrapper.add(result);
                 hi.revalidateWithAnimationSafety();
@@ -95,6 +103,10 @@ public class SimpleDateFormatTest {
                 ToastBar.showErrorMessage("Parse failed: "+ex.getMessage());
             }
         });
+        
+        
+        
+        
         result.addAll(
                 new Label("Short month name:"),
                 shortMonth,
@@ -103,7 +115,11 @@ public class SimpleDateFormatTest {
                 new Label("Short Date:"),
                 shortDate,
                 new Label("Long Date:"),
-                longDate
+                longDate,
+                new Label("Time: "),
+                dateTime,
+                new Label("Formatted String:"),
+                formattedString
         );
 
         hi.addAll(

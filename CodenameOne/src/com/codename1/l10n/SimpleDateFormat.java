@@ -308,13 +308,7 @@ public class SimpleDateFormat extends DateFormat {
                 case AMPM_LETTER:
                     boolean am = calendar.get(Calendar.AM_PM) == Calendar.AM;
                     String ampm[] = getDateFormatSymbols().getAmPmStrings();
-                    if (len == 1) {
-						// JDK6 doesn't handle this, but likely useful
-                        // somewhere, and is parsable.
-                        toAppendTo.append(am ? ampm[0].charAt(0) : ampm[1].charAt(0));
-                    } else {
-                        toAppendTo.append(am ? ampm[0] : ampm[1]);
-                    }
+                    toAppendTo.append(am ? ampm[0] : ampm[1]);
                     break;
                 case ERA_LETTER:
                     toAppendTo.append(getDateFormatSymbols().getEras()[calendar.get(ERA)]);
