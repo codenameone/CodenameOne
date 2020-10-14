@@ -6278,7 +6278,7 @@ public class Component implements Animation, StyleListener, Editable {
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
                 if (revalidateOnStyleChange) {
-                    parent.revalidate();
+                    parent.revalidateLater();
                 }
             }
         }
