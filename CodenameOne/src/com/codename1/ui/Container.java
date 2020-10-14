@@ -1463,7 +1463,7 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
     
-    void revalidateWithAnimationSafetyInternal(boolean fromRoot) {
+    void revalidateWithAnimationSafetyInternal(final boolean fromRoot) {
         if (revalidatePending) {
             return;
         }
