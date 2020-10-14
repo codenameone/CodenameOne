@@ -742,7 +742,7 @@ public class Sheet extends Container {
                 
                 if (parent != null && parent.getComponentForm() != null) {
                     cnt.remove();
-                    parent.getComponentForm().revalidateWithAnimationSafety();
+                    parent.getComponentForm().revalidateLater();
                     fireCloseEvent(true);
                     
                     

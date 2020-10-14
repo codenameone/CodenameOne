@@ -542,7 +542,7 @@ public class BrowserComponent extends Container {
                 addComponent(BorderLayout.CENTER, internal);
                 
                 onReady();
-                revalidateWithAnimationSafety();
+                revalidateLater();
             }
         });
         onReady(new Runnable() {

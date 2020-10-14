@@ -695,7 +695,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
         addComponent(t, icon.getParent());
         updateGap();
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
     
     /**
@@ -723,7 +723,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
             removeComponent(emblem.getParent());
         }
         addComponent(t, emblem.getParent());
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
     
     /**

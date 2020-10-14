@@ -48,7 +48,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.ListIterator;
+import java.util.Set;
 
 /**
  *<p> Top level component that serves as the root for the UI, this {@link Container}
@@ -270,6 +273,81 @@ public class Form extends Container {
             return;
         }
         pasteListener.removeListener(l);
+    }
+    
+    /**
+     * A queue of containers that are scheduled to be revalidated before the next 
+     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The 
+     * queue the queue is flushed in {@link #flushRevalidateQueue() }
+     */
+    private Set<Container> pendingRevalidateQueue = new HashSet<Container>();
+    
+    /**
+     * A temporary container used in {@link #flushRevalidateQueue() } for the list
+     * of containers that are being revalidated.  This should not be used outside
+     * of {@link #flushRevalidateQueue() }
+     */
+    private ArrayList<Container> revalidateQueue = new ArrayList<Container>();
+    
+    /**
+     * A flag that enables/disables the behaviour that revalidate() on any container
+     * will trigger a revalidate() in its parent form.  Not sure why we do this
+     * but this flag turns off this behaviour.  Hopefully we can default this 
+     * to "Off" eventually.
+     * 
+     * Used in {@link Container#revalidate() }.
+     */
+    boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+    
+    /**
+     * Adds a container to the revalidation queue to be revalidated before the next
+     * paint.
+     * @param cnt The container to schedule for revalidation
+     */
+    void revalidateLater(Container cnt) {
+        if (!pendingRevalidateQueue.contains(cnt)) {
+            // It doesn't need to be in queue more than once.
+            Iterator<Container> it = pendingRevalidateQueue.iterator();
+            
+            // Iterate through the existing queue to make sure that this container
+            // isn't already scheduled to be revalidated.
+            while (it.hasNext()) {
+                Container existing = it.next();
+                if (existing.contains(cnt)) {
+                    // cnt is already in a container that is scheduled for revalidation
+                    // we don't need to add it.
+                    return;
+                } else if (cnt.contains(existing)) {
+                    // cnt is the parent of this container.  Remove the existing container
+                    // as it will be covered by a revalidate of cnt
+                    it.remove();
+                }
+                
+            }
+            pendingRevalidateQueue.add(cnt);
+        }
+    }
+    
+    /**
+     * Removes a container from the revalidation queue.  This is called from 
+     * {@link Container#revalidate() }.
+     * @param cnt The container to remove from the queue.
+     */
+    void removeFromRevalidateQueue(Container cnt) {
+        pendingRevalidateQueue.remove(cnt);
+    }
+    
+    void flushRevalidateQueue() {
+        
+        if (!pendingRevalidateQueue.isEmpty()) {
+            revalidateQueue.addAll(pendingRevalidateQueue);
+            int len = revalidateQueue.size();
+            for (int i=0; i<len; i++) {
+                Container cnt = revalidateQueue.get(i);
+                cnt.revalidateWithAnimationSafetyInternal(false);
+            }
+            revalidateQueue.clear();
+        }
     }
     
     /**
@@ -528,7 +606,7 @@ public class Form extends Container {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
                 titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
-                titleArea.revalidateWithAnimationSafety();
+                titleArea.revalidateLater();
             }
         }
     }
@@ -802,7 +880,7 @@ public class Form extends Container {
         }
         
         repaint();
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
 
     /**
@@ -1520,7 +1598,7 @@ public class Form extends Container {
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
-            revalidateWithAnimationSafety();
+            revalidateLater();
         }
         return layeredPane;
     }
@@ -1635,7 +1713,7 @@ public class Form extends Container {
                 int b = Display.getInstance().getCommandBehavior();
                 if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
                         || b == Display.COMMAND_BEHAVIOR_ICS || b == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
-                    titleArea.revalidateWithAnimationSafety();
+                    titleArea.revalidateLater();
                 }
                 if (this.title.shouldTickerStart()) {
                     this.title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
@@ -2637,7 +2715,7 @@ public class Form extends Container {
             }
         }
         if (triggerRevalidate) {
-            revalidateWithAnimationSafety();
+            revalidateLater();
         }
     }
 

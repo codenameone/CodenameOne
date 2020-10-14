@@ -294,7 +294,7 @@ public class InteractionDialog extends Container {
                     p.remove();
                 }
                 //pp.removeAll();
-                pp.revalidateWithAnimationSafety();
+                pp.revalidateLater();
                 cleanupLayer(f);
             }
         }

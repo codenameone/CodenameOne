@@ -623,7 +623,7 @@ public class Tree extends Container {
         }
         
         
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
     
 

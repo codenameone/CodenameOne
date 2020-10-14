@@ -1250,10 +1250,16 @@ public final class Display extends CN1Constants {
             return;
         }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
+        Form current = impl.getCurrentForm();
+        if (current != null) {
+            // Revalidate components that registered to be revalidated
+            // before the next paint cycle.
+            current.flushRevalidateQueue();
+        }
         impl.paintDirty();
 
         // draw the animations
-        Form current = impl.getCurrentForm();
+        
         if(current != null){
             current.repaintAnimations();
             // check key repeat events
@@ -1272,6 +1278,7 @@ public final class Display extends CN1Constants {
             }
         }
         processSerialCalls();
+        
         time = System.currentTimeMillis() - currentTime;
     }
 

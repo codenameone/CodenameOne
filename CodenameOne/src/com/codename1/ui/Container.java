@@ -41,7 +41,9 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -904,7 +906,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(insertion);
                         }
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                     }
                 }
 
@@ -1298,7 +1300,7 @@ public class Container extends Component implements Iterable<Component>{
                         } finally {
                             changeQueue.remove(removed);
                         }
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                     }
                 }
 
@@ -1460,31 +1462,92 @@ public class Container extends Component implements Iterable<Component>{
             revalidate();
         }
     }
-   
+    
+    void revalidateWithAnimationSafetyInternal(boolean fromRoot) {
+        if (revalidatePending) {
+            return;
+        }
+        revalidatePending = true;
+        AnimationManager mgr = getAnimationManager();
+        if (mgr == null) {
+            revalidatePending = false;
+            revalidateInternal(fromRoot);
+            return;
+        }
+        if (mgr.isAnimating()) {
+            mgr.flushAnimation(new Runnable() {
+                @Override
+                public void run() {
+                    revalidatePending = false;
+                    revalidateInternal(fromRoot);
+                }
+
+            });
+        } else {
+            revalidatePending = false;
+            revalidateInternal(fromRoot);
+        }
+    }
+    
+    
     /**
      * Re-layout the container, this is useful when we modify the container hierarchy and
      * need to redo the layout
      */
     public void revalidate() {
+        revalidateInternal(true);
+    }
+    
+    /**
+     * Internal revalidate method.  Takes parameter {@literal fromRoot} that
+     * allows you to disable the default behaviour of revalidating the form.
+     * @param fromRoot 
+     */
+    void revalidateInternal(boolean fromRoot) {
         setShouldCalcPreferredSize(true);
         Form root = getComponentForm();
         
         if (root != null && root != this) {
-            root.layoutContainer();
-            root.repaint();
-            
-            // for complex hierarchies 
-            if(getParent() != null) {
-                getParent().shouldLayout = true;
-                getParent().layoutContainer();
+            root.removeFromRevalidateQueue(this);
+            if (fromRoot && root.revalidateFromRoot) {
+                root.layoutContainer();
+                root.repaint();
+
+                // for complex hierarchies 
+                if(getParent() != null) {
+                    getParent().shouldLayout = true;
+                    getParent().layoutContainer();
+                } else {
+                    layoutContainer();
+                }
             } else {
                 layoutContainer();
+                repaint();
             }
         } else {
             layoutContainer();
             repaint();
         }
     }
+    
+    /**
+     * Revalidates the container before the next paint cycle.  Prefer this
+     * method to {@link #revalidate() } and {@link #revalidateWithAnimationSafety() }
+     * if you don't need the revalidate (layout and repaint) to happen immediately,
+     * but you *do* want it to happen before the next paint.  This is can be far more
+     * efficient as it will squash the revalidation calls into the minimal set
+     * of containers that require revalidation, so that the system doesn't end up
+     * revalidating the same container multiple times between paints.
+     * 
+     */
+    public void revalidateLater() {
+        Form root = getComponentForm();
+        if (root != null) {
+            root.revalidateLater(this);
+        }
+        
+    }
+    
     
     /**
      * A more powerful form of revalidate that recursively lays out the full hierarchy
