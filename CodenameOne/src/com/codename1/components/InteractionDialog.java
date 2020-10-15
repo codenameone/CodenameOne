@@ -678,6 +678,7 @@ public class InteractionDialog extends Container {
         rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
         rect.setY(rect.getY() - getLayeredPane(f).getAbsoluteY());
         disposed = false;
+        pressedOutOfBounds = false;
         getUnselectedStyle().setOpacity(255);
         if(getUIID().equals("Dialog")) {
             setUIID("PopupDialog");
