@@ -1598,7 +1598,7 @@ public class Form extends Container {
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
-            revalidateLater();
+            revalidateWithAnimationSafety();
         }
         return layeredPane;
     }
