@@ -631,6 +631,16 @@ public class BytecodeMethod implements SignatureSet {
                     localsOffset++;
                 }
             }
+        } else {
+            if(synchronizedMethod) {
+                if(staticMethod) {
+                    b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                    b.append(clsName);
+                    b.append(");\n");
+                } else {
+                    b.append("    monitorEnter(threadStateData, __cn1ThisObject);\n");
+                }
+            }
         }
         
         BasicInstruction.setSynchronizedMethod(synchronizedMethod, staticMethod, clsName);
