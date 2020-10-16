@@ -576,11 +576,11 @@ public class BytecodeMethod implements SignatureSet {
             int startOffset = 0;
             if(synchronizedMethod) {
                 if(staticMethod) {
-                    b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                    b.append("    monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
                     b.append(clsName);
                     b.append(");\n");
                 } else {
-                    b.append("    monitorEnter(threadStateData, __cn1ThisObject);\n");
+                    b.append("    monitorEnterBlock(threadStateData, __cn1ThisObject);\n");
                 }
             }
             if(!staticMethod) {
@@ -634,11 +634,11 @@ public class BytecodeMethod implements SignatureSet {
         } else {
             if(synchronizedMethod) {
                 if(staticMethod) {
-                    b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                    b.append("    monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
                     b.append(clsName);
                     b.append(");\n");
                 } else {
-                    b.append("    monitorEnter(threadStateData, __cn1ThisObject);\n");
+                    b.append("    monitorEnterBlock(threadStateData, __cn1ThisObject);\n");
                 }
             }
         }
@@ -1334,11 +1334,11 @@ public class BytecodeMethod implements SignatureSet {
                                 }
                                 if(synchronizedMethod) {
                                     if(staticMethod) {
-                                        sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                        sb.append("    monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
                                         sb.append(getClsName());
                                         sb.append(");\n");
                                     } else {
-                                        sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                        sb.append("    monitorExitBlock(threadStateData, __cn1ThisObject);\n");
                                     }
                                 }
                                 if(hasTryCatch) {
@@ -1396,11 +1396,11 @@ public class BytecodeMethod implements SignatureSet {
                                     }
                                     if(synchronizedMethod) {
                                         if(staticMethod) {
-                                            sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                            sb.append("    monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
                                             sb.append(getClsName());
                                             sb.append(");\n");
                                         } else {
-                                            sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                            sb.append("    monitorExitBlock(threadStateData, __cn1ThisObject);\n");
                                         }
                                     }
                                     if(hasTryCatch) {

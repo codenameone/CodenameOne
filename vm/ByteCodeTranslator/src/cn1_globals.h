@@ -741,6 +741,11 @@ struct TryBlock {
     
     // -1 for all exceptions
     JAVA_INT exceptionClass;
+
+    // Synchronized methods will use a TryBlock for its monitor
+    // so that the monitor will be exited when an exception is thrown.
+    // This will be 0 for regular TryBlock.
+    JAVA_OBJECT monitor;
 };
 
 #define CN1_MAX_STACK_CALL_DEPTH 1024
@@ -816,6 +821,7 @@ extern struct ThreadLocalData* getThreadLocalData();
 #define DEFINE_EXCEPTION_HANDLING_CONSTANTS() int methodBlockOffset = threadStateData->tryBlockOffset
 
 #define BEGIN_TRY(classId, destinationJump) {\
+        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
         memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, destinationJump, sizeof(jmp_buf)); \
         threadStateData->tryBlockOffset++; \
@@ -939,6 +945,8 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 
 extern JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 extern JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
+extern JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
+extern JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array);
 

@@ -1352,7 +1352,14 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     threadStateData->exception = exceptionArg; 
     threadStateData->tryBlockOffset--; 
     while(threadStateData->tryBlockOffset >= 0) { 
-        if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
+        if (threadStateData->blocks[threadStateData->tryBlockOffset].monitor != 0) {
+            // This tryblock was actually created by a synchronized method's monitorEnterBlock
+            // We need to exit the monitor since the exception will cause us to 
+            // leave the method.
+            monitorExitBlock(threadStateData, threadStateData->blocks[threadStateData->tryBlockOffset].monitor);
+            // Continue to search for a matching exception ...
+            continue;
+        } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
             int off = threadStateData->tryBlockOffset;
             threadStateData->tryBlockOffset++;  // exception should be caught by the end block
                                                 // which will decrement this again so we need

@@ -1132,6 +1132,17 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     }
 }
 
+// monitorEnterBlock is used for synchronized methods because the JVM bytecode
+// doesn't actually generate the "try/catch" blocks for us like they do with 
+// synchronized blocks.  monitorEnterBlock will add a "block" to the block
+// stack so that throwException() can exit the block in the case that an exception
+// is thrown.
+JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    monitorEnter(threadStateData, obj);
+    threadStateData->blocks[threadStateData->tryBlockOffset].monitor = obj;
+    threadStateData->tryBlockOffset++;
+}
+
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //NSLog(@"Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
@@ -1144,6 +1155,16 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     if(err != 0) {
         NSLog(@"Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i", err, EINVAL, ETIMEDOUT, EPERM);
     }
+}
+
+// monitorEnterBlock is used for synchronized methods because the JVM bytecode
+// doesn't actually generate the "try/catch" blocks for us like they do with 
+// synchronized blocks.  monitorEnterBlock will add a "block" to the block
+// stack so that throwException() can exit the block in the case that an exception
+// is thrown.
+JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    threadStateData->tryBlockOffset--;
+    monitorExit(threadStateData, obj);
 }
 
 JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {
