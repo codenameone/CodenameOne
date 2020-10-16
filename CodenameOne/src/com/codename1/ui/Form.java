@@ -341,12 +341,14 @@ public class Form extends Container {
         
         if (!pendingRevalidateQueue.isEmpty()) {
             revalidateQueue.addAll(pendingRevalidateQueue);
+            pendingRevalidateQueue.clear();
             int len = revalidateQueue.size();
             for (int i=0; i<len; i++) {
                 Container cnt = revalidateQueue.get(i);
                 cnt.revalidateWithAnimationSafetyInternal(false);
             }
             revalidateQueue.clear();
+            
         }
     }
     
