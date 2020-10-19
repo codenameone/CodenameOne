@@ -53,6 +53,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     }
 
     private native static java.lang.Class forNameImpl(java.lang.String className) throws java.lang.ClassNotFoundException;
+    private java.lang.String name;
     
     /**
      * Returns the fully-qualified name of the entity (class, interface, array
@@ -68,7 +69,51 @@ public final class Class<T> implements java.lang.reflect.Type {
      * interface name is given in fully qualified form as shown in the example
      * above.
      */
-    public native java.lang.String getName();
+    public native java.lang.String getName();/* {
+        if (this.name == null) {
+            String name = getNameImpl();
+            if (name.endsWith("[]")) {
+                String componentType = name.substring(name.indexOf("["));
+                int dimension = (name.length() - componentType.length())/2;
+                String type = null;
+                StringBuilder sb = new StringBuilder();
+                while (dimension-- > 0) {
+                    sb.append("[");
+                }
+                if (componentType.indexOf(".") != -1) {
+                    sb.append("L").append(componentType).append(";");
+                    
+                } else if ("int".equals(componentType)) {
+                    sb.append("I");
+                    
+                } else if ("float".equals(componentType)) {
+                    sb.append("F");
+                } else if ("boolean".equals(componentType)) {
+                    sb.append("Z");
+                } else if ("byte".equals(componentType)) {
+                    sb.append("B");
+                } else if ("char".equals(componentType)) {
+                    sb.append("C");
+                } else if ("short".equals(componentType)) {
+                    sb.append("S");
+                } else if ("long".equals(componentType)) {
+                    sb.append("J");
+                } else if ("double".equals(componentType)) {
+                    sb.append("D");
+                } else {
+                    sb.append(name);
+                }
+                this.name = sb.toString();
+            } else {
+                this.name = name;
+            }
+            
+        }
+        return this.name;
+    }
+    
+    native java.lang.String getNameImpl();
+    */
 
     /**
      * Finds a resource with a given name in the application's JAR file. This
@@ -219,6 +264,12 @@ public final class Class<T> implements java.lang.reflect.Type {
      * <code>null</code> or an instance of <var>c</var>
      */
     public Object cast(Object object) {
+        if (object == null) {
+            return null;
+        }
+        if (!isAssignableFrom(object.getClass())) {
+            throw new java.lang.ClassCastException("Cannot cast "+object.getClass()+" to "+this);
+        }
         return object;
     }
 

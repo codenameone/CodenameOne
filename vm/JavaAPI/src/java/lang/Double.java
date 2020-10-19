@@ -288,9 +288,9 @@ public final class Double extends Number implements Comparable<Double> {
             return 0;
         }
         if(f1 > f2) {
-            return -1;
+            return 1;
         }
-        return 1;
+        return -1;
     }
 
     public int compareTo(Double another) {

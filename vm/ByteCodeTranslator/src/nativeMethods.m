@@ -24,6 +24,7 @@
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
 #include "CodenameOne_GLViewController.h"
+#include "java_lang_StringToReal.h"
 #import <mach/mach.h>
 
 extern JAVA_BOOLEAN lowMemoryMode;
@@ -619,6 +620,9 @@ JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CO
             break;
         }
     }
+    if (strcmp(s, "NAN") == 0) {
+        s[1] = 'a';
+    }
     return newStringFromCString(threadStateData, s);
 }
 
@@ -670,7 +674,9 @@ JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODE
             break;
         }
     }
-    
+    if (strcmp(s, "NAN") == 0) {
+        s[1] = 'a';
+    }
     return newStringFromCString(threadStateData, s);
 }
 
@@ -1350,7 +1356,12 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
         data[iter] = (char)chrs[iter];
     }
     data[length] = 0;
-    JAVA_DOUBLE db = strtod(data, NULL);
+    char *err;
+    JAVA_DOUBLE db = strtod(data, &err);
+    if (data == err) {
+        JAVA_OBJECT numberFormatException = java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(threadStateData, s, JAVA_TRUE);
+        throwException(threadStateData,numberFormatException);
+    }
     JAVA_LONG exp = 1;
     if(e != 0) {
         if(e < 0) {

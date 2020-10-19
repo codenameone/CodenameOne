@@ -205,7 +205,9 @@ public final class Long extends Number implements Comparable<Long> {
     }
 
     public static int compare(long f1, long f2) {
-        return (int)(f1 - f2);
+       if (f1 > f2) return 1;
+       else if (f1 < f2) return -1;
+       return 0;
     }
 
     public int compareTo(Long another) {

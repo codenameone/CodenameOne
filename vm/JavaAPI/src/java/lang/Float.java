@@ -268,9 +268,9 @@ public final class Float extends Number implements Comparable<Float> {
             return 0;
         }
         if(f1 > f2) {
-            return -1;
+            return 1;
         }
-        return 1;
+        return -1;
     }
 
     public int compareTo(Float another) {

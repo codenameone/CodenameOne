@@ -1361,9 +1361,6 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             continue;
         } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
             int off = threadStateData->tryBlockOffset;
-            threadStateData->tryBlockOffset++;  // exception should be caught by the end block
-                                                // which will decrement this again so we need
-                                                // to increment it here.
             longjmp(threadStateData->blocks[off].destination, 1);
             return;
         } 

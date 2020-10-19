@@ -138,6 +138,10 @@ public final class Integer extends Number implements Comparable<Integer> {
         if (negative && ++i == length) {
             throw invalidInt(string);
         }
+        boolean positive = string.charAt(i) == '+';
+        if (positive && ++i == length) {
+            throw invalidInt(string);
+        }
 
         return parse(string, i, radix, negative);
     }
@@ -324,7 +328,11 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public static int compare(int f1, int f2) {
-        return f1 - f2;
+        
+        if (f1 > f2) return 1;
+        else if (f1 < f2) return -1;
+        return 0;    
+        
     }
 
     public int compareTo(Integer another) {

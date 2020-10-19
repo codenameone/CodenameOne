@@ -853,7 +853,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 #define RETURN_FROM_VOID(cn1SizeOfLocals) releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \
         return; \
 
-#define END_TRY() threadStateData->tryBlockOffset--
+#define END_TRY(offset) threadStateData->tryBlockOffset = methodBlockOffset + offset - 1
 
 #define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) jmp_buf destinationJump; \
 { \
