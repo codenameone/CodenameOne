@@ -69,6 +69,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
             }
         }
     }
+    
+    public static boolean isSynchronizedMethod() {
+        return synchronizedMethod;
+    }
 
     @Override
     public boolean isConstant() {
