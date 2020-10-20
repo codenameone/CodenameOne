@@ -2539,6 +2539,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
                 if ([str hasPrefix:@"file://localhost"]) {
                     str = [str substringFromIndex:16];
                 }
+                str = [str stringByRemovingPercentEncoding];
                 NSURL* nu = [NSURL fileURLWithPath:str];           
                 [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
             }
