@@ -931,10 +931,15 @@ JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lan
 }
 
 JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    char s[32];
-    sprintf(s, "Obj[%i]", ((int)obj));
-    return newStringFromCString(threadStateData, s);
-    
+    if (obj == JAVA_NULL) {
+        return newStringFromCString(threadStateData, "null");
+    } else {
+        struct clazz* cls = obj->__codenameOneParentClsReference;
+        const char* className = cls->clsName;
+        char s[strlen(className) + 32];
+        sprintf(s, "%s@%llX", className, ((JAVA_LONG)obj));
+        return newStringFromCString(threadStateData, s);
+    }
 }
 
 void initClazzClazz() {
