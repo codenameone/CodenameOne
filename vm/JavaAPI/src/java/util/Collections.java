@@ -1654,7 +1654,7 @@ public class Collections {
         Iterator<? extends T> it = collection.iterator();
         T min = it.next();
         if ( NumberComparator.isNumber(min)){
-            return (T)max(collection, NumberComparator.createComparator(min.getClass()));
+            return (T)min(collection, NumberComparator.createComparator(min.getClass()));
         }
         while (it.hasNext()) {
             T next = it.next();
