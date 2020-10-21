@@ -53,7 +53,6 @@ public final class Class<T> implements java.lang.reflect.Type {
     }
 
     private native static java.lang.Class forNameImpl(java.lang.String className) throws java.lang.ClassNotFoundException;
-    private java.lang.String name;
     
     /**
      * Returns the fully-qualified name of the entity (class, interface, array
