@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase.cef;
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.JavaSEPort.CN1JPanel;
 
 import com.codename1.ui.CN;
@@ -15,6 +16,7 @@ import java.awt.CardLayout;
 import java.awt.KeyboardFocusManager;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.net.ServerSocket;
 import javax.swing.JButton;
 import javax.swing.SwingUtilities;
 import org.cef.CefApp;
@@ -37,6 +39,8 @@ import org.cef.handler.CefLoadHandlerAdapter;
  */
 public abstract class BrowserPanel extends CN1JPanel {
     
+
+    
     /**
      * Registry for InputStreams.  This is used for playing media or loading page content with InputStreams.
      */
@@ -52,7 +56,7 @@ public abstract class BrowserPanel extends CN1JPanel {
      */
     private CefBrowser browser_ = null;
     
-    
+
     private static int browserCount_ = 0;
     private Runnable afterParentChangedAction_ = null;
     private String title_ = null;
@@ -74,6 +78,7 @@ public abstract class BrowserPanel extends CN1JPanel {
     
     public BrowserPanel(String startingURL, CEFPeerComponentBuffer buffer, BrowserNavigationCallback navigationCallback, boolean osrEnabled, boolean transparentPaintingEnabled,
             boolean createImmediately, String[] args) {
+
         setZoom(1);
         //this.browserComponent = browserComponent;
         this.buffer_ = buffer;
@@ -152,12 +157,13 @@ public abstract class BrowserPanel extends CN1JPanel {
         
         
         CefApp myApp;
+         
         if (CefApp.getState() != CefApp.CefAppState.INITIALIZED) {
             // 1) CefApp is the entry point for JCEF. You can pass
             //    application arguments to it, if you want to handle any
             //    chromium or CEF related switches/attributes in
             //    the native world.
-            CefSettings settings = new CefSettings();
+           CefSettings settings = new CefSettings();
             //settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_VERBOSE;
             //settings.log_file = "/tmp/cef.log";
             
@@ -166,7 +172,16 @@ public abstract class BrowserPanel extends CN1JPanel {
             settings.background_color = settings.new ColorType(100, 255, 242, 211);
             //settings.user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1";
             settings.user_agent = CN.getProperty("user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1" );
-            settings.remote_debugging_port = 8088;
+            
+            int port = 8088;
+            try {
+                ServerSocket sock = new ServerSocket(0);
+                port = sock.getLocalPort();
+                sock.close();
+            } catch (Exception ex){}
+            
+            settings.remote_debugging_port = port;
+            JavaSEPort.instance.setChromeDebugPort(port);
             myApp = CefApp.getInstance(args, settings);
 
             CefApp.CefVersion version = myApp.getVersion();
@@ -176,6 +191,9 @@ public abstract class BrowserPanel extends CN1JPanel {
             //    add an own schemes (search:// and client://) and its corresponding
             //    protocol handlers. So if you enter "search:something on the web", your
             //    search request "something on the web" is forwarded to www.google.com
+            
+            
+            
             
             CefApp.addAppHandler(new AppHandler(args));
         } else {
