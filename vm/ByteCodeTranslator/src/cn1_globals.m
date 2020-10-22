@@ -581,12 +581,21 @@ void codenameOneGCMark() {
                 }
                 
                 // place allocations from the local thread into the global heap list
+                if (!t->lightweightThread) {
+                    // For native threads, we need to actually lock them while we traverse the 
+                    // heap allocations because we can't use the usual locking mechanisms on
+                    // them.
+                    lockThreadHeapMutex();
+                }
                 for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
                     JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
                     if(obj) {
                         t->pendingHeapAllocations[heapTrav] = 0;
                         placeObjectInHeapCollection(obj);
                     }
+                }
+                if (!t->lightweightThread) {
+                    unlockThreadHeapMutex();
                 }
                 
                 // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
@@ -976,12 +985,18 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                     java_lang_System_gc__(threadStateData);
                     threadStateData->nativeAllocationMode = JAVA_FALSE;
                 }
+                if (!threadStateData->lightweightThread) {
+                    lockThreadHeapMutex();
+                }
                 void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
                 threadStateData->threadHeapTotalSize *= 2;
                 free(threadStateData->pendingHeapAllocations);
                 threadStateData->pendingHeapAllocations = tmp;
+                if (!threadStateData->lightweightThread) {
+                    unlockThreadHeapMutex();
+                }
             }
         }
     }

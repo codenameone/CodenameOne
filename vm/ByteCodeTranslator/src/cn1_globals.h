@@ -963,6 +963,8 @@ extern JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length1, int leng
 
 extern void lockCriticalSection();
 extern void unlockCriticalSection();
+extern void lockThreadHeapMutex();
+extern void unlockThreadHeapMutex();
 
 extern struct clazz class_array1__JAVA_BOOLEAN;
 extern struct clazz class_array2__JAVA_BOOLEAN;

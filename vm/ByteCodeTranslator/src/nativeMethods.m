@@ -1066,6 +1066,22 @@ void lockCriticalSection() {
 void unlockCriticalSection() {
     pthread_mutex_unlock(criticalSection);
 }
+pthread_mutex_t* threadHeapMutex = NULL;
+pthread_mutex_t* getThreadHeapMutex() {
+    if(threadHeapMutex == NULL) {
+        threadHeapMutex = malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(threadHeapMutex, NULL);
+    }
+    return threadHeapMutex;
+}
+
+void lockThreadHeapMutex() {
+    pthread_mutex_lock(getThreadHeapMutex());
+}
+
+void unlockThreadHeapMutex() {
+    pthread_mutex_unlock(getThreadHeapMutex());
+}
 
 extern void flushReleaseQueue();
 long gcThreadId = -1;
