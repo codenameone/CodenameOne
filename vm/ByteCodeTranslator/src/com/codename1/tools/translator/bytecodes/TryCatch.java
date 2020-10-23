@@ -75,7 +75,7 @@ public class TryCatch extends Instruction {
         hasTryCatch = true;
         if(firstException) {
             // we need to append basic exception handling logic
-            b.append("    DEFINE_EXCEPTION_HANDLING_CONSTANTS();\n");
+            //b.append("    DEFINE_EXCEPTION_HANDLING_CONSTANTS();\n");
             firstException = false;
         }
         

@@ -818,7 +818,6 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 extern struct ThreadLocalData* getThreadLocalData();
 
-#define DEFINE_EXCEPTION_HANDLING_CONSTANTS() int methodBlockOffset = threadStateData->tryBlockOffset
 
 #define BEGIN_TRY(classId, destinationJump) {\
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
@@ -1012,7 +1011,8 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
     initMethodStack(threadStateData, (JAVA_OBJECT)1, stackSize,localsStackSize, classNameId, methodNameId); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
@@ -1020,7 +1020,8 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
     initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
 
 
 #ifdef __OBJC__
