@@ -16,6 +16,7 @@ import java.awt.CardLayout;
 import java.awt.KeyboardFocusManager;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.lang.ref.WeakReference;
 import java.net.ServerSocket;
 import javax.swing.JButton;
 import javax.swing.SwingUtilities;
@@ -63,7 +64,7 @@ public abstract class BrowserPanel extends CN1JPanel {
     private String url_ = null;
     private final CefClient client_;
     private String errorMsg_ = "";
-    private CEFPeerComponentBuffer buffer_;
+    //private CEFPeerComponentBuffer buffer_;
     private boolean browserFocus_ = true;
     private Runnable readyCallback;
     //private static AppHandler appHandler_;
@@ -81,7 +82,7 @@ public abstract class BrowserPanel extends CN1JPanel {
 
         setZoom(1);
         //this.browserComponent = browserComponent;
-        this.buffer_ = buffer;
+        //this.buffer_ = buffer;
         setLayout(new CardLayout());
         
         addFocusListener(new FocusListener() {
@@ -169,7 +170,8 @@ public abstract class BrowserPanel extends CN1JPanel {
             
             settings.windowless_rendering_enabled = osrEnabled;
             // try to load URL "about:blank" to see the background color
-            settings.background_color = settings.new ColorType(100, 255, 242, 211);
+            settings.background_color = settings.new ColorType(0xff, 255, 0, 0);
+            
             //settings.user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1";
             settings.user_agent = CN.getProperty("user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/83.0.4103.88 Mobile/15E148 Safari/604.1" );
             
@@ -235,20 +237,8 @@ public abstract class BrowserPanel extends CN1JPanel {
         // 2.1) We're overriding CefDisplayHandler as nested anonymous class
         //      to update our address-field, the title of the panel as well
         //      as for updating the status-bar on the bottom of the browser
-        client_.addDisplayHandler(new CefDisplayHandlerAdapter() {
-            @Override
-            public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
-                url_ = url;
-            }
-            @Override
-            public void onTitleChange(CefBrowser browser, String title) {
-                setTitle(title);
-            }
-            @Override
-            public void onStatusMessage(CefBrowser browser, String value) {
-                //status_panel_.setStatusText(value);
-            }
-        });
+        //final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(this);
+        client_.addDisplayHandler(createDisplayHandlerAdapter(this));
 
         // 2.2) To disable/enable navigation buttons and to display a prgress bar
         //      which indicates the load state of our website, we're overloading
@@ -256,35 +246,7 @@ public abstract class BrowserPanel extends CN1JPanel {
         //      load handler is responsible to deal with (load) errors as well.
         //      For example if you navigate to a URL which does not exist, the
         //      browser will show up an error message.
-        client_.addLoadHandler(new CefLoadHandlerAdapter() {
-            @Override
-            public void onLoadingStateChange(CefBrowser browser, boolean isLoading,
-                    boolean canGoBack, boolean canGoForward) {
-                    if (isLoading) {
-                        onStart(new ActionEvent(url_));
-                    } else {
-                        onLoad(new ActionEvent(url_));
-                    }
-
-            }
-
-            @Override
-            public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode,
-                    String errorText, String failedUrl) {
-                onError(new ActionEvent(errorText, errorCode.getCode()));
-                
-                if (errorCode != CefLoadHandler.ErrorCode.ERR_NONE && errorCode != CefLoadHandler.ErrorCode.ERR_ABORTED) {
-                    errorMsg_ = "<html><head>";
-                    errorMsg_ += "<title>Error while loading</title>";
-                    errorMsg_ += "</head><body>";
-                    errorMsg_ += "<h1>" + errorCode + "</h1>";
-                    errorMsg_ += "<h3>Failed to load " + failedUrl + "</h3>";
-                    errorMsg_ += "<p>" + (errorText == null ? "" : errorText) + "</p>";
-                    errorMsg_ += "</body></html>";
-                    browser.stopLoad();
-                }
-            }
-        });
+        client_.addLoadHandler(createLoadHandler(this));
 
         // Create the browser.
         CN1CefBrowser.setComponentFactory(new CEFComponentFactory());
@@ -316,26 +278,12 @@ public abstract class BrowserPanel extends CN1JPanel {
         });
         */
         // Clear focus from the address field when the browser gains focus.
-        client_.addFocusHandler(new CefFocusHandlerAdapter() {
-            @Override
-            public void onGotFocus(CefBrowser browser) {
-                if (browserFocus_) return;
-                browserFocus_ = true;
-                KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
-                browser.setFocus(true);
-            }
-
-            @Override
-            public void onTakeFocus(CefBrowser browser, boolean next) {
-                browserFocus_ = false;
-            }
-        });
+        client_.addFocusHandler(createFocusHandler(this));
 
         if (createImmediately) browser.createImmediately();
         
         // Add the browser to the UI.
         add(getBrowser().getUIComponent());
-        add(new JButton("This is a button"));
 
         /*
         MenuBar menuBar = new MenuBar(
@@ -363,27 +311,128 @@ public abstract class BrowserPanel extends CN1JPanel {
         setJMenuBar(menuBar);
         */
     }
+
+    private static CefFocusHandlerAdapter createFocusHandler(BrowserPanel p) {
+        final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(p);
+        return new CefFocusHandlerAdapter() {
+            @Override
+            public void onGotFocus(CefBrowser browser) {
+                BrowserPanel self = selfRef.get();
+                if (self == null) return;
+                if (self.browserFocus_) return;
+                self.browserFocus_ = true;
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
+                browser.setFocus(true);
+            }
+
+            @Override
+            public void onTakeFocus(CefBrowser browser, boolean next) {
+                BrowserPanel self = selfRef.get();
+                if (self == null) return;
+                self.browserFocus_ = false;
+            }
+        };
+    }
+    
+    private static CefDisplayHandlerAdapter createDisplayHandlerAdapter(BrowserPanel p) {
+        final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(p);
+        return new CefDisplayHandlerAdapter() {
+            @Override
+            public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
+                BrowserPanel self = selfRef.get();
+                if (self != null) {
+                    self.url_ = url;
+                }
+            }
+            @Override
+            public void onTitleChange(CefBrowser browser, String title) {
+                BrowserPanel self = selfRef.get();
+                if (self != null) {
+                    self.setTitle(title);
+                }
+            }
+            @Override
+            public void onStatusMessage(CefBrowser browser, String value) {
+                //status_panel_.setStatusText(value);
+            }
+        };
+    }
+    
+    private static CefLoadHandlerAdapter createLoadHandler(BrowserPanel p) {
+        final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(p);
+        return new CefLoadHandlerAdapter() {
+            @Override
+            public void onLoadingStateChange(CefBrowser browser, boolean isLoading,
+                    boolean canGoBack, boolean canGoForward) {
+                BrowserPanel self = selfRef.get();
+                if (self != null) {
+                    if (isLoading) {
+                        self.onStart(new ActionEvent(self.url_));
+                    } else {
+                        self.onLoad(new ActionEvent(self.url_));
+                    }
+                }
+                
+
+            }
+
+            @Override
+            public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode,
+                    String errorText, String failedUrl) {
+                BrowserPanel self = selfRef.get();
+                if (self != null) {
+                    self.onError(new ActionEvent(errorText, errorCode.getCode()));
+
+                    if (errorCode != CefLoadHandler.ErrorCode.ERR_NONE && errorCode != CefLoadHandler.ErrorCode.ERR_ABORTED) {
+                        self.errorMsg_ = "<html><head>";
+                        self.errorMsg_ += "<title>Error while loading</title>";
+                        self.errorMsg_ += "</head><body>";
+                        self.errorMsg_ += "<h1>" + errorCode + "</h1>";
+                        self.errorMsg_ += "<h3>Failed to load " + failedUrl + "</h3>";
+                        self.errorMsg_ += "<p>" + (errorText == null ? "" : errorText) + "</p>";
+                        self.errorMsg_ += "</body></html>";
+                        browser.stopLoad();
+                    }
+                }
+                
+            }
+        };
+    }
+    
+    @Override
+    protected void finalize() throws Throwable {
+        cleanup();
+        super.finalize();
+    }
+    
+    
     private boolean ready_;
     
-    public void setBrowser(CefBrowser browser) {
-        if (browser_ == null) browser_ = browser;
-
-        browser_.getClient().removeLifeSpanHandler();
-        browser_.getClient().addLifeSpanHandler(new CefLifeSpanHandlerAdapter() {
+    private static CefLifeSpanHandlerAdapter createLifespanHandler(BrowserPanel p) {
+        final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(p);
+        return new CefLifeSpanHandlerAdapter() {
             @Override
             public void onAfterCreated(CefBrowser browser) {
+                BrowserPanel self = selfRef.get();
+                if (self == null) {
+                    return;
+                }
                 browserCount_++;
-                ready_ = true;
-                if (readyCallback != null) {
-                    readyCallback.run();
+                self.ready_ = true;
+                if (self.readyCallback != null) {
+                    self.readyCallback.run();
                 }
             }
 
             @Override
             public void onAfterParentChanged(CefBrowser browser) {
-                if (afterParentChangedAction_ != null) {
-                    SwingUtilities.invokeLater(afterParentChangedAction_);
-                    afterParentChangedAction_ = null;
+                BrowserPanel self = selfRef.get();
+                if (self == null) {
+                    return;
+                }
+                if (self.afterParentChangedAction_ != null) {
+                    SwingUtilities.invokeLater(self.afterParentChangedAction_);
+                    self.afterParentChangedAction_ = null;
                 }
             }
 
@@ -400,7 +449,14 @@ public abstract class BrowserPanel extends CN1JPanel {
 
                 }
             }
-        });
+        };
+    }
+    
+    public void setBrowser(CefBrowser browser) {
+        if (browser_ == null) browser_ = browser;
+
+        browser_.getClient().removeLifeSpanHandler();
+        browser_.getClient().addLifeSpanHandler(createLifespanHandler(this));
     }
 
     public void removeBrowser(Runnable r) {

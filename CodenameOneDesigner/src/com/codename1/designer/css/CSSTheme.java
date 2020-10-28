@@ -59,8 +59,7 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.scene.paint.Color;
-import javafx.scene.web.WebView;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.metadata.IIOMetadata;
@@ -1328,7 +1327,11 @@ public class CSSTheme {
     
     public String generateCaptureHtml() {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!doctype html>\n<html><base href=\""+baseURL.toExternalForm()+"\"/> <head><style type=\"text/css\">body {padding:0; margin:0} div.element {margin: 0 !important; padding: 0 !important; }</style></head><body>");
+        sb.append("<!doctype html>\n<html>"
+                + "<head><style type=\"text/css\">* {background-color: rgba(255,0,0,0);} "
+                + "body {padding:0; margin:0} "
+                + "div.element {margin: 0 !important; padding: 0 !important; }"
+                + "</style></head><body>");
         for (String name : elements.keySet()) {
             if (!isModified(name)) {
                 continue;
@@ -2331,7 +2334,7 @@ public class CSSTheme {
     }
     
     public static interface WebViewProvider {
-        WebView getWebView();
+        com.codename1.ui.BrowserComponent getWebView();
     }
     
     public void createImageBorders(WebViewProvider webviewProvider) {

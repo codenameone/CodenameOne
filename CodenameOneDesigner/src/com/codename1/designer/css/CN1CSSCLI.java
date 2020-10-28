@@ -10,7 +10,19 @@ package com.codename1.designer.css;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import com.codename1.designer.css.CSSTheme.WebViewProvider;
+import com.codename1.impl.javase.CN1Bootstrap;
 import com.codename1.io.Util;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.util.Resources;
 import java.awt.BorderLayout;
 import java.awt.Container;
@@ -45,54 +57,50 @@ import java.util.Properties;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Application;
-import static javafx.application.Application.launch;
-import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.scene.Scene;
-import javafx.scene.paint.Color;
-import javafx.scene.web.WebView;
-import javafx.stage.Stage;
+
 import javax.swing.JFrame;
+import javax.swing.JPanel;
 //import org.apache.tools.ant.types.Path;
 
 /**
  *
  * @author shannah
  */
-public class CN1CSSCLI extends Application {
+public class CN1CSSCLI {
     static Object lock = new Object();
-    static WebView web;
-    @Override
-    public void start(Stage stage) throws Exception {
-        Platform.setImplicitExit(false);
-        startImpl(stage);
+    static BrowserComponent web;
+    
+    public void start() throws Exception {
+        //Platform.setImplicitExit(false);
+        startImpl();
         //stage.hide();
         
     }
     
-    private static void startImpl(Stage stage) throws Exception {
-        System.out.println("Opening JavaFX Webview to render some CSS styles");
-        web = new WebView();
-        web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
+    private static void startImpl() throws Exception {
+        //System.out.println("Opening JavaFX Webview to render some CSS styles");
+        web = new BrowserComponent();
+        web.addWebEventListener(BrowserComponent.onError, new ActionListener() {
             @Override
-            public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
-                System.out.println("Received exception: "+t1.getMessage());
+            public void actionPerformed(ActionEvent evt) {
+                 System.out.println("Received exception: "+evt.getSource());
             }
+            
         });
+        web.setPreferredW(400);
+        web.setPreferredH(800);
         
-        Scene scene = new Scene(web, 400, 800, Color.web("#666670"));
-        stage.setScene(scene);
-        stage.show();
+        //Scene scene = new Scene(web, 400, 800, Color.web("#666670"));
+        //stage.setScene(scene);
+        //stage.show();
         synchronized(lock) {
             lock.notify();
         }
     }
     
     private static void relaunch() throws Exception {
-        Stage stage = new Stage();
-        startImpl(stage);
+        //Stage stage = new Stage();
+        startImpl();
     }
     
     public static boolean mergeMode;
@@ -263,15 +271,18 @@ public class CN1CSSCLI extends Application {
             JavaSEPort.setShowEDTViolationStacks(false);
             JavaSEPort.blockMonitors();
             JavaSEPort.setShowEDTWarnings(false);
-            Container cnt = new Container();
-            cnt.setLayout(new BorderLayout());
-            cnt.setSize(new Dimension(640, 480));
-            Display.init(cnt);
+            JFrame f = new JFrame();
+            Display.init(f.getContentPane());
+            int w = 640;
+            int h = 480;
+            f.getContentPane().setPreferredSize(new java.awt.Dimension(w, h));
+            f.getContentPane().setMinimumSize(new java.awt.Dimension(w, h));
+            f.getContentPane().setMaximumSize(new java.awt.Dimension(w, h));
+            f.pack();
             
             
         }
         
-        //Thread.sleep(5000);
         File inputFile = new File(inputPath);
         File outputFile = new File(outputPath);
         
@@ -397,6 +408,11 @@ public class CN1CSSCLI extends Application {
             }
             System.out.println("CSS file successfully compiled.  "+outputFile);
         } catch (Throwable t) {
+            if (!CN1Bootstrap.isBootstrapped() && t instanceof MissingNativeBrowserException) {
+                // Rethrow MissingNativeBrowserException so that it can be handled in main
+                // to attempt to re-add
+                throw t;
+            }
             t.printStackTrace();
             if (!watchmode) {
                 System.exit(1);
@@ -462,66 +478,52 @@ public class CN1CSSCLI extends Application {
                 WebViewProvider webViewProvider = new WebViewProvider() {
 
                     @Override
-                    public WebView getWebView() {
+                    public BrowserComponent getWebView() {
                         if (web == null) {
-                            new Thread(()->{
-                                launch(CN1CSSCLI.class, new String[0]);
-                            }).start();
+                            if (!CN1Bootstrap.isCEFLoaded() && !CN1Bootstrap.isJavaFXLoaded()) {
+                                throw new MissingNativeBrowserException();
+                            }
+                            if (!CN.isEdt()) {
+                                CN.callSerially(()->{
+                                    getWebView();
+                                });
+                                int counter = 0;
+                                while (web == null && counter++ < 50) {
+                                    Util.sleep(100);
+                                }
+                                return web;
+                            }
+                            web = new BrowserComponent();
+                            ComponentSelector.select("*", web).add(web, true).selectAllStyles()
+                                    .setBgTransparency(0)
+                                    .setMargin(0)
+                                    .setPadding(0)
+                                    .setBorder(Border.createEmpty())
+                                    .each(new ComponentClosure() {
+                                @Override
+                                public void call(Component c) {
+                                    c.setOpaque(false);
+                                }
+                                        
+                                
+                                    });
+                            web.setOpaque(false);
+                            Form f = new Form();
+                            f.getContentPane().getStyle().setBgColor(0xff0000);
+                            f.getContentPane().getStyle().setBgTransparency(0xff);
+                            if (f.getToolbar() == null) {
+                                f.setToolbar(new com.codename1.ui.Toolbar());
+                            }
+                            f.getToolbar().hideToolbar();
+                            f.setLayout(new com.codename1.ui.layouts.BorderLayout());
+                            f.add(CN.CENTER, web);
+                            f.show();
+                            
+                            
+                            
+                            
                         } 
-                        while (web == null) {
-                            System.out.println("Waiting for web browser");
-                            synchronized(lock) {
-                                try {
-                                    lock.wait(1000l);
-                                } catch (InterruptedException ex) {
-                                    Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
-                                }
-                            }
-                        }
-                        final boolean[] showing = new boolean[1];
-                        final boolean[] complete = new boolean[1];
-                        Platform.runLater(new Runnable() {
-                            public void run() {
-                                if (!web.getScene().getWindow().isShowing()) {
-                                    try {
-                                        relaunch();
-                                        synchronized(complete) {
-                                            showing[0] = true;
-                                            complete[0] = true;
-                                            complete.notify();
-                                        }
-                                    } catch (Throwable t) {
-                                        t.printStackTrace();
-                                    } finally {
-                                        synchronized(complete) {
-                                            complete[0] = true;
-                                            complete.notify();
-                                        }
-                                    }
-                                    
-                                } else {
-                                    synchronized(complete) {
-                                        showing[0] = true;
-                                        complete[0] = true;
-                                        complete.notify();
-                                    }
-                                }
-                            }
-                        });
                         
-                        while (!complete[0]) {
-                            synchronized(complete) {
-                                try {
-                                    complete.wait();
-                                } catch (Throwable t) {
-                                    throw new RuntimeException(t);
-                                }
-                            }
-                        }
-                        if (!showing[0]) {
-                            throw new RuntimeException("Failed to open WebView for generating 9-piece images");
-                        }
-                        System.out.println("Web browser is available");
                         return web;
                     }
 
@@ -555,16 +557,7 @@ public class CN1CSSCLI extends Application {
             if (channel != null) {
                 channel.close();
             }
-            if (web != null) {
-                Platform.runLater(new Runnable() {
-                    public void run() {
-                        if (web != null) {
-                            web.getScene().getWindow().hide();
-                        }
-                    }
-                });
-                
-            }
+            
             
         }
     }

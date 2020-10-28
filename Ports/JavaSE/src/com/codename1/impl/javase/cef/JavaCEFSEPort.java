@@ -99,8 +99,8 @@ public class JavaCEFSEPort extends JavaSEPort {
                 EventQueue.invokeAndWait(new Runnable() {
                     public void run() {
                         
-                        out[0] = createCEFBrowserComponent(parent);
-                    }
+                            out[0] = createCEFBrowserComponent(parent);
+                        }
                 });
             } catch (Throwable ex) {
                 throw new RuntimeException("Failed to create CEF browser", ex);

@@ -5,18 +5,17 @@
  */
 package com.codename1.designer.css;
 
+import com.codename1.io.Log;
+import com.codename1.processing.Result;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.Image;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Platform;
-import javafx.embed.swing.SwingFXUtils;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.image.WritableImage;
-import javafx.scene.web.WebView;
-import netscape.javascript.JSObject;
+
 
 /**
  *
@@ -24,7 +23,7 @@ import netscape.javascript.JSObject;
  */
 public class WebviewSnapshotter {
     private int x, y, w, h;
-    private WebView web;
+    private BrowserComponent web;
     final LinkedList<Runnable> eventQueue = new LinkedList<Runnable>();
     Thread eventThread;
     Runnable onDone;
@@ -32,11 +31,10 @@ public class WebviewSnapshotter {
     BufferedImage image;
     Graphics2D imageGraphics;
     
-    SnapshotParameters snapshotParams;
     
-    public WebviewSnapshotter(WebView web, SnapshotParameters params) {
+    public WebviewSnapshotter(BrowserComponent web) {
         this.web = web;
-        this.snapshotParams = params;
+        
         //this.onDone = onDone;
     }
     
@@ -48,16 +46,32 @@ public class WebviewSnapshotter {
     }
     
     private void fireJSSnap(int x, int y, int w, int h) {
-        if (!Platform.isFxApplicationThread()) {
-            Platform.runLater(()-> {
+        if (!CN.isEdt()) {
+            CN.callSerially(()-> {
                 fireJSSnap(x, y, w, h);
             });
             return;
         } 
-        //System.out.println("in FireJSSnap "+x+","+y+","+w+","+h);
-        JSObject window = (JSObject)web.getEngine().executeScript("window");
-        window.setMember("snapper", this);
-        web.getEngine().executeScript("getRectSnapshot("+x+","+y+","+w+","+h+");");
+        
+        web.execute("window.snapper = window.snapper || {}; "
+                + "window.snapper.handleJSSnap = function(scrollX, scrollY, x, y, w, h) {"
+                + "  callback.onSuccess(JSON.stringify({scrollX:scrollX, scrollY:scrollY, x:x, y:y, w:w, h:h}));"
+                + "}; window.getRectSnapshot("+x+","+y+","+w+","+h+");", res -> {
+                    try {
+                        Result data = Result.fromContent(res.toString(), Result.JSON);
+                        handleJSSnap(
+                                data.getAsInteger("scrollX"),
+                                data.getAsInteger("scrollY"),
+                                data.getAsInteger("x"),
+                                data.getAsInteger("y"),
+                                data.getAsInteger("w"),
+                                data.getAsInteger("h")
+                        );
+                    } catch (Exception ex) {
+                        Log.p("Failed to parse callback in fireJSSnap");
+                        Log.e(ex);
+                    }
+                });
     }
     
     private boolean isEventThread() {
@@ -85,11 +99,12 @@ public class WebviewSnapshotter {
         }
         
         //System.out.println("In handleJSSnap "+scrollX+", "+scrollY+", "+x+","+y+","+w+","+h);
-        Platform.runLater(()-> {
+        CN.callSerially(()-> {
             //snapshotParams.
-            WritableImage wi = web.snapshot(snapshotParams, null);
+            //WritableImage wi = web.snapshot(snapshotParams, null);
+            Image wi = web.captureScreenshot().get();
 
-            BufferedImage img = SwingFXUtils.fromFXImage(wi, null);
+            BufferedImage img = (BufferedImage)wi.getImage();
             
             runLater(()-> {
                 //System.out.println("Getting subImag "+(x-scrollX)+", "+(y-scrollY)+", "+w+", "+h+" for image "+img.getWidth()+", "+img.getHeight());

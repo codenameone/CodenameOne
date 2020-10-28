@@ -35,8 +35,11 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.io.File;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import javax.swing.MenuSelectionManager;
@@ -50,7 +53,7 @@ import org.cef.handler.CefScreenInfo;
  * CefBrowser instance, please use CefBrowserFactory.
  */
 public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
-    private CefRenderer renderer_;
+    //private CefRenderer renderer_;
     //private GLCanvas canvas_;
     private long window_handle_ = 0;
     private Rectangle browser_rect_ = new Rectangle(0, 0, 1, 1); // Work around CEF issue #1437.
@@ -58,7 +61,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     private boolean isTransparent_;
     private JPanel component_;
     //private BufferedImage bufferedImage_;
-    private PixelBuffer buffer_;
+    private WeakReference<PixelBuffer> bufferRef;
     private byte[] buf_;
     
 
@@ -70,7 +73,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             CefRequestContext context, CN1CefBrowser parent, Point inspectAt) {
         super(client, url, context, parent, inspectAt);
         isTransparent_ = transparent;
-        renderer_ = new CefRenderer(transparent);
+        //renderer_ = new CefRenderer(transparent);
         createComponent();
     }
     
@@ -79,7 +82,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
      * @param buf 
      */
     public void setPeerComponentBuffer(PixelBuffer buf) {
-        buffer_ = buf;
+        bufferRef = new WeakReference<PixelBuffer>(buf);
     }
    
     @Override
@@ -358,7 +361,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     public void onPopupShow(CefBrowser browser, boolean show) {
         try {
             if (!show) {
-                renderer_.clearPopupRects();
+                //renderer_.clearPopupRects();
                 invalidate();
             }
         } catch (Throwable t) {
@@ -370,7 +373,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     @Override
     public void onPopupSize(CefBrowser browser, Rectangle size) {
         try {
-            renderer_.onPopupSize(size);
+            //renderer_.onPopupSize(size);
         } catch (Throwable t) {
             System.out.println("Exception in thread "+Thread.currentThread().getName());
             t.printStackTrace();
@@ -390,7 +393,10 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     }
     public void _onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
             final ByteBuffer buffer, final int width, final int height) {    
-        
+        PixelBuffer buffer_ = bufferRef.get();
+        if (buffer_ == null) {
+            return;
+        }
         BufferedImage img = buffer_.getBufferedImage();
         boolean imgUpdated = false;
          if (img == null || img.getWidth() != width || img.getHeight() != height) {
@@ -439,7 +445,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
                         int dy2 = dy+rh;
                         for (int row=dy; row<dy2; row++) {
                             buffer.position(row * width * 4 + dx * 4);
-                           
                             buffer.get(buf_, rw * (row-dy) * 4, rw * 4);
                        }
                         int len = rw * rh * 4;
