@@ -11913,8 +11913,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             
         }
 
+        @Override
+        public Image toImage() {
+            if (getWidth() <= 0 || getHeight() <= 0) {
+                return null;
+            }
+            Image image = Image.createImage(getWidth(), getHeight(),0x0);
+            Graphics g = image.getGraphics();
+
+            g.translate(-getX(), -getY());
+            //paintComponentBackground(g);
+            paint(g);
+
+            g.translate(getX(), getY());
+            return image;
+        }
+        
+        
+
         private void applyStyle() {
-            System.out.println("Applying CN1 styles");
             Style source = getStyle();
             
             if (true) {
@@ -12053,6 +12070,47 @@ public class JavaSEPort extends CodenameOneImplementation {
             allowSetCntBounds = false;
         }
         
+        private static JPanel createPanel(Peer p) {
+            final java.lang.ref.WeakReference<Peer> selfRef = new java.lang.ref.WeakReference<Peer>(p);
+            return new JPanel() {
+                @Override
+                public void paint(java.awt.Graphics g) {
+                    final Peer self = selfRef.get();
+                    if (self == null) {
+                        return;
+                    }
+                    if (self.peerBuffer != null) {
+                        //peerBuffer.paint((Graphics2D)g, cnt);
+                        // If we are using a peer buffer, we won't *actually* paint the 
+                        // component because the peer buffer will be painted
+                        // in the CN1 paint cycle on the CN1 context
+                        return;
+                    }
+                    self.paintOnBuffer();
+
+                    // We need to tell CN1 to repaint now
+                    // since the native peer has been updated
+                    // There should be a new buffer to paint now.
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            self.repaint();
+                        }
+                    });
+                }
+
+                @Override
+                public void setBounds(int x, int y, int w, int h) {
+                    Peer self = selfRef.get();
+                    if (self == null) {
+                        return;
+                    }
+                    if (self.allowSetCntBounds) {
+                        super.setBounds(x, y, w, h);
+                    } 
+                }   
+            };
+        }
+        
         public Peer(JFrame f, java.awt.Component c) {
             super(null);
             this.frm = f;
@@ -12067,35 +12125,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-                    cnt = new JPanel() {
-                        @Override
-                        public void paint(java.awt.Graphics g) {
-                            if (peerBuffer != null) {
-                                //peerBuffer.paint((Graphics2D)g, cnt);
-                                // If we are using a peer buffer, we won't *actually* paint the 
-                                // component because the peer buffer will be painted
-                                // in the CN1 paint cycle on the CN1 context
-                                return;
-                            }
-                            paintOnBuffer();
-                            
-                            // We need to tell CN1 to repaint now
-                            // since the native peer has been updated
-                            // There should be a new buffer to paint now.
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    Peer.this.repaint();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void setBounds(int x, int y, int w, int h) {
-                            if (allowSetCntBounds) {
-                                super.setBounds(x, y, w, h);
-                            } 
-                        }   
-                    };
+                    cnt = createPanel(Peer.this);
                     cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, cmp);
