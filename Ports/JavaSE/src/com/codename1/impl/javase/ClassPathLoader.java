@@ -54,6 +54,7 @@ class ClassPathLoader extends ClassLoader {
         excludes.add("org.jdesktop");
         excludes.add("netscape.javascript");
         excludes.add("javafx");
+        excludes.add("org.w3c");
     }
     private List<String> includes = new ArrayList<String>();
     {
