@@ -188,7 +188,7 @@ public class BrowserComponent extends Container {
                 return i;
             }
         }
-        AsyncResource<Image> out = new AsyncResource<>();
+        AsyncResource<Image> out = new AsyncResource<Image>();
         if (internal != null) {
             out.complete(internal.toImage());
         } else {
