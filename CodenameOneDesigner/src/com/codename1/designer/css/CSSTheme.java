@@ -1345,7 +1345,7 @@ public class CSSTheme {
     public String generateCaptureHtml() {
         StringBuilder sb = new StringBuilder();
         sb.append("<!doctype html>\n<html>"
-                + "<head><style type=\"text/css\">* {background-color: rgba(255,0,0,0);} "
+                + "<head><style type=\"text/css\">* {background-color: transparent;} "
                 + "body {padding:0; margin:0} "
                 + "div.element {margin: 0 !important; padding: 0 !important; }"
                 + "</style></head><body>");

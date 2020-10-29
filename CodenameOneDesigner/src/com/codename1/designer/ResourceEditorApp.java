@@ -261,7 +261,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
             // some CSS needs a browser component to generate 9-piece border
             // it throws the MissingNativeBrowserException
             // Catch it here and try to add CEF to the classpath, then run again.
-            System.out.println("Looks like this CSS file needs CEF or JavaFX on classpath... adding it now, and retrying...");
+            System.out.println("Looks like this CSS file needs CEF on classpath... adding it now, and retrying...");
             CN1Bootstrap.run(ResourceEditorApp.class, args);
         }
     }

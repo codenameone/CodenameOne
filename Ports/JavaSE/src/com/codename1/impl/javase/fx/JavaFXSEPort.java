@@ -22,6 +22,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.AsyncResource;
@@ -1046,6 +1047,20 @@ public class JavaFXSEPort extends JavaSEPort {
 
         }
     }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public AsyncResource<Image> captureBrowserScreenshot(PeerComponent browserPeer) {
+        if (!(browserPeer instanceof SEBrowserComponent)) {
+            return null;
+        }
+        SEBrowserComponent sebc = (SEBrowserComponent)browserPeer;
+        return sebc.captureScreenshot();
+    }
+    
+    
     
     public PeerComponent createFXBrowserComponent(final Object parent) {
         java.awt.Container cnt = canvas.getParent();
@@ -1071,6 +1086,7 @@ public class JavaFXSEPort extends JavaSEPort {
             public void run() {
                 StackPane root = new StackPane();
                 final WebView webView = new WebView();
+                
                 root.getChildren().add(webView);
                 webContainer.setScene(new Scene(root));
                 

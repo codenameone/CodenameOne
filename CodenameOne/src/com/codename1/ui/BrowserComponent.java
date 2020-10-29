@@ -182,6 +182,12 @@ public class BrowserComponent extends Container {
      * @since 7.0
      */
     public AsyncResource<Image> captureScreenshot() {
+        if (internal != null) {
+            AsyncResource<Image> i = Display.impl.captureBrowserScreenshot(internal);
+            if (i != null) {
+                return i;
+            }
+        }
         AsyncResource<Image> out = new AsyncResource<>();
         if (internal != null) {
             out.complete(internal.toImage());

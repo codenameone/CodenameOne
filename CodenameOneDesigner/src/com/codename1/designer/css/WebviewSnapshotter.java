@@ -51,8 +51,6 @@ public class WebviewSnapshotter {
     
     public WebviewSnapshotter(BrowserComponent web) {
         this.web = web;
-        
-        //this.onDone = onDone;
     }
     
     public void setBounds(int x, int y, int w, int h) {
@@ -107,24 +105,17 @@ public class WebviewSnapshotter {
     }
     
     public final void handleJSSnap(int scrollX, int scrollY, int x, int y, int w, int h) {
-        //System.out.println("In handleJSSnap before thread check");
         if (!isEventThread()) {
             runLater(()-> {
                 handleJSSnap(scrollX, scrollY, x, y, w, h);
             });
             return;
         }
-        
-        //System.out.println("In handleJSSnap "+scrollX+", "+scrollY+", "+x+","+y+","+w+","+h);
         CN.callSerially(()-> {
-            //snapshotParams.
-            //WritableImage wi = web.snapshot(snapshotParams, null);
             Image wi = web.captureScreenshot().get();
-
             BufferedImage img = (BufferedImage)wi.getImage();
             
             runLater(()-> {
-                //System.out.println("Getting subImag "+(x-scrollX)+", "+(y-scrollY)+", "+w+", "+h+" for image "+img.getWidth()+", "+img.getHeight());
                 int remw = Math.min(w, 320);
                 int remh = Math.min(h, 480);
                 //remw = Math.min(remw, 320);
@@ -142,14 +133,9 @@ public class WebviewSnapshotter {
                     fireDone();
                 }
             });
-            
-            //
+
         });
-       
-        
-        
-        
-        
+
     }
     
     public final void fireDone() {
