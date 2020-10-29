@@ -140,7 +140,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
      */
     public AsyncResource<Image> captureScreenshot() {
         
-        AsyncResource<Image> out = new AsyncResource<Image>();
+        final AsyncResource<Image> out = new AsyncResource<Image>();
         EventQueue.invokeLater(new Runnable() {
             public void run() {
                 panel.repaint();
