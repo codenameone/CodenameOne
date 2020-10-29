@@ -497,7 +497,9 @@ public class CN1CSSCLI {
                     @Override
                     public BrowserComponent getWebView() {
                         if (web == null) {
-                            if (!CN1Bootstrap.isCEFLoaded() && !CN1Bootstrap.isJavaFXLoaded()) {
+                            if (!CN1Bootstrap.isCEFLoaded()/* && !CN1Bootstrap.isJavaFXLoaded()*/) {
+                                // In theory having JavaFX should work, but I'm having problems getting the snapshotter
+                                // to output the correct bounds so we are killing FX support.  CEF only.
                                 throw new MissingNativeBrowserException();
                             }
                             if (!CN.isEdt()) {
