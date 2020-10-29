@@ -226,7 +226,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
         
         CEFPeerComponentBuffer buffer = new CEFPeerComponentBuffer();
-        WeakReference<CEFBrowserComponentListener> parentRef = new WeakReference<CEFBrowserComponentListener>(parent);
+        final WeakReference<CEFBrowserComponentListener> parentRef = new WeakReference<CEFBrowserComponentListener>(parent);
         BrowserNavigationCallback navigationCallback = new BrowserNavigationCallback() {
             private CEFBrowserComponentListener l = parentRef.get();
             @Override
