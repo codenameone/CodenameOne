@@ -411,7 +411,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     }
     public void _onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
             final ByteBuffer buffer, final int width, final int height) {    
-        PixelBuffer buffer_ = bufferRef.get();
+        final PixelBuffer buffer_ = bufferRef.get();
         if (buffer_ == null) {
             return;
         }
