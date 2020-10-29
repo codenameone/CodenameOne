@@ -471,48 +471,7 @@ public class ResourcesMutator {
     private BrowserComponent web;
     private boolean screenshotsComplete;
     private final Object screenshotsLock = new Object();
-    public void createScreenshotCallback_old(String id, int x, int y, int w, int h) {
-        CN.callSerially(()->{
-            //System.out.println("in screenshot callback id "+id);
-            //System.out.println(imageProcessors);
-            if (imageProcessors.containsKey(id)) {
-                double ratio = 1.0;
-                //this.targetDensity = Display.DENSITY_VERY_HIGH;
-                //SnapshotParameters params = new SnapshotParameters();
-                //params.setTransform(Transform.scale(ratio, ratio));
-                //params.setFill(Color.TRANSPARENT);
-                com.codename1.ui.Image cn1Img = web.captureScreenshot().get();
-                
-                BufferedImage img = (BufferedImage)cn1Img.getImage();
-                img = img.getSubimage((int)(x*ratio), (int)(y*ratio), (int)(w*ratio), (int)(h*ratio));
-                imageProcessors.get(id).process(img);
-                
-            }
-            
-            web.addJSCallback("window.app.createScreenshotCallback = function(id, x, y, w, h) {"
-                    + "callback.onSuccess(JSON.stringify({id:id, x:x, y:y, w:w, h:h}));"
-                    + "}; window.captureScreenshots();", res -> {
-                        try {
-                            
-                            
-                            Result data = Result.fromContent(new StringReader(res.toString()), Result.JSON);
-                            
-                            createScreenshotCallback(
-                                    data.getAsString("id"),
-                                    data.getAsInteger("x"),
-                                    data.getAsInteger("y"),
-                                    data.getAsInteger("w"),
-                                    data.getAsInteger("h"));
-                        } catch (Exception ex) {
-                            Log.p("Failed to parse input to createScreenshotsCallback");
-                            Log.e(ex);
-                        }
-                        
-            });
-            
-            
-        });
-    }
+   
     
     /**
      * A callback function triggered inside capture.js Javascript file to take a screenshot
@@ -525,6 +484,7 @@ public class ResourcesMutator {
      * @param h The height
      */
     public void createScreenshotCallback(String id, int x, int y, int w, int h) {
+        //System.out.println("In createScreenshotsCallback("+id+","+x+","+y+","+w+","+h);
         // There are 3 possibilities:
         // 1. There is no registered image processor with ID=id -> call captureScreenshots()
         // 2. There is a registered image processor with ID=id, but image generate fails -> call captureScreenshots()
@@ -593,14 +553,21 @@ public class ResourcesMutator {
      * @param baseURL The BaseURL - general points to the CSS file location.  Used for loading resources from relative paths.
      */
     public void createScreenshots(BrowserComponent web, String html, String baseURL) {
-        
+        //System.out.println("in createScreenshots");
         try {
             File baseURLFile = new File(new URL(baseURL).toURI());
             if (!baseURLFile.isDirectory()) {
                 baseURLFile = baseURLFile.getParentFile();
             }
             startWebServer(baseURLFile);
-            if (!webServer.waitForServer(2000)) {
+            boolean waitForServerResult[] = new boolean[1];
+            CN.invokeAndBlock(new Runnable() {
+                public void run() {
+                    waitForServerResult[0] = webServer.waitForServer(2000);
+               
+                }
+            });
+            if (!waitForServerResult[0]) {
                 throw new RuntimeException("Failed to start webserver after 2 seconds");
             }
             
@@ -630,6 +597,7 @@ public class ResourcesMutator {
                 }
                 web.removeWebEventListener(BrowserComponent.onLoad, loadListener);
                 try {
+                    //System.out.println("In onLoad event");
                     // Use reflection to retrieve the WebEngine's private 'page' field.
                     web.addJSCallback("window.app = window.app || {}; window.app.createScreenshotCallback = function(id, x, y, w, h) {"
                             + "callback.onSuccess(JSON.stringify({id:id, x:x, y:y, w:w, h:h}));"
@@ -685,14 +653,19 @@ public class ResourcesMutator {
             web.setURL("http://localhost:"+webServer.getPort()+"/index.html");
             
         });
-        long startTime = System.currentTimeMillis();
-        while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
-            synchronized(screenshotsLock) {
-                try {
-                    screenshotsLock.wait(timeout);
-                } catch (Exception ex){}
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                long startTime = System.currentTimeMillis();
+                while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
+                    synchronized(screenshotsLock) {
+                        try {
+                            screenshotsLock.wait(timeout);
+                        } catch (Exception ex){}
+                    }
+                }
             }
-        }
+        });
+        
         if (!screenshotsComplete) {
             throw new RuntimeException("Failed to create screenshots for HTML "+html+".  Timeout reached.  Likely there was a problem initializing the browser component.");
         }

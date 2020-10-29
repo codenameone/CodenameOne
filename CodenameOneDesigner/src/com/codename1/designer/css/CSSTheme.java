@@ -1390,15 +1390,21 @@ public class CSSTheme {
     }
     
     public void saveSelectorChecksums(File output) throws FileNotFoundException, IOException {
+        //System.out.println("Saving selector checksums for "+output+": "+calculateSelectorChecksums());
         try (ObjectOutputStream fos = new ObjectOutputStream(new FileOutputStream(output))) {
             fos.writeObject(calculateSelectorChecksums());
         }
     }
     
     public Map<String, String> loadSelectorChecksums(File input) throws FileNotFoundException, IOException, ClassNotFoundException {
+        Map<String,String> out;
         try (ObjectInputStream fis = new ObjectInputStream(new FileInputStream(input))) {
-            return (Map<String,String>)fis.readObject();
+            out = (Map<String,String>)fis.readObject();
         }
+        
+        //System.out.println("Loading selector checksums for "+input+": "+out);
+        return out;
+        
     }
     
     public static enum CacheStatus {

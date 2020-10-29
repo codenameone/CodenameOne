@@ -228,10 +228,11 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         CEFPeerComponentBuffer buffer = new CEFPeerComponentBuffer();
         WeakReference<CEFBrowserComponentListener> parentRef = new WeakReference<CEFBrowserComponentListener>(parent);
         BrowserNavigationCallback navigationCallback = new BrowserNavigationCallback() {
+            private CEFBrowserComponentListener l = parentRef.get();
             @Override
             public boolean shouldNavigate(String url) {
                 //System.out.println("in shouldNavigate "+url);
-                CEFBrowserComponentListener l = parentRef.get();
+                //CEFBrowserComponentListener l = parentRef.get();
                 if (l != null) {
                     return l.shouldNavigate(url);
                 }
@@ -241,9 +242,11 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         };
         final BrowserPanel panel = new BrowserPanel(
                 startingURL, buffer, navigationCallback,  osrEnabledArg, transparentPaintingEnabledArg, createImmediately, args) {
-            @Override
+            
+            private CEFBrowserComponentListener p = parentRef.get();
+                    @Override
             protected void onError(ActionEvent l) {
-                CEFBrowserComponentListener p = parentRef.get();
+                //CEFBrowserComponentListener p = parentRef.get();
                 if (p != null) {
                     p.onError(l);
                 }
@@ -251,7 +254,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
             @Override
             protected void onStart(ActionEvent l) {
-                CEFBrowserComponentListener p = parentRef.get();
                 if (p != null) {
                     p.onStart(l);
                 }
@@ -259,7 +261,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
             @Override
             protected void onLoad(ActionEvent l) {
-                CEFBrowserComponentListener p = parentRef.get();
                 if (p != null) {
                     p.onLoad(l);
                 }

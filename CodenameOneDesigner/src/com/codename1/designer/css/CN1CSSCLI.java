@@ -296,7 +296,7 @@ public class CN1CSSCLI {
             f.getContentPane().setMinimumSize(new java.awt.Dimension(w, h));
             f.getContentPane().setMaximumSize(new java.awt.Dimension(w, h));
             f.pack();
-            
+            //f.setVisible(true);
             
         }
         
@@ -465,6 +465,7 @@ public class CN1CSSCLI {
         System.out.println("Lock obtained");
         try {
             Map<String,String> checksums = loadChecksums(baseDir);
+            //System.out.println("Loaded checksums["+baseDir+"]: "+checksums);
             if (outputFile.exists()) {
                 String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
                 String previousChecksum = checksums.get(inputFile.getName());
@@ -550,19 +551,22 @@ public class CN1CSSCLI {
 
 
                 File cacheFile = new File(theme.cssFile.getParentFile(), theme.cssFile.getName()+".checksums");
+                //System.out.println("Cache file: "+cacheFile+" [Exists="+(cacheFile.exists()+"]"));
                 if (outputFile.exists() && cacheFile.exists()) {
                     theme.loadResourceFile();
-
+                    //System.out.println("Loading cache file: "+cacheFile);
                     theme.loadSelectorCacheStatus(cacheFile);
                 }
 
                 theme.createImageBorders(webViewProvider);
                 theme.updateResources();
                 theme.save(outputFile);
+                
                 theme.saveSelectorChecksums(cacheFile);
                 
                 String checksum = getMD5Checksum(outputFile.getAbsolutePath());
                 checksums.put(inputFile.getName(), checksum);
+                //System.out.println("Saving checksums ["+baseDir+"]: "+checksums);
                 saveChecksums(baseDir, checksums);
             
             } catch (MalformedURLException ex) {
@@ -620,8 +624,8 @@ public class CN1CSSCLI {
            return new HashMap<String,String>();
        }
        HashMap<String,String> out = new HashMap<String,String>();
-       try {
-            Scanner scanner = new Scanner(checkSums);
+       try (FileInputStream fis = new FileInputStream(checkSums)){
+            Scanner scanner = new Scanner(fis);
 
             //now read the file line by line...
             int lineNum = 0;

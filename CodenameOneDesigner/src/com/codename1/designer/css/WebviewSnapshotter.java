@@ -61,6 +61,7 @@ public class WebviewSnapshotter {
     }
     
     private void fireJSSnap(int x, int y, int w, int h) {
+        //System.out.println("[WebviewSnapshotter::fireJSSnap("+x+","+y+","+w+","+h);
         if (!CN.isEdt()) {
             CN.callSerially(()-> {
                 fireJSSnap(x, y, w, h);
@@ -105,6 +106,7 @@ public class WebviewSnapshotter {
     }
     
     public final void handleJSSnap(int scrollX, int scrollY, int x, int y, int w, int h) {
+        //System.out.println("[WebviewSnapshotter::handleJSSnap("+scrollX+","+scrollY+","+x+","+y+","+w+","+h+")");
         if (!isEventThread()) {
             runLater(()-> {
                 handleJSSnap(scrollX, scrollY, x, y, w, h);
@@ -139,7 +141,7 @@ public class WebviewSnapshotter {
     }
     
     public final void fireDone() {
-        
+        //System.out.println("[WebViewSnapshotter::fireDone()]");
         if (!isEventThread()) {
             runLater(()-> {
                 fireDone();
@@ -157,6 +159,7 @@ public class WebviewSnapshotter {
     }
     
     public void snapshot(Runnable onDone) {
+        //System.out.println("[WebviewSnapshotter::snapshot()]");
         if (eventThread != null) {
             throw new RuntimeException("Snapshot event thread already created");
         }
@@ -197,16 +200,20 @@ public class WebviewSnapshotter {
                 lock.notify();
             }
         });
-        
-        while (!complete[0]) {
-            synchronized(lock) {
-                try {
-                    lock.wait();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(WebviewSnapshotter.class.getName()).log(Level.SEVERE, null, ex);
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                while (!complete[0]) {
+                    synchronized(lock) {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(WebviewSnapshotter.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
                 }
             }
-        }
+        });
+        
     }
     
     public BufferedImage getImage() {

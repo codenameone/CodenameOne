@@ -34,18 +34,18 @@ import javax.swing.SwingUtilities;
 public class RequestHandler extends CefResourceRequestHandlerAdapter implements CefRequestHandler {
     private final WeakReference<Container> ownerRef;
     //private BrowserComponent browserComponent_;
-    private final WeakReference<BrowserNavigationCallback> navigationCallbackRef;
+    private final BrowserNavigationCallback navigationCallback_;
     
 
     public RequestHandler(Container owner, BrowserNavigationCallback navigationCallback) {
         ownerRef = new WeakReference<Container>(owner);
-        this.navigationCallbackRef = new WeakReference<BrowserNavigationCallback>(navigationCallback);
+        this.navigationCallback_ = navigationCallback;
     }
 
     @Override
     public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
             boolean user_gesture, boolean is_redirect) {
-        BrowserNavigationCallback navigationCallback_ = navigationCallbackRef.get();
+        //BrowserNavigationCallback navigationCallback_ = navigationCallbackRef.get();
         if (navigationCallback_ != null) {
             
             boolean res = navigationCallback_.shouldNavigate(request.getURL());
