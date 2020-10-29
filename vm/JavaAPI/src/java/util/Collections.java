@@ -2168,7 +2168,11 @@ public class Collections {
      * @return an {@code ArrayList} from {@code enumeration}.
      */
     public static <T> ArrayList<T> list(java.util.Enumeration<T> enumeration) {
-        return null;
+        ArrayList<T> list = new ArrayList<T>();
+        while (enumeration.hasMoreElements()) {
+            list.add(enumeration.nextElement());
+        }
+        return list;
     }
 
     /**
