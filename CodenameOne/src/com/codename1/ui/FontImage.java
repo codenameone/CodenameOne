@@ -7908,6 +7908,7 @@ public class FontImage extends Image {
      * 
      * @param l a label or subclass (e.g. Button etc.)
      * @param icon one of the MATERIAL_* icons
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setMaterialIcon(Label l, char icon) {
         setMaterialIcon(l, icon, -1);
@@ -7965,13 +7966,14 @@ public class FontImage extends Image {
      * @param font a font with icons
      * @param icon an icon in the font
      * @param size the size of the icon in millimeters, or -1 to use the default height of the font
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char icon, float size) {
         setIcon((IconHolder)l, font, icon, size);
     }
     
     
-        /**
+    /**
      * <p>Applies an icon from the font to the given label using the 
      * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
      * will be set appropriately.</p>
@@ -8024,6 +8026,7 @@ public class FontImage extends Image {
      * in the list for the remaining expected icons.
      * @param size The font size.
      * @since 7.0
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char[] icons, float size) {
         FontImage.setIcon((IconHolder)l, font, icons, size);
