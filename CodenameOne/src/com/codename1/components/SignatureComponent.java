@@ -87,6 +87,7 @@ import com.codename1.ui.util.EventDispatcher;
 public class SignatureComponent extends Container implements ActionSource {
     
     private Image signatureImage;
+    private final SignaturePanel signaturePanel = new SignaturePanel();
     private final Button lead;
     private final EventDispatcher eventDispatcher = new EventDispatcher();
     private final Font xFont;
@@ -214,8 +215,6 @@ public class SignatureComponent extends Container implements ActionSource {
                 g.setFont(xFont);
                 g.drawString("X", getX() + getStyle().getPaddingLeftNoRTL() + Display.getInstance().convertToPixels(3, true), getY() + getHeight() / 2);
             }
-
-            
         };
         lead.setText(localize("SignatureComponent.LeadText","Press to sign"));
         lead.setUIID("SignatureButton");
@@ -229,6 +228,7 @@ public class SignatureComponent extends Container implements ActionSource {
                         dialog.dispose();
                     }
                 };
+                signaturePanel.clear();
 
                 sigBody.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent sigDoneEvent) {
@@ -290,11 +290,19 @@ public class SignatureComponent extends Container implements ActionSource {
      * @return 
      */
     public Image getSignatureImage() {
-        return signatureImage;
+        if(signatureImage != null){
+            return signatureImage;
+        }else{
+            return signaturePanel.getImage();
+        }
     }
     
-    public static SignaturePanel createSignaturePanel(){
-        return new SignaturePanel();
+    public Component getSignaturePanel(){
+        return signaturePanel;
+    }
+    
+    public void clearSignaturePanel(){
+        signaturePanel.clear();
     }
     
     /**
@@ -306,13 +314,11 @@ public class SignatureComponent extends Container implements ActionSource {
         private Button doneButton;
         private Button resetButton;
         private Button cancelButton;
-        private SignaturePanel signaturePanel;
         private final EventDispatcher eventDispatcher = new EventDispatcher();
         private Image value;
 
         public SignatureDialogBody() {
             setLayout(new BorderLayout());
-            signaturePanel = new SignaturePanel();
             addComponent(BorderLayout.CENTER, signaturePanel);
             doneButton = new Button(
                 localize("SignatureComponent.SaveButtonLabel", "Save"),
@@ -337,7 +343,7 @@ public class SignatureComponent extends Container implements ActionSource {
                         return;
                     }
                     eventDispatcher.fireActionEvent(new ActionEvent(this));
-
+                    removeComponent(signaturePanel);
                 }
             });
 
@@ -351,6 +357,7 @@ public class SignatureComponent extends Container implements ActionSource {
 
             cancelButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
+                    removeComponent(signaturePanel);
                     onCancel();
                 }
             });
@@ -413,7 +420,7 @@ public class SignatureComponent extends Container implements ActionSource {
     * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
     * it merely provides the functionality to record the drawing of a signature.
     */
-   public static class SignaturePanel extends Component {
+   private class SignaturePanel extends Component {
 
        private final GeneralPath path = new GeneralPath();
        private final Stroke stroke = new Stroke();
