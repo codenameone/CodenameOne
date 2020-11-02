@@ -235,7 +235,6 @@ public class SignatureComponent extends Container implements ActionSource {
                         dialog.dispose();
                         setSignatureImage(sigBody.getValue());
                         fireActionEvent();
-
                     }
                 });
 
@@ -294,6 +293,10 @@ public class SignatureComponent extends Container implements ActionSource {
         return signatureImage;
     }
     
+    public static SignaturePanel createSignaturePanel(){
+        return new SignaturePanel();
+    }
+    
     /**
      * Inner class with the actual body of the dialog for drawing the signature.  This dialog
      * is shown when the user clicks on the main button.
@@ -323,7 +326,8 @@ public class SignatureComponent extends Container implements ActionSource {
 
             doneButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    if (signaturePanel.path.getPointsSize() < 2) {
+                    value = signaturePanel.getImage();
+                    if (value == null) {
                         Dialog.show(
                                 localize("SignatureComponent.ErrorDialog.SignatureRequired.Title", "Signature Required"), 
                                 localize("SignatureComponent.ErrorDialog.SignatureRequired.Body", "Please draw your signature in the space provided."), 
@@ -332,7 +336,6 @@ public class SignatureComponent extends Container implements ActionSource {
                         );
                         return;
                     }
-                    value = signaturePanel.getImage();
                     eventDispatcher.fireActionEvent(new ActionEvent(this));
 
                 }
@@ -404,166 +407,163 @@ public class SignatureComponent extends Container implements ActionSource {
             }
             return value;
         }
-
-        /**
-         * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
-         * it merely provides the functionality to record the drawing of a signature.
-         */
-        private class SignaturePanel extends Component {
-
-            private final GeneralPath path = new GeneralPath();
-            private final Stroke stroke = new Stroke();
-            private final Rectangle signatureRect = new Rectangle();
-            private final Font xFont;
-            private boolean initialized;
-            private Style signatureBoxStyle;
-            private Style signatureStyle;
-            
-            SignaturePanel() {
-                setUIID("SignaturePanel");
-                signatureBoxStyle = getUIManager().getComponentStyle("SignaturePanelBox");
-                signatureStyle = getUIManager().getComponentStyle("SignaturePanelSignature");
-                stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true)/2));
-                xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
-                
-            }
-
-            /**
-             * Overridden to try to make this component as sensitive as possible to 
-             * drag events.  If we don't do this, it requires a longer drag before the "drag" 
-             * events will kick in.
-             * @param x
-             * @param y
-             * @return 
-             */
-            @Override
-            protected int getDragRegionStatus(int x, int y) {
-                return Component.DRAG_REGION_LIKELY_DRAG_XY;
-            }
-            
-            /**
-             * 
-             * @param g 
-             */
-            @Override
-            public void paint(Graphics g) {
-                super.paint(g);
-                
-                g.setColor(signatureBoxStyle.getFgColor());
-                calcSignatureRect(signatureRect);
-                g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
-                g.drawString("X", signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);
-                g.pushClip();
-                g.clipRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
-                paintSignature(g);
-                g.popClip();
-            }
-            
-            /**
-             * Paints just the signature portion of the panel.  This is is reuised to
-             * also create the image of the signature.
-             * @param g 
-             */
-            private void paintSignature(Graphics g) {
-                g.setColor(signatureStyle.getFgColor());
-                boolean oldAA = g.isAntiAliased();
-                g.setAntiAliased(true);
-                g.drawShape(path, stroke);
-                g.setAntiAliased(oldAA);
-            }
-            
-            /**
-             * Calculates a rectangle (in parent component space) used for the drawn "rectangle" inside
-             * which the user should draw their signature.  It tries to create a 16x9 rectangle that
-             * fits inside the component with a bit of padding (3mm on each edge).
-             * @param r Output variable.
-             */
-            private void calcSignatureRect(Rectangle r) {
-                int w = getWidth() - Display.getInstance().convertToPixels(6, true);
-                int h = (int)(w * 9.0 / 16.0);
-                if (h > getHeight()) {
-                    h = getHeight() - Display.getInstance().convertToPixels(6, false);
-                    w = (int)(h * 16.0 / 9.0);
-                }
-                r.setX(getX() + (getWidth() - w) / 2);
-                r.setY(getY() + (getHeight() - h)/2);
-                r.setWidth(w);
-                r.setHeight(h);
-            }
-            
-            @Override
-            protected Dimension calcPreferredSize() {
-                Display d = Display.getInstance();
-                return new Dimension(d.convertToPixels(100, true), d.convertToPixels(60, false));
-            }
-            
-            @Override
-            public void pointerPressed(int x, int y) {
-                path.moveTo(x(x), y(y));
-                initialized = true;
-                
-                value = null;
-                repaint();
-            }
-
-            @Override
-            public void pointerDragged(int x, int y) {
-                if(!initialized) {
-                    initialized = true;
-                    path.moveTo(x(x), y(y));
-                } else {
-                    path.lineTo(x(x), y(y));
-                }
-                value = null;
-                repaint();
-            }
-
-            @Override
-            public void pointerReleased(int x, int y) {
-                path.lineTo(x(x), y(y));
-                value = null;
-                repaint();
-            }
-
-            /**
-             * Converts an x coordinate from screen space, to parent component space.
-             * @param x
-             * @return 
-             */
-            private int x(int x) {
-                return x - getParent().getAbsoluteX();
-            }
-
-            /**
-             * Converts a y coordinate from screen space to parent component space.
-             * @param y
-             * @return 
-             */
-            private int y(int y) {
-                return y - getParent().getAbsoluteY();
-            }
-
-            /**
-             * Gets the currently drawn signature as an image.  This only includes the 
-             * areas inside the {@link #signatureRect}
-             * @return 
-             */
-            private Image getImage() {
-                calcSignatureRect(signatureRect);
-                
-                Image img = Image.createImage(signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
-                Graphics g = img.getGraphics();
-                g.translate(-signatureRect.getX(), -signatureRect.getY());
-                paintSignature(g);
-                return img;
-            }
-
-            /**
-             * Resets the signature as a blank path.
-             */
-            private void clear() {
-                path.reset();
-            }
-        }
     }
+    
+    /**
+    * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
+    * it merely provides the functionality to record the drawing of a signature.
+    */
+   public static class SignaturePanel extends Component {
+
+       private final GeneralPath path = new GeneralPath();
+       private final Stroke stroke = new Stroke();
+       private final Rectangle signatureRect = new Rectangle();
+       private boolean initialized;
+       private Style signatureBoxStyle;
+       private Style signatureStyle;
+
+       SignaturePanel() {
+           setUIID("SignaturePanel");
+           signatureBoxStyle = getUIManager().getComponentStyle("SignaturePanelBox");
+           signatureStyle = getUIManager().getComponentStyle("SignaturePanelSignature");
+           stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true)/2));                
+       }
+
+       /**
+        * Overridden to try to make this component as sensitive as possible to 
+        * drag events.  If we don't do this, it requires a longer drag before the "drag" 
+        * events will kick in.
+        * @param x
+        * @param y
+        * @return 
+        */
+       @Override
+       protected int getDragRegionStatus(int x, int y) {
+           return Component.DRAG_REGION_LIKELY_DRAG_XY;
+       }
+
+       /**
+        * 
+        * @param g 
+        */
+       @Override
+       public void paint(Graphics g) {
+           super.paint(g);
+
+           g.setColor(signatureBoxStyle.getFgColor());
+           calcSignatureRect(signatureRect);
+           g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
+           g.drawString("X", signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);
+           g.pushClip();
+           g.clipRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
+           paintSignature(g);
+           g.popClip();
+       }
+
+       /**
+        * Paints just the signature portion of the panel.  This is is reuised to
+        * also create the image of the signature.
+        * @param g 
+        */
+       private void paintSignature(Graphics g) {
+           g.setColor(signatureStyle.getFgColor());
+           boolean oldAA = g.isAntiAliased();
+           g.setAntiAliased(true);
+           g.drawShape(path, stroke);
+           g.setAntiAliased(oldAA);
+       }
+
+       /**
+        * Calculates a rectangle (in parent component space) used for the drawn "rectangle" inside
+        * which the user should draw their signature.  It tries to create a 16x9 rectangle that
+        * fits inside the component with a bit of padding (3mm on each edge).
+        * @param r Output variable.
+        */
+       private void calcSignatureRect(Rectangle r) {
+           int w = getWidth() - Display.getInstance().convertToPixels(6, true);
+           int h = (int)(w * 9.0 / 16.0);
+           if (h > getHeight()) {
+               h = getHeight() - Display.getInstance().convertToPixels(6, false);
+               w = (int)(h * 16.0 / 9.0);
+           }
+           r.setX(getX() + (getWidth() - w) / 2);
+           r.setY(getY() + (getHeight() - h)/2);
+           r.setWidth(w);
+           r.setHeight(h);
+       }
+
+       @Override
+       protected Dimension calcPreferredSize() {
+           Display d = Display.getInstance();
+           return new Dimension(d.convertToPixels(50, true), d.convertToPixels(30, false));
+       }
+
+       @Override
+       public void pointerPressed(int x, int y) {
+           path.moveTo(x(x), y(y));
+           initialized = true;
+
+           repaint();
+       }
+
+       @Override
+       public void pointerDragged(int x, int y) {
+           if(!initialized) {
+               initialized = true;
+               path.moveTo(x(x), y(y));
+           } else {
+               path.lineTo(x(x), y(y));
+           }
+           repaint();
+       }
+
+       @Override
+       public void pointerReleased(int x, int y) {
+           path.lineTo(x(x), y(y));
+           repaint();
+       }
+
+       /**
+        * Converts an x coordinate from screen space, to parent component space.
+        * @param x
+        * @return 
+        */
+       private int x(int x) {
+           return x - getParent().getAbsoluteX();
+       }
+
+       /**
+        * Converts a y coordinate from screen space to parent component space.
+        * @param y
+        * @return 
+        */
+       private int y(int y) {
+           return y - getParent().getAbsoluteY();
+       }
+
+       /**
+        * Gets the currently drawn signature as an image.  This only includes the 
+        * areas inside the {@link #signatureRect}
+        * @return 
+        */
+       public Image getImage() {
+           if(path.getPointsSize() < 2){
+               return null;
+           }
+           calcSignatureRect(signatureRect);
+
+           Image img = Image.createImage(signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
+           Graphics g = img.getGraphics();
+           g.translate(-signatureRect.getX(), -signatureRect.getY());
+           paintSignature(g);
+           return img;
+       }
+
+       /**
+        * Resets the signature as a blank path.
+        */
+       public void clear() {
+           path.reset();
+       }
+   }
 }
