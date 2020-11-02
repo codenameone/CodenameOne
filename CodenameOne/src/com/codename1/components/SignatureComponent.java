@@ -297,10 +297,22 @@ public class SignatureComponent extends Container implements ActionSource {
         }
     }
     
+    /**
+     * Get the component that is the actual panel for drawing a signature.
+     * The component can be used instead the SignatureComponent if embedded signature needed.
+     * 
+     * Use the clearSignaturePanel() and the getSignatureImage() functions to work with this component.
+     * 
+     * @return 
+     */
     public Component getSignaturePanel(){
         return signaturePanel;
     }
     
+    /**
+     * Clear the signature image and allow to draw a new one.
+     * Use only if you use the signature panel component from the getSignaturePanel() method.
+     */
     public void clearSignaturePanel(){
         signaturePanel.clear();
     }
