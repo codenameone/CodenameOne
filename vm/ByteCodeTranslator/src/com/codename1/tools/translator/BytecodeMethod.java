@@ -465,7 +465,7 @@ public class BytecodeMethod implements SignatureSet {
         b.append(prefix);
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -688,7 +688,7 @@ public class BytecodeMethod implements SignatureSet {
         }
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -721,7 +721,7 @@ public class BytecodeMethod implements SignatureSet {
         } 
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -783,7 +783,7 @@ public class BytecodeMethod implements SignatureSet {
         StringBuilder bld = new StringBuilder();
         bld.append(cls);
         bld.append("_");
-        bld.append(methodName);
+        bld.append(getCMethodName());
         bld.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(bld);
@@ -837,7 +837,7 @@ public class BytecodeMethod implements SignatureSet {
         StringBuilder bld = new StringBuilder();
         bld.append(cls);
         bld.append("_");
-        bld.append(methodName);
+        bld.append(getCMethodName());
         bld.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(bld);
@@ -860,7 +860,7 @@ public class BytecodeMethod implements SignatureSet {
     public void appendFunctionPointer(StringBuilder b, String className) {
         b.append(className);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -1076,6 +1076,14 @@ public class BytecodeMethod implements SignatureSet {
         return constructor && arguments.size() == 0;
     }
 
+    private String cMethodName;
+    public String getCMethodName() {
+        if (cMethodName == null) {
+            cMethodName = methodName.replace('-','_');
+        }
+        return cMethodName;
+    }
+    
     /**
      * @return the clsName
      */

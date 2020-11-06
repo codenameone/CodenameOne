@@ -79,6 +79,14 @@ public class Invoke extends Instruction {
         return desc + "." + name;
     }
     
+    private String cMethodName;
+    private String getCMethodName() {
+        if (cMethodName == null) {
+            cMethodName = name.replace('-', '_');
+        }
+        return cMethodName;
+    }
+    
     @Override
     public void addDependencies(List<String> dependencyList) {
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -99,7 +107,7 @@ public class Invoke extends Instruction {
             if(name.equals("<clinit>")) {
                 bld.append("__CLINIT__");
             } else {
-                bld.append(name);
+                bld.append(getCMethodName());
             }
         }
         bld.append("__");
@@ -157,7 +165,7 @@ public class Invoke extends Instruction {
             if(name.equals("<clinit>")) {
                 bld.append("__CLINIT__");
             } else {
-                bld.append(name);
+                bld.append(getCMethodName());
             }
         }
         bld.append("__");

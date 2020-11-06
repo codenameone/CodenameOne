@@ -57,6 +57,14 @@ public class CustomInvoke extends Instruction {
         this.itf = itf;
     }
     
+    private String cMethodName;
+    private String getCMethodName() {
+        if (cMethodName == null) {
+            cMethodName = name.replace('-', '_');
+        }
+        return cMethodName;
+    }
+    
     public void setTargetObjectLiteral(String lit) {
         this.targetObjectLiteral = lit;
         
@@ -100,7 +108,7 @@ public class CustomInvoke extends Instruction {
             if(name.equals("<clinit>")) {
                 bld.append("__CLINIT__");
             } else {
-                bld.append(name);
+                bld.append(getCMethodName());
             }
         }
         bld.append("__");
@@ -169,7 +177,7 @@ public class CustomInvoke extends Instruction {
             if(name.equals("<clinit>")) {
                 bld.append("__CLINIT__");
             } else {
-                bld.append(name);
+                bld.append(getCMethodName());
             }
         }
         bld.append("__");
@@ -262,7 +270,7 @@ public class CustomInvoke extends Instruction {
             if(name.equals("<clinit>")) {
                 bld.append("__CLINIT__");
             } else {
-                bld.append(name);
+                bld.append(getCMethodName());
             }
         }
         bld.append("__");

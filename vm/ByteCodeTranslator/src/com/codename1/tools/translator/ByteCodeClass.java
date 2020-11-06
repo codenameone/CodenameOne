@@ -1226,13 +1226,13 @@ public class ByteCodeClass {
                 b.append("#define virtual_");
                 b.append(m.getClsName());
                 b.append("_");
-                b.append(m.getMethodName());
+                b.append(m.getCMethodName());
                 b.append("__");
                 m.appendArgumentTypes(b);
                 b.append(" ");
                 b.append(m.getClsName());
                 b.append("_");
-                b.append(m.getMethodName());
+                b.append(m.getCMethodName());
                 b.append("__");
                 m.appendArgumentTypes(b);
                 b.append("\n");
