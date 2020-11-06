@@ -596,7 +596,7 @@ public class SplitPane extends Container {
      * @return 
      */
     public Component getTopOrLeftComponent() {
-        for (Component c : bottomOrRight) {
+        for (Component c : topOrLeft) {
             return c;
         }
         return null;
