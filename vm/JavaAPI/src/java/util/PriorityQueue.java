@@ -322,7 +322,7 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
     @SuppressWarnings("unchecked")
     private <T> T[] newArray(T[] array) {
         if (size > array.length) {
-            return null;
+            array = (T[])java.lang.reflect.Array.newInstance(array.getClass().getComponentType(), size);
         }
         System.arraycopy(elements, 0, array, 0, size);
         if (size < array.length) {
