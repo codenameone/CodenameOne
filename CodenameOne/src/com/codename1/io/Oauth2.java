@@ -232,8 +232,6 @@ public class Oauth2 {
      *
      * @param al a listener that will receive at its source either a token for
      * the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to
-     * perform the authentication
      */
     public void showAuthentication(final ActionListener al) {
         
@@ -278,6 +276,7 @@ public class Oauth2 {
         }
         authenticationForm.setLayout(new BorderLayout());
         authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
+        authenticationForm.show();
     }
 
     private String buildURL() {
