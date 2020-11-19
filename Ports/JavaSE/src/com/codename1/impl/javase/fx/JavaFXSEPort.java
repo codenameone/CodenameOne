@@ -12,6 +12,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import static com.codename1.impl.javase.JavaSEPort.checkForPermission;
 import static com.codename1.impl.javase.JavaSEPort.retinaScale;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.media.AbstractMedia;
 import com.codename1.media.AsyncMedia;
 import com.codename1.media.Media;
@@ -1114,21 +1115,15 @@ public class JavaFXSEPort extends JavaSEPort {
                 
             }
         });
-        if (bc[0] == null && err[0] == null) {
+        while (bc[0] == null && err[0] == null) {
+
             Display.getInstance().invokeAndBlock(new Runnable() {
 
-            @Override
-            public void run() {
-                synchronized (bc) {
-                    while (bc[0] == null && err[0] == null) {
-                        try {
-                            bc.wait(20);
-                        } catch (InterruptedException ex) {
-                        }
-                    }
+                @Override
+                public void run() {
+                    Util.wait(bc, 20);
                 }
-            }
-        });
+            });
         }
         
         return bc[0];

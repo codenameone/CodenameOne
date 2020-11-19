@@ -916,7 +916,7 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements
     public <T> T[] toArray(T[] contents) {
         int index = 0;
         if (size > contents.length) {
-            throw new RuntimeException("Collection.toArray(T[]) requires an array of the same size as the collection to be passed as a parameter. ");
+            contents = (T[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), size);
         }
         Link<E> link = voidLink.next;
         while (link != voidLink) {
