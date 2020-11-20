@@ -653,18 +653,16 @@ public class ResourcesMutator {
             web.setURL("http://localhost:"+webServer.getPort()+"/index.html");
             
         });
-        CN.invokeAndBlock(new Runnable() {
-            public void run() {
-                long startTime = System.currentTimeMillis();
-                while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
-                    synchronized(screenshotsLock) {
-                        try {
-                            screenshotsLock.wait(timeout);
-                        } catch (Exception ex){}
-                    }
+        long startTime = System.currentTimeMillis();
+        while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
+            CN.invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.wait(screenshotsLock, 50);
                 }
-            }
-        });
+            });
+            
+        }
+        
         
         if (!screenshotsComplete) {
             throw new RuntimeException("Failed to create screenshots for HTML "+html+".  Timeout reached.  Likely there was a problem initializing the browser component.");
