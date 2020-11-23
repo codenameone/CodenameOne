@@ -22,6 +22,9 @@
  */
 
 package java.lang;
+
+import java.util.Arrays;
+
 /**
  * The Character class wraps a value of the primitive type char in an object. An object of type Character contains a single field whose type is char.
  * In addition, this class provides several methods for determining the type of a character and converting characters from uppercase to lowercase and vice versa.
@@ -52,6 +55,160 @@ public final class Character implements Comparable<Character>{
      * Since: JDK1.0.2 See Also:Constant Field Values
      */
     public static final char MIN_VALUE=(char)0;
+    
+    
+    /**
+     * <p>
+     * Minimum value of a high surrogate or leading surrogate unit in UTF-16
+     * encoding - <code>'\uD800'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MIN_HIGH_SURROGATE = '\uD800';
+
+    /**
+     * <p>
+     * Maximum value of a high surrogate or leading surrogate unit in UTF-16
+     * encoding - <code>'\uDBFF'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MAX_HIGH_SURROGATE = '\uDBFF';
+
+    /**
+     * <p>
+     * Minimum value of a low surrogate or trailing surrogate unit in UTF-16
+     * encoding - <code>'\uDC00'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MIN_LOW_SURROGATE = '\uDC00';
+
+    /**
+     * Maximum value of a low surrogate or trailing surrogate unit in UTF-16
+     * encoding - <code>'\uDFFF'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MAX_LOW_SURROGATE = '\uDFFF';
+
+    /**
+     * <p>
+     * Minimum value of a surrogate unit in UTF-16 encoding - <code>'\uD800'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MIN_SURROGATE = '\uD800';
+
+    /**
+     * <p>
+     * Maximum value of a surrogate unit in UTF-16 encoding - <code>'\uDFFF'</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final char MAX_SURROGATE = '\uDFFF';
+
+    /**
+     * <p>
+     * Minimum value of a supplementary code point - <code>U+010000</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final int MIN_SUPPLEMENTARY_CODE_POINT = 0x10000;
+
+    /**
+     * <p>
+     * Minimum code point value - <code>U+0000</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final int MIN_CODE_POINT = 0x000000;
+
+    /**
+     * <p>
+     * Maximum code point value - <code>U+10FFFF</code>.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final int MAX_CODE_POINT = 0x10FFFF;
+
+    /**
+     * <p>
+     * Constant for the number of bits to represent a <code>char</code> in
+     * two's compliment form.
+     * </p>
+     * 
+     * @since 1.5
+     */
+    public static final int SIZE = 16;
+    
+    //public static final int MIN_RADIX = 2;
+    //public static final int MAX_RADIX = 36;
+    //public static final char MIN_VALUE = '\0';
+    //public static final char MAX_VALUE = '\uFFFF';
+    public static final Class<Character> TYPE = char.class;
+    public static final byte UNASSIGNED = 0;
+    public static final byte UPPERCASE_LETTER = 1;
+    public static final byte LOWERCASE_LETTER = 2;
+    public static final byte TITLECASE_LETTER = 3;
+    public static final byte MODIFIER_LETTER = 4;
+    public static final byte OTHER_LETTER = 5;
+    public static final byte NON_SPACING_MARK = 6;
+    public static final byte ENCLOSING_MARK = 7;
+    public static final byte COMBINING_SPACING_MARK = 8;
+    public static final byte DECIMAL_DIGIT_NUMBER = 9;
+    public static final byte LETTER_NUMBER = 10;
+    public static final byte OTHER_NUMBER = 11;
+    public static final byte SPACE_SEPARATOR = 12;
+    public static final byte LINE_SEPARATOR = 13;
+    public static final byte PARAGRAPH_SEPARATOR = 14;
+    public static final byte CONTROL = 15;
+    public static final byte FORMAT = 16;
+    public static final byte PRIVATE_USE = 17;
+    public static final byte SURROGATE = 19;
+    public static final byte DASH_PUNCTUATION = 20;
+    public static final byte START_PUNCTUATION = 21;
+    public static final byte END_PUNCTUATION = 22;
+    public static final byte CONNECTOR_PUNCTUATION = 23;
+    public static final byte OTHER_PUNCTUATION = 24;
+    public static final byte MATH_SYMBOL = 25;
+    public static final byte CURRENCY_SYMBOL = 26;
+    public static final byte MODIFIER_SYMBOL = 27;
+    public static final byte OTHER_SYMBOL = 28;
+    public static final byte INITIAL_QUOTE_PUNCTUATION = 29;
+    public static final byte FINAL_QUOTE_PUNCTUATION = 30;
+    public static final byte DIRECTIONALITY_UNDEFINED = -1;
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT = 0;
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT = 1;
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC = 2;
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER = 3;
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER_SEPARATOR = 4;
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER_TERMINATOR = 5;
+    public static final byte DIRECTIONALITY_ARABIC_NUMBER = 6;
+    public static final byte DIRECTIONALITY_COMMON_NUMBER_SEPARATOR = 7;
+    public static final byte DIRECTIONALITY_NONSPACING_MARK = 8;
+    public static final byte DIRECTIONALITY_BOUNDARY_NEUTRAL = 9;
+    public static final byte DIRECTIONALITY_PARAGRAPH_SEPARATOR = 10;
+    public static final byte DIRECTIONALITY_SEGMENT_SEPARATOR = 11;
+    public static final byte DIRECTIONALITY_WHITESPACE = 12;
+    public static final byte DIRECTIONALITY_OTHER_NEUTRALS = 13;
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT_EMBEDDING = 14;
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE = 15;
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING = 16;
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE = 17;
+    public static final byte DIRECTIONALITY_POP_DIRECTIONAL_FORMAT = 18;
+
+    
+    
 
     private char value;
     
@@ -124,6 +281,98 @@ public final class Character implements Comparable<Character>{
     public int hashCode(){
         return value; 
     }
+    
+    public static boolean isLetterOrDigit(char ch) {
+        return isLetterOrDigit((int) ch);
+    }
+
+    public static boolean isLetterOrDigit(int codePoint) {
+        switch (getType(codePoint)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case DECIMAL_DIGIT_NUMBER:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    public static boolean isLetter(char ch) {
+        return isLetter((int) ch);
+    }
+
+    public static boolean isLetter(int codePoint) {
+        switch (getType(codePoint)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    public static boolean isJavaIdentifierStart(char ch) {
+        return isJavaIdentifierStart((int) ch);
+    }
+
+    public static boolean isJavaIdentifierStart(int codePoint) {
+        switch (getType(codePoint)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case LETTER_NUMBER:
+            case CONNECTOR_PUNCTUATION:
+            case CURRENCY_SYMBOL:
+                return true;
+            default:
+                return isIdentifierIgnorable(codePoint);
+        }
+    }
+    
+    public static boolean isJavaIdentifierPart(char ch) {
+        return isJavaIdentifierPart((int) ch);
+    }
+
+    public static boolean isJavaIdentifierPart(int codePoint) {
+        switch (getType(codePoint)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case LETTER_NUMBER:
+            case DECIMAL_DIGIT_NUMBER:
+            case COMBINING_SPACING_MARK:
+            case NON_SPACING_MARK:
+            case CONNECTOR_PUNCTUATION:
+            case CURRENCY_SYMBOL:
+                return true;
+            default:
+                return isIdentifierIgnorable(codePoint);
+        }
+    }
+
+    
+    public static boolean isIdentifierIgnorable(char ch) {
+        return isIdentifierIgnorable((int) ch);
+    }
+
+    public static boolean isIdentifierIgnorable(int codePoint) {
+        if (codePoint >= 0x00 && codePoint <= 0x08 || codePoint >= 0x0E && codePoint <= 0x1B
+                || codePoint >= 0x7F && codePoint <= 0x9F) {
+            return true;
+        }
+        return getType(codePoint) == FORMAT;
+    }
+    
 
     /**
      * Determines if the specified character is a digit.
@@ -268,99 +517,6 @@ public final class Character implements Comparable<Character>{
     }
 
 
-    /**
-     * <p>
-     * Minimum value of a high surrogate or leading surrogate unit in UTF-16
-     * encoding - <code>'\uD800'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MIN_HIGH_SURROGATE = '\uD800';
-
-    /**
-     * <p>
-     * Maximum value of a high surrogate or leading surrogate unit in UTF-16
-     * encoding - <code>'\uDBFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MAX_HIGH_SURROGATE = '\uDBFF';
-
-    /**
-     * <p>
-     * Minimum value of a low surrogate or trailing surrogate unit in UTF-16
-     * encoding - <code>'\uDC00'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MIN_LOW_SURROGATE = '\uDC00';
-
-    /**
-     * Maximum value of a low surrogate or trailing surrogate unit in UTF-16
-     * encoding - <code>'\uDFFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MAX_LOW_SURROGATE = '\uDFFF';
-
-    /**
-     * <p>
-     * Minimum value of a surrogate unit in UTF-16 encoding - <code>'\uD800'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MIN_SURROGATE = '\uD800';
-
-    /**
-     * <p>
-     * Maximum value of a surrogate unit in UTF-16 encoding - <code>'\uDFFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final char MAX_SURROGATE = '\uDFFF';
-
-    /**
-     * <p>
-     * Minimum value of a supplementary code point - <code>U+010000</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final int MIN_SUPPLEMENTARY_CODE_POINT = 0x10000;
-
-    /**
-     * <p>
-     * Minimum code point value - <code>U+0000</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final int MIN_CODE_POINT = 0x000000;
-
-    /**
-     * <p>
-     * Maximum code point value - <code>U+10FFFF</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final int MAX_CODE_POINT = 0x10FFFF;
-
-    /**
-     * <p>
-     * Constant for the number of bits to represent a <code>char</code> in
-     * two's compliment form.
-     * </p>
-     * 
-     * @since 1.5
-     */
-    public static final int SIZE = 16;
 
     /**
      * <p>
@@ -1082,8 +1238,42 @@ public final class Character implements Comparable<Character>{
         throw new UnsupportedOperationException("Character.getDirectionality() not supported on this platform");
     }
     
-    public static int getType(char ch) {
-        throw new UnsupportedOperationException("Character.getType() not supported on this platform");
+    public static int getType(char c) {
+        return getType((int) c);
+    }
+
+    public static boolean isBmpCodePoint(int codePoint) {
+        return codePoint > 0 && codePoint <= MAX_VALUE;
+    }
+    
+    public static boolean isSurrogate(char ch) {
+        return isHighSurrogate(ch) || isLowSurrogate(ch);
+    }
+    
+    private static UnicodeHelper.Range[] classMapping;
+    private static UnicodeHelper.Range[] getClasses() {
+       throw new UnsupportedOperationException("UnicodeHelper.getClasses() not supported");
+    }
+    
+    public static int getType(int codePoint) {
+        if (isBmpCodePoint(codePoint) && isSurrogate((char) codePoint)) {
+            return SURROGATE;
+        }
+        UnicodeHelper.Range[] classes = getClasses();
+        int l = 0;
+        int u = classes.length - 1;
+        while (l <= u) {
+            int i = (l + u) / 2;
+            UnicodeHelper.Range range = classes[i];
+            if (codePoint >= range.end) {
+                l = i + 1;
+            } else if (codePoint < range.start) {
+                u = i - 1;
+            } else {
+                return range.data[codePoint - range.start];
+            }
+        }
+        return 0;
     }
     
     /**
@@ -1126,4 +1316,318 @@ public final class Character implements Comparable<Character>{
         return toString().compareTo(String.valueOf(another.value));
     }
     
+    
+    
+}
+
+
+class UnicodeHelper {
+    private UnicodeHelper() {
+    }
+
+    static char hexDigit(int value) {
+        return value < 10 ? (char) ('0' + value) : (char) ('A' + value);
+    }
+
+    static int valueOfHexDigit(char digit) {
+        return digit <= '9' ? digit - '0' : digit - 'A' + 10;
+    }
+
+    public static class Range {
+        public final int start;
+        public final int end;
+        public final byte[] data;
+
+        public Range(int start, int end, byte[] data) {
+            this.start = start;
+            this.end = end;
+            this.data = data;
+        }
+    }
+
+    public static String encodeIntPairsDiff(int[] data) {
+        StringBuilder sb = new StringBuilder();
+        Base46.encodeUnsigned(sb, data.length / 2);
+        int lastKey = 0;
+        int lastValue = 0;
+        for (int i = 0; i < data.length; i += 2) {
+            int key = data[i];
+            int value = data[i + 1];
+            Base46.encode(sb, key - lastKey);
+            Base46.encode(sb, value - lastValue);
+            lastKey = key;
+            lastValue = value;
+        }
+        return sb.toString();
+    }
+
+    public static int[] decodeIntPairsDiff(String text) {
+        CharFlow flow = new CharFlow(text.toCharArray());
+        int sz = Base46.decodeUnsigned(flow);
+        int[] data = new int[sz * 2];
+        int j = 0;
+        int lastKey = 0;
+        int lastValue = 0;
+        for (int i = 0; i < sz; i++) {
+            lastKey += Base46.decode(flow);
+            lastValue += Base46.decode(flow);
+            data[j++] = lastKey;
+            data[j++] = lastValue;
+        }
+        return data;
+    }
+
+    public static String encodeIntDiff(int[] data) {
+        StringBuilder sb = new StringBuilder();
+        Base46.encodeUnsigned(sb, data.length);
+        int last = 0;
+        for (int i = 0; i < data.length; i++) {
+            int v = data[i];
+            Base46.encode(sb, v - last);
+            last = v;
+        }
+        return sb.toString();
+    }
+
+    public static int[] decodeIntDiff(String text) {
+        CharFlow flow = new CharFlow(text.toCharArray());
+        int sz = Base46.decodeUnsigned(flow);
+        int[] data = new int[sz];
+        int last = 0;
+        for (int i = 0; i < sz; i++) {
+            last += Base46.decode(flow);
+            data[i] = last;
+        }
+        return data;
+    }
+
+    public static char encodeByte(byte b) {
+        if (b < '\"' - ' ') {
+            return (char) (b + ' ');
+        } else if (b < '\\' - ' ' - 1) {
+            return (char) (b + ' ' + 1);
+        } else {
+            return (char) (b + ' ' + 2);
+        }
+    }
+
+    public static byte decodeByte(char c) {
+        if (c > '\\') {
+            return (byte) (c - ' ' - 2);
+        } else if (c > '"') {
+            return (byte) (c - ' ' - 1);
+        } else {
+            return (byte) (c - ' ');
+        }
+    }
+
+    public static String compressRle(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bytes.length;) {
+            byte b = bytes[i];
+            if (i < bytes.length - 1 && b == bytes[i + 1]) {
+                int count = 0;
+                while (count < 16384 && bytes[i + count] == b) {
+                    ++count;
+                }
+                i += count;
+                if (count < 80) {
+                    sb.append(UnicodeHelper.encodeByte((byte) (b + 32)));
+                    sb.append(UnicodeHelper.encodeByte((byte) count));
+                } else {
+                    sb.append(UnicodeHelper.encodeByte((byte) 64));
+                    sb.append(UnicodeHelper.encodeByte(b));
+                    for (int j = 0; j < 3; ++j) {
+                        sb.append(UnicodeHelper.encodeByte((byte) (count & 0x3F)));
+                        count /= 0x40;
+                    }
+                }
+            } else {
+                sb.append(UnicodeHelper.encodeByte(bytes[i++]));
+            }
+        }
+        return sb.toString();
+    }
+
+    public static Range[] extractRle(String encoded) {
+        Range[] ranges = new Range[16384];
+        byte[] buffer = new byte[16384];
+        int index = 0;
+        int rangeIndex = 0;
+        int codePoint = 0;
+        for (int i = 0; i < encoded.length(); ++i) {
+            byte b = decodeByte(encoded.charAt(i));
+            int count;
+            if (b == 64) {
+                b = decodeByte(encoded.charAt(++i));
+                count = 0;
+                int pos = 1;
+                for (int j = 0; j < 3; ++j) {
+                    byte digit = decodeByte(encoded.charAt(++i));
+                    count |= pos * digit;
+                    pos *= 0x40;
+                }
+            } else if (b >= 32) {
+                b -= 32;
+                count = decodeByte(encoded.charAt(++i));
+            } else {
+                count = 1;
+            }
+            if (b != 0 || count < 128) {
+                if (index + count >= buffer.length) {
+                    ranges[rangeIndex++] = new Range(codePoint, codePoint + index, Arrays.copyOf(buffer, index));
+                    codePoint += index + count;
+                    index = 0;
+                }
+                while (count-- > 0) {
+                    buffer[index++] = b;
+                }
+            } else {
+                if (index > 0) {
+                    ranges[rangeIndex++] = new Range(codePoint, codePoint + index, Arrays.copyOf(buffer, index));
+                }
+                codePoint += index + count;
+                index = 0;
+            }
+        }
+        return Arrays.copyOf(ranges, rangeIndex);
+    }
+    
+    
+}
+
+/*
+ *  Copyright 2015 Alexey Andreev.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+class CharFlow {
+    public final char[] characters;
+    public int pointer;
+
+    public CharFlow(char[] characters) {
+        this.characters = characters;
+    }
+}
+
+/**
+ * <p>Base47 encoding is best fit for encoding varible length numbers in JavaScript strings.</p>
+ *
+ * <p>47 = (int)(93 / 2), where 94 is the number of ASCII characters representable in JavaScript string
+ * without escaping. These characters are encoded by one byte in UTF-8 charset. All other character require
+ * either escaping or two or more bytes in UTF-8.</p>
+ *
+ * <p>We divide 93 by 2 for the following trick. Representing integers takes 5 bytes in Base93. However,
+ * we often need smaller integers that might be represented by one or two bytes. By each Base93 digit we
+ * can encode both part of the number and a flag indicating whether the number contains one more digit.</p>
+ *
+ * @author Alexey Andreev
+ */
+final class Base46 {
+    private Base46() {
+    }
+
+    public static void encodeUnsigned(StringBuilder sb, int number) {
+        boolean hasMore;
+        do {
+            int digit = number % 46;
+            number /= 46;
+            hasMore = number > 0;
+            digit = digit * 2 + (hasMore ? 1 : 0);
+            sb.append(encodeDigit(digit));
+        } while (hasMore);
+    }
+
+    public static void encode(StringBuilder sb, int number) {
+        encodeUnsigned(sb, Math.abs(number) * 2 + (number >= 0 ? 0 : 1));
+    }
+
+    public static void encodeUnsigned(StringBuilder sb, long number) {
+        boolean hasMore;
+        do {
+            int digit = (int) (number % 46);
+            number /= 46;
+            hasMore = number > 0;
+            digit = digit * 2 + (hasMore ? 1 : 0);
+            sb.append(encodeDigit(digit));
+        } while (hasMore);
+    }
+
+    public static void encode(StringBuilder sb, long number) {
+        encodeUnsigned(sb, Math.abs(number) * 2 + (number >= 0 ? 0 : 1));
+    }
+
+    public static int decodeUnsigned(CharFlow seq) {
+        int number = 0;
+        int pos = 1;
+        boolean hasMore;
+        do {
+            int digit = decodeDigit(seq.characters[seq.pointer++]);
+            hasMore = digit % 2 == 1;
+            number += pos * (digit / 2);
+            pos *= 46;
+        } while (hasMore);
+        return number;
+    }
+
+    public static int decode(CharFlow seq) {
+        int number = decodeUnsigned(seq);
+        int result = number / 2;
+        if (number % 2 != 0) {
+            result = -result;
+        }
+        return result;
+    }
+
+    public static long decodeUnsignedLong(CharFlow seq) {
+        long number = 0;
+        long pos = 1;
+        boolean hasMore;
+        do {
+            int digit = decodeDigit(seq.characters[seq.pointer++]);
+            hasMore = digit % 2 == 1;
+            number += pos * (digit / 2);
+            pos *= 46;
+        } while (hasMore);
+        return number;
+    }
+
+    public static long decodeLong(CharFlow seq) {
+        long number = decodeUnsigned(seq);
+        long result = number / 2;
+        if (number % 2 != 0) {
+            result = -result;
+        }
+        return result;
+    }
+
+    public static char encodeDigit(int digit) {
+        if (digit < 2) {
+            return (char) (digit + ' ');
+        } else if (digit < 59) {
+            return (char) (digit + 1 + ' ');
+        } else {
+            return (char) (digit + 2 + ' ');
+        }
+    }
+
+    public static int decodeDigit(char c) {
+        if (c < '"') {
+            return c - ' ';
+        } else if (c < '\\') {
+            return c - ' ' - 1;
+        } else {
+            return c - ' ' - 2;
+        }
+    }
 }
