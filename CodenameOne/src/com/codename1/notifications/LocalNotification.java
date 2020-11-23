@@ -103,6 +103,7 @@ public class LocalNotification {
     private String alertTitle = "";
     private String alertSound = "";
     private String alertImage = "";
+    private boolean foreground;
     
     /**
      * Creates a new local notification
@@ -228,6 +229,26 @@ public class LocalNotification {
      */ 
     public void setAlertImage(String image) {
         this.alertImage = image;
+    }
+    
+    /**
+     * Set whether this notification should be displayed in the device's notification center even when the app is 
+     * in the foreground.
+     * @param foreground True to display this notification in the notification center even when the app is in the foreground.
+     * @since 7.0
+     */
+    public void setForeground(boolean foreground) {
+        this.foreground = foreground;
+    }
+    
+    /**
+     * Checks whether this notification will be displayed in the device's notification center even when the app is in the foreground.
+     * @return True if the notification will display in the device's notification center even when the app is in the foreground.
+     * @since 7.0 
+    * 
+     */
+    public boolean isForeground() {
+        return foreground;
     }
     
 }

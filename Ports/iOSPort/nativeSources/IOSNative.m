@@ -99,9 +99,9 @@
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
 extern int popoverSupported();
-
+//#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
-#ifdef INCLUDE_CN1_PUSH2
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
 #endif
 
@@ -8972,82 +8972,153 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
 #endif
 
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int( CN1_THREAD_STATE_MULTI_ARG
-    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType
+JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int_boolean( CN1_THREAD_STATE_MULTI_ARG
+    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
-    
-    UILocalNotification *notification = [[UILocalNotification alloc] init];
-    NSString * msg = [NSString string];
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+    NSString * title = [NSString string];
+    NSString * body = [NSString string];
     NSString *tmpStr;
     if (alertTitle != NULL) {
-        tmpStr = [msg stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
-        
+        tmpStr = [title stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
+                    
 #ifndef CN1_USE_ARC
-        [msg release];
+        [title release];
 #endif
-        msg = tmpStr;
+        title = tmpStr;
     }
+    
     if (alertBody != NULL) {
-        
-        tmpStr = [msg stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
+                    
+        tmpStr = [body stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
 #ifndef CN1_USE_ARC
-        [msg release];
+        [body release];
 #endif
-        msg = tmpStr;
+        body = tmpStr;
     }
-    tmpStr = [msg stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
+    tmpStr = [body stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
 #ifndef CN1_USE_ARC
-    [msg release];
+    [body release];
 #endif
-    msg = tmpStr;
-    notification.alertBody = msg;
-
-    notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
-    notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
-    notification.timeZone = [NSTimeZone defaultTimeZone];
-    if (badgeNumber >= 0) {
-        notification.applicationIconBadgeNumber = badgeNumber;
-    }
-    switch (repeatType) {
-        case 0:
-            notification.repeatInterval = nil;
-            break;
-        case 1:
-            notification.repeatInterval = NSMinuteCalendarUnit;
-            break;
-        case 3:
-            notification.repeatInterval = NSHourCalendarUnit;
-            break;
-        case 4:
-            notification.repeatInterval = NSDayCalendarUnit;
-            break;
-        case 5:
-            notification.repeatInterval = NSWeekCalendarUnit;
-            break;
-        default:
-            CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
-            notification.repeatInterval = nil;
-    }
+    body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
     [dict setObject: toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) forKey: @"__ios_id__"];
+    if (foreground) {
+        [dict setObject: @"true" forKey: @"foreground"];
+    }
     
-    notification.userInfo = dict;
-    
-    
-    dispatch_sync(dispatch_get_main_queue(), ^{
-#ifdef __IPHONE_8_0
-        if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
-            [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
-            //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
-            //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
-            //                                           UIUserNotificationTypeSound categories:nil]];
+    if (NO && @available(iOS 10, *)) {
+        // November 23, 2020 - Steve
+        // Disabling this block, which uses the new UNUserNotifications API for sending local notifications,
+        // and opting to continue to use the old UILocalNotifications API for now.  This is because
+        // the new API doesn't have an option to use a different repeat interval than the firstFire
+        // interval, and the UNUserNotifications API can still be used to receive the notification
+        // in the application delegate class fine.
+        // Eventually we'll probably want to switch to the new API, but for now, it is just too much work
+        // to try to replicate the functionality lost by the new API.
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            
+            UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+            
+            content.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
+            content.body = [NSString localizedUserNotificationStringForKey:body
+                    arguments:nil];
+            if (alertSound) {
+                content.sound = [UNNotificationSound soundNamed:toNSString(CN1_THREAD_STATE_PASS_ARG alertSound)];
+                
+            }
+            if (badgeNumber >= 0) {
+                
+                content.badge = [NSNumber numberWithInt:badgeNumber];
+            }
+            content.userInfo = dict;
+                                           
+            
+            
+           
+            UNTimeIntervalNotificationTrigger *trigger = [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:fireDate/1000 - [[NSDate date] timeIntervalSince1970] + 1 repeats:NO];
+            
+            // Create the request object.
+            UNNotificationRequest* request = [UNNotificationRequest
+                   requestWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) content:content trigger:trigger];
+           
+           
+             
+            UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+            UNAuthorizationOptions authOptions;
+            if (@available(iOS 12.0, *)) {
+              authOptions = UNAuthorizationOptionProvisional | UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+
+            } else {
+              authOptions = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+
+            }
+            [center requestAuthorizationWithOptions:authOptions
+            completionHandler:^(BOOL granted, NSError * _Nullable error) {
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                   if (error != nil) {
+                       NSLog(@"%@", error.localizedDescription);
+                   }
+                }];
+            }];
+            
+        });
+        
+        
+        return;
+    } else {
+        UILocalNotification *notification = [[UILocalNotification alloc] init];
+        notification.alertTitle = title;
+        notification.alertBody = body;
+
+        notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
+        notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
+        notification.timeZone = [NSTimeZone defaultTimeZone];
+        if (badgeNumber >= 0) {
+            notification.applicationIconBadgeNumber = badgeNumber;
         }
+        switch (repeatType) {
+            case 0:
+                notification.repeatInterval = nil;
+                break;
+            case 1:
+                notification.repeatInterval = NSMinuteCalendarUnit;
+                break;
+            case 3:
+                notification.repeatInterval = NSHourCalendarUnit;
+                break;
+            case 4:
+                notification.repeatInterval = NSDayCalendarUnit;
+                break;
+            case 5:
+                notification.repeatInterval = NSWeekCalendarUnit;
+                break;
+            default:
+                CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
+                notification.repeatInterval = nil;
+        }
+            
+        
+        
+        notification.userInfo = dict;
+        
+            
+            dispatch_sync(dispatch_get_main_queue(), ^{
+#ifdef __IPHONE_8_0
+                if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
+                    [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
+                    //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
+                    //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
+                    //                                           UIUserNotificationTypeSound categories:nil]];
+                }
 #endif
-        
-        [[UIApplication sharedApplication] scheduleLocalNotification: notification];
-        
-    });
+                
+                [[UIApplication sharedApplication] scheduleLocalNotification: notification];
+                
+            });
+    }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {

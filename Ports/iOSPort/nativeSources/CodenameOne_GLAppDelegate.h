@@ -21,15 +21,15 @@
  * need additional information or have any questions.
  */
 #import <UIKit/UIKit.h>
-#define INCLUDE_CN1_PUSH3
-#ifdef INCLUDE_CN1_PUSH3
+//#define CN1_INCLUDE_NOTIFICATIONS
+#ifdef CN1_INCLUDE_NOTIFICATIONS
 #import <UserNotifications/UserNotifications.h>
 #endif
 
 @class CodenameOne_GLViewController;
 
 @interface CodenameOne_GLAppDelegate : NSObject <UIApplicationDelegate
-#ifdef INCLUDE_CN1_PUSH3
+#ifdef CN1_INCLUDE_NOTIFICATIONS
 ,UNUserNotificationCenterDelegate
 #endif
 > {

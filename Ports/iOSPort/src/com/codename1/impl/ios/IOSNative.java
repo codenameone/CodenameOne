@@ -589,7 +589,7 @@ public final class IOSNative {
 
     public native void inviteFriends(String appLinkUrl, String previewImageUrl);
     
-    native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType);
+    native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground);
 
     native void cancelLocalNotification(String id);
 
