@@ -25,7 +25,7 @@ jobs:
     - name: Fetch JavaDoc Source Embed
       uses: carlosperate/download-file-action@v1.0.3
       with:
-        file-url: ${{ secrets.JAVADOC_SOURCE_EMBED_URL }}
+        file-url: https://github.com/codenameone/JavaDocSourceEmbed/releases/download/refs%2Fheads%2Fmaster/JavaDocSourceEmbed-1.0-SNAPSHOT.jar
         file-name: JavaDocSourceEmbed.jar
             
     - name: Build Release
