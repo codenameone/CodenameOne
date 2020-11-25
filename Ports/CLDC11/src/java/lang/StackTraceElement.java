@@ -26,21 +26,39 @@ package java.lang;
  *
  * @author shannah
  */
-public abstract class Number {
-    public abstract int intValue();
-    
-    public byte byteValue() {
-        return (byte)intValue();
+public class StackTraceElement {
+    private String declaringClass;
+    private String methodName;
+    private String fileName;
+    private int lineNumber;
+    public StackTraceElement(String declaringClass, String methodName, String fileName, int lineNumber) {
+        if (declaringClass == null || methodName == null) {
+            throw new NullPointerException();
+        }
+        this.declaringClass = declaringClass;
+        this.methodName = methodName;
+        this.fileName = fileName;
+        this.lineNumber = lineNumber;
     }
 
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
+    public String getClassName() {
+        return declaringClass;
     }
+
+    public String getMethodName() {
+        return methodName;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public int getLineNumber() {
+        return lineNumber;
+    }
+
+    public boolean isNativeMethod() {
+        return fileName == null;
+    }
+
 }

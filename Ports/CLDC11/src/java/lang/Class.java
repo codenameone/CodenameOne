@@ -24,13 +24,20 @@
 package java.lang;
 
 import java.lang.annotation.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 /**
  * Instances of the class Class represent classes and interfaces in a running Java application. Every array also belongs to a class that is reflected as a Class object that is shared by all arrays with the same element type and number of dimensions.
  * Class has no public constructor. Instead Class objects are constructed automatically by the Java Virtual Machine as classes are loaded.
  * The following example uses a Class object to print the class name of an object:
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Class<T>{
+public final class Class<T> implements java.lang.reflect.Type {
+    
+    public ClassLoader getClassLoader() {
+        return ClassLoader.getSystemClassLoader();
+    }
+    
     /**
      * Returns the Class object associated with the class with the given string name. Given the fully-qualified name for a class or interface, this method attempts to locate, load and link the class.
      * For example, the following code fragment returns the runtime Class descriptor for the class named java.lang.Thread: Classt= Class.forName("java.lang.Thread")
@@ -211,8 +218,64 @@ public final class Class<T>{
 	public String getCanonicalName() {
             return null;
 	}
+        
+       /**
+        * Gets for Array classes, this returns the type of the elements of the array.
+        * @return 
+        */
+    public Class getComponentType() {
+        return null;
+    }
 
+    /**
+     * @deprecated Not supported
+     * @return 
+     */
     public boolean desiredAssertionStatus() {
         return false;
-    }        
+    }   
+    
+    /**
+     * @deprecated Not supported
+     * @return 
+     */
+     public java.lang.reflect.Type[] getGenericInterfaces() {
+        throw new UnsupportedOperationException("Class.getGenericInterfaces() not supported on this platform");
+    }
+     
+    /**
+     * Returns true if this class is a primitive type.
+     * @return 
+     */
+    public boolean isPrimitive() {
+        return false;
+    }
+    
+     
+    /**
+     * 
+     * @return 
+     * @deprecated Not supported
+     */
+    public Method getEnclosingMethod() {
+        return null;
+    }
+    
+    /**
+     * Returns null always.  Not supported in CN1.
+     * @return 
+     * @deprecated Not supported
+     */
+    public Constructor getEnclosingConstructor() {
+        return null;
+    }
+    
+    /**
+     * 
+     * @return 
+     * @deprecated Not supported
+     */
+    public boolean isLocalClass() {
+        return false;
+    }
 }

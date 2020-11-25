@@ -28,6 +28,8 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.1
  */
 public final class Double extends Number implements Comparable<Double> {
+    
+    public static final Class<Double> TYPE = double.class;
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values
@@ -100,7 +102,11 @@ public final class Double extends Number implements Comparable<Double> {
      * also has the value true. However, there are two exceptions: If d1 and d2 both represent Double.NaN, then the equals method returns true, even though Double.NaN==Double.NaN has the value false. If d1 represents +0.0 while d2 represents -0.0, or vice versa, the equals test has the value false, even though +0.0==-0.0 has the value true. This allows hashtables to operate properly.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Double)obj).value == value;
+        if (obj == null || !(obj instanceof Double)) {
+            return false;
+        }
+        Double d = (Double)obj;
+        return d.isNaN() && isNaN() || d.value == value;
     }
 
     /**

@@ -28,6 +28,8 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0
  */
 public final class Integer extends Number implements Comparable<Integer> {
+    
+    public static final Class<Integer> TYPE = int.class;
     /**
      * The largest value of type int. The constant value of this field is 2147483647.
      * See Also:Constant Field Values
@@ -239,5 +241,33 @@ public final class Integer extends Number implements Comparable<Integer> {
     
     public int compareTo(Integer i) {
         return compare(this, i);
+    }
+    
+    public static int numberOfLeadingZeros(int i) {
+        if (i == 0) {
+            return 32;
+        }
+        int n = 0;
+        if (i >>> 16 != 0) {
+            i >>>= 16;
+            n |= 16;
+        }
+        if (i >>> 8 != 0) {
+            i >>>= 8;
+            n |= 8;
+        }
+        if (i >>> 4 != 0) {
+            i >>>= 4;
+            n |= 4;
+        }
+        if (i >>> 2 != 0) {
+            i >>>= 2;
+            n |= 2;
+        }
+        if (i >>> 1 != 0) {
+            i >>>= 1;
+            n |= 1;
+        }
+        return 32 - n - 1;
     }
 }

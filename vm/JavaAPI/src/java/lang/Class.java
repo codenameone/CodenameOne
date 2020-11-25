@@ -37,6 +37,11 @@ import java.lang.reflect.Method;
  * an object: Since: JDK1.0, CLDC 1.0
  */
 public final class Class<T> implements java.lang.reflect.Type {
+    
+    
+    public ClassLoader getClassLoader() {
+        return ClassLoader.getSystemClassLoader();
+    }
 
     /**
      * Returns the Class object associated with the class with the given string

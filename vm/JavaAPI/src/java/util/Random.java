@@ -122,5 +122,9 @@ public class Random{
     public void setSeed(long seed){
         this.seed = (seed ^ multiplier) & ((1L << 48) - 1);
     }
+    
+    public boolean nextBoolean() {
+        return nextInt() % 2 == 0;
+    }
 
 }

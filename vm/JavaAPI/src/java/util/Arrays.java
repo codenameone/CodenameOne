@@ -4048,4 +4048,9 @@ public class Arrays {
         }
         throw new IllegalArgumentException();
     }
+    
+    public static short[] copyOf(short[] original, int len) {
+        return copyOfRange(original, 0, len);
+    }
+   
 }

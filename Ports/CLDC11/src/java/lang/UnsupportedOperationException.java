@@ -20,27 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+
 package java.lang;
 
 /**
  *
- * @author shannah
+ * @author Shai Almog
  */
-public abstract class Number {
-    public abstract int intValue();
-    
-    public byte byteValue() {
-        return (byte)intValue();
+public class UnsupportedOperationException extends RuntimeException {
+    public UnsupportedOperationException() {
     }
-
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
+    
+    public UnsupportedOperationException(String m) {
+        super(m);
     }
 }
