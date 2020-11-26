@@ -27,6 +27,10 @@ package java.lang;
  * Since: JDK1.1, CLDC 1.0
  */
 public final class Byte extends Number implements Comparable<Byte> {
+    
+    public static final Class<Byte> TYPE = byte.class;
+    public static final int SIZE = 8;
+    
     /**
      * The maximum value a Byte can have.
      * See Also:Constant Field Values
@@ -67,7 +71,7 @@ public final class Byte extends Number implements Comparable<Byte> {
      * Returns a hashcode for this Byte.
      */
     public int hashCode(){
-        return value & 0xff;
+        return intValue();
     }
 
     /**

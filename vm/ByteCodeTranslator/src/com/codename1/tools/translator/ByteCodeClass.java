@@ -231,6 +231,16 @@ public class ByteCodeClass {
             } 
         }        
     }
+    
+    
+    public boolean isMethodPrivate(String name, String desc) {
+        for (BytecodeMethod meth : methods) {
+            if (meth.getMethodName().equals(name) && desc.equals(meth.getSignature())) {
+                return meth.isPrivate();
+            }
+        }
+        return false;
+    }
 
     public void unmark() {
         marked = false;
@@ -522,7 +532,10 @@ public class ByteCodeClass {
             b.append(clsName);
             b.append(", \"");
             b.append(clsName.replace('_', '.'));
-            b.append("[]\", ");
+            for (int arrayDim = 0; arrayDim < iter; arrayDim++) {
+                b.append("[]");
+            }
+            b.append("\", ");
 
             // array class type, dimension & internal type
             b.append("JAVA_TRUE, ");
@@ -950,6 +963,16 @@ public class ByteCodeClass {
             b.append(".vtable = initVtableForInterface();\n    ");
         }
 
+        if( arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+            b.append("class_array2__");
+            b.append(clsName);
+            b.append(".vtable = initVtableForInterface();\n    ");
+        }
+        if(arrayTypes.contains("3_" + clsName)) {
+            b.append("class_array3__");
+            b.append(clsName);
+            b.append(".vtable = initVtableForInterface();\n    ");
+        }
         
         // create the vtable
         b.append("    class__");

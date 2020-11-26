@@ -776,6 +776,10 @@ public class BytecodeMethod implements SignatureSet {
         return forceVirtual;
     }
     
+    public String getFullCName() {
+        return this.clsName + "_"+this.getCMethodName();
+    }
+    
     public void appendVirtualMethodC(String cls, StringBuilder b, String offset, boolean includeStaticInitializer) {
         if(virtualOverriden) {
             return;
@@ -1077,6 +1081,12 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private String cMethodName;
+    
+    /**
+     * Gets the method name, mangled to be usable as the C method name.  This will replace illegal characters
+     * with underscores.
+     * @return 
+     */
     public String getCMethodName() {
         if (cMethodName == null) {
             cMethodName = methodName.replace('-','_');

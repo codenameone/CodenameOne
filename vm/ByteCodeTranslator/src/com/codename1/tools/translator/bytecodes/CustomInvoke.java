@@ -26,6 +26,7 @@ import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
+import com.codename1.tools.translator.SignatureSet;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,7 +80,7 @@ public class CustomInvoke extends Instruction {
     }
 
     public boolean isMethodUsed(String desc, String name) {
-        return this.desc.equals(desc) && name.equals(name);
+        return this.desc.equals(desc) && this.name.equals(name);
     }
 
     public String getMethodUsed() {
@@ -159,8 +160,28 @@ public class CustomInvoke extends Instruction {
         
         StringBuilder bld = new StringBuilder();
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
-            //b.append("    ");
-            bld.append("virtual_");
+            b.append("    ");
+            
+            // Well, it is actually legal to call private methods with invoke virtual, and kotlin
+            // generates such calls.  But ParparVM strips out these virtual method definitions
+            // so we need to check 
+            boolean isVirtual = true;
+            if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                if (bc == null) {
+                    System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
+                } else {
+                    if (bc.isMethodPrivate(name, desc)) {
+                        isVirtual = false;
+                    }
+                }
+                
+            }
+            if (isVirtual) {
+                bld.append("virtual_");
+            }
+        } else {
+            b.append("    ");
         }
         
         if(origOpcode == Opcodes.INVOKESTATIC) {
@@ -168,8 +189,11 @@ public class CustomInvoke extends Instruction {
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             owner = findActualOwner(bc);
         }
-
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        if (owner.startsWith("[")) {
+            bld.append("java_lang_Object");
+        } else{
+            bld.append(owner.replace('/', '_').replace('$', '_'));
+        }
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
@@ -249,7 +273,25 @@ public class CustomInvoke extends Instruction {
         StringBuilder bld = new StringBuilder();
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
-            bld.append("virtual_");
+            
+            // Well, it is actually legal to call private methods with invoke virtual, and kotlin
+            // generates such calls.  But ParparVM strips out these virtual method definitions
+            // so we need to check 
+            boolean isVirtual = true;
+            if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                if (bc == null) {
+                    System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
+                } else {
+                    if (bc.isMethodPrivate(name, desc)) {
+                        isVirtual = false;
+                    }
+                }
+                
+            }
+            if (isVirtual) {
+                bld.append("virtual_");
+            }
         } else {
             b.append("    ");
         }
@@ -262,7 +304,11 @@ public class CustomInvoke extends Instruction {
         //if(owner.replace('/', '_').replace('$', '_').equals("java_lang_System_1") && name.equals("sleep")) {
         //    System.out.println("Break");
         //}
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        if (owner.startsWith("[")) {
+            bld.append("java_lang_Object");
+        } else{
+            bld.append(owner.replace('/', '_').replace('$', '_'));
+        }
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
@@ -476,5 +522,14 @@ public class CustomInvoke extends Instruction {
         this.noReturn = noReturn;
     }
 
+    public boolean containsSignature(SignatureSet sig) {
+            return desc.equals(sig.getSignature());
+    }
+    public String getMethodName() {
+            return(name);
+    }
+    
+    
+    
     
 }

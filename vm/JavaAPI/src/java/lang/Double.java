@@ -99,14 +99,26 @@ public final class Double extends Number implements Comparable<Double> {
      * Note that in most cases, for two instances of class Double, d1 and d2, the value of d1.equals(d2) is true if and only if
      * d1.doubleValue()
      * == d2.doubleValue()
-     * also has the value true. However, there are two exceptions: If d1 and d2 both represent Double.NaN, then the equals method returns true, even though Double.NaN==Double.NaN has the value false. If d1 represents +0.0 while d2 represents -0.0, or vice versa, the equals test has the value false, even though +0.0==-0.0 has the value true. This allows hashtables to operate properly.
+     * also has the value true. However, there are two exceptions: If d1 and d2 both represent Double.NaN, then the equals method returns true, even though Double.NaN==Double.NaN has the value false. 
+     * If d1 represents +0.0 while d2 represents -0.0, or vice versa, the equals test has the value false, even though +0.0==-0.0 has the value true. This allows hashtables to operate properly.
      */
     public boolean equals(java.lang.Object obj){
-        if (obj == null || !(obj instanceof Double)) {
+        if (obj == null || !(obj.getClass().equals(Double.class))) {
             return false;
         }
+        
         Double d = (Double)obj;
-        return d.isNaN() && isNaN() || d.value == value;
+        if (d.isNaN() && isNaN()) {
+            // Exception #1.  If both doubles represent NaN, then they are treated equal here
+            // even though NaN!=NaN
+            return true;
+        }
+        if (value == 0.0 && d.value == 0.0) {
+            // Exception #2. If one Double represents -0.0 and the other represents +0.0, then
+            // they should be Not equal even though +0.0==-0.0
+            return doubleToLongBits(d.value) == doubleToLongBits(value);
+        }
+        return d.value == value;
     }
 
     /**

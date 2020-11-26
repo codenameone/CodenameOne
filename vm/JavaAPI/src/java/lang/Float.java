@@ -98,7 +98,7 @@ public final class Float extends Number implements Comparable<Float> {
      * also has the value true. However, there are two exceptions: If f1 and f2 both represent Float.NaN, then the equals method returns true, even though Float.NaN==Float.NaN has the value false. If f1 represents +0.0f while f2 represents -0.0f, or vice versa, the equal test has the value false, even though 0.0f==-0.0f has the value true. This definition allows hashtables to operate properly.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Float)obj).value == value;
+        return obj != null && obj.getClass() == getClass() && floatToIntBits(((Float)obj).value) == floatToIntBits(value);
     }
 
     /**
@@ -119,8 +119,7 @@ public final class Float extends Number implements Comparable<Float> {
      * , of the primitive float value represented by this Float object.
      */
     public int hashCode(){
-        int v = floatToIntBits(value);
-        return v ^ (v >>> 32);
+        return floatToIntBits(value);
     }
 
     /**

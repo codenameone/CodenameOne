@@ -72,7 +72,7 @@ public class Invoke extends Instruction {
     
 
     public boolean isMethodUsed(String desc, String name) {
-        return this.desc.equals(desc) && name.equals(name);
+        return this.desc.equals(desc) && this.name.equals(name);
     }
 
     public String getMethodUsed() {
@@ -144,7 +144,25 @@ public class Invoke extends Instruction {
         StringBuilder bld = new StringBuilder();
         if(opcode == Opcodes.INVOKEINTERFACE || opcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
-            bld.append("virtual_");
+            
+            // Well, it is actually legal to call private methods with invoke virtual, and kotlin
+            // generates such calls.  But ParparVM strips out these virtual method definitions
+            // so we need to check if the method is private, and remove the virtual invocation 
+            // if it is.
+            boolean isVirtual = true;
+            if (opcode == Opcodes.INVOKEVIRTUAL) {
+                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                if (bc == null) {
+                    System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
+                } else {
+                    if (bc.isMethodPrivate(name, desc)) {
+                        isVirtual = false;
+                    }
+                }
+            }
+            if (isVirtual) {
+                bld.append("virtual_");
+            }
         } else {
             b.append("    ");
         }
@@ -157,7 +175,13 @@ public class Invoke extends Instruction {
         //if(owner.replace('/', '_').replace('$', '_').equals("java_lang_System_1") && name.equals("sleep")) {
         //    System.out.println("Break");
         //}
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        if (owner.startsWith("[")) {
+            // Kotlin seems to generate calls to toString() on arrays using the array class
+            // as owner.  We'll just change this to java_lang_Object instead.
+            bld.append("java_lang_Object");
+        } else{
+            bld.append(owner.replace('/', '_').replace('$', '_'));
+        }
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
