@@ -1115,13 +1115,15 @@ public class JavaFXSEPort extends JavaSEPort {
                 
             }
         });
-        while (bc[0] == null && err[0] == null) {
+        if (bc[0] == null && err[0] == null) {
 
             Display.getInstance().invokeAndBlock(new Runnable() {
 
                 @Override
                 public void run() {
-                    Util.wait(bc, 20);
+                    while (bc[0] == null && err[0] == null) {	
+                        Util.wait(bc, 20);		
+                    }
                 }
             });
         }
