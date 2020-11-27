@@ -1417,13 +1417,31 @@ public class Arrays {
         }
         return hashCode;
     }
-
+    
     private static int deepHashCodeElement(Object element) {
         Class<?> cl;
         if (element == null) {
             return 0;
         }
-
+        if (element instanceof boolean[]) {
+            return hashCode((boolean[]) element);
+        } else if (element instanceof byte[]) {
+            return hashCode((byte[]) element);
+        } else if (element instanceof short[]) {
+            return hashCode((short[]) element);
+        } else if (element instanceof char[]) {
+            return hashCode((char[]) element);
+        } else if (element instanceof int[]) {
+            return hashCode((int[]) element);
+        } else if (element instanceof long[]) {
+            return hashCode((long[]) element);
+        } else if (element instanceof float[]) {
+            return hashCode((float[]) element);
+        } else if (element instanceof double[]) {
+            return hashCode((double[]) element);
+        } else if (element instanceof Object[]) {
+            return  deepHashCode((Object[]) element);
+        } 
         return element.hashCode();
     }
 
@@ -3710,6 +3728,9 @@ public class Arrays {
     }
     
     public static <T> T[] copyOf(T[] original, int newLength,  Class<? extends T[]> newType) {
+        if (newLength < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newLength);
+        }
         T[] arr = (T[])Array.newInstance(newType.getComponentType(), newLength);
         int len = Math.min(original.length, newLength);
         System.arraycopy(original, 0, arr, 0, len);
@@ -3717,6 +3738,9 @@ public class Arrays {
     }
     
     public static <T> T[] copyOf(T[] original, int newLength) {
+        if (newLength < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newLength);
+        }
         return copyOf(original, newLength, (Class<T[]>)original.getClass());
     }
 
@@ -3869,6 +3893,9 @@ public class Arrays {
     }
     
     public static boolean[] copyOf(boolean[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3877,6 +3904,9 @@ public class Arrays {
     }
     
     public static char[] copyOf(char[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3884,6 +3914,9 @@ public class Arrays {
         return copyOfRange(original, 0, original.length);
     }
     public static double[] copyOf(double[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3891,6 +3924,9 @@ public class Arrays {
         return copyOfRange(original, 0, original.length);
     }
     public static float[] copyOf(float[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3899,6 +3935,9 @@ public class Arrays {
     }
     
     public static long[] copyOf(long[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3907,6 +3946,9 @@ public class Arrays {
     }
     
     public static int[] copyOf(int[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3915,6 +3957,11 @@ public class Arrays {
     }
     
     public static byte[] copyOf(byte[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3926,8 +3973,14 @@ public class Arrays {
                     int from,
                     int to,
                     Class<? extends T[]> newType) {
-        if (from < 0 || to > original.length) {
-            throw new ArrayIndexOutOfBoundsException();
+        if (original == null) {
+            throw new NullPointerException("copyOfRange() attempted on null array");
+        }
+        if (from < 0 || from > original.length) {
+            throw new ArrayIndexOutOfBoundsException(from);
+        }
+        if (from > to) {
+            throw new IllegalArgumentException("Expected 'from' parameter in copyOfRange must be <= the 'to' param.  From="+from+", to="+to);
         }
         T[] out = (T[])Array.newInstance(newType.getComponentType(), to-from);
         System.arraycopy(original, from, out, 0, to-from);
@@ -3938,6 +3991,15 @@ public class Arrays {
     public static <T> T[] copyOfRange(T[] original,
                   int from,
                   int to) {
+        if (original == null) {
+            throw new NullPointerException("copyOfRange() attempted on null array");
+        }
+        if (from < 0 || from > original.length) {
+            throw new ArrayIndexOutOfBoundsException(from);
+        }
+        if (from > to) {
+            throw new IllegalArgumentException("Expected 'from' parameter in copyOfRange must be <= the 'to' param.  From="+from+", to="+to);
+        }
         return copyOfRange(original, from, to, (Class<T[]>)original.getClass());
     }
 

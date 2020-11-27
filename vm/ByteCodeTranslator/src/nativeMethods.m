@@ -503,7 +503,14 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
     JAVA_ARRAY srcArr = (JAVA_ARRAY)src;
     JAVA_ARRAY dstArr = (JAVA_ARRAY)dst;
-
+    if (src == JAVA_NULL || dst == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+        return;
+    }
+    if (srcOffset < 0 || dstOffset < 0 || srcOffset + length > srcArr->length || dstOffset + length > dstArr->length || length < 0) {
+        THROW_ARRAY_INDEX_EXCEPTION(-1);
+        return;
+    }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
     memcpy( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
