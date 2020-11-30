@@ -262,17 +262,26 @@ public final class Float extends Number implements Comparable<Float> {
         return new Float(i);
     }
     
+    private static final int NEGATIVE_ZERO_BITS=floatToIntBits(-0f);
+    
     public static int compare(float f1, float f2) {
-        if(f1 == f2) {
+        if (isNaN(f1) && isNaN(f2)) {
             return 0;
-        }
-        if(f1 > f2) {
+        } else if (isNaN(f1)) {
             return 1;
+        } else if (isNaN(f2)) {
+            return -1;
+        } else if (f1 == 0f && f2 == 0f) {
+            int f1bits = floatToIntBits(f1);
+            int f2bits = floatToIntBits(f2);
+            return f1bits == f2bits ? 0 :
+                    f1bits == NEGATIVE_ZERO_BITS ? -1 : 1;
+        } else {
+            return f1 < f2 ? -1 : f1 > f2 ? 1 : 0;
         }
-        return -1;
     }
 
     public int compareTo(Float another) {
-        return value < another.value ? -1 : value > another.value ? 1 : 0;
+        return compare(value, another.value);
     }
 }

@@ -119,7 +119,7 @@ public class Arrays {
         }
 
         @Override
-        public E set(int location, E object) {
+        public E set(int location, E object) {    
             try {
                 E result = a[location];
                 a[location] = object;
@@ -622,9 +622,6 @@ public class Arrays {
         checkIndexForBinarySearch(array.length, startIndex, endIndex);
         if (array.length == 0) {
             return -1;
-        }
-        if ( NumberComparator.isNumber(object)){
-            return binarySearch(array, startIndex, endIndex, object, NumberComparator.createComparator(object.getClass()));
         }
         int low = startIndex, mid = -1, high = endIndex - 1, result = 0;
         while (low <= high) {
@@ -1753,24 +1750,17 @@ public class Arrays {
     }
 
     private static boolean isSame(double double1, double double2) {
-        // Simple case
-        if (double1 == double2 && 0.0d != double1) {
-            return true;
-        }
-
-        // Deal with NaNs
+        
         if (Double.isNaN(double1)) {
             return Double.isNaN(double2);
         }
         if (Double.isNaN(double2)) {
             return false;
         }
+        long d1 = Double.doubleToLongBits(double1);
+        long d2 = Double.doubleToLongBits(double2);
+        return d1 == d2;
 
-        // Deal with +0.0 and -0.0
-        //long d1 = Double.doubleToRawLongBits(double1);
-        //long d2 = Double.doubleToRawLongBits(double2);
-        //return d1 == d2;
-        return false;
     }
 
     private static boolean lessThan(double double1, double double2) {
@@ -1778,21 +1768,19 @@ public class Arrays {
         // Double.compare(double1, double2) < 0.
 
         // Non-zero and non-NaN checking.
-        if (double1 < double2) {
-            return true;
-        }
-        if (double1 > double2) {
-            return false;
-        }
-        if (double1 == double2 && 0.0d != double1) {
-            return false;
-        }
 
         // NaNs are equal to other NaNs and larger than any other double.
         if (Double.isNaN(double1)) {
             return false;
         } else if (Double.isNaN(double2)) {
             return true;
+        }
+        
+        if (double1 == 0d && double1 == double2) {
+            long bits1 = Double.doubleToLongBits(double1);
+            long bits2 = Double.doubleToLongBits(double2);
+            long neg0 = Double.doubleToLongBits(-0.0);
+            return bits1 != bits2 && bits1 == neg0;
         }
 
         // Deal with +0.0 and -0.0.
@@ -1801,51 +1789,40 @@ public class Arrays {
         return double1 < double2;
     }
 
-    private static boolean isSame(float float1, float float2) {
-        // Simple case
-        if (float1 == float2 && 0.0d != float1) {
-            return true;
+    private static boolean isSame(float double1, float double2) {
+        
+        if (Float.isNaN(double1)) {
+            return Float.isNaN(double2);
         }
-
-        // Deal with NaNs
-        if (Float.isNaN(float1)) {
-            return Float.isNaN(float2);
-        }
-        if (Float.isNaN(float2)) {
+        if (Float.isNaN(double2)) {
             return false;
         }
-
-        // Deal with +0.0 and -0.0
-        //int f1 = Float.floatToRawIntBits(float1);
-        //int f2 = Float.floatToRawIntBits(float2);
-        return false; //f1 == f2;
+        long d1 = Float.floatToIntBits(double1);
+        long d2 = Float.floatToIntBits(double2);
+        return d1 == d2;
     }
     
-    private static boolean lessThan(float float1, float float2) {
-        // A slightly specialized version of Float.compare(float1, float2) < 0.
+    private static boolean lessThan(float double1, float double2) {
+        // A slightly specialized version of
+        // Double.compare(double1, double2) < 0.
 
         // Non-zero and non-NaN checking.
-        if (float1 < float2) {
+
+        // NaNs are equal to other NaNs and larger than any other double.
+        if (Float.isNaN(double1)) {
+            return false;
+        } else if (Float.isNaN(double2)) {
             return true;
         }
-        if (float1 > float2) {
-            return false;
-        }
-        if (float1 == float2 && 0.0f != float1) {
-            return false;
-        }
-
-        // NaNs are equal to other NaNs and larger than any other float
-        if (Float.isNaN(float1)) {
-            return false;
-        } else if (Float.isNaN(float2)) {
-            return true;
+        
+        if (double1 == 0d && double1 == double2) {
+            long bits1 = Float.floatToIntBits(double1);
+            long bits2 = Float.floatToIntBits(double2);
+            long neg0 = Float.floatToIntBits(-0.0f);
+            return bits1 != bits2 && bits1 == neg0;
         }
 
-        // Deal with +0.0 and -0.0
-        //int f1 = Float.floatToRawIntBits(float1);
-        //int f2 = Float.floatToRawIntBits(float2);
-        return float1 < float2;
+        return double1 < double2;
     }
 
     private static int med3(byte[] array, int a, int b, int c) {
@@ -1925,7 +1902,7 @@ public class Arrays {
     private static void checkBounds(int arrLength, int start, int end) {
         if (start > end) {
             // luni.35=Start index ({0}) is greater than end index ({1})
-            throw new IndexOutOfBoundsException("" + start + " out of: " + end);
+            throw new IllegalArgumentException("" + start + " out of: " + end);
         }
         if (start < 0) {
             // luni.36=Array index out of range\: {0}
@@ -2665,10 +2642,6 @@ public class Arrays {
         int len = end - start;
         
         Object o = in[start];
-        if ( NumberComparator.isNumber(o)){
-            mergeSort(in, out, start, end, NumberComparator.createComparator(o.getClass()));
-            return;
-        }
         // use insertion sort for small arrays
         if (len <= SIMPLE_LENGTH) {
             for (int i = start + 1; i < end; i++) {
@@ -2837,9 +2810,6 @@ public class Arrays {
      */
     @SuppressWarnings("unchecked")
     private static int find(Object[] arr, java.lang.Comparable val, int bnd, int l, int r) {
-        if ( NumberComparator.isNumber(val)){
-            return find(arr, val, bnd, l, r, NumberComparator.createComparator(val.getClass()));
-        }
         int m = l;
         int d = 1;
         while (m <= r) {
