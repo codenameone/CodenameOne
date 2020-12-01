@@ -1709,7 +1709,20 @@ public class InPlaceEditView extends FrameLayout{
             @Override
             public void run() {
 		if (!isEditedFieldSwitch) {
-                    releaseEdit();
+                    //https://github.com/codenameone/CodenameOne/issues/3311
+                    //https://github.com/codenameone/CodenameOne/issues/3316
+                    //https://github.com/codenameone/CodenameOne/issues/3317
+                    //When clearing a textfield, the keyboard re-loads. It goes down, and it comes back up.
+                    //This may be ok for most applications, but it isn't for a host of others (chat send buttons clear textfield but need the user to stay focused on the textfield, not have to see how it goes down and up)
+                    //To clear a textfield without moving the keyboard, the following steps must be followed:
+                    //1. call com.codename1.impl.android.AndroidImplementation.stopEditing(); natively instead of textField.stopEditing(); this will reset the textfield's internal logic but not hide the keyboard
+                    //2. call textField.setText(""). This will erase the text
+                    //3. call Display.getInstance().setProperty("android.keepEditorOpenWhenClearing", "true"); This will prepare the next startEditingAsync to not re-load the keyboard (done in releaseEdit() below)
+		    //4. call textField.startEditingAsync();
+                    if("false".equals(Display.getInstance().getProperty("android.keepEditorOpenWhenClearing", "false")))
+                        releaseEdit();
+                    else
+                        Display.getInstance().setProperty("android.keepEditorOpenWhenClearing", "false");
 
                     if (sInstance == null) {
                         sInstance = new InPlaceEditView(impl);
