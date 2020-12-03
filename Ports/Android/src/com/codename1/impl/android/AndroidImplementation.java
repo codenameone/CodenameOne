@@ -1464,6 +1464,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isNativeEditorVisible(Component c) {
         return super.isNativeEditorVisible(c) && !InPlaceEditView.isActiveTextEditorHidden();
     }
+    
+    @Override
+    public void stopTextEditing(boolean hideKeyboard) {
+        stopEditing(!hideKeyboard);
+    }
 
     public static void stopEditing() {
         stopEditing(false);
