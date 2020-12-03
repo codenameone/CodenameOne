@@ -344,6 +344,14 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing() {    
     }
+	
+	
+    /**
+     * Invoked for special cases to stop text editing and clear native editing state
+     * Used specifically to prevent hiding keyboard on Android
+     */
+    public void stopTextEditing(boolean hideKeyboard) {    
+    }
 
     
     /**
