@@ -1805,6 +1805,18 @@ public final class Display extends CN1Constants {
             }
         }
     }
+    
+    /**
+     * Allows us to stop editString on the given text component without hiding the keyboard
+     * Only use on Android
+     * @param cmp the text field/text area component
+     * @param hideKeyboard hide/keep keyboard on
+     */
+    public void stopEditing(Component cmp, boolean hideKeyboard) {
+        if(isTextEditing(cmp)) {
+            impl.stopTextEditing(hideKeyboard);
+        }
+    }
 
     boolean isTextEditing(Component c) {
         if (c instanceof Form && c == getCurrent()) {
