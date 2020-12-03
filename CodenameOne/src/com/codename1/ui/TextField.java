@@ -866,7 +866,7 @@ public class TextField extends TextArea {
      * Clears the text from the TextField with the option of not toggling keyboard (iOS, And)
      */
     public void clear(boolean toggleKeyboard){
-        if(hideKeyboard) {
+        if(toggleKeyboard) {
             clear();
         } else {
             if(Display.getInstance().getPlatformName().equals("ios")) {
