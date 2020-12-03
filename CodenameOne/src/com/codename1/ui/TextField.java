@@ -865,19 +865,21 @@ public class TextField extends TextArea {
     /**
      * Clears the text from the TextField with the option of not toggling keyboard (iOS, And)
      */
-    public void clear(boolean hideKeyboard){
+    public void clear(boolean toggleKeyboard){
         if(hideKeyboard) {
             clear();
         } else {
             if(Display.getInstance().getPlatformName().equals("ios")) {
                 setText("");
+                requestFocus();
             } else if (Display.getInstance().getPlatformName().equals("and")) {
-                Display.getInstance().stopEditing(this, hideKeyboard);
+                Display.getInstance().stopEditing(this, toggleKeyboard);
                 setText("");
                 Display.getInstance().setProperty("android.keepEditorOpenWhenClearing", "true");
                 this.startEditingAsync();
-            }
-            requestFocus();
+                requestFocus();
+            }else
+                clear();
         }
     }
     
