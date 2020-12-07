@@ -31,12 +31,17 @@ import android.util.Log;
 import android.view.*;
 import android.view.inputmethod.EditorInfo;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.LayeredLayout;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -425,19 +430,14 @@ public class CodenameOneView {
         //if (nativePeerGrabbedPointer) {
         //    return false;
         //}
+
         Component componentAt;
-        try {
-            if (x == null) {
-                componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
-            } else {
-                componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
-            }
-        } catch (Throwable t) {
-            // Since this is is an EDT violation, we may get an exception
-            // Just consume it
-            componentAt = null;
+        if (x == null) {
+            componentAt = safetyGetComponentAt(this.implementation.getCurrentForm(), (int)event.getX(), (int)event.getY());
+        } else {
+            componentAt = safetyGetComponentAt(this.implementation.getCurrentForm(), (int)x[0], (int)y[0]);
         }
-        boolean isPeer = (componentAt instanceof PeerComponent);
+        boolean isPeer = (componentAt != null && componentAt instanceof PeerComponent);
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
     
         switch (event.getAction()) {
@@ -470,6 +470,32 @@ public class CodenameOneView {
         }
 
         return consumeEvent;
+    }
+
+    private Component safetyGetComponentAt(final Container root, final int x, final int y){
+        if (!root.isVisible() || !root.contains(x, y)) {
+            return null;
+        }
+
+        List<Component> children = root.getChildrenAsList(true);
+        if (root.getLayout() instanceof LayeredLayout){
+            Collections.reverse(children);
+        }
+        for (Component currComponent : children) {
+            if (currComponent.contains(x, y)) {
+                if (!currComponent.isBlockLead() && currComponent instanceof Container) {
+                    currComponent = safetyGetComponentAt((Container)currComponent, x, y);
+                }
+
+                if (currComponent != null && currComponent.isVisible() && currComponent.isEnabled()) {
+                    return currComponent;
+                }
+            }
+        }
+        if (root.isEnabled() && (root.isFocusable() || root.isGrabsPointerEvents() || root.isDraggable())){
+            return root;
+        }
+        return  null;
     }
 
     public AndroidGraphics getGraphics() {
