@@ -437,7 +437,7 @@ public class CodenameOneView {
         } else {
             componentAt = safetyGetComponentAt(this.implementation.getCurrentForm(), (int)x[0], (int)y[0]);
         }
-        boolean isPeer = (componentAt != null && componentAt instanceof PeerComponent);
+        boolean isPeer = (componentAt instanceof PeerComponent);
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
     
         switch (event.getAction()) {
@@ -481,7 +481,18 @@ public class CodenameOneView {
         if (root.getLayout() instanceof LayeredLayout){
             Collections.reverse(children);
         }
-        for (Component currComponent : children) {
+
+        int componentCount = root.getComponentCount();
+        int startingPoint = 0;
+        int endPoint = componentCount;
+        int direction = 1;
+        if(root.getLayout() instanceof LayeredLayout){
+            direction = -1;
+            endPoint = -1;
+            startingPoint = componentCount - 1;
+        }
+        for(int iter = startingPoint ; iter != endPoint ; iter += direction) {
+            Component currComponent = root.getComponentAt(iter);
             if (currComponent.contains(x, y)) {
                 if (!currComponent.isBlockLead() && currComponent instanceof Container) {
                     currComponent = safetyGetComponentAt((Container)currComponent, x, y);
