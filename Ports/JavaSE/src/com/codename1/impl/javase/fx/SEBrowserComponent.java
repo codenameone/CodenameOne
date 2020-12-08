@@ -288,8 +288,8 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     }
     
     private static void init(SEBrowserComponent self, BrowserComponent p) {
-        final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<>(self);
-        final WeakReference<BrowserComponent> weakP = new WeakReference<>(p);
+        final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<SEBrowserComponent>(self);
+        final WeakReference<BrowserComponent> weakP = new WeakReference<BrowserComponent>(p);
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 SEBrowserComponent self = weakSelf.get();
@@ -381,6 +381,11 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                 if (self == null || p == null) {
                     return;
                 }
+                /*
+                // DISABLING TRANSPARENCY BECAUSE IT CAUSES A MESS WHEN SCROLLING
+                // ORIGINALLY TRIED TO ADD THIS FOR CSS GENERATION, BUT LATER OPTED
+                // TO ONLY USE CEF FOR THAT ANYWAYS
+                // SINCE THIS FX COMPONENT IS DEPRECATED, WE'LL JUST LET IT DIE
                 self.transparent = p.getStyle().getBgTransparency() == 0;
                 if (self.transparent) {
                     try {
@@ -392,7 +397,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                         setBackgroundColor.invoke(webPage, 0);
                     } catch (Exception ex){}
                 }
-                
+                */
                 String url = self.web.getEngine().getLocation();
                 if (newState == State.SCHEDULED) {
                     p.fireWebEvent("onStart", new ActionEvent(url));

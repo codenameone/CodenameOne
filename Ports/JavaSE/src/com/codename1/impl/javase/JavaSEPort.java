@@ -4031,7 +4031,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         skinsTable.setRowHeight(112);
                         skinsTable.getTableHeader().setReorderingAllowed(false);
                         final JTextField filter = new JTextField();
-                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(((DefaultTableModel) skinsTable.getModel())); 
+                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(((DefaultTableModel) skinsTable.getModel())); 
                         
                         filter.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
                             
@@ -6220,6 +6220,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
     
+    static BufferedImage deepCopy(BufferedImage bi) {
+        java.awt.image.ColorModel cm = bi.getColorModel();
+        boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
+        java.awt.image.WritableRaster raster = bi.copyData(null);
+        return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+    }
+  
     private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
         if (cmp instanceof Peer) {
             Peer peer = (Peer)cmp;
@@ -7501,6 +7508,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     
+
 
     @Override
     public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
@@ -11851,7 +11859,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private boolean matchCN1Style;
         
-        
+        private Image peerImage;
+        private boolean lightweightMode;
         private PeerComponentBuffer peerBuffer;
         
         // Buffered image that will be drawn to by AWT and read from
@@ -12143,7 +12152,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastH=0;
             lastW=0;
             lastZoom=1;
+            peerImage = null;
             super.initComponent();
+            if (!init) {
+                addNativeCnt();
+            }
+            
         }
 
         @Override
@@ -12153,33 +12167,127 @@ public class JavaSEPort extends CodenameOneImplementation {
                 instance.testRecorder.dispose();
                 instance.testRecorder = null;
             }
-            SwingUtilities.invokeLater(new Runnable() {
+            if (init) {
+                removeNativeCnt();
+            }
+            
+            // We set visibility to false, and then schedule removal
+            // for 1000ms from now.  This will deal with the situation where
+            // a modal dialog is shown to avoid having to fully remove the native 
+            // container.
+            //cnt.setVisible(false);
+            //removeNativeCnt(3000);
+        }
+        
+        /**
+         * Adds the native container to the swing component hierarchy.
+         * 
+         * This can be called off the Swing event thread, in which case it will just schedule a call
+         * to itself later.
+         * 
+         * 
+         */
+        protected void addNativeCnt() {
+            
+            if (!EventQueue.isDispatchThread()) {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        addNativeCnt();
+                    }
+                });
+                return;
+            }
+            
+            if (!init && isInitialized()) {
 
-                @Override
-                public void run() {
-                    frm.remove(cnt);
-                    frm.repaint();
-                }
-            });
+                init = true;
+                cnt.setVisible(true);
+                frm.add(cnt, 0);
+                frm.repaint();
+            }
+            
+        }
+        
+        /**
+         * Removes the native container from the Swing component hierarchy.
+         * This can be called on or off the swing event thread.  If called off the swing event
+         * thread, it will just schedule itself on the event thread later - async.
+         */
+        protected void removeNativeCnt() {
+            if (!EventQueue.isDispatchThread()) {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        removeNativeCnt();
+                    }
+                });
+                return;
+            }
+            if (peerImage == null) {
+                peerImage = generatePeerImage();
+            }
+            init = false;
+            frm.remove(cnt);
+            frm.repaint();
+            
         }
 
+        @Override
+        protected com.codename1.ui.Image generatePeerImage() {
+            if (peerImage != null) {
+                return peerImage;
+            }
+            if (peerBuffer != null) {
+                peerBuffer.modifyBuffer(new Runnable() {
+                    public void run() {
+                        BufferedImage bimg = peerBuffer.getBufferedImage();
+                        peerImage = instance.new NativeImage(bimg);
+                    }
+                   
+                });
+            }
+            return super.generatePeerImage();
+        }
+
+        @Override
+        protected boolean shouldRenderPeerImage() {
+            return lightweightMode && peerImage != null;
+        }
+        
+        
+        
+        
+
         protected void setLightweightMode(final boolean l) {
+            if (lightweightMode == l) {
+                if (l || init) {
+                    return;
+                }
+            }
+            lightweightMode = l;
+            if (l) {
+                if (peerImage == null) {
+                    peerImage = generatePeerImage();
+                } 
+            } else {
+                peerImage = null;
+            }
             SwingUtilities.invokeLater(new Runnable() {
 
                 @Override
                 public void run() {
-
                     if (!l) {
                         if (!init) {
                             init = true;
                             cnt.setVisible(true);
                             frm.add(cnt, 0);
                             frm.repaint();
+                            peerImage = null;
                         } else {
-                            cnt.setVisible(false);
+                            cnt.setVisible(true);
                         }
                     } else {
                         if (init) {
+                            
                             cnt.setVisible(false);
                         }
                     }
@@ -12194,8 +12302,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
         }
 
+        
         @Override
         public void paint(final Graphics g) {
+            if (lightweightMode) {
+                super.paint(g);
+                return;
+            }
             if (init) {
                 onPositionSizeChange();
                 instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
@@ -12310,7 +12423,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean checkForPermission(String permission, String description){
         return checkForPermission(permission, description, false);
     }
-    
+
     public static boolean checkForPermission(String permission, String description, boolean forceAsk){
                
         if(!android6PermissionsFlag){
