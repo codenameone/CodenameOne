@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
@@ -74,6 +75,10 @@ public class SplitPane extends Container {
      */
     public static class Settings {
         private int orientation=HORIZONTAL_SPLIT;
+        
+        // leave dividerUIID null so that we create the compound border by default.
+        // If the dev wants to override the UIID then they're on their own for the border.
+        private String dividerUIID=null;
         private String expandButtonUIID="Label";
         private String collapseButtonUIID="Label";
         private String dragHandleUIID="Label";
@@ -104,6 +109,8 @@ public class SplitPane extends Container {
             this.preferredInset = preferredInset;
             this.maxInset = maxInset;
         }
+        
+        
         
         /**
          * Sets the orientation.
@@ -176,6 +183,16 @@ public class SplitPane extends Container {
          */
         public Settings dividerThicknessMM(float dividerThicknessMM) {
             this.dividerThicknessMM = dividerThicknessMM;
+            return this;
+        }
+        
+        /**
+         * A custom UIID to use for the divider.  Leave null to use default.
+         * @param uiid The custom UIID
+         * @return self for chaining.
+         */
+        public Settings dividerUIID(String uiid) {
+            dividerUIID = uiid;
             return this;
         }
         
@@ -288,6 +305,12 @@ public class SplitPane extends Container {
     private String dragHandleUIID = "Label";
     
     /**
+     * The UIID for the divider.  Default is null so that we can generate the style and border
+     * manually.
+     */
+    private String dividerUIID = null;
+    
+    /**
      * The preferred divider thickness in millimetres
      */
     private float dividerThicknessMM = 3;
@@ -356,6 +379,7 @@ public class SplitPane extends Container {
         this.dividerThicknessMM = settings.dividerThicknessMM;
         this.showDragHandle = settings.showDragHandle;
         this.showExpandCollapseButtons = settings.showExpandCollapseButtons;
+        this.dividerUIID = settings.dividerUIID;
 
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);
@@ -858,6 +882,9 @@ public class SplitPane extends Container {
         }
         Divider() {
             super(new LayeredLayout());
+            if (dividerUIID != null) {
+                setUIID(dividerUIID);
+            }
             btnCollapse = $(new Button())
                     .setUIID(collapseButtonUIID)
                     .setCursor(Component.HAND_CURSOR)
@@ -901,6 +928,8 @@ public class SplitPane extends Container {
                 add(dragHandle);
             }
             
+            boolean isDesktop = CN.isDesktop();
+            
             LayeredLayout l = (LayeredLayout)getLayout();
             switch (orientation) {
                 case HORIZONTAL_SPLIT: {
@@ -908,6 +937,13 @@ public class SplitPane extends Container {
                             .setInsets(btnExpand, "0 0 auto 0")
                             .setInsets(dragHandle, "auto auto auto auto")
                             .setReferenceComponentTop(btnExpand, btnCollapse, 1f);
+                    if (!isDesktop) {
+                        // On tablets and phones it is difficult to use the collapse
+                        // expand buttons when they are adjacent.
+                        // On these devices we'll place them at opposite ends of the divider
+                        l.setInsets(btnExpand, "auto 0 0 0")
+                                .setReferenceComponentTop(btnExpand, null, 1f);
+                    }
                     break;
                 }
                 default: {
@@ -915,15 +951,30 @@ public class SplitPane extends Container {
                             .setInsets(btnExpand, "0 auto 0 0")
                             .setInsets(dragHandle, "auto auto auto auto")
                             .setReferenceComponentLeft(btnExpand, btnCollapse, 1f);
+                    if (!isDesktop) {
+                        // On tablets and phones it is difficult to use the collapse
+                        // expand buttons when they are adjacent.
+                        // On these devices we'll place them at opposite ends of the divider
+                        l.setInsets(btnExpand, "0 0 0 auto")
+                                .setReferenceComponentLeft(btnExpand, null, 1f);
+                    }
                 }
             }
             
-            $(this)
-                    .setBorder(createBorder())
-                    .setCursor(getDragCursor())
-                    .setDraggable(true)
-                    
-                    ;
+            if (dividerUIID == null) {
+                $(this)
+                        .setBorder(createBorder())
+                        .setCursor(getDragCursor())
+                        .setDraggable(true)
+
+                        ;
+            } else {
+                $(this)
+                        .setCursor(getDragCursor())
+                        .setDraggable(true)
+
+                        ;
+            }
             
             
             
