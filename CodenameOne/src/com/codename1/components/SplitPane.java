@@ -26,6 +26,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
@@ -88,6 +89,9 @@ public class SplitPane extends Container {
         private String minInset="0";
         private String preferredInset="50%";
         private String maxInset="100%";
+        
+        private char expandMaterialIcon, collapseMaterialIcon, dragHandleMaterialIcon;
+        private Image expandIcon, collapseIcon, dragHandleIcon;
         
         /**
          * Creates a new Settings with default values.
@@ -173,6 +177,66 @@ public class SplitPane extends Container {
             this.dragHandleUIID = uiid;
             this.collapseButtonUIID = uiid;
             this.expandButtonUIID = uiid;
+            return this;
+        }
+        
+        /**
+         * Sets the icon to use for the collapse button.
+         * @param icon
+         * @return 
+         */
+        public Settings collapseIcon(Image icon) {
+            this.collapseIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the icon to use for the expand button.
+         * @param icon
+         * @return 
+         */
+        public Settings expandIcon(Image icon) {
+            this.expandIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the icon to use for the drag handle.
+         * @param icon
+         * @return 
+         */
+        public Settings dragHandleIcon(Image icon) {
+            this.dragHandleIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the collapse button.
+         * @param icon
+         * @return 
+         */
+        public Settings collapseMaterialIcon(char icon) {
+            this.collapseMaterialIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the expand button.
+         * @param icon
+         * @return 
+         */
+        public Settings expandMaterialIcon(char icon) {
+            this.expandMaterialIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the drag handle.
+         * @param icon
+         * @return 
+         */
+        public Settings dragHandleMaterialIcon(char icon) {
+            this.dragHandleMaterialIcon = icon;
             return this;
         }
         
@@ -303,6 +367,34 @@ public class SplitPane extends Container {
      * UIID to use for the drag handle on the divider
      */
     private String dragHandleUIID = "Label";
+    
+    /**
+     * Material icon for expand button.
+     */
+    private char expandMaterialIcon, 
+            
+            /**
+             * Material icon for collapse button.
+             */
+            collapseMaterialIcon, 
+            
+            /**
+             * Material icon for drag handle.
+             */
+            dragHandleMaterialIcon;
+    
+    /**
+     * Icon for expand button.
+     */       
+    private Image expandIcon, 
+            /**
+             * Icon for collapse button.
+             */    
+            collapseIcon, 
+            /**
+             * Icon or drag handle
+             */
+            dragHandleIcon;
     
     /**
      * The UIID for the divider.  Default is null so that we can generate the style and border
@@ -833,7 +925,10 @@ public class SplitPane extends Container {
         private boolean inDrag;
         
         
-        private char getCollapseIcon() {
+        private char getCollapseMaterialIcon() {
+            if (collapseMaterialIcon != 0) {
+                return collapseMaterialIcon;
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return 0xe314;
@@ -842,7 +937,10 @@ public class SplitPane extends Container {
             }
         }
         
-        private char getExpandIcon() {
+        private char getExpandMaterialIcon() {
+            if (expandMaterialIcon != 0) {
+                return expandMaterialIcon;
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return 0xe315;
@@ -852,7 +950,16 @@ public class SplitPane extends Container {
         }
         
         private Image getDragIconImage() {
-            Image img = FontImage.createMaterial(FontImage.MATERIAL_DRAG_HANDLE, getStyle(), 3);
+            Image img = null;
+            if (dragHandleIcon != null) {
+                img = dragHandleIcon;
+            } else {
+                char materialIcon = FontImage.MATERIAL_DRAG_HANDLE;
+                if (dragHandleMaterialIcon != 0) {
+                    materialIcon = dragHandleMaterialIcon;
+                }
+                img = FontImage.createMaterial(materialIcon, getStyle(), 3);
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return img.rotate90Degrees(true);
@@ -888,7 +995,17 @@ public class SplitPane extends Container {
             btnCollapse = $(new Button())
                     .setUIID(collapseButtonUIID)
                     .setCursor(Component.HAND_CURSOR)
-                    .setIcon(getCollapseIcon())
+                    .each(new ComponentClosure() {
+                        @Override
+                        public void call(Component c) {
+                            if (collapseIcon != null) {
+                                ((Label)c).setIcon(collapseIcon);
+                            } else {
+                                ((Label)c).setMaterialIcon(getCollapseMaterialIcon());
+                            }
+                        }
+                        
+                    })
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {
                             collapse();
@@ -901,7 +1018,17 @@ public class SplitPane extends Container {
             btnExpand =  $(new Button())
                     .setCursor(Component.HAND_CURSOR)
                     .setUIID(expandButtonUIID)
-                    .setIcon(getExpandIcon())
+                    .each(new ComponentClosure() {
+                        @Override
+                        public void call(Component c) {
+                            if (expandIcon != null) {
+                                ((Label)c).setIcon(expandIcon);
+                            } else {
+                                ((Label)c).setMaterialIcon(getExpandMaterialIcon());
+                            }
+                        }
+                        
+                    })
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {
                             expand();
