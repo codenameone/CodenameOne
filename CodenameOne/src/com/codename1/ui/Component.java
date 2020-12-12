@@ -4299,7 +4299,8 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if the pointer responds to pointer events.
      */
     public boolean respondsToPointerEvents() {
-        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents() || isDraggable());
+        boolean isScrollable = CN.isEdt() ? isScrollable() : (scrollableXFlag() || scrollableYFlag());
+        return isVisible() && isEnabled() && (isScrollable || isFocusable() || isGrabsPointerEvents() || isDraggable());
     }
     
     private boolean pointerReleaseMaterialPullToRefresh() {

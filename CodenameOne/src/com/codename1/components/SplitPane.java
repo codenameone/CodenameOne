@@ -23,8 +23,10 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
@@ -74,6 +76,10 @@ public class SplitPane extends Container {
      */
     public static class Settings {
         private int orientation=HORIZONTAL_SPLIT;
+        
+        // leave dividerUIID null so that we create the compound border by default.
+        // If the dev wants to override the UIID then they're on their own for the border.
+        private String dividerUIID=null;
         private String expandButtonUIID="Label";
         private String collapseButtonUIID="Label";
         private String dragHandleUIID="Label";
@@ -83,6 +89,9 @@ public class SplitPane extends Container {
         private String minInset="0";
         private String preferredInset="50%";
         private String maxInset="100%";
+        
+        private char expandMaterialIcon, collapseMaterialIcon, dragHandleMaterialIcon;
+        private Image expandIcon, collapseIcon, dragHandleIcon;
         
         /**
          * Creates a new Settings with default values.
@@ -104,6 +113,8 @@ public class SplitPane extends Container {
             this.preferredInset = preferredInset;
             this.maxInset = maxInset;
         }
+        
+        
         
         /**
          * Sets the orientation.
@@ -170,12 +181,82 @@ public class SplitPane extends Container {
         }
         
         /**
+         * Sets the icon to use for the collapse button.
+         * @param icon
+         * @return 
+         */
+        public Settings collapseIcon(Image icon) {
+            this.collapseIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the icon to use for the expand button.
+         * @param icon
+         * @return 
+         */
+        public Settings expandIcon(Image icon) {
+            this.expandIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the icon to use for the drag handle.
+         * @param icon
+         * @return 
+         */
+        public Settings dragHandleIcon(Image icon) {
+            this.dragHandleIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the collapse button.
+         * @param icon
+         * @return 
+         */
+        public Settings collapseMaterialIcon(char icon) {
+            this.collapseMaterialIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the expand button.
+         * @param icon
+         * @return 
+         */
+        public Settings expandMaterialIcon(char icon) {
+            this.expandMaterialIcon = icon;
+            return this;
+        }
+        
+        /**
+         * Sets the material icon to use for the drag handle.
+         * @param icon
+         * @return 
+         */
+        public Settings dragHandleMaterialIcon(char icon) {
+            this.dragHandleMaterialIcon = icon;
+            return this;
+        }
+        
+        /**
          * Sets the preferred divider thickness in Millimetres.
          * @param dividerThicknessMM The divider thickness in Millimetres.
          * @return Self for chaining.
          */
         public Settings dividerThicknessMM(float dividerThicknessMM) {
             this.dividerThicknessMM = dividerThicknessMM;
+            return this;
+        }
+        
+        /**
+         * A custom UIID to use for the divider.  Leave null to use default.
+         * @param uiid The custom UIID
+         * @return self for chaining.
+         */
+        public Settings dividerUIID(String uiid) {
+            dividerUIID = uiid;
             return this;
         }
         
@@ -288,6 +369,40 @@ public class SplitPane extends Container {
     private String dragHandleUIID = "Label";
     
     /**
+     * Material icon for expand button.
+     */
+    private char expandMaterialIcon, 
+            
+            /**
+             * Material icon for collapse button.
+             */
+            collapseMaterialIcon, 
+            
+            /**
+             * Material icon for drag handle.
+             */
+            dragHandleMaterialIcon;
+    
+    /**
+     * Icon for expand button.
+     */       
+    private Image expandIcon, 
+            /**
+             * Icon for collapse button.
+             */    
+            collapseIcon, 
+            /**
+             * Icon or drag handle
+             */
+            dragHandleIcon;
+    
+    /**
+     * The UIID for the divider.  Default is null so that we can generate the style and border
+     * manually.
+     */
+    private String dividerUIID = null;
+    
+    /**
      * The preferred divider thickness in millimetres
      */
     private float dividerThicknessMM = 3;
@@ -356,6 +471,7 @@ public class SplitPane extends Container {
         this.dividerThicknessMM = settings.dividerThicknessMM;
         this.showDragHandle = settings.showDragHandle;
         this.showExpandCollapseButtons = settings.showExpandCollapseButtons;
+        this.dividerUIID = settings.dividerUIID;
 
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);
@@ -809,7 +925,10 @@ public class SplitPane extends Container {
         private boolean inDrag;
         
         
-        private char getCollapseIcon() {
+        private char getCollapseMaterialIcon() {
+            if (collapseMaterialIcon != 0) {
+                return collapseMaterialIcon;
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return 0xe314;
@@ -818,7 +937,10 @@ public class SplitPane extends Container {
             }
         }
         
-        private char getExpandIcon() {
+        private char getExpandMaterialIcon() {
+            if (expandMaterialIcon != 0) {
+                return expandMaterialIcon;
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return 0xe315;
@@ -828,7 +950,16 @@ public class SplitPane extends Container {
         }
         
         private Image getDragIconImage() {
-            Image img = FontImage.createMaterial(FontImage.MATERIAL_DRAG_HANDLE, getStyle(), 3);
+            Image img = null;
+            if (dragHandleIcon != null) {
+                img = dragHandleIcon;
+            } else {
+                char materialIcon = FontImage.MATERIAL_DRAG_HANDLE;
+                if (dragHandleMaterialIcon != 0) {
+                    materialIcon = dragHandleMaterialIcon;
+                }
+                img = FontImage.createMaterial(materialIcon, getStyle(), 3);
+            }
             switch (orientation) {
                 case HORIZONTAL_SPLIT:
                     return img.rotate90Degrees(true);
@@ -858,10 +989,23 @@ public class SplitPane extends Container {
         }
         Divider() {
             super(new LayeredLayout());
+            if (dividerUIID != null) {
+                setUIID(dividerUIID);
+            }
             btnCollapse = $(new Button())
                     .setUIID(collapseButtonUIID)
                     .setCursor(Component.HAND_CURSOR)
-                    .setIcon(getCollapseIcon())
+                    .each(new ComponentClosure() {
+                        @Override
+                        public void call(Component c) {
+                            if (collapseIcon != null) {
+                                ((Label)c).setIcon(collapseIcon);
+                            } else {
+                                ((Label)c).setMaterialIcon(getCollapseMaterialIcon());
+                            }
+                        }
+                        
+                    })
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {
                             collapse();
@@ -874,7 +1018,17 @@ public class SplitPane extends Container {
             btnExpand =  $(new Button())
                     .setCursor(Component.HAND_CURSOR)
                     .setUIID(expandButtonUIID)
-                    .setIcon(getExpandIcon())
+                    .each(new ComponentClosure() {
+                        @Override
+                        public void call(Component c) {
+                            if (expandIcon != null) {
+                                ((Label)c).setIcon(expandIcon);
+                            } else {
+                                ((Label)c).setMaterialIcon(getExpandMaterialIcon());
+                            }
+                        }
+                        
+                    })
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {
                             expand();
@@ -901,6 +1055,8 @@ public class SplitPane extends Container {
                 add(dragHandle);
             }
             
+            boolean isDesktop = CN.isDesktop();
+            
             LayeredLayout l = (LayeredLayout)getLayout();
             switch (orientation) {
                 case HORIZONTAL_SPLIT: {
@@ -908,6 +1064,13 @@ public class SplitPane extends Container {
                             .setInsets(btnExpand, "0 0 auto 0")
                             .setInsets(dragHandle, "auto auto auto auto")
                             .setReferenceComponentTop(btnExpand, btnCollapse, 1f);
+                    if (!isDesktop) {
+                        // On tablets and phones it is difficult to use the collapse
+                        // expand buttons when they are adjacent.
+                        // On these devices we'll place them at opposite ends of the divider
+                        l.setInsets(btnExpand, "auto 0 0 0")
+                                .setReferenceComponentTop(btnExpand, null, 1f);
+                    }
                     break;
                 }
                 default: {
@@ -915,15 +1078,30 @@ public class SplitPane extends Container {
                             .setInsets(btnExpand, "0 auto 0 0")
                             .setInsets(dragHandle, "auto auto auto auto")
                             .setReferenceComponentLeft(btnExpand, btnCollapse, 1f);
+                    if (!isDesktop) {
+                        // On tablets and phones it is difficult to use the collapse
+                        // expand buttons when they are adjacent.
+                        // On these devices we'll place them at opposite ends of the divider
+                        l.setInsets(btnExpand, "0 0 0 auto")
+                                .setReferenceComponentLeft(btnExpand, null, 1f);
+                    }
                 }
             }
             
-            $(this)
-                    .setBorder(createBorder())
-                    .setCursor(getDragCursor())
-                    .setDraggable(true)
-                    
-                    ;
+            if (dividerUIID == null) {
+                $(this)
+                        .setBorder(createBorder())
+                        .setCursor(getDragCursor())
+                        .setDraggable(true)
+
+                        ;
+            } else {
+                $(this)
+                        .setCursor(getDragCursor())
+                        .setDraggable(true)
+
+                        ;
+            }
             
             
             
