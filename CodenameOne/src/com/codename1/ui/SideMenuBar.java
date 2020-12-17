@@ -752,6 +752,7 @@ public class SideMenuBar extends MenuBar {
      * Returns true if the Menu is currently open
      *
      * @return true if menu open
+     * @deprecated this code references functionality that is no longer supported and currently always returns false
      */
     public boolean isMenuOpen() {
         return Display.getInstance().getCurrent() == menu;
