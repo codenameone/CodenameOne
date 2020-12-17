@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+#set ( $d = "$")
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>cn1app</packaging>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <cn1.version>${cn1-version}</cn1.version>
+		<kotlin.version>${kotlin-version}</kotlin.version>
+        <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+            <version>${d}{cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+		#if ("true" == ${kotlin})
+		<dependencies>
+		    <dependency>
+		        <groupId>org.jetbrains.kotlin</groupId>
+		        <artifactId>kotlin-stdlib</artifactId>
+		        <version>${d}{kotlin.version}</version>
+		    </dependency>
+		</dependencies>
+		#end
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>read-project-properties</goal>
+                        </goals>
+                        <configuration>
+                            <files>
+                                <file>${d}{basedir}/codenameone_settings.properties</file>
+                            </files>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+			#if ("true" == ${kotlin})
+			<plugin>
+			            <groupId>org.jetbrains.kotlin</groupId>
+			            <artifactId>kotlin-maven-plugin</artifactId>
+			            <version>${d}{kotlin.version}</version>
+			            <executions>
+			                <execution>
+			                    <id>compile</id>
+			                    <goals>
+			                        <goal>compile</goal>
+			                    </goals>
+			                    <configuration>
+			                        <sourceDirs>
+			                            <sourceDir>${d}{project.basedir}/src/main/kotlin</sourceDir>
+			                            <sourceDir>${d}{project.basedir}/src/main/java</sourceDir>
+			                        </sourceDirs>
+			                    </configuration>
+			                </execution>
+			                <execution>
+			                    <id>test-compile</id>
+			                    <goals> <goal>test-compile</goal> </goals>
+			                    <configuration>
+			                        <sourceDirs>
+			                            <sourceDir>${d}{project.basedir}/src/test/kotlin</sourceDir>
+			                            <sourceDir>${d}{project.basedir}/src/test/java</sourceDir>
+			                        </sourceDirs>
+			                    </configuration>
+			                </execution>
+			            </executions>
+			        </plugin>
+			        <plugin>
+			            <groupId>org.apache.maven.plugins</groupId>
+			            <artifactId>maven-compiler-plugin</artifactId>
+			            <version>3.5.1</version>
+			            <executions>
+			                <!-- Replacing default-compile as it is treated specially by maven -->
+			                <execution>
+			                    <id>default-compile</id>
+			                    <phase>none</phase>
+			                </execution>
+			                <!-- Replacing default-testCompile as it is treated specially by maven -->
+			                <execution>
+			                    <id>default-testCompile</id>
+			                    <phase>none</phase>
+			                </execution>
+			                <execution>
+			                    <id>java-compile</id>
+			                    <phase>compile</phase>
+			                    <goals>
+			                        <goal>compile</goal>
+			                    </goals>
+			                </execution>
+			                <execution>
+			                    <id>java-test-compile</id>
+			                    <phase>test-compile</phase>
+			                    <goals>
+			                        <goal>testCompile</goal>
+			                    </goals>
+			                    <configuration>
+			                        <skip>${d}{maven.test.skip}</skip>
+			                    </configuration>
+			                </execution>
+			            </executions>
+			        </plugin>
+					#end
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${d}{cn1.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>installcn1libs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+            </plugin>
+            
+            
+            
+        </plugins>
+
+        
+    </build>
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray-plugins</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <profiles>
+        <profile>
+            <!-- 
+                For running in simulator in process use:
+                mvn cn1:java -P simulator
+                            
+                Fro running in simulator in forked process use:
+                mvn cn1:simulator -P simulator
+            -->
+                        
+            <id>simulator</id>
+            <properties>
+                
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <version>${d}{cn1.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-debug
+            -->
+            <id>ios-debug</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-release
+            -->
+            <id>ios-release</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                <codename1.production>true</codename1.production>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+                <codename1.appStoreBuild>true</codename1.appStoreBuild>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Javascript builds use:
+                mvn cn:build -P javascript
+            -->
+            <id>javascript</id>
+            <properties>
+                <codename1.targetType>javascript</codename1.targetType>
+                <codename1.targetPlatform>javascript</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Android builds use:
+                mvn cn:build -P android
+            -->
+            <id>android</id>
+            <properties>
+                <codename1.targetType>android</codename1.targetType>
+                <codename1.targetPlatform>android</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows UWP builds use:
+                mvn cn:build -P uwp
+            -->
+            <id>uwp</id>
+            <properties>
+                <codename1.targetType>windows</codename1.targetType>
+                <codename1.targetPlatform>win</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows desktop builds use:
+                mvn cn:build -P windows
+            -->
+            <id>windows</id>
+            <properties>
+                <codename1.targetType>desktop_windows</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Mac Desktop builds use:
+                mvn cn:build -P mac
+            -->
+            <id>mac</id>
+            <properties>
+                <codename1.targetType>desktop_macosx</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+    </profiles>
+</project>
