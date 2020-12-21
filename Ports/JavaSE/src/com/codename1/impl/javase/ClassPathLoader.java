@@ -47,6 +47,7 @@ class ClassPathLoader extends ClassLoader {
     private Map<String,URL> resources = new HashMap<>();
     private List<String> excludes = new ArrayList<String>();
     {
+        excludes.add("com.apple.laf");
         excludes.add("com.github.sarxos.webcam");
         excludes.add("org.bridj");
         excludes.add("java");
@@ -219,11 +220,9 @@ class ClassPathLoader extends ClassLoader {
     }
  */
     
-    
     public Class findClass(String className) throws ClassNotFoundException {
         byte[] classByte;
         Class result = null;
-
         result = (Class) classes.get(className); //checks in cached classes
         if (result != null) {
             return result;

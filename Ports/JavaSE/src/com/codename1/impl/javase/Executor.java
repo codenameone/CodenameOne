@@ -22,7 +22,6 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.impl.javase.fx.JavaFXLoader;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -30,19 +29,14 @@ import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.awt.Desktop;
-import java.awt.EventQueue;
-import java.awt.Toolkit;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
@@ -137,6 +131,7 @@ public class Executor {
                                 return null;
                             }
                         });
+                        
                         setQuitHandler.invoke(Desktop.getDesktop(), new Object[]{quitProxy});
                         
 

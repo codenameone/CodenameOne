@@ -43,7 +43,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
     private boolean extractArtifact(Artifact artifact) throws IOException {
         File cn1libFile = findArtifactFile(artifact);
         File destDir = getLibDirFor(artifact);
-        getLog().info("Extracting cn1lib "+artifact);
+        getLog().info("Extracting cn1lib "+artifact+" to "+destDir);
         boolean requiresUpdate = !destDir.isDirectory() || destDir.lastModified() < cn1libFile.lastModified();
         if ("true".equals(System.getProperty("cn1.updateLibs", null))) {
             
@@ -151,6 +151,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
                         getLog().info("Merged properties for "+artifact+" into project properties");
                         changed = true;
                     }
+                    getLog().info("UPdating project css for "+artifact);
                     updateProjectCSS(artifact);
                 }
                 
@@ -323,7 +324,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
      * @throws IOException 
      */
     private File getLibCSSZip(Artifact artifact) throws IOException {
-        return new File(getLibDirFor(artifact), "css.zip");
+        return new File(getLibDirFor(artifact), "META-INF" + File.separator + "cn1lib" + File.separator + "css.zip");
     }
     
     /**
@@ -447,7 +448,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
      */
     private File getLibraryAppendedPropertiesFile(Artifact artifact) {
         File dir = getLibDirFor(artifact);
-        return new File(dir, "codenameone_library_appended.properties");
+        return new File(dir, "META-INF" + File.separator + "codenameone_library_appended.properties");
     }
     
     /**
@@ -475,7 +476,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
      */
     private File getLibraryRequiredPropertiesFile(Artifact artifact) {
         File dir = getLibDirFor(artifact);
-        return new File(dir, "codenameone_library_required.properties");
+        return new File(dir, "META-INF" + File.separator + "codenameone_library_required.properties");
     }
     
     /**
@@ -515,16 +516,27 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
     private void updateProjectCSS(Artifact artifact) throws IOException {
         File cssZip = getLibCSSZip(artifact);
         if (!cssZip.exists()) {
-            return;
+            getLog().info(cssZip+" does not exist");
+            getLog().info("Checking if is cn1lib "+artifact.getFile());
+            if (!getLibDirFor(artifact).exists() && Cn1libUtil.isCN1Lib(artifact.getFile())) {
+                getLog().info("Extracting artifact");
+                extractArtifact(artifact);
+            }
+            if (!cssZip.exists()) {
+                getLog().info(cssZip+" still doesn't exist");
+                return;
+            }
         }
         
         File libCssDir = getLibCSSDir(artifact);
         if (!libCssDir.exists()) {
+            System.out.println("css dir "+libCssDir+" does not exist yet.  Extracting zip");
             extractLibCSSDir(artifact);
         }
         
         File libCSSFile = getLibCSSFile(artifact);
         if (!libCSSFile.exists()) {
+            System.out.println("No theme.css "+libCSSFile+" found");
             return;
         }
         
@@ -540,10 +552,10 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
         if (!cssFile.exists()) {
             failActivateCSS(artifact);
         }
-        File cssImpl = new File(wrap(project).getCN1LibProjectDir(), "lib" + File.separator + "impl" + File.separator + "css");
+        File cssImpl = new File(project.getBuild().getDirectory() + File.separator + "css");
         String baseName = artifact.getGroupId()+"__"+artifact.getArtifactId();
         if (!cssImpl.exists()) {
-            cssImpl.mkdir();
+            cssImpl.mkdirs();
         }
         
         File libCssImpl = new File(cssImpl, baseName);

@@ -129,7 +129,7 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-buildclient</artifactId>
-                <version>6.0.0</version>
+                <version>${project.version}</version>
                
             </dependency>
 
@@ -166,6 +166,17 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-io</artifactId>
                 <version>1.3.2</version>
+            </dependency>
+            <dependency>
+                <groupId>com.guardsquare</groupId>
+                <artifactId>proguard-core</artifactId>
+                <version>7.0.1</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.guardsquare/proguard-base -->
+            <dependency>
+                <groupId>com.guardsquare</groupId>
+                <artifactId>proguard-base</artifactId>
+                <version>7.0.1</version>
             </dependency>
 
         </dependencies>
@@ -259,6 +270,14 @@
             <name>bintray</name>
             <url>https://dl.bintray.com/codenameone/codenameone</url>
         </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-guardsquare-proguard</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/guardsquare/proguard</url>
+        </repository>
     </repositories>
     <pluginRepositories>
         <pluginRepository>
@@ -270,4 +289,12 @@
             <url>https://dl.bintray.com/codenameone/codenameone</url>
         </pluginRepository>
     </pluginRepositories>
+    <profiles>
+        <profile>
+            <id>build-client</id>
+            <modules>
+                <module>build-client</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>

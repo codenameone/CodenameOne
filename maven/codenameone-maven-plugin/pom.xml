@@ -91,7 +91,14 @@
             <artifactId>commons-io</artifactId>
     
         </dependency>
-
+        <dependency>
+            <groupId>com.guardsquare</groupId>
+            <artifactId>proguard-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.guardsquare</groupId>
+            <artifactId>proguard-base</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

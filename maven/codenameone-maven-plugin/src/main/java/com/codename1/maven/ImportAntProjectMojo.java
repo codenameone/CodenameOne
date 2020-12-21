@@ -275,6 +275,17 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
                 copy.execute();
             }
             
+            File antNativeDirectory = new File(sourceProject, "native");
+            File nativeDirectory = new File(project.getBasedir() + File.separator + "native");
+            if (antNativeDirectory.exists()) {
+                if (nativeDirectory.exists()) {
+                    FileUtils.deleteDirectory(nativeDirectory);
+
+                }
+                FileUtils.copyDirectory(antNativeDirectory, nativeDirectory);
+                
+            }
+            
             
             File srcFile = new File(sourceProject, "codenameone_settings.properties");
             File destFile = new File(project.getBasedir() + File.separator + srcFile.getName());
@@ -330,9 +341,10 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
         }
         
         for (File child : outputDir.listFiles()) {
-            File metaInfChild = new File(metaInf, child.getName());
+            File metaInfChild = new File(metaInf, "cn1lib" + File.separator + child.getName());
+            
             if (child.getName().endsWith(".zip") || child.getName().endsWith(".properties")) {
-                
+                metaInfChild.getParentFile().mkdirs();
                 child.renameTo(metaInfChild);
             } else {
                 continue;
@@ -349,10 +361,10 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
                 metaInfChild.renameTo(sourcesZip);
             }
             if (child.getName().equals("nativese.zip")) {
-                metaInfChild.renameTo(new File(metaInf, "nativejavase.zip"));
+                metaInfChild.renameTo(new File(metaInf, "cn1lib" + File.separator + "nativejavase.zip"));
             }
             if (child.getName().equals("nativeand.zip")) {
-                metaInfChild.renameTo(new File(metaInf, "nativeandroid.zip"));
+                metaInfChild.renameTo(new File(metaInf, "cn1lib" + File.separator + "nativeandroid.zip"));
             }
             
         }
@@ -411,6 +423,7 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
 "    </repository>\n");
             }
             
+            
             if (!contents.contains("<artifactId>"+outputDir.getName()+"</artifactId>")) {
                 changed = true;
                 contents = contents.replaceFirst("</dependencies>", "    <dependency>\n"
@@ -418,6 +431,11 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
                     + "                <artifactId>"+outputDir.getName()+"</artifactId>\n"
                     + "                <version>"+version+"</version>"
                     + "            </dependency>\n"
+                    + "            <dependency>\n" +
+                      "                <groupId>org.jetbrains</groupId>\n" +
+                      "                <artifactId>annotations</artifactId>\n" +
+                      "                <version>13.0</version>\n" +
+                      "            </dependency>"
                     + "        </dependencies>");
             }
             

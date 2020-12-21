@@ -124,5 +124,9 @@ public class Object{
     public final void wait(long timeout, int nanos) throws java.lang.InterruptedException{
         return; //TODO codavaj!!
     }
+    
+    public Object clone() {
+        return null;
+    }
 
 }

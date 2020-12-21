@@ -72,7 +72,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         
         buildNatives(metaCn1lib);
         nativeDir = getCN1LibProjectDir();
-        buildNative(metaCn1lib, "css", "");
+        buildCSS(metaCn1lib);
         
         
         stubber();
@@ -177,7 +177,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         Path classpath = new Path(antProject);
         
         for (Artifact artifact : project.getDependencyArtifacts()) {
-            log.info("Checking artifact "+artifact);
+            log.debug("Checking artifact "+artifact);
             if (!filterByScope(artifact)) {
                 continue;
             }
@@ -194,7 +194,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         //}
         //classpath.append(classFiles.getPath());
         //paths.add(classFiles.getAbsolutePath());
-        log.info("Using the following classpath for Stubber: " + classpath);
+        log.debug("Using the following classpath for Stubber: " + classpath);
         return classpath;
     }
    private boolean filterByScope(Artifact artifact) {
@@ -336,6 +336,35 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         libRoot.mkdirs();
         
         File destFile = new File(libRoot, prefix+type+".zip");
+        zip.setDestFile(destFile);
+        zip.execute();
+        
+        
+    }
+    
+    private File findCSSDir() {
+        for (String path : project.getCompileSourceRoots()) {
+            File file = new File(path);
+            File css = new File(file.getParentFile(), "css");
+            if (css.exists()) {
+                return css;
+            }
+        }
+        return new File("src" + File.separator + "main" + File.separator + "css");
+    }
+    
+    private void buildCSS(File libRoot) {
+        File cssDir = findCSSDir();
+        if (!cssDir.exists()) {
+            return;
+        }
+        Zip zip = (Zip)antProject.createTask("zip");
+        zip.setBasedir(cssDir);
+        zip.setCompress(false);
+        
+        libRoot.mkdirs();
+        
+        File destFile = new File(libRoot, "css.zip");
         zip.setDestFile(destFile);
         zip.execute();
         

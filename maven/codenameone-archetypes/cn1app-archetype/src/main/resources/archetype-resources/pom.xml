@@ -11,7 +11,8 @@
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <cn1.version>${cn1-version}</cn1.version>
-		<kotlin.version>${kotlin-version}</kotlin.version>
+        <kotlin.version>${kotlin-version}</kotlin.version>
+        <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
         <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
     </properties>
     <dependencies>
@@ -33,6 +34,12 @@
 		        <artifactId>kotlin-stdlib</artifactId>
 		        <version>${d}{kotlin.version}</version>
 		    </dependency>
+                    <!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+                    <dependency>
+                        <groupId>org.jetbrains</groupId>
+                        <artifactId>annotations</artifactId>
+                        <version>13.0</version>
+                    </dependency>
 		</dependencies>
 		#end
     </dependencies>
@@ -129,9 +136,20 @@
                 <extensions>true</extensions>
                 <executions>
                     <execution>
+                        <id>cn1-initialize</id>
                         <phase>initialize</phase>
                         <goals>
                             <goal>installcn1libs</goal>
+                            <goal>generate-gui-sources</goal>
+                        </goals>
+                        
+                    </execution>
+                    <execution>
+                        <id>cn1-process-classes</id>
+                    <phase>process-classes</phase>
+                        <goals>
+                            <goal>compliance-check</goal>
+                            <goal>compile-javase-sources</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -152,6 +170,14 @@
             <id>bintray-codenameone-codenameone</id>
             <name>bintray</name>
             <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-guardsquare-proguard</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/guardsquare/proguard</url>
         </repository>
     </repositories>
     <pluginRepositories>

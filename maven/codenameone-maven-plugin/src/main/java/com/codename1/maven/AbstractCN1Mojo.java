@@ -21,6 +21,7 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
+import org.apache.maven.doxia.logging.Log;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -67,6 +68,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected String finalName;
     
     protected Project antProject;
+    
+    @Parameter(property = "plugin.artifacts", required = true, readonly = true)
+    protected List<Artifact> pluginArtifacts;
     
     @Component 
     protected RepositorySystem repositorySystem;
@@ -138,12 +142,32 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     public Java createJava() {
+        return createJava(Log.LEVEL_DEBUG);
+    }
+    
+    public Java createJava(final int logLevel) {
+        
         Java java = new Java() {
             {
                redirector = new Redirector(this) {
                    @Override
                    protected void handleOutput(String output) {
-                       getLog().info(output);
+                       switch (logLevel) {
+                            case Log.LEVEL_DEBUG:
+                                getLog().debug(output);
+                                break;
+                            case Log.LEVEL_DISABLED:
+                                break;
+                            case Log.LEVEL_ERROR:
+                                getLog().error(output);
+                                break;
+                            case Log.LEVEL_INFO:
+                                getLog().info(output);
+                                break;
+                            case Log.LEVEL_WARN:
+                                getLog().warn(output);
+                                break;
+                        }
                    }
 
                    @Override
@@ -157,7 +181,23 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
             @Override
             protected void handleOutput(String output) {
-                getLog().info(output);
+                switch (logLevel) {
+                    case Log.LEVEL_DEBUG:
+                        getLog().debug(output);
+                        break;
+                    case Log.LEVEL_DISABLED:
+                        break;
+                    case Log.LEVEL_ERROR:
+                        getLog().error(output);
+                        break;
+                    case Log.LEVEL_INFO:
+                        getLog().info(output);
+                        break;
+                    case Log.LEVEL_WARN:
+                        getLog().warn(output);
+                        break;
+                }
+                
             }
 
             @Override
@@ -167,7 +207,22 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
             @Override
             protected void handleFlush(String output) {
-                getLog().info(output);
+                switch (logLevel) {
+                    case Log.LEVEL_DEBUG:
+                        getLog().debug(output);
+                        break;
+                    case Log.LEVEL_DISABLED:
+                        break;
+                    case Log.LEVEL_ERROR:
+                        getLog().error(output);
+                        break;
+                    case Log.LEVEL_INFO:
+                        getLog().info(output);
+                        break;
+                    case Log.LEVEL_WARN:
+                        getLog().warn(output);
+                        break;
+                }
             }
 
             @Override
@@ -273,8 +328,16 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * @return 
      */
     protected File getProjectCSSDir() {
-        File projectDir = getCN1ProjectDir();
-        return new File(projectDir, "css");
+        for (String dir : project.getCompileSourceRoots()) {
+            File dirFile = new File(dir);
+            File cssSibling = new File(dirFile.getParentFile(), "css");
+            File themeCss = new File(cssSibling, "theme.css");
+            if (themeCss.exists()) {
+                return cssSibling;
+            }
+            
+        }
+        return new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "css");
     }
     
     /**
@@ -418,13 +481,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     protected List<File> getLibsNativeJarsForPlatform(String platform) {
-        getLog().info("Getting nativese source jars");
+        getLog().debug("Getting nativese source jars");
         List<File> out = new ArrayList<File>();
         for (Artifact artifact : project.getDependencyArtifacts()) {
             File artifactFile = artifact.getFile();
-            getLog().info("Checking "+artifactFile);
+            getLog().debug("Checking "+artifactFile);
             if (!Cn1libUtil.isCN1Lib(artifactFile)) {
-                getLog().info("Not a cn1lib");
+                getLog().debug("Not a cn1lib");
                 continue;
             }
             File nativeSejar = Cn1libUtil.getNativeJar(artifact, platform);
@@ -437,13 +500,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     protected List<File> getLibsNativeSESourceJars() {
-        getLog().info("Getting nativese source jars");
+        getLog().debug("Getting nativese source jars");
         List<File> out = new ArrayList<File>();
         for (Artifact artifact : project.getDependencyArtifacts()) {
             File artifactFile = artifact.getFile();
-            getLog().info("Checking "+artifactFile);
+            getLog().debug("Checking "+artifactFile);
             if (!Cn1libUtil.isCN1Lib(artifactFile)) {
-                getLog().info("Not a cn1lib");
+                getLog().debug("Not a cn1lib");
                 continue;
             }
             File nativeSejar = Cn1libUtil.getNativeSEJar(artifact);
@@ -509,7 +572,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     os.write(buf, 0, len);
                 }
             } else {
-                getLog().info("Designer is up to date");
+                getLog().debug("Designer is up to date");
             }
         } finally {
             if (os != null) {

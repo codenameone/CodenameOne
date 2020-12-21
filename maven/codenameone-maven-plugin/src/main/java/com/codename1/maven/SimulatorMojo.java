@@ -149,14 +149,14 @@ private static final String GROUP_ID="com.codenameone";
     
     private Path prepareClasspath(Java java) {
         Log log = getLog();
-        log.info("Preparing classpath for Simulator");
+        log.debug("Preparing classpath for Simulator");
         List<String> paths = new ArrayList<>();
         //StringBuilder classpath = new StringBuilder();
         Path classpath = java.createClasspath();
         
         for (Artifact artifact : project.getDependencyArtifacts()) {
             
-            log.info("Checking artifact "+artifact);
+            log.debug("Checking artifact "+artifact);
             //if (!filterByScope(artifact)) {
             //    continue;
             //}
@@ -192,7 +192,7 @@ private static final String GROUP_ID="com.codenameone";
         //classpath.append(classFiles.getPath());
         //paths.add(classFiles.getAbsolutePath());
         classpath.add(new Path(antProject, project.getBuild().getOutputDirectory()));
-        log.info("Using the following classpath for Stubber: " + classpath);
+        log.debug("Using the following classpath for Stubber: " + classpath);
         return classpath;
     }
     
