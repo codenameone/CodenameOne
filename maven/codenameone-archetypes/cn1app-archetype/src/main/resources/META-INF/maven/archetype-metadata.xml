@@ -1,60 +1,66 @@
 <archetype-descriptor
-        xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 https://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
-        name="cn1app">
+    xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 https://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
+    name="cn1app">
 		
-		<requiredProperties>
-		        <requiredProperty key="cn1-version">
-		            <defaultValue>7.0-SNAPSHOT</defaultValue>
-		        </requiredProperty>
-		        <requiredProperty key="kotlin">
-		            <defaultValue>false</defaultValue>
-		        </requiredProperty>
-				<requiredProperty key="kotlin-version">
-					<defaultValue>1.3.72</defaultValue>
-				</requiredProperty>
+    <requiredProperties>
+        <requiredProperty key="cn1-version">
+            <defaultValue>7.0-SNAPSHOT</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="kotlin">
+            <defaultValue>false</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="kotlin-version">
+            <defaultValue>1.3.72</defaultValue>
+        </requiredProperty>
 
-				<requiredProperty key="mainName">
-					<validationRegex>^[A-Z][a-zA-Z0-9]+$</validationRegex>
-				</requiredProperty>
+        <requiredProperty key="mainName">
+            <validationRegex>^[A-Z][a-zA-Z0-9]+$</validationRegex>
+        </requiredProperty>
 
-		    </requiredProperties>
+    </requiredProperties>
     <fileSets>
         <fileSet filtered="true" packaged="true">
             <directory>src/main/java</directory>
-			<includes>
-			        <include>**/*.java</include>
-			      </includes>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
         </fileSet>
         <fileSet filtered="true" packaged="true">
             <directory>src/test/java</directory>
-			<includes>
-			        <include>**/*.java</include>
-			      </includes>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
         </fileSet>
         <fileSet filtered="true" packaged="true">
             <directory>src/main/kotlin</directory>
-			<includes>
-			        <include>**/*.kt</include>
-			      </includes>
+            <includes>
+                <include>**/*.kt</include>
+            </includes>
         </fileSet>
         <fileSet filtered="true" packaged="true">
             <directory>src/test/kotlin</directory>
-			<includes>
-			        <include>**/*.kt</include>
-			      </includes>
+            <includes>
+                <include>**/*.kt</include>
+            </includes>
         </fileSet>
-		<fileSet filtered="false" packaged="false">
-			<directory>src/main/resources</directory>
-			<includes>
-				<include>**</include>
-			</includes>
-		</fileSet>
-		<fileSet filtered="true" packaged="false">
-			<directory/>
-			<includes>
-				<include>codenameone_settings.properties</include>
-			</includes>
-		</fileSet>
+        <fileSet filtered="false" packaged="false">
+            <directory>src/main/resources</directory>
+            <includes>
+                <include>**</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="false">
+            <directory>.mvn</directory>
+            <includes>
+                <include>**</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="false">
+            <directory/>
+            <includes>
+                <include>codenameone_settings.properties</include>
+            </includes>
+        </fileSet>
     </fileSets>
 </archetype-descriptor>

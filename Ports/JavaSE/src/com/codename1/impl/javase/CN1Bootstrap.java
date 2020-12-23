@@ -146,7 +146,8 @@ public class CN1Bootstrap {
             fxSupported = true;
         } catch (Throwable ex) {}
         boolean fxOnSystemPath = fxSupported;
-        File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
+        File cef = System.getProperty("cef.dir") != null ? new File(System.getProperty("cef.dir")) : new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
+        //File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         if (cef.exists()) {
             if (isUnix && !is64Bit) {
                 System.out.println("Found CEF, but not using because CEF is only supported on 64 bit platforms.  Try running inside a 64 bit JVM");

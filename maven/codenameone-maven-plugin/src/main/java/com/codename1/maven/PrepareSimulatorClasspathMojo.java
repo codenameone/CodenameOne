@@ -12,6 +12,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.tools.ant.taskdefs.Expand;
 
 /**
  *
@@ -29,8 +30,8 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getModel().setProperties(props);
         }
         props.setProperty("exec.args", properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
-
         
     }
+    
     
 }

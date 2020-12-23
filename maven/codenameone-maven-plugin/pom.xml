@@ -99,6 +99,12 @@
             <groupId>com.guardsquare</groupId>
             <artifactId>proguard-base</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-cef</artifactId>
+            <version>84.4.1</version>
+            <type>pom</type>
+        </dependency>
     </dependencies>
 
     <build>

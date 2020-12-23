@@ -34,6 +34,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         if (true) {
             // Using the proguard check because it works even for code that has already been compiled
             // such as kotlin, or other java libraries.
+            copyKotlinIncrementalCompileOutputToOutputDir();
             runProguard();
             return;
         }
@@ -143,13 +144,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         java.createArg().setValue("Signature");
         if (passNum == 0) {
             Path inJars = new Path(antProject, project.getBuild().getOutputDirectory());
-            if ("true".equals(project.getProperties().getProperty("kotlin.compiler.incremental"))) {
-                File kotlinIncrementalOutputDir = new File(project.getBuild().getDirectory() + File.separator + "kotlin-ic" + File.separator + "compile" + File.separator + "classes");
-                if (kotlinIncrementalOutputDir.exists()) {
-                    inJars.add(new Path(antProject, kotlinIncrementalOutputDir.getAbsolutePath()));
-                }
-                    
-            }
+            
             project.getDependencyArtifacts().forEach(artifact -> {
                 if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("codenameone-core")) {
                     return;

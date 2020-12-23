@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
@@ -34,8 +35,10 @@ import org.apache.maven.repository.RepositorySystem;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.input.DefaultInputHandler;
 import org.apache.tools.ant.input.InputHandler;
+import org.apache.tools.ant.taskdefs.Copy;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.taskdefs.Redirector;
+import org.apache.tools.ant.types.FileSet;
 
 /**
  *
@@ -251,8 +254,34 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return getJar(art);
     }
     
+   
+    
     protected Artifact getArtifact(String groupId, String artifactId) {
-        return project.getDependencyArtifacts().stream().filter(art->art.getArtifactId().equals(artifactId) && art.getGroupId().equals(groupId)).findFirst().orElse(null);
+        Artifact out = project.getDependencyArtifacts().stream().filter(art->art.getArtifactId().equals(artifactId) && art.getGroupId().equals(groupId)).findFirst().orElse(null);
+        if (out != null) return out;
+        out = pluginArtifacts.stream().filter(
+                art->art.getArtifactId().equals(artifactId) && 
+                        art.getGroupId().equals(groupId)).findFirst().orElse(null);
+        return out;
+    }
+    
+    protected File getJar(String groupId, String artifactId, String classifier) {
+        Artifact art = getArtifact(groupId, artifactId, classifier);
+        if (art == null) return null;
+        return getJar(art);
+    }
+    
+    protected Artifact getArtifact(String groupId, String artifactId, String classifier) {
+        Artifact out =  project.getDependencyArtifacts().stream().filter(
+                art->art.getArtifactId().equals(artifactId) && 
+                        art.getGroupId().equals(groupId) &&
+                        Objects.equals(art.getClassifier(), classifier)).findFirst().orElse(null);
+        if (out != null) return out;
+        out = pluginArtifacts.stream().filter(
+                art->art.getArtifactId().equals(artifactId) && 
+                        art.getGroupId().equals(groupId) &&
+                        Objects.equals(art.getClassifier(), classifier)).findFirst().orElse(null);
+        return out;
     }
     
     protected File getJar(Artifact artifact) {
@@ -621,5 +650,26 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         java.createArg().setValue("force");
         java.executeJava();
     }
+    
+    
+    protected void copyKotlinIncrementalCompileOutputToOutputDir() {
+        if ("true".equals(project.getProperties().getProperty("kotlin.compiler.incremental"))) {
+            File kotlinIncrementalOutputDir = new File(project.getBuild().getDirectory() + File.separator + "kotlin-ic" + File.separator + "compile" + File.separator + "classes");
+            File outputDir = new File(project.getBuild().getOutputDirectory());
+            if (kotlinIncrementalOutputDir.exists()) {
+                Copy copy = (Copy)antProject.createTask("copy");
+                copy.setTodir(outputDir);
+                FileSet files = new FileSet();
+                files.setProject(antProject);
+                files.setDir(kotlinIncrementalOutputDir);
+                files.setIncludes("**");
+                copy.addFileset(files);
+                copy.setOverwrite(true);
+                copy.execute();
+            }
+
+        }
+    }
    
 }
+    

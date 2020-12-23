@@ -51,8 +51,9 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         java.setJar(getDesignerJar());
         java.setFork(true);
         java.setFailonerror(true);
-        
+        String cefDir = System.getProperty("cef.dir", System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         java.createJvmarg().setValue("-Dcli=true");
+        java.createJvmarg().setValue("-Dcef.dir="+cefDir);
         java.createJvmarg().setValue("-Dcn1.libCSSDir="+cssImplDir.getAbsolutePath());
         java.createArg().setValue("-css");
         java.createArg().setFile(cssTheme);

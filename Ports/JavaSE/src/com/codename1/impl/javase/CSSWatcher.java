@@ -148,10 +148,10 @@ public class CSSWatcher implements Runnable {
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
-        
+        String cefDir = System.getProperty("cef.dir", cn1Home + File.separator + "cef");
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
+                "-jar", "-Dcli=true", "-Dcef.dir="+cefDir, "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
                 "-css",
                 srcFile.getAbsolutePath(),
                 destFile.getAbsolutePath(),

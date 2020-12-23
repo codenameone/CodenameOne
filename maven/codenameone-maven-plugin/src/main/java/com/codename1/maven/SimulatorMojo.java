@@ -153,7 +153,14 @@ private static final String GROUP_ID="com.codenameone";
         List<String> paths = new ArrayList<>();
         //StringBuilder classpath = new StringBuilder();
         Path classpath = java.createClasspath();
-        
+        if (System.getProperty("cef.dir") != null) {
+            Variable v = new Variable();
+            v.setKey("cef.dir");
+            v.setValue(System.getProperty("cef.dir"));
+            java.addSysproperty(v);
+            
+        }
+        copyKotlinIncrementalCompileOutputToOutputDir();
         for (Artifact artifact : project.getDependencyArtifacts()) {
             
             log.debug("Checking artifact "+artifact);

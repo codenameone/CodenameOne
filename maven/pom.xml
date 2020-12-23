@@ -296,5 +296,14 @@
                 <module>build-client</module>
             </modules>
         </profile>
+        <profile>
+            <id>tests</id>
+            <modules>
+                <module>tests/core-tests</module>
+            </modules>
+        
+        </profile>
     </profiles>
+    
+
 </project>

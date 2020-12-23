@@ -99,118 +99,29 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
     }
     
     private void addKotlinDependencies() throws MojoExecutionException {
-        File pomFile = new File(project.getBasedir() + File.separator + "pom.xml");
-        if (!pomFile.exists()) {
-            throw new MojoExecutionException("Cannot add kotlin dependencies to pom file "+pomFile+" because the file could not be found.");
+        File mvnDir = new File(project.getBasedir() + File.separator + ".mvn");
+        if (!mvnDir.exists()) {
+            mvnDir.mkdir();
+        }
+        File jvmConfig = new File(mvnDir, "jvm.config");
+        if (!jvmConfig.exists()) {
+            try {
+                jvmConfig.createNewFile();
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Failed to add .mvn/jvm.config file", ex);
+            }
         }
         try {
-           
-            String contents = FileUtils.readFileToString(pomFile, "UTF-8");
-            boolean changed = false;
-            
-            
-            if (!contents.contains("<artifactId>kotlin-stdlib</artifactId>")) {
-                changed = true;
-                
-                contents = replaceFirst(contents, "</dependencies>", "<dependency>\n" +
-"		        <groupId>org.jetbrains.kotlin</groupId>\n" +
-"		        <artifactId>kotlin-stdlib</artifactId>\n" +
-"		        <version>${kotlin.version}</version>\n" +
-"		    </dependency>"
-                    + "        </dependencies>");
+            String contents = FileUtils.readFileToString(jvmConfig);
+            if (contents.contains("-Dcn1.kotlin=")) {
+                contents = contents.replaceAll("-Dcn1\\.kotlin=(true|false)", "");
             }
-            if (!contents.contains("<kotlin.version>")) {
-                changed = true;
-                contents = replaceFirst(contents, "<properties>", "<properties>\n"
-                        + "<kotlin.version>"+KOTLIN_VERSION+"</kotlin.version>\n"
-                                + "");
-            }
-            
-            if (!contents.contains("<artifactId>kotlin-maven-plugin</artifactId>")) {
-                changed = true;
-                contents = replaceFirst(contents, "</plugin>", "</plugin>\n"
-                + "<plugin>\n" +
-"			            <groupId>org.jetbrains.kotlin</groupId>\n" +
-"			            <artifactId>kotlin-maven-plugin</artifactId>\n" +
-"			            <version>${kotlin.version}</version>\n" +
-"			            <executions>\n" +
-"			                <execution>\n" +
-"			                    <id>compile</id>\n" +
-"			                    <goals>\n" +
-"			                        <goal>compile</goal>\n" +
-"			                    </goals>\n" +
-"			                    <configuration>\n" +
-"			                        <sourceDirs>\n" +
-"			                            <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>\n" +
-"			                            <sourceDir>${project.basedir}/src/main/java</sourceDir>\n" +
-"			                        </sourceDirs>\n" +
-"			                    </configuration>\n" +
-"			                </execution>\n" +
-"			                <execution>\n" +
-"			                    <id>test-compile</id>\n" +
-"			                    <goals> <goal>test-compile</goal> </goals>\n" +
-"			                    <configuration>\n" +
-"			                        <sourceDirs>\n" +
-"			                            <sourceDir>${project.basedir}/src/test/kotlin</sourceDir>\n" +
-"			                            <sourceDir>${project.basedir}/src/test/java</sourceDir>\n" +
-"			                        </sourceDirs>\n" +
-"			                    </configuration>\n" +
-"			                </execution>\n" +
-"			            </executions>\n" +
-"			        </plugin>\n" +
-"			        <plugin>\n" +
-"			            <groupId>org.apache.maven.plugins</groupId>\n" +
-"			            <artifactId>maven-compiler-plugin</artifactId>\n" +
-"			            <version>3.5.1</version>\n" +
-"			            <executions>\n" +
-"			                <!-- Replacing default-compile as it is treated specially by maven -->\n" +
-"			                <execution>\n" +
-"			                    <id>default-compile</id>\n" +
-"			                    <phase>none</phase>\n" +
-"			                </execution>\n" +
-"			                <!-- Replacing default-testCompile as it is treated specially by maven -->\n" +
-"			                <execution>\n" +
-"			                    <id>default-testCompile</id>\n" +
-"			                    <phase>none</phase>\n" +
-"			                </execution>\n" +
-"			                <execution>\n" +
-"			                    <id>java-compile</id>\n" +
-"			                    <phase>compile</phase>\n" +
-"			                    <goals>\n" +
-"			                        <goal>compile</goal>\n" +
-"			                    </goals>\n" +
-"			                </execution>\n" +
-"			                <execution>\n" +
-"			                    <id>java-test-compile</id>\n" +
-"			                    <phase>test-compile</phase>\n" +
-"			                    <goals>\n" +
-"			                        <goal>testCompile</goal>\n" +
-"			                    </goals>\n" +
-"			                    <configuration>\n" +
-"			                        <skip>${maven.test.skip}</skip>\n" +
-"			                    </configuration>\n" +
-"			                </execution>\n" +
-"			            </executions>\n" +
-"			        </plugin>");
-            }
-            
-            if (changed) {
-                
-                if (!pomBackedUp) {
-                    pomBackedUp = true;
-                    File pomBackup = new File(pomFile.getAbsolutePath()+"."+System.currentTimeMillis()+".bak");
-                    getLog().info("Backing up pom.xml to "+pomBackup);
-                    FileUtils.copyFile(pomFile, pomBackup , true);
-                }
-                getLog().info("Kotlin dependencies to pom.xml");
-                FileUtils.writeStringToFile(pomFile, contents, "UTF-8");
-            }
-            
-            
-            
+            contents += " -Dcn1.kotlin=true";
+            FileUtils.writeStringToFile(jvmConfig, contents);
         } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to read pom file", ex);
+            throw new MojoExecutionException("Failed to update .mvn/jvm.config file", ex);
         }
+
     }
     
     private void migrateSources() throws Exception {
