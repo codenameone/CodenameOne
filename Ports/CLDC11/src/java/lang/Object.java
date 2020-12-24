@@ -125,7 +125,7 @@ public class Object{
         return; //TODO codavaj!!
     }
     
-    public Object clone() {
+    protected Object clone() {
         return null;
     }
 
