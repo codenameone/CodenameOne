@@ -6687,7 +6687,17 @@ public abstract class CodenameOneImplementation {
         
     }
 
-    
+    /**
+     * Sets connection to be insecure.  If platform supports it, this will turn off SSL cerficate checks for validity.
+     * @param connection
+     * @param insecure True to make connection insecure.
+     * @since 7.0
+     * @see ConnectionRequest#setInsecure(boolean) 
+     * @see ConnectionRequest#isInsecure() 
+     */
+    public void setInsecure(Object connection, boolean insecure) {
+        
+    }
 
     /**
      * Checks if this platform supports read timeout in network connections.

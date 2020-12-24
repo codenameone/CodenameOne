@@ -5842,12 +5842,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((URLConnection)connection).setReadTimeout(readTimeout);
         }
     }
+    
+    
 
     @Override
     public boolean isReadTimeoutSupported() {
         return true;
     }
     
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        if (insecure) {
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                try {
+                    TrustModifier.relaxHostChecking(conn);
+                } catch (Exception ex) {
+                    com.codename1.io.Log.e(ex);
+                }
+            }
+        }
+    }
     
 
     /**
