@@ -29,17 +29,40 @@ import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 
 /**
- *
+ * Imports an existing legacy ANT project into the current project.  Typical workflow would be to
+ * first generate a project using archetype:generate, then run cn1:import-ant-project -Dcn1.sourceProject=/path/to/legacy-project
+ * 
+ * This leaves the legacy project untouched.
+ * 
+ * NOTE: This will overwrite all current settings in the maven project - effectively destroying it.
+ * 
+ * 
+ * As a safety feature, this goal will fail if the maven project has an existing src directory.  Before running 
+ * this goal, you need to delete or move the src directory.
  * @author shannah
  */
 @Mojo(name = "import-ant-project")
 public class ImportAntProjectMojo extends AbstractCN1Mojo {
 
+    /**
+     * The file system repository (located ad $basedir/repository where cn1libs
+     * are installed.
+     */
     private File repository;
+    
+    /**
+     * A flag that is set to indicate that the pom file has already been backed up.
+     */
     private boolean pomBackedUp;
+    
+    /**
+     * The version of Kotlin to use for kotlin projects.
+     */
     public static final String KOTLIN_VERSION="1.3.72";
     
-    
+    /**
+     * The source ANT project.
+     */
     private File sourceProject;
     
     @Override
@@ -56,6 +79,9 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
         if (!sourceProject.exists()) {
             throw new MojoExecutionException("Source project must point to the root directory of a Codename One ant project.  The directory supplied doesn't exist. "+sourceProject);
         }
+        
+        // Just a safety feature:  If the current project has a "src" directory, then this goal will fail
+        // Force them to delete or move the project src directory in order to run this goal.
         for (String root : project.getCompileSourceRoots()) {
             if (new File(root).exists()) {
                 getLog().error("Before you can run the import-ant-project goal, you must delete or rename the source directory in this project.");
@@ -63,6 +89,9 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
                 throw new MojoExecutionException("Project import failed");
             }
         }
+        
+        // Find all cn1libs in the legacy project - convert them to maven format, and install them 
+        // in file system repository inside the project.
         repository = new File(project.getBasedir() + File.separator + "repository");
         File tmpDir = new File(project.getBuild().getDirectory() + File.separator + "cn1libs");
         File libs = new File(sourceProject, "lib");
@@ -72,6 +101,8 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
             }
             migrateLib(cn1lib, tmpDir, "1.0-SNAPSHOT");
         }
+        
+        // Now migrate all of the source files.
         try {
             migrateSources();
         } catch (Exception ex) {
@@ -79,16 +110,28 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed to migrate sources", ex);
         }
         
+        // If it is a kotlin project, we need to activate kotlin.
         if (isKotlinProject()) {
             addKotlinDependencies();
         }
     }
     
-    
+    /**
+     * Checks if the project (the legacy ant project) is a kotlin project.  Projects are deemed to be 
+     * kotlin projects if they include the kotlin-runtime.cn1lib
+     * @return 
+     */
     private boolean isKotlinProject() {
         return new File(sourceProject + File.separator + "lib" + File.separator + "kotlin-runtime.cn1lib").exists();
     }
     
+    /**
+     * Replaces the first instance of patttern in inputString with replacement - Not using regex.
+     * @param inputString
+     * @param pattern
+     * @param replacement
+     * @return 
+     */
     private String replaceFirst(String inputString, String pattern, String replacement) {
         int patternLen = pattern.length();
         int index = inputString.indexOf(pattern);
@@ -98,6 +141,11 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
         return inputString;
     }
     
+    /**
+     * Kotlin dependencies are added by simply adding the cn1.kotlin=true system property
+     * to builds (or explicitly invoke the "kotlin" profile.  We will use the .mvn/jvm.config
+     * file to set the cn1.kotlin system property by default.
+     */
     private void addKotlinDependencies() throws MojoExecutionException {
         File mvnDir = new File(project.getBasedir() + File.separator + ".mvn");
         if (!mvnDir.exists()) {
@@ -124,10 +172,14 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
 
     }
     
+    /**
+     * Migrate all sources from the legacy project into the maven project.
+     */
     private void migrateSources() throws Exception {
+        File javaSources = new File(project.getCompileSourceRoots().get(0));
         File antSrcDir = new File(sourceProject, "src");
         if (antSrcDir.exists()) {
-            File javaSources = new File(project.getCompileSourceRoots().get(0));
+            
             File kotlinSources = new File(javaSources.getParentFile(), "kotlin");
             javaSources.mkdirs();
             if (javaSources.exists()) {
@@ -204,9 +256,66 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
             FileUtils.copyFile(srcFile, destFile);
             
             
+            
+            
+            
+        }
+        File antResDirectory = new File(sourceProject, "res");
+        File resDirectory = new File(javaSources.getParentFile(), "res");
+
+        File guibuilderDirectory = new File(javaSources.getParentFile(), "guibuilder");
+        if (antResDirectory.exists()) {
+            FileUtils.copyDirectory(antResDirectory, resDirectory, true);
+            File guibuilder  = new File(resDirectory, "guibuilder");
+            if (guibuilder.exists()) {
+                FileUtils.copyDirectory(guibuilder, guibuilderDirectory, true);
+                FileUtils.deleteDirectory(guibuilder);
+            } else {
+                guibuilderDirectory.mkdirs();
+            }
+        } else {
+            resDirectory.mkdirs();
+            guibuilderDirectory.mkdirs();
         }
         
         
+        File antTestDirectory = new File(sourceProject, "test");
+        File javaTestSources = new File(project.getBasedir() + File.separator + "src" + File.separator + "test" + File.separator + "java");
+        javaTestSources.mkdirs();
+        if (antTestDirectory.exists()) {
+            Copy copy = (Copy)antProject.createTask("copy");
+            copy.setTodir(javaTestSources);
+            FileSet fs = new FileSet();
+            fs.setProject(antProject);
+            fs.setDir(antTestDirectory);
+            fs.setIncludes("**/*.java");
+            copy.addFileset(fs);
+            copy.execute();
+            
+            File kotlinTestSources = new File(javaTestSources.getParentFile(), "kotlin");
+            kotlinTestSources.mkdirs();
+            copy = (Copy)antProject.createTask("copy");
+            copy.setTodir(kotlinTestSources);
+            fs = new FileSet();
+            fs.setProject(antProject);
+            fs.setDir(antTestDirectory);
+            fs.setIncludes("**/*.kt");
+            copy.addFileset(fs);
+            copy.execute();
+            
+            File testResources = new File(javaTestSources.getParentFile(), "resources");
+            testResources.mkdirs();
+            copy = (Copy)antProject.createTask("copy");
+            copy.setTodir(testResources);
+            fs = new FileSet();
+            fs.setProject(antProject);
+            fs.setDir(antTestDirectory);
+            fs.setExcludes("**/*.kt,**/*.java");
+            copy.addFileset(fs);
+            copy.execute();
+            
+            
+        }
         
         
         

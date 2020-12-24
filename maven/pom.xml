@@ -300,6 +300,8 @@
             <id>tests</id>
             <modules>
                 <module>tests/core-tests</module>
+                <module>tests/signindemo</module>
+                <module>tests/testnativeinterfaces</module>
             </modules>
         
         </profile>
