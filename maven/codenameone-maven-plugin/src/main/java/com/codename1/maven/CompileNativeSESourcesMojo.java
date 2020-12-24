@@ -83,7 +83,7 @@ public class CompileNativeSESourcesMojo extends AbstractCN1Mojo {
         for (File jar : getLibsNativeSEDependencyJars()) {
             classpath.add(new Path(antProject, jar.getAbsolutePath()));
         }
-        project.getDependencyArtifacts().forEach(artifact -> {
+        project.getArtifacts().forEach(artifact -> {
             if (isJavaSEDep(artifact) || "compile".equals(artifact.getScope()) || "system".equals(artifact.getScope()) || "runtime".equals(artifact.getScope())) {
                 classpath.add(new Path(antProject, findArtifactFile(artifact).getAbsolutePath()));
             }

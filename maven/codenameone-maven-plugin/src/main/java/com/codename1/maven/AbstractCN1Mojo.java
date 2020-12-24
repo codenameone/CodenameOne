@@ -257,7 +257,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
    
     
     protected Artifact getArtifact(String groupId, String artifactId) {
-        Artifact out = project.getDependencyArtifacts().stream().filter(art->art.getArtifactId().equals(artifactId) && art.getGroupId().equals(groupId)).findFirst().orElse(null);
+        Artifact out = project.getArtifacts().stream().filter(art->art.getArtifactId().equals(artifactId) && art.getGroupId().equals(groupId)).findFirst().orElse(null);
         if (out != null) return out;
         out = pluginArtifacts.stream().filter(
                 art->art.getArtifactId().equals(artifactId) && 
@@ -272,7 +272,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     protected Artifact getArtifact(String groupId, String artifactId, String classifier) {
-        Artifact out =  project.getDependencyArtifacts().stream().filter(
+        Artifact out =  project.getArtifacts().stream().filter(
                 art->art.getArtifactId().equals(artifactId) && 
                         art.getGroupId().equals(groupId) &&
                         Objects.equals(art.getClassifier(), classifier)).findFirst().orElse(null);

@@ -26,6 +26,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Path;
 
@@ -33,7 +34,7 @@ import org.apache.tools.ant.types.Path;
  *
  * @author shannah
  */
-@Mojo(name = "test", defaultPhase = LifecyclePhase.TEST)
+@Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
 public class RunTestsMojo extends AbstractCN1Mojo {
     private static final int VERSION = 1;
     
@@ -47,11 +48,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
             paths.add(new File(project.getBuild().getTestOutputDirectory()));
             paths.add(new File(project.getBuild().getOutputDirectory()));
             
-            for (Artifact artifact : project.getDependencyArtifacts()) {
+            for (Artifact artifact : project.getArtifacts()) {
                 //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
                 paths.add(getJar(artifact));
                 //}
             }
+            getLog().info("Looking for test cases in "+paths);
             Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
                 return false;
@@ -176,7 +178,10 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         Path cp = java.createClasspath();
         cp.add(new Path(antProject, project.getBuild().getTestOutputDirectory()));
         cp.add(new Path(antProject, project.getBuild().getOutputDirectory()));
-        for (Artifact artifact : project.getDependencyArtifacts()) {
+        for (Artifact artifact : project.getArtifacts()) {
+            if ("provided".equals(artifact.getScope())) {
+                continue;
+            }
             //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
                 cp.add(new Path(antProject, getJar(artifact).getAbsolutePath()));
             //}

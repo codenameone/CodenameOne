@@ -151,6 +151,9 @@ public class SendServerBuildMojo extends AbstractCN1Mojo {
             provisioningProfile = createFile(tmp);
         }
         appid = p("appId");
+        if (appid == null || appid.isEmpty()) {
+            appid = p("ios.appid");
+        }
         tmp = p("automated");
         automated = "true".equals(tmp);
         
@@ -258,7 +261,7 @@ public class SendServerBuildMojo extends AbstractCN1Mojo {
             copy.execute();
         }
 
-        project.getDependencyArtifacts().forEach(art->{
+        project.getArtifacts().forEach(art->{
             if (art.getGroupId().equals("com.codenameone")) {
                 if (art.getArtifactId().equals("codenameone-core") || art.getArtifactId().equals("codenameone-javase") || art.getArtifactId().equals("codenameone-java-runtime")) {
                     return;

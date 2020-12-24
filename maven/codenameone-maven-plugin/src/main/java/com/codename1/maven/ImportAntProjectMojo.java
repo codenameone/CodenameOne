@@ -99,7 +99,7 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
             if (!cn1lib.getName().endsWith(".cn1lib")) {
                 continue;
             }
-            migrateLib(cn1lib, tmpDir, "1.0-SNAPSHOT");
+            migrateLib(cn1lib, tmpDir, project.getVersion());
         }
         
         // Now migrate all of the source files.
@@ -451,11 +451,6 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
                     + "                <artifactId>"+outputDir.getName()+"</artifactId>\n"
                     + "                <version>"+version+"</version>"
                     + "            </dependency>\n"
-                    + "            <dependency>\n" +
-                      "                <groupId>org.jetbrains</groupId>\n" +
-                      "                <artifactId>annotations</artifactId>\n" +
-                      "                <version>13.0</version>\n" +
-                      "            </dependency>"
                     + "        </dependencies>");
             }
             

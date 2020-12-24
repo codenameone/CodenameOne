@@ -138,7 +138,7 @@
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
                 <version>${project.version}</version>
-                <scope>compile</scope>
+                
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>

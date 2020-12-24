@@ -16,6 +16,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-factory</artifactId>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
     <properties>

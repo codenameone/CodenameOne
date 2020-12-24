@@ -19,6 +19,7 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.Delete;
@@ -28,7 +29,7 @@ import org.apache.tools.ant.taskdefs.Expand;
  *
  * @author shannah
  */
-@Mojo(name = "installcn1libs")
+@Mojo(name = "installcn1libs", requiresDependencyResolution = ResolutionScope.TEST)
 public class InstallCn1libsMojo extends AbstractCN1Mojo {
     
     
@@ -117,7 +118,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
         Exception[] err = new Exception[1];
         List<Artifact> cn1libArtifacts = new ArrayList<>();
         
-        project.getDependencyArtifacts().forEach(artifact -> {
+        project.getArtifacts().forEach(artifact -> {
             File jarFile = findArtifactFile(artifact);
             
             if (Cn1libUtil.isCN1Lib(jarFile)) {
@@ -146,7 +147,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
                 getLog().info("Dependencies have changed.  Updating project properties and CSS");
                 // The dependencies have changed
                 boolean changed = false;
-                for (Artifact artifact : project.getDependencyArtifacts()) {
+                for (Artifact artifact : project.getArtifacts()) {
                     if (mergeProjectProperties(artifact)) {
                         getLog().info("Merged properties for "+artifact+" into project properties");
                         changed = true;

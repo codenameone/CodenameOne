@@ -15,6 +15,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.taskdefs.Javac;
 import org.apache.tools.ant.types.Path;
@@ -23,7 +24,7 @@ import org.apache.tools.ant.types.Path;
  *
  * @author shannah
  */
-@Mojo(name = "compliance-check", defaultPhase = LifecyclePhase.PROCESS_CLASSES)
+@Mojo(name = "compliance-check", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.TEST)
 public class ComplianceCheckMojo extends AbstractCN1Mojo {
 
     @Override
@@ -63,7 +64,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         javac.setTarget("1.8");
         javac.setBootclasspath(new Path(antProject, javaRuntimeJar.getAbsolutePath()));
         Path path = new Path(antProject);
-        project.getDependencyArtifacts().forEach(artifact -> {
+        project.getArtifacts().forEach(artifact -> {
             if (isSupportedScope(artifact.getScope())) {
                 path.add(new Path(antProject, getJar(artifact).getAbsolutePath()));
             }
@@ -145,15 +146,18 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         if (passNum == 0) {
             Path inJars = new Path(antProject, project.getBuild().getOutputDirectory());
             
-            project.getDependencyArtifacts().forEach(artifact -> {
+            project.getArtifacts().forEach(artifact -> {
+                getLog().info("artifact "+artifact);
                 if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("codenameone-core")) {
                     return;
                 }
 
-                if (artifact.getScope().equals("compile") || artifact.getScope().equals("system")) {
+                if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
+                    getLog().info("Adding to injars: "+getJar(artifact));
                     inJars.add(new Path(antProject, getJar(artifact).getAbsolutePath()+"(!META-INF/**)"));
                 }
             });
+            getLog().info("injars = "+inJars);
             java.createArg().setValue("-injars");
             java.createArg().setPath(inJars);
             java.createArg().setValue("-outjars");
@@ -188,7 +192,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
     
 
     private File getJavaRuntimeJar() {
-        for (Artifact artifact : project.getDependencyArtifacts()) {
+        for (Artifact artifact : project.getArtifacts()) {
             if (JAVA_RUNTIME_ARTIFACT_ID.equals(artifact.getArtifactId()) && GROUP_ID.equals(artifact.getGroupId())) {
                 return getJar(artifact);
             }
@@ -204,7 +208,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
     
     private File getCodenameOneJar() {
         String codenameOneCoreId = "codenameone-core";
-        for (Artifact artifact : project.getDependencyArtifacts()) {
+        for (Artifact artifact : project.getArtifacts()) {
             if (codenameOneCoreId.equals(artifact.getArtifactId()) && GROUP_ID.equals(artifact.getGroupId())) {
                 return getJar(artifact);
             }

@@ -176,7 +176,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         //StringBuilder classpath = new StringBuilder();
         Path classpath = new Path(antProject);
         
-        for (Artifact artifact : project.getDependencyArtifacts()) {
+        for (Artifact artifact : project.getArtifacts()) {
             log.debug("Checking artifact "+artifact);
             if (!filterByScope(artifact)) {
                 continue;

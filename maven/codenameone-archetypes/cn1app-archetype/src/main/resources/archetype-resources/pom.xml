@@ -18,7 +18,7 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
             <version>${d}{cn1.version}</version>
-            <scope>provided</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>

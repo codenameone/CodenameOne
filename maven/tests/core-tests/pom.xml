@@ -21,7 +21,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
-            <scope>provided</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>

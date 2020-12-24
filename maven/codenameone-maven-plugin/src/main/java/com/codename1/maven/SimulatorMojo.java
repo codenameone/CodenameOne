@@ -161,16 +161,19 @@ private static final String GROUP_ID="com.codenameone";
             
         }
         copyKotlinIncrementalCompileOutputToOutputDir();
-        for (Artifact artifact : project.getDependencyArtifacts()) {
+        for (Artifact artifact : project.getArtifacts()) {
             
             log.debug("Checking artifact "+artifact);
             //if (!filterByScope(artifact)) {
             //    continue;
             //}
+            if ("provided".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
+                continue;
+            }
             if (!filterByName(artifact)) {
                 continue;
             }
-            File file = artifact.getFile();
+            File file = getJar(artifact);
             //if (classpath.length() > 0) {
             //    classpath.append(':');
             //}
