@@ -709,7 +709,7 @@ public final class IOSNative {
     native boolean isMultiGallerySelectSupported();
 
     native void setConnectionId(long peer, int id);
-    native void setInsecure(long peer, boolean insecure);
+    //native void setInsecure(long peer, boolean insecure);
     
     native int getDisplaySafeInsetLeft();
 
