@@ -429,7 +429,7 @@ public class BoxLayout extends Layout{
     
     /**
      * The equivalent of Container.enclose() with a box layout Y
-     * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" />
+     * <img src="https://www.codenameone.com/img/developer-guide/box-layout-y.png" alt="Box Layout Y" />
      * @param cmps the set of components
      * @return the newly created container
      */

@@ -1527,6 +1527,18 @@ public class Util {
         } else {
             NetworkManager.getInstance().addToQueueAndWait(cr);
         }
+        if(cr.getContentLength() > 0) {
+            // verify the resulting file has the same size as the content length
+            if(storage) {
+                if(Storage.getInstance().entrySize(fileName) < cr.getContentLength()) {
+                    return false;
+                }
+            } else {
+                if(FileSystemStorage.getInstance().getLength(fileName) < cr.getContentLength()) {
+                    return false;
+                }
+            }
+        }
         int rc = cr.getResponseCode();
         return rc == 200 || rc == 201;
     }

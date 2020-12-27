@@ -769,7 +769,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         }
         addComponent(t, icon.getParent());
         updateGap();
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
     
     /**
@@ -797,7 +797,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             removeComponent(emblem.getParent());
         }
         addComponent(t, emblem.getParent());
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
     
     /**

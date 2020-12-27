@@ -37,12 +37,14 @@ UIWebViewDelegate
 #ifndef NO_UIWEBVIEW
 ,
 #endif
-        WKNavigationDelegate, WKUIDelegate
+        WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler
 #endif
 >{
     void *c;
 }
 
 - (id)initWithCallback:(void*)callback;
-
+#ifdef ENABLE_WKWEBVIEW
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message;
+#endif
 @end

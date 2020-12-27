@@ -321,6 +321,7 @@ public class ImageViewer extends Component {
         pressX = x;
         pressY = y;
         currentZoom = zoom;
+        getComponentForm().addComponentAwaitingRelease(this);
     }
 
     private Image getImageRight() {
@@ -512,8 +513,8 @@ public class ImageViewer extends Component {
         }
         imageDrawWidth = (int)(((float)iW) * r2 * zoom);
         imageDrawHeight = (int)(((float)iH) * r2 * zoom);
-        imageX = (int)(s.getPaddingLeftNoRTL()+ (width - imageDrawWidth) * panPositionX);
-        imageY = (int)(s.getPaddingTop() + (height - imageDrawHeight) * panPositionY);
+        imageX = (int)(s.getPaddingLeftNoRTL()+ imageDrawWidth * (0.5-panPositionX));
+        imageY = (int)(s.getPaddingTop() + imageDrawHeight * (0.5 - panPositionY));
         cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
     }
     

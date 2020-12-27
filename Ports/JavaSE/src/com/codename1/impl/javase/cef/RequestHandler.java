@@ -21,6 +21,7 @@ import org.cef.network.CefPostDataElement;
 import org.cef.network.CefRequest;
 
 import java.awt.Frame;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -31,20 +32,20 @@ import javax.swing.SwingUtilities;
 //import tests.detailed.dialog.PasswordDialog;
 
 public class RequestHandler extends CefResourceRequestHandlerAdapter implements CefRequestHandler {
-    private final Container owner_;
+    private final WeakReference<Container> ownerRef;
     //private BrowserComponent browserComponent_;
-    private BrowserNavigationCallback navigationCallback_;
+    private final BrowserNavigationCallback navigationCallback_;
     
 
     public RequestHandler(Container owner, BrowserNavigationCallback navigationCallback) {
-        owner_ = owner;
+        ownerRef = new WeakReference<Container>(owner);
         this.navigationCallback_ = navigationCallback;
     }
 
     @Override
     public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
             boolean user_gesture, boolean is_redirect) {
-        
+        //BrowserNavigationCallback navigationCallback_ = navigationCallbackRef.get();
         if (navigationCallback_ != null) {
             
             boolean res = navigationCallback_.shouldNavigate(request.getURL());
@@ -70,8 +71,11 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
                     SwingUtilities.invokeLater(new Runnable() {
                         @Override
                         public void run() {
-                            JOptionPane.showMessageDialog(owner_,
-                                    "The request was rejected because you've entered \"ignore\" into the form.");
+                            Container owner_ = ownerRef.get();
+                            if (owner_ != null) {
+                                JOptionPane.showMessageDialog(owner_,
+                                        "The request was rejected because you've entered \"ignore\" into the form.");
+                            }
                         }
                     });
                     return true;
@@ -130,7 +134,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
                 request.setMethod("GET");
                 request.setURL(forwardTo);
                 request.setFirstPartyForCookies(forwardTo);
-                HashMap<String, String> headerMap = new HashMap<>();
+                HashMap<String, String> headerMap = new HashMap<String,String>();
                 request.getHeaderMap(headerMap);
                 headerMap.remove("Content-Type");
                 headerMap.remove("Origin");

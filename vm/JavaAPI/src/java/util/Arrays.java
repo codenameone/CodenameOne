@@ -119,7 +119,7 @@ public class Arrays {
         }
 
         @Override
-        public E set(int location, E object) {
+        public E set(int location, E object) {    
             try {
                 E result = a[location];
                 a[location] = object;
@@ -622,9 +622,6 @@ public class Arrays {
         checkIndexForBinarySearch(array.length, startIndex, endIndex);
         if (array.length == 0) {
             return -1;
-        }
-        if ( NumberComparator.isNumber(object)){
-            return binarySearch(array, startIndex, endIndex, object, NumberComparator.createComparator(object.getClass()));
         }
         int low = startIndex, mid = -1, high = endIndex - 1, result = 0;
         while (low <= high) {
@@ -1417,13 +1414,31 @@ public class Arrays {
         }
         return hashCode;
     }
-
+    
     private static int deepHashCodeElement(Object element) {
         Class<?> cl;
         if (element == null) {
             return 0;
         }
-
+        if (element instanceof boolean[]) {
+            return hashCode((boolean[]) element);
+        } else if (element instanceof byte[]) {
+            return hashCode((byte[]) element);
+        } else if (element instanceof short[]) {
+            return hashCode((short[]) element);
+        } else if (element instanceof char[]) {
+            return hashCode((char[]) element);
+        } else if (element instanceof int[]) {
+            return hashCode((int[]) element);
+        } else if (element instanceof long[]) {
+            return hashCode((long[]) element);
+        } else if (element instanceof float[]) {
+            return hashCode((float[]) element);
+        } else if (element instanceof double[]) {
+            return hashCode((double[]) element);
+        } else if (element instanceof Object[]) {
+            return  deepHashCode((Object[]) element);
+        } 
         return element.hashCode();
     }
 
@@ -1735,24 +1750,17 @@ public class Arrays {
     }
 
     private static boolean isSame(double double1, double double2) {
-        // Simple case
-        if (double1 == double2 && 0.0d != double1) {
-            return true;
-        }
-
-        // Deal with NaNs
+        
         if (Double.isNaN(double1)) {
             return Double.isNaN(double2);
         }
         if (Double.isNaN(double2)) {
             return false;
         }
+        long d1 = Double.doubleToLongBits(double1);
+        long d2 = Double.doubleToLongBits(double2);
+        return d1 == d2;
 
-        // Deal with +0.0 and -0.0
-        //long d1 = Double.doubleToRawLongBits(double1);
-        //long d2 = Double.doubleToRawLongBits(double2);
-        //return d1 == d2;
-        return false;
     }
 
     private static boolean lessThan(double double1, double double2) {
@@ -1760,21 +1768,19 @@ public class Arrays {
         // Double.compare(double1, double2) < 0.
 
         // Non-zero and non-NaN checking.
-        if (double1 < double2) {
-            return true;
-        }
-        if (double1 > double2) {
-            return false;
-        }
-        if (double1 == double2 && 0.0d != double1) {
-            return false;
-        }
 
         // NaNs are equal to other NaNs and larger than any other double.
         if (Double.isNaN(double1)) {
             return false;
         } else if (Double.isNaN(double2)) {
             return true;
+        }
+        
+        if (double1 == 0d && double1 == double2) {
+            long bits1 = Double.doubleToLongBits(double1);
+            long bits2 = Double.doubleToLongBits(double2);
+            long neg0 = Double.doubleToLongBits(-0.0);
+            return bits1 != bits2 && bits1 == neg0;
         }
 
         // Deal with +0.0 and -0.0.
@@ -1783,51 +1789,40 @@ public class Arrays {
         return double1 < double2;
     }
 
-    private static boolean isSame(float float1, float float2) {
-        // Simple case
-        if (float1 == float2 && 0.0d != float1) {
-            return true;
+    private static boolean isSame(float double1, float double2) {
+        
+        if (Float.isNaN(double1)) {
+            return Float.isNaN(double2);
         }
-
-        // Deal with NaNs
-        if (Float.isNaN(float1)) {
-            return Float.isNaN(float2);
-        }
-        if (Float.isNaN(float2)) {
+        if (Float.isNaN(double2)) {
             return false;
         }
-
-        // Deal with +0.0 and -0.0
-        //int f1 = Float.floatToRawIntBits(float1);
-        //int f2 = Float.floatToRawIntBits(float2);
-        return false; //f1 == f2;
+        long d1 = Float.floatToIntBits(double1);
+        long d2 = Float.floatToIntBits(double2);
+        return d1 == d2;
     }
     
-    private static boolean lessThan(float float1, float float2) {
-        // A slightly specialized version of Float.compare(float1, float2) < 0.
+    private static boolean lessThan(float double1, float double2) {
+        // A slightly specialized version of
+        // Double.compare(double1, double2) < 0.
 
         // Non-zero and non-NaN checking.
-        if (float1 < float2) {
+
+        // NaNs are equal to other NaNs and larger than any other double.
+        if (Float.isNaN(double1)) {
+            return false;
+        } else if (Float.isNaN(double2)) {
             return true;
         }
-        if (float1 > float2) {
-            return false;
-        }
-        if (float1 == float2 && 0.0f != float1) {
-            return false;
-        }
-
-        // NaNs are equal to other NaNs and larger than any other float
-        if (Float.isNaN(float1)) {
-            return false;
-        } else if (Float.isNaN(float2)) {
-            return true;
+        
+        if (double1 == 0d && double1 == double2) {
+            long bits1 = Float.floatToIntBits(double1);
+            long bits2 = Float.floatToIntBits(double2);
+            long neg0 = Float.floatToIntBits(-0.0f);
+            return bits1 != bits2 && bits1 == neg0;
         }
 
-        // Deal with +0.0 and -0.0
-        //int f1 = Float.floatToRawIntBits(float1);
-        //int f2 = Float.floatToRawIntBits(float2);
-        return float1 < float2;
+        return double1 < double2;
     }
 
     private static int med3(byte[] array, int a, int b, int c) {
@@ -1907,7 +1902,7 @@ public class Arrays {
     private static void checkBounds(int arrLength, int start, int end) {
         if (start > end) {
             // luni.35=Start index ({0}) is greater than end index ({1})
-            throw new IndexOutOfBoundsException("" + start + " out of: " + end);
+            throw new IllegalArgumentException("" + start + " out of: " + end);
         }
         if (start < 0) {
             // luni.36=Array index out of range\: {0}
@@ -2647,10 +2642,6 @@ public class Arrays {
         int len = end - start;
         
         Object o = in[start];
-        if ( NumberComparator.isNumber(o)){
-            mergeSort(in, out, start, end, NumberComparator.createComparator(o.getClass()));
-            return;
-        }
         // use insertion sort for small arrays
         if (len <= SIMPLE_LENGTH) {
             for (int i = start + 1; i < end; i++) {
@@ -2819,9 +2810,6 @@ public class Arrays {
      */
     @SuppressWarnings("unchecked")
     private static int find(Object[] arr, java.lang.Comparable val, int bnd, int l, int r) {
-        if ( NumberComparator.isNumber(val)){
-            return find(arr, val, bnd, l, r, NumberComparator.createComparator(val.getClass()));
-        }
         int m = l;
         int d = 1;
         while (m <= r) {
@@ -3710,6 +3698,9 @@ public class Arrays {
     }
     
     public static <T> T[] copyOf(T[] original, int newLength,  Class<? extends T[]> newType) {
+        if (newLength < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newLength);
+        }
         T[] arr = (T[])Array.newInstance(newType.getComponentType(), newLength);
         int len = Math.min(original.length, newLength);
         System.arraycopy(original, 0, arr, 0, len);
@@ -3717,6 +3708,9 @@ public class Arrays {
     }
     
     public static <T> T[] copyOf(T[] original, int newLength) {
+        if (newLength < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newLength);
+        }
         return copyOf(original, newLength, (Class<T[]>)original.getClass());
     }
 
@@ -3869,6 +3863,9 @@ public class Arrays {
     }
     
     public static boolean[] copyOf(boolean[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3877,6 +3874,9 @@ public class Arrays {
     }
     
     public static char[] copyOf(char[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3884,6 +3884,9 @@ public class Arrays {
         return copyOfRange(original, 0, original.length);
     }
     public static double[] copyOf(double[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3891,6 +3894,9 @@ public class Arrays {
         return copyOfRange(original, 0, original.length);
     }
     public static float[] copyOf(float[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3899,6 +3905,9 @@ public class Arrays {
     }
     
     public static long[] copyOf(long[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3907,6 +3916,9 @@ public class Arrays {
     }
     
     public static int[] copyOf(int[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3915,6 +3927,11 @@ public class Arrays {
     }
     
     public static byte[] copyOf(byte[] original, int newlen) {
+        if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }if (newlen < 0) {
+            throw new NegativeArraySizeException("copyOf expects newLength >= 0, but found "+newlen);
+        }
         return copyOfRange(original, 0, newlen);
     }
     
@@ -3926,8 +3943,14 @@ public class Arrays {
                     int from,
                     int to,
                     Class<? extends T[]> newType) {
-        if (from < 0 || to > original.length) {
-            throw new ArrayIndexOutOfBoundsException();
+        if (original == null) {
+            throw new NullPointerException("copyOfRange() attempted on null array");
+        }
+        if (from < 0 || from > original.length) {
+            throw new ArrayIndexOutOfBoundsException(from);
+        }
+        if (from > to) {
+            throw new IllegalArgumentException("Expected 'from' parameter in copyOfRange must be <= the 'to' param.  From="+from+", to="+to);
         }
         T[] out = (T[])Array.newInstance(newType.getComponentType(), to-from);
         System.arraycopy(original, from, out, 0, to-from);
@@ -3938,6 +3961,15 @@ public class Arrays {
     public static <T> T[] copyOfRange(T[] original,
                   int from,
                   int to) {
+        if (original == null) {
+            throw new NullPointerException("copyOfRange() attempted on null array");
+        }
+        if (from < 0 || from > original.length) {
+            throw new ArrayIndexOutOfBoundsException(from);
+        }
+        if (from > to) {
+            throw new IllegalArgumentException("Expected 'from' parameter in copyOfRange must be <= the 'to' param.  From="+from+", to="+to);
+        }
         return copyOfRange(original, from, to, (Class<T[]>)original.getClass());
     }
 
@@ -4048,4 +4080,9 @@ public class Arrays {
         }
         throw new IllegalArgumentException();
     }
+    
+    public static short[] copyOf(short[] original, int len) {
+        return copyOfRange(original, 0, len);
+    }
+   
 }

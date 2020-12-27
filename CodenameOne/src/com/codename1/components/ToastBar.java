@@ -792,7 +792,12 @@ public class ToastBar {
             c.setVisible(false);
             c.setHeight(0);
             c.setShouldCalcPreferredSize(true);
-            c.getParent().revalidate();
+            Form f = c.getComponentForm();
+            if (f != null) {
+                f.revalidate();
+            } else {
+                c.getParent().revalidate();
+            }
             c.hidden = false;
 
             c.label.setPreferredH(UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true).getHeight());

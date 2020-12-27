@@ -42,6 +42,7 @@ import com.codename1.util.regex.StringReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 
@@ -53,7 +54,7 @@ import java.util.Map;
  * @author Chen Fishbein
  */
 public class Oauth2 {
-
+    private boolean useRedirectForWeb = false;
     private boolean useBrowserWindow = "true".equals(CN.getProperty("oauth2.useBrowserWindow", "true"));
     public static final String TOKEN = "access_token";
 
@@ -88,6 +89,48 @@ public class Oauth2 {
     private Hashtable additionalParams;
     private Dialog login;
     private static boolean backToParent = true;
+    
+    private void serializeAuth() {
+        Map params = new HashMap();
+        params.put("token", token);
+        params.put("refreshToken", refreshToken);
+        params.put("identityToken", identityToken);
+        params.put("clientId", clientId);
+        params.put("redirectURI", redirectURI);
+        params.put("scope", scope);
+        params.put("clientSecret", clientSecret);
+        params.put("oauth2URL", oauth2URL);
+        params.put("tokenRequestURL", tokenRequestURL);
+        params.put("additionalParams", additionalParams);
+        params.put("backToParent", backToParent);
+        Storage s = Storage.getInstance();
+        s.writeObject("__oauth2Params", params);
+    }
+     
+     
+    public static Oauth2 fetchSerializedOauth2Request() {
+        Storage s = Storage.getInstance();
+        Map m = (Map)s.readObject("__oauth2Params");
+        if (m == null) {
+            return null;
+        }
+        Oauth2 out = new Oauth2((String)m.get("oauth2URL"), (String)m.get("clientId"), (String)m.get("redirectURI"));
+        out.token = (String)m.get("token");
+        out.refreshToken = (String)m.get("refreshToken");
+        out.identityToken = (String)m.get("identityToken");
+        out.scope = (String)m.get("scope");
+        out.clientSecret = (String)m.get("clientSecrete");
+        out.tokenRequestURL = (String)m.get("tokenRequestURL");
+        if (m.get("additionalParams") != null) {
+            out.additionalParams = new Hashtable();
+            out.additionalParams.putAll((Map)m.get("additionalParams"));
+        }
+        out.backToParent = (Boolean)m.get("backToParent");
+        s.deleteStorageFile("__oauth2Params");
+        return out;
+        
+    }
+    
 
     /**
      * Simple constructor
@@ -212,6 +255,36 @@ public class Oauth2 {
     public boolean isUseBrowserWindow() {
         return useBrowserWindow;
     }
+    
+    /**
+     * Sets thisOAuth2 object to use a redirect for login instead of an iframe when running on the Web (via the Javascript port).  Some
+     * Oauth providers won't work inside an iframe.
+     * 
+     * <p>Using this option will cause the browser to navigate away from the app to go to the login page.  The Oauth
+     * login will redirect back to the app after login is complete.</p>
+     * 
+     * <p><strong>Warning</strong>: If the user has unsaved changes in the app, navigating away from the app may cause them to lose their changes.  You should provide
+     * a warning, or confirmation prompt for the user in such cases.  The usual onbeforeunload handler is disabled when using this action so the user
+     * won't receive any warnings other than what you explicitly prompt.</p>
+     * @param redirect Set to true to use a redirect for Oauth login instead of an iframe when running on the web.
+     * @since 7.0
+     * @see #isUseRedirectForWeb() 
+     * @see #handleRedirect(com.codename1.ui.events.ActionListener) 
+     */
+    public void setUseRedirectForWeb(boolean redirect) {
+        this.useRedirectForWeb = redirect;
+    }
+    
+    /**
+     * Checks wither this Oauth component is configured to use a redirect for Oauth login when running on the web.
+     * @return True if this component will use a redirect for Oauth login.
+     * @since 7.0
+     * @see #setUseRedirectForWeb(boolean) 
+     * @see #handleRedirect(com.codename1.ui.events.ActionListener) 
+     */
+    public boolean isUseRedirectForWeb() {
+        return useRedirectForWeb;
+    }
 
     /**
      * This method creates a component which can authenticate. You will receive
@@ -228,14 +301,43 @@ public class Oauth2 {
     }
 
     /**
+     * When using the {@link #setUseRedirectForWeb(boolean) } option you should call this method at the beginning of your app's 
+     * {@code start()} method.  If the app was loaded as a result of redirecting from an Oauth login, then this method will handle the login
+     * and will call the callback method on complete.
+     * @param callback a listener that will receive at its source either a token for
+     * the service or an exception in case of a failure
+     * @return True the redirect was handled.  False if it was not handled.  If this returns {@literal true}, then you should just return from the start() method, and instead
+     * handle control flow in your callback.
+     * @since 7.0
+     * @see #setUseRedirectForWeb(boolean) 
+     * @see #isUseRedirectForWeb() 
+     */
+    public static boolean handleRedirect(ActionListener callback) {
+        Oauth2 request = fetchSerializedOauth2Request();
+        if (request == null) {
+            return false;
+        }
+        String href = CN.getProperty("browser.window.location.href", null);
+        request.handleURL(href, null, callback, null, null, null);
+        return true;
+    }
+    
+    /**
      * This method shows an authentication for login form
      *
      * @param al a listener that will receive at its source either a token for
      * the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to
-     * perform the authentication
      */
     public void showAuthentication(final ActionListener al) {
+        
+        
+        if ("HTML5".equals(CN.getPlatformName()) && useRedirectForWeb) {
+            String href = CN.getProperty("browser.window.location.href", null);
+            redirectURI = href;
+            serializeAuth();
+            CN.execute("javascript:(function(){window.onbeforeunload=function(){}; window.location.href='"+buildURL()+"';})();");
+            return;
+        }
         
         if (useBrowserWindow) {
             final BrowserWindow win = new BrowserWindow(buildURL());
@@ -278,6 +380,7 @@ public class Oauth2 {
         }
         authenticationForm.setLayout(new BorderLayout());
         authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));
+        authenticationForm.show();
     }
 
     private String buildURL() {
@@ -417,7 +520,7 @@ public class Oauth2 {
     
     private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
-            if (Display.getInstance().getCurrent() == progress) {
+            if (progress != null && Display.getInstance().getCurrent() == progress) {
                 progress.dispose();
             }
 

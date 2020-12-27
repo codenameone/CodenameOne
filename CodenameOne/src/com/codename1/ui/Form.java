@@ -28,27 +28,30 @@ import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
-import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
-import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.ListIterator;
+import java.util.Set;
 
 /**
  *<p> Top level component that serves as the root for the UI, this {@link Container}
@@ -71,7 +74,7 @@ public class Form extends Container {
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
-    private Container contentPane;
+    private final Container contentPane;
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
@@ -158,7 +161,8 @@ public class Form extends Container {
     int initialPressX;
     int initialPressY;
     private EventDispatcher orientationListener;
-    private EventDispatcher sizeChangedListener;    
+    private EventDispatcher sizeChangedListener;   
+    private EventDispatcher pasteListener;
     private UIManager uiManager;
     private Component stickyDrag;
     private boolean dragStopFlag;
@@ -240,7 +244,126 @@ public class Form extends Container {
         super.setAllowEnableLayoutOnPaint(allow);
     }
     
+    /**
+     * Adds a listener to be notified when the user has initiated a paste event.  This will primarily
+     * occur only on desktop devices which allow the user to initiate a paste outside
+     * the UI of the app itself, either using a key code (Command/Ctrl V), or a menu (Edit &gt; Paste).
+     * 
+     * <p>The event will be fired after the paste action has updated the clipboard contents, so you can
+     * access the clipboard contents via {@link Display#getPasteDataFromClipboard() }.</p>
+     * 
+     * @param l Listener registered to receive paste events.
+     * @since 7.0
+     */
+    public void addPasteListener(ActionListener l) {
+        if (pasteListener == null) {
+            pasteListener = new EventDispatcher();
+        }
+        pasteListener.addListener(l);
+    }
     
+    /**
+     * Removes listener from being notified when the user has initiated a paste event.
+     * @param l Listener to unregister to receive paste events.
+     * @since 7.0
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void removePasteListener(ActionListener l) {
+        if (pasteListener == null) {
+            return;
+        }
+        pasteListener.removeListener(l);
+    }
+    
+    /**
+     * A queue of containers that are scheduled to be revalidated before the next 
+     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The 
+     * queue the queue is flushed in {@link #flushRevalidateQueue() }
+     */
+    private Set<Container> pendingRevalidateQueue = new HashSet<Container>();
+    
+    /**
+     * A temporary container used in {@link #flushRevalidateQueue() } for the list
+     * of containers that are being revalidated.  This should not be used outside
+     * of {@link #flushRevalidateQueue() }
+     */
+    private ArrayList<Container> revalidateQueue = new ArrayList<Container>();
+    
+    /**
+     * A flag that enables/disables the behaviour that revalidate() on any container
+     * will trigger a revalidate() in its parent form.  Not sure why we do this
+     * but this flag turns off this behaviour.  Hopefully we can default this 
+     * to "Off" eventually.
+     * 
+     * Used in {@link Container#revalidate() }.
+     */
+    boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+    
+    /**
+     * Adds a container to the revalidation queue to be revalidated before the next
+     * paint.
+     * @param cnt The container to schedule for revalidation
+     */
+    void revalidateLater(Container cnt) {
+        if (!pendingRevalidateQueue.contains(cnt)) {
+            // It doesn't need to be in queue more than once.
+            Iterator<Container> it = pendingRevalidateQueue.iterator();
+            
+            // Iterate through the existing queue to make sure that this container
+            // isn't already scheduled to be revalidated.
+            while (it.hasNext()) {
+                Container existing = it.next();
+                if (existing.contains(cnt)) {
+                    // cnt is already in a container that is scheduled for revalidation
+                    // we don't need to add it.
+                    return;
+                } else if (cnt.contains(existing)) {
+                    // cnt is the parent of this container.  Remove the existing container
+                    // as it will be covered by a revalidate of cnt
+                    it.remove();
+                }
+                
+            }
+            pendingRevalidateQueue.add(cnt);
+        }
+    }
+    
+    /**
+     * Removes a container from the revalidation queue.  This is called from 
+     * {@link Container#revalidate() }.
+     * @param cnt The container to remove from the queue.
+     */
+    void removeFromRevalidateQueue(Container cnt) {
+        pendingRevalidateQueue.remove(cnt);
+    }
+    
+    void flushRevalidateQueue() {
+        
+        if (!pendingRevalidateQueue.isEmpty()) {
+            revalidateQueue.addAll(pendingRevalidateQueue);
+            pendingRevalidateQueue.clear();
+            int len = revalidateQueue.size();
+            for (int i=0; i<len; i++) {
+                Container cnt = revalidateQueue.get(i);
+                cnt.revalidateWithAnimationSafetyInternal(false);
+            }
+            revalidateQueue.clear();
+            
+        }
+    }
+    
+    /**
+     * Fires a paste event to the paste listeners.  For internal use.
+     * @param l The paste event.  Includes no useful data currently.
+     * @since 7.0
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
+     * @see #removePasteListener(com.codename1.ui.events.ActionListener) 
+     */
+    public void dispatchPaste(ActionEvent l) {
+        if (pasteListener != null) {
+            pasteListener.fireActionEvent(l);
+        }
+    }
     
     /**
      * Gets TextSelection support for this form.
@@ -485,7 +608,7 @@ public class Form extends Container {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
                 titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
-                titleArea.revalidateWithAnimationSafety();
+                titleArea.revalidateLater();
             }
         }
     }
@@ -759,7 +882,7 @@ public class Form extends Container {
         }
         
         repaint();
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
 
     /**
@@ -1592,7 +1715,7 @@ public class Form extends Container {
                 int b = Display.getInstance().getCommandBehavior();
                 if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
                         || b == Display.COMMAND_BEHAVIOR_ICS || b == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
-                    titleArea.revalidateWithAnimationSafety();
+                    titleArea.revalidateLater();
                 }
                 if (this.title.shouldTickerStart()) {
                     this.title.startTicker(getUIManager().getLookAndFeel().getTickerSpeed(), true);
@@ -1791,7 +1914,7 @@ public class Form extends Container {
     /**
      * Indicate that cmp would no longer like to receive animation events
      * 
-     * @param cmp component that would no longer receive animation events
+     * @param mediaCmp component that would no longer receive animation events
      */
     void deregisterMediaComponent(Component mediaCmp) {
         mediaComponents.remove(mediaCmp);
@@ -2543,7 +2666,7 @@ public class Form extends Container {
     /**
      * Invoked by display to hide the menu during transition
      * 
-     * @see restoreMenu
+     * @see {@link #restoreMenu()}
      */
     void hideMenu() {
         menuBar.unInstallMenuBar();
@@ -2552,7 +2675,7 @@ public class Form extends Container {
     /**
      * Invoked by display to restore the menu after transition
      * 
-     * @see hideMenu
+     * @see {@link #hideMenu()}
      */
     void restoreMenu() {
         menuBar.installMenuBar();
@@ -2594,7 +2717,7 @@ public class Form extends Container {
             }
         }
         if (triggerRevalidate) {
-            revalidateWithAnimationSafety();
+            revalidateLater();
         }
     }
 
@@ -3312,14 +3435,14 @@ public class Form extends Container {
     }
     
     
-    public <C extends Component & ReleasableComponent> void addComponentAwaitingRelease(C c) {
+    public <C extends Component> void addComponentAwaitingRelease(C c) {
       if(componentsAwaitingRelease == null) {
 	      componentsAwaitingRelease = new ArrayList<Component>();
 	  }
 	  componentsAwaitingRelease.add(c);
     }
 
-    public <C extends Component & ReleasableComponent> void removeComponentAwaitingRelease(C c) {
+    public <C extends Component> void removeComponentAwaitingRelease(C c) {
     	 if(componentsAwaitingRelease != null) {
              componentsAwaitingRelease.remove(c);
          }

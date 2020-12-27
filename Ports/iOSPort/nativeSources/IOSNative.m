@@ -99,9 +99,9 @@
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
 extern int popoverSupported();
-
+//#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
-#ifdef INCLUDE_CN1_PUSH2
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
 #endif
 
@@ -534,10 +534,14 @@ void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(
 }
 
 
+extern long CN1_EDT_THREAD_ID;
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int]
     POOL_BEGIN();
+    if (CN1_EDT_THREAD_ID < 0) {
+        CN1_EDT_THREAD_ID = (long)threadStateData->threadId;
+    }
     Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl((void *)n1, n2, n3, n4, n5);
     POOL_END();
     //XMLVM_END_WRAPPER
@@ -2385,11 +2389,25 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
         dispatch_sync(dispatch_get_main_queue(), ^{
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
+            if (@available(iOS 10, *)) {
+                config.mediaTypesRequiringUserActionForPlayback=WKAudiovisualMediaTypeNone;
+            }
+            config.suppressesIncrementalRendering = YES;
+            UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+            WKUserContentController* userContentController = [[WKUserContentController alloc] init];
+            NSString *bootstrapSource = @"window.cn1application = window.cn1application || {};\
+            window.cn1application.shouldNavigate = function(url) {\
+                window.webkit.messageHandlers.cn1.postMessage({'shouldNavigate' : url});\
+            };";
+            WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+            [userContentController addUserScript:bootstrapScript];
+            [userContentController addScriptMessageHandler:del name:@"cn1"];
+            config.userContentController = userContentController;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
-            UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+            
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
             
@@ -2495,7 +2513,23 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
             WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-            [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
+            @try {
+                // This is an unofficial (unsupported) hack for allowing file access which is necessary
+                // for things like setURLHierarchy(). 
+                // It has been reported to sometimes not work, and throw an exception
+                // -[__NSCFConstantString
+                // charValue]: unrecognized selector sent to instance 0x99444c*
+                // 2020-09-22 17:08:04.200 OrdyxDisplay[637:204697] ** Terminating app due
+                // to uncaught exception 'NSInvalidArgumentException', reason:
+                // '-[__NSCFConstantString charValue]: unrecognized selector sent to instance
+                // 0x99444c'*
+                //
+                // Therefore we are wrapping it in a try/catch here to swallow the exception
+                [w.configuration.preferences setValue:@"TRUE" forKey:@"allowFileAccessFromFileURLs"];
+            }
+            @catch (NSException *exception) {
+                NSLog(@"Setting the key 'allowFileAccessFromFileURLs' failed.  file:// URLs may not work correctly");
+            }
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             if ([str hasPrefix:@"http://"] || [str hasPrefix:@"https://"]) {
                 NSURL* nu = [NSURL URLWithString:str];
@@ -2505,6 +2539,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
                 if ([str hasPrefix:@"file://localhost"]) {
                     str = [str substringFromIndex:16];
                 }
+                str = [str stringByRemovingPercentEncoding];
                 NSURL* nu = [NSURL fileURLWithPath:str];           
                 [w loadFileURL:nu allowingReadAccessToURL:nu.URLByDeletingLastPathComponent];
             }
@@ -2621,13 +2656,13 @@ void com_codename1_impl_ios_IOSNative_browserExecute___long_java_lang_String(CN1
             }];
             POOL_END();
         } else {
+            NSString* js = [NSString stringWithFormat:@"setTimeout(function(){%@}, 0);", toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)];
             dispatch_async(dispatch_get_main_queue(), ^{
                 POOL_BEGIN();
                 WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
-            
-                [w evaluateJavaScript:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript) completionHandler:^(id result, NSError *error) {
+                [w evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
                     if (error != nil) {
-                        NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+                        NSLog(@"evaluateJavaScript2 error : %@ : %@", error.localizedDescription, js);
                     }
                 }];
                 POOL_END();
@@ -8937,82 +8972,153 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
 #endif
 
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int( CN1_THREAD_STATE_MULTI_ARG
-    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType
+JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int_boolean( CN1_THREAD_STATE_MULTI_ARG
+    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
-    
-    UILocalNotification *notification = [[UILocalNotification alloc] init];
-    NSString * msg = [NSString string];
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+    NSString * title = [NSString string];
+    NSString * body = [NSString string];
     NSString *tmpStr;
     if (alertTitle != NULL) {
-        tmpStr = [msg stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
-        
+        tmpStr = [title stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
+                    
 #ifndef CN1_USE_ARC
-        [msg release];
+        [title release];
 #endif
-        msg = tmpStr;
+        title = tmpStr;
     }
+    
     if (alertBody != NULL) {
-        
-        tmpStr = [msg stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
+                    
+        tmpStr = [body stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
 #ifndef CN1_USE_ARC
-        [msg release];
+        [body release];
 #endif
-        msg = tmpStr;
+        body = tmpStr;
     }
-    tmpStr = [msg stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
+    tmpStr = [body stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
 #ifndef CN1_USE_ARC
-    [msg release];
+    [body release];
 #endif
-    msg = tmpStr;
-    notification.alertBody = msg;
-
-    notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
-    notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
-    notification.timeZone = [NSTimeZone defaultTimeZone];
-    if (badgeNumber >= 0) {
-        notification.applicationIconBadgeNumber = badgeNumber;
-    }
-    switch (repeatType) {
-        case 0:
-            notification.repeatInterval = nil;
-            break;
-        case 1:
-            notification.repeatInterval = NSMinuteCalendarUnit;
-            break;
-        case 3:
-            notification.repeatInterval = NSHourCalendarUnit;
-            break;
-        case 4:
-            notification.repeatInterval = NSDayCalendarUnit;
-            break;
-        case 5:
-            notification.repeatInterval = NSWeekCalendarUnit;
-            break;
-        default:
-            CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
-            notification.repeatInterval = nil;
-    }
+    body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
     [dict setObject: toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) forKey: @"__ios_id__"];
+    if (foreground) {
+        [dict setObject: @"true" forKey: @"foreground"];
+    }
     
-    notification.userInfo = dict;
-    
-    
-    dispatch_sync(dispatch_get_main_queue(), ^{
-#ifdef __IPHONE_8_0
-        if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
-            [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
-            //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
-            //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
-            //                                           UIUserNotificationTypeSound categories:nil]];
+    if (NO && @available(iOS 10, *)) {
+        // November 23, 2020 - Steve
+        // Disabling this block, which uses the new UNUserNotifications API for sending local notifications,
+        // and opting to continue to use the old UILocalNotifications API for now.  This is because
+        // the new API doesn't have an option to use a different repeat interval than the firstFire
+        // interval, and the UNUserNotifications API can still be used to receive the notification
+        // in the application delegate class fine.
+        // Eventually we'll probably want to switch to the new API, but for now, it is just too much work
+        // to try to replicate the functionality lost by the new API.
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            
+            UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+            
+            content.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
+            content.body = [NSString localizedUserNotificationStringForKey:body
+                    arguments:nil];
+            if (alertSound) {
+                content.sound = [UNNotificationSound soundNamed:toNSString(CN1_THREAD_STATE_PASS_ARG alertSound)];
+                
+            }
+            if (badgeNumber >= 0) {
+                
+                content.badge = [NSNumber numberWithInt:badgeNumber];
+            }
+            content.userInfo = dict;
+                                           
+            
+            
+           
+            UNTimeIntervalNotificationTrigger *trigger = [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:fireDate/1000 - [[NSDate date] timeIntervalSince1970] + 1 repeats:NO];
+            
+            // Create the request object.
+            UNNotificationRequest* request = [UNNotificationRequest
+                   requestWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) content:content trigger:trigger];
+           
+           
+             
+            UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+            UNAuthorizationOptions authOptions;
+            if (@available(iOS 12.0, *)) {
+              authOptions = UNAuthorizationOptionProvisional | UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+
+            } else {
+              authOptions = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+
+            }
+            [center requestAuthorizationWithOptions:authOptions
+            completionHandler:^(BOOL granted, NSError * _Nullable error) {
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                   if (error != nil) {
+                       NSLog(@"%@", error.localizedDescription);
+                   }
+                }];
+            }];
+            
+        });
+        
+        
+        return;
+    } else {
+        UILocalNotification *notification = [[UILocalNotification alloc] init];
+        notification.alertTitle = title;
+        notification.alertBody = body;
+
+        notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
+        notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
+        notification.timeZone = [NSTimeZone defaultTimeZone];
+        if (badgeNumber >= 0) {
+            notification.applicationIconBadgeNumber = badgeNumber;
         }
+        switch (repeatType) {
+            case 0:
+                notification.repeatInterval = nil;
+                break;
+            case 1:
+                notification.repeatInterval = NSMinuteCalendarUnit;
+                break;
+            case 3:
+                notification.repeatInterval = NSHourCalendarUnit;
+                break;
+            case 4:
+                notification.repeatInterval = NSDayCalendarUnit;
+                break;
+            case 5:
+                notification.repeatInterval = NSWeekCalendarUnit;
+                break;
+            default:
+                CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
+                notification.repeatInterval = nil;
+        }
+            
+        
+        
+        notification.userInfo = dict;
+        
+            
+            dispatch_sync(dispatch_get_main_queue(), ^{
+#ifdef __IPHONE_8_0
+                if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
+                    [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
+                    //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
+                    //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
+                    //                                           UIUserNotificationTypeSound categories:nil]];
+                }
 #endif
-        
-        [[UIApplication sharedApplication] scheduleLocalNotification: notification];
-        
-    });
+                
+                [[UIApplication sharedApplication] scheduleLocalNotification: notification];
+                
+            });
+    }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {

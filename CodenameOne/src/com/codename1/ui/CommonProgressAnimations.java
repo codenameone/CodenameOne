@@ -104,7 +104,7 @@ public class CommonProgressAnimations {
             if (parent != null) {
                 parent.replace(progress, cmp, t);
                 if (t == null) {
-                    parent.revalidateWithAnimationSafety();
+                    parent.revalidateLater();
                 }
             }
         }

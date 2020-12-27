@@ -18,6 +18,7 @@
 package java.util;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 
 /**
  * {@code Arrays} contains static methods which operate on arrays.
@@ -3893,4 +3894,93 @@ public class Arrays {
         }
         throw new IllegalArgumentException();
     }
+    
+    public static <T,U> T[] copyOfRange(U[] original,
+                    int from,
+                    int to,
+                    Class<? extends T[]> newType) {
+        return null;
+    }
+    
+    public static <T> T[] copyOfRange(T[] original,
+                  int from,
+                  int to) {
+        return null;
+    }
+    
+    
+    
+    public static <T> T[] copyOf(T[] original, int newLength,  Class<? extends T[]> newType) {
+        T[] arr = (T[])Array.newInstance(newType.getComponentType(), newLength);
+        int len = Math.min(original.length, newLength);
+        System.arraycopy(original, 0, arr, 0, len);
+        return arr;
+    }
+    
+    public static <T> T[] copyOf(T[] original, int newLength) {
+        return copyOf(original, newLength, (Class<T[]>)original.getClass());
+    }
+    
+    public static boolean[] copyOf(boolean[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static boolean[] copyOf(boolean[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static char[] copyOf(char[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static char[] copyOf(char[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static double[] copyOf(double[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    public static double[] copyOf(double[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static float[] copyOf(float[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    public static float[] copyOf(float[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static long[] copyOf(long[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static long[] copyOf(long[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static int[] copyOf(int[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static int[] copyOf(int[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static byte[] copyOf(byte[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static byte[] copyOf(byte[] original, int newlen) {
+        return copyOfRange(original, 0, newlen);
+    }
+    
+    public static short[] copyOf(short[] original) {
+        return copyOfRange(original, 0, original.length);
+    }
+    
+    public static short[] copyOf(short[] original, int len) {
+        return copyOfRange(original, 0, len);
+    }
+   
 }

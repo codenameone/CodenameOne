@@ -1,0 +1,13 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+OnlineLabel {
+	cn1-derive: Label;
+	color:green;
+}
+
+OfflineLabel {
+	cn1-derive: Label;
+	color:gray;
+}

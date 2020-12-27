@@ -5560,6 +5560,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return dDensity;
             }
             int dispWidth = getDisplayWidth();
+            int dispHeight = getDisplayHeight();
             // ipad mini is ignored, there is no sensible way to detect it
             if(isTablet()) {
                 if(dispWidth < 1100) {
@@ -5573,8 +5574,73 @@ public class IOSImplementation extends CodenameOneImplementation {
                     dDensity = Display.DENSITY_MEDIUM;
                     return dDensity;
                 }
-                int largest = Math.max(dispWidth, getDisplayHeight());
-                if(largest > 2000) {
+                int largest = Math.max(dispWidth, dispHeight);
+                int smallest = Math.min(dispWidth, dispHeight);
+                if (largest == 2340 && smallest == 1080) {
+                    // 12 mini
+                    //ppi = PPI_476;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2532 && smallest == 1170) {
+                    // 12
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 1792 && smallest == 828) {
+                    // iPhone 11
+                    //ppi = PPI_326;
+                    dDensity = Display.DENSITY_VERY_HIGH;
+                    return dDensity;
+                } else if (largest == 2688 && smallest == 1242) {
+                    // iPhone 11 max pro
+                    //ppi = PPI_458;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                } else if (largest == 1792 && smallest == 828) {
+                    // 11, XR
+                    //ppi = PPI_326;
+                    dDensity = Display.DENSITY_VERY_HIGH;
+                    return dDensity;
+
+                } else if (largest == 2688 && smallest == 1242) {
+                    // 11 Pro Max, Xs Max
+                    //ppi = PPI_458;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                } else if (largest == 2208 && smallest == 1242) {
+                    // 6+, 6s, 7+, 8+
+                    //ppi = PPI_401;
+                    dDensity = Display.DENSITY_HD;
+                    return dDensity;
+                } else if (largest == 1334 && smallest == 750) {
+                    // 6, 6s, 7, 8
+                    //ppi = PPI_326;
+                    dDensity = Display.DENSITY_VERY_HIGH;
+                    return dDensity;
+                } else if (largest == 1136 && smallest == 640) {
+                    //5, 5s, 5c, SE
+                    //ppi = PPI_326;
+                    dDensity = Display.DENSITY_VERY_HIGH;
+                    return dDensity;
+                } else if (largest == 960 && smallest == 640) {
+                    // 4, 4s
+                    //ppi = PPI_326;
+                    dDensity = Display.DENSITY_VERY_HIGH;
+                    return dDensity;
+                } else if (largest == 480 && smallest == 320) {
+                    //2G, 3G, 3GS
+                    //ppi = PPI_163;
+                    dDensity = Display.DENSITY_MEDIUM;
+                    return dDensity;
+                }
+                else if (largest == 2436) {
+                    // iphone X
+                    //ppi = 18.031496062992126;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                } 
+                else if(largest > 2000) {
                     dDensity = Display.DENSITY_560;
                     return dDensity;
                 }
@@ -5586,6 +5652,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     double ppi = 0;
+    private static final double PPI_458 = 18.031496062992126;
+    private static final double PPI_326 = 12.834645669291339;
+    private static final double PPI_401 = 15.78740157480315;
+    private static final double PPI_163 = 6.417322834645669;
+    private static final double PPI_476 = 18.740157480314963;
+    private static final double PPI_460 = 18.11023622047244;
     
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
@@ -5606,8 +5678,46 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(dispWidth < 500) {
                     ppi = 6.4173236936575;
                 } else {
-                    int largest = Math.max(dispWidth, getDisplayHeight());
-                    if (largest == 2436) {
+                    int dispHeight = getDisplayHeight();
+                    int largest = Math.max(dispWidth, dispHeight);
+                    int smallest = Math.min(dispWidth, dispHeight);
+                    if (largest == 2340 && smallest == 1080) {
+                        // 12 mini
+                        ppi = PPI_476;
+                    }
+                    else if (largest == 2532 && smallest == 1170) {
+                        // 12
+                        ppi = PPI_460;
+                    }
+                    else if (largest == 1792 && smallest == 828) {
+                        // iPhone 11
+                        ppi = PPI_326;
+                    } else if (largest == 2688 && smallest == 1242) {
+                        // iPhone 11 max pro
+                        ppi = PPI_458;
+                    } else if (largest == 1792 && smallest == 828) {
+                        // 11, XR
+                        ppi = PPI_326;
+                    } else if (largest == 2688 && smallest == 1242) {
+                        // 11 Pro Max, Xs Max
+                        ppi = PPI_458;
+                    } else if (largest == 2208 && smallest == 1242) {
+                        // 6+, 6s, 7+, 8+
+                        ppi = PPI_401;
+                    } else if (largest == 1334 && smallest == 750) {
+                        // 6, 6s, 7, 8
+                        ppi = PPI_326;
+                    } else if (largest == 1136 && smallest == 640) {
+                        //5, 5s, 5c, SE
+                        ppi = PPI_326;
+                    } else if (largest == 960 && smallest == 640) {
+                        // 4, 4s
+                        ppi = PPI_326;
+                    } else if (largest == 480 && smallest == 320) {
+                        //2G, 3G, 3GS
+                        ppi = PPI_163;
+                    }
+                    else if (largest == 2436) {
                         // iphone X
                         ppi = 18.031496062992126;
                     } else {
@@ -6981,12 +7091,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         private String[] sslCertificates;
         private boolean connected;
         private boolean ensureConnectionLock;
+        private boolean insecure;
         String error;
         public final Object LOCK = new Object();
         
         public void setId(int id) {
             this.id = id;
             nativeInstance.setConnectionId(peer, id);
+        }
+        
+        public void setInsecure(boolean insecure) {
+            this.insecure = insecure;
+            if (insecure) {
+                //nativeInstance.setInsecure(peer, insecure);
+            }
         }
         
         public void setChunkedStreamingMode(int len) {
@@ -7352,6 +7470,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         NetworkConnection n = (NetworkConnection)connection;
         n.setId(id);
     }
+
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.setInsecure(insecure);
+    }
+    
+    
     
     
 
@@ -7699,6 +7825,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openFileInputStream(String file) throws IOException {
         file = unfile(file);
+        if(!nativeInstance.fileExists(file)) {
+            throw new IOException("File not found: " + file);
+        }
         return new BufferedInputStream(new NSFileInputStream(file), file);
     }
 
@@ -8880,7 +9009,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 n.getAlertSound(),
                 n.getBadgeNumber(),
                 firstTime,
-                repeat
+                repeat,
+                n.isForeground()
         );
         
        

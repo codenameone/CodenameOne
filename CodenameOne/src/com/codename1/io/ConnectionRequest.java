@@ -159,12 +159,18 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * There are 4 caching modes: OFF is the default  meaning no caching.
-     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
-     * MANUAL means that the developer is responsible for the actual caching but the system
-     * will not do a request on a resource that's already "fresh"
-     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
-     * a 404 error if data isn't available
+     * <p>There are 5 caching modes:</p>
+     * <ol>
+     * <li>{@code OFF} is the default, meaning no caching.
+     * <li>{@code SMART} means all get requests are cached intelligently and caching is "mostly" seamless.
+     * <li>{@code MANUAL} means that the developer is responsible for the actual caching but the system will not do a
+     * request on a resource that's already "fresh".
+     * <li>{@code OFFLINE} will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+     * if data isn't available.
+     * <li>{@code OFFLINE_FIRST} works the same way as offline but if data isn't available locally it will try to
+     * connect to the server.
+     * </ol>
+     *
      * @return the cacheMode
      */
     public CachingMode getCacheMode() {
@@ -172,12 +178,18 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * There are 4 caching modes: OFF is the default meaning no caching.
-     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
-     * MANUAL means that the developer is responsible for the actual caching but the system
-     * will not do a request on a resource that's already "fresh"
-     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
-     * a 404 error if data isn't available
+     * <p>There are 5 caching modes:</p>
+     * <ol>
+     * <li>{@code OFF} is the default, meaning no caching.
+     * <li>{@code SMART} means all get requests are cached intelligently and caching is "mostly" seamless.
+     * <li>{@code MANUAL} means that the developer is responsible for the actual caching but the system will not do a
+     * request on a resource that's already "fresh".
+     * <li>{@code OFFLINE} will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+     * if data isn't available.
+     * <li>{@code OFFLINE_FIRST} works the same way as offline but if data isn't available locally it will try to
+     * connect to the server.
+     * </ol>
+     *
      * @param cacheMode the cacheMode to set
      */
     public void setCacheMode(CachingMode cacheMode) {
@@ -199,18 +211,24 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * There are 4 caching modes: OFF is the default meaning no caching. 
-     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
-     * MANUAL means that the developer is responsible for the actual caching but the system
-     * will not do a request on a resource that's already "fresh"
-     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
-     * a 404 error if data isn't available
+     * <p>There are 5 caching modes:</p>
+     * <ol>
+     * <li>{@code OFF} is the default, meaning no caching.
+     * <li>{@code SMART} means all get requests are cached intelligently and caching is "mostly" seamless.
+     * <li>{@code MANUAL} means that the developer is responsible for the actual caching but the system will not do a
+     * request on a resource that's already "fresh".
+     * <li>{@code OFFLINE} will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+     * if data isn't available.
+     * <li>{@code OFFLINE_FIRST} works the same way as offline but if data isn't available locally it will try to
+     * connect to the server.
+     * </ol>
      */
     public static enum CachingMode {
         OFF,
         MANUAL,
         SMART,
-        OFFLINE
+        OFFLINE,
+        OFFLINE_FIRST
     }
     
     /**
@@ -224,12 +242,17 @@ public class ConnectionRequest implements IOProgressListener {
     private static CachingMode defaultCacheMode = CachingMode.OFF;
     
     /**
-     * There are 4 caching modes: OFF is the default meaning no caching. 
-     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
-     * MANUAL means that the developer is responsible for the actual caching but the system
-     * will not do a request on a resource that's already "fresh"
-     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
-     * a 404 error if data isn't available
+     * <p>There are 5 caching modes:</p>
+     * <ol>
+     * <li>{@code OFF} is the default, meaning no caching.
+     * <li>{@code SMART} means all get requests are cached intelligently and caching is "mostly" seamless.
+     * <li>{@code MANUAL} means that the developer is responsible for the actual caching but the system will not do a
+     * request on a resource that's already "fresh".
+     * <li>{@code OFFLINE} will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+     * if data isn't available.
+     * <li>{@code OFFLINE_FIRST} works the same way as offline but if data isn't available locally it will try to
+     * connect to the server.
+     * </ol>
      */
     private CachingMode cacheMode = defaultCacheMode;
     
@@ -354,6 +377,11 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean checkSSLCertificates;
     
     /**
+     * A flag that turns off checking for invalid certificates.
+     */
+    private boolean insecure;
+    
+    /**
      * When set to true (the default), the global error handler in 
      * {@code NetworkManager} should receive errors for response code as well
      */
@@ -411,6 +439,24 @@ public class ConnectionRequest implements IOProgressListener {
     public ConnectionRequest(String url, boolean post) {
         this(url);
         setPost(post);
+    }
+    
+    /**
+     * Turns off checking to make sure that SSL certificate is valid.
+     * @param insecure 
+     * @since 7.0
+     */
+    public void setInsecure(boolean insecure) {
+        this.insecure = insecure;
+    }
+    
+    /**
+     * Checks if the request is insecure (default false).
+     * @return True if the request is insecure, i.e. does not check SSL certificate for validity.
+     * @since 7.0
+     */
+    public boolean isInsecure() {
+        return insecure;
     }
     
     /**
@@ -539,6 +585,9 @@ public class ConnectionRequest implements IOProgressListener {
         if (readTimeout > 0) {
             impl.setReadTimeout(connection, readTimeout);
         }
+        if (insecure) {
+            impl.setInsecure(connection, insecure);
+        }
         impl.setConnectionId(connection, id);
 
         if(getUserAgent() != null) {
@@ -568,7 +617,8 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setChunkedStreamingMode(connection, chunkedStreamingLen);
         }
         
-        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART)) {
+        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART
+                || cacheMode == CachingMode.OFFLINE_FIRST)) {
             String msince = Preferences.get("cn1MSince" + createRequestURL(), null);
             if(msince != null) {
                 impl.setHeader(connection, "If-Modified-Since", msince);
@@ -591,8 +641,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * This method should be overriden in CacheMode.MANUAL to provide offline caching. The default
-     * implementation will work as expected in the CacheMode.SMART mode.
+     * This method should be overriden in {@code CacheMode.MANUAL} to provide offline caching. The default
+     * implementation will work as expected in the {@code CacheMode.SMART} and {@code CacheMode.OFFLINE_FIRST} modes.
      * @return the offline cached data or null/exception if unavailable
      */
     protected InputStream getCachedData() throws IOException{
@@ -743,16 +793,18 @@ public class ConnectionRequest implements IOProgressListener {
         if(shouldStop()) {
             return true;
         }
-        if(cacheMode == CachingMode.OFFLINE) {
+        if(cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = getCachedData();
             if(is != null) {
                 readResponse(is);
                 Util.cleanup(is);
+                return true;
             } else {
-                responseCode = 404;
-                throw new IOException("File unavilable in cache");
+                if(cacheMode == CachingMode.OFFLINE) {
+                    responseCode = 404;
+                    throw new IOException("File unavilable in cache");
+                }
             }
-            return true;
         }
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
@@ -916,7 +968,8 @@ public class ConnectionRequest implements IOProgressListener {
             }
             responseContentType = getHeader(connection, "Content-Type");
             
-            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL) {
+            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL
+                    || cacheMode == CachingMode.OFFLINE_FIRST) {
                 String last = getHeader(connection, "Last-Modified");
                 String etag = getHeader(connection, "ETag");
                 Preferences.set("cn1MSince" + createRequestURL(), last);
@@ -938,7 +991,8 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                     ((BufferedInputStream)input).setYield(getYield());
                 }
-                if(!post && cacheMode == CachingMode.SMART && destinationFile == null && destinationStorage == null) {
+                if(!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
+                        && destinationFile == null && destinationStorage == null) {
                     byte[] d = Util.readInputStream(input);
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
                     os.write(d);

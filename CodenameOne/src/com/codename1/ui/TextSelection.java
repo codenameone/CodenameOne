@@ -1484,7 +1484,7 @@ public class TextSelection {
         selectionRoot = root;
         selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());
         update();
-        selectionRoot.getComponentForm().revalidateWithAnimationSafety();
+        selectionRoot.getComponentForm().revalidateLater();
         textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
     }
     

@@ -1,0 +1,11 @@
+#Constants {
+    includeNativeBool: true; 
+}
+
+LoggedInStatusButton {
+	color: green;
+}
+
+LoggedOutStatusButton {
+	color: #cccccc;
+}

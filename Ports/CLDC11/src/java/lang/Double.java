@@ -28,6 +28,8 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.1
  */
 public final class Double extends Number implements Comparable<Double> {
+    
+    public static final Class<Double> TYPE = double.class;
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values

@@ -284,7 +284,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
         removeComponent(actualButton);
         addComponent(t, actualButton);
         updateGap();
-        revalidateWithAnimationSafety();
+        revalidateLater();
     }
 
     /**

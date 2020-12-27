@@ -173,6 +173,32 @@ public class BrowserComponent extends Container {
         this.browserNavigationCallback = callback;
     }
 
+    
+    /**
+     * Async method for capturing a screenshot of the browser content.  Currently only supported
+     * in the simulator.  Also, only displays the visible rectangle of the BrowserComponent,
+     * not the entire page.
+     * @return AsyncResource resolving to an Image of the webview contents.
+     * @since 7.0
+     */
+    public AsyncResource<Image> captureScreenshot() {
+        if (internal != null) {
+            AsyncResource<Image> i = Display.impl.captureBrowserScreenshot(internal);
+            if (i != null) {
+                return i;
+            }
+        }
+        AsyncResource<Image> out = new AsyncResource<Image>();
+        if (internal != null) {
+            out.complete(internal.toImage());
+        } else {
+            out.complete(toImage());
+        }
+        return out;
+    }
+    
+    
+
     /**
      * The browser navigation callback interface allows handling a case where 
      * a URL invocation can be delegated to Java code. This allows binding 
@@ -529,12 +555,20 @@ public class BrowserComponent extends Container {
         CN.callSerially(new Runnable() {
             public void run() {
                 PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);
+                if (c == null) {
+                    if (CN.isSimulator()) {
+                        Log.p("Failed to create the browser component.  Please ensure that you are either using a JDK that has JavaFX (e.g. ZuluFX), or that you have installed the Codename One CEF component.  See https://www.codenameone.com/blog/big-changes-jcef.html for more information");
+                    } else {
+                        Log.p("Failed to create browser component.  This platform may not support the native browser component");
+                    }
+                    return;
+                }
                 internal = c;
                 removeComponent(placeholder);
                 addComponent(BorderLayout.CENTER, internal);
                 
                 onReady();
-                revalidateWithAnimationSafety();
+                revalidateLater();
             }
         });
         onReady(new Runnable() {
@@ -612,7 +646,7 @@ public class BrowserComponent extends Container {
     public AsyncResource<BrowserComponent> ready() {
         return ready(5000);
     }
-    
+
     /**
      * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
      * ready once it has received the start or load event from at least one page.
@@ -2110,6 +2144,29 @@ public class BrowserComponent extends Container {
             putClientProperty("BrowserComponent.firebug", null);
         }
     }
+
+    @Override
+    public void putClientProperty(String key, Object value) {
+        super.putClientProperty(key, value);
+        // In Javascript we use an iframe, and normal behaviour is for the
+        // iframe to be added hidden to the DOM immediately on creation, but
+        // it is removed from the DOM on deinitialize() and added in initComponent().
+        // In some cases, e.g. WebRTC, removing from the DOM breaks things, so we
+        // need it to remain on the dom even after deinitialize().  This is necessary
+        // in case we reinitialize it afterward (e.g when displaying a dialog, it will
+        // deinitialize the form, and when we close the dialog it will reshow the form
+        // but the browser will be broken.
+        // Thie client property is a flag to tell the JS port not to remove the peer
+        // on deinitialize.
+        if ("HTML5Peer.removeOnDeinitialize".equals(key)) {
+            if (internal != null) {
+                internal.putClientProperty(key, value);
+            }
+        }
+        
+    }
+    
+    
     
     /**
      * Indicates if debug mode is set (might have no effect though)

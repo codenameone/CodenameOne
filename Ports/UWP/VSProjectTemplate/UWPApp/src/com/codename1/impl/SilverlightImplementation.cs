@@ -3092,6 +3092,12 @@ namespace com.codename1.impl
             }
             return st;
         }
+        
+        public override bool supportsBrowserExecuteAndReturnString(PeerComponent @internal)
+        {
+            return true;
+        }
+        
 
         private Purchase pur;
         private WindowsPurchase windPur;

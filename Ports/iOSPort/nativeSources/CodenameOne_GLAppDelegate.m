@@ -155,13 +155,22 @@ static void installSignalHandlers() {
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
 #endif
-    
-#ifdef INCLUDE_CN1_PUSH
+
+#ifdef CN1_INCLUDE_NOTIFICATIONS
     if (@available(iOS 10, *)) {
         if (isIOS10()) {
             UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
             center.delegate = self;
-            
+            [center requestAuthorizationWithOptions:(UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionBadge) completionHandler:^(BOOL granted, NSError * _Nullable error){
+                if( !error ) {}
+            }];
+        } 
+    }
+#endif
+    
+#ifdef INCLUDE_CN1_PUSH
+    if (@available(iOS 10, *)) {
+        if (isIOS10()) {
             com_codename1_impl_ios_IOSImplementation_initPushActionCategories__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } 
     }
@@ -376,6 +385,62 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 }
 #endif
 
+
+#ifdef CN1_INCLUDE_NOTIFICATIONS
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler __API_AVAILABLE(macos(10.14), ios(10.0), watchos(3.0), tvos(10.0)) 
+{
+    if (@available(iOS 10, *)) {
+        if( [notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
+        {
+            CN1Log(@"Received local notification while running: %@", notification);
+
+            NSString* alertValue = [notification.request.content.userInfo valueForKey:@"__ios_id__"];
+            com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
+            if (completionHandler != nil) {
+                if ([notification.request.content.userInfo valueForKey:@"foreground"] != NULL) {
+                    completionHandler(UNNotificationPresentationOptionAlert);
+                } else {
+                    completionHandler(UNNotificationPresentationOptionNone);
+                }
+            }
+            return;
+        }
+    }
+#ifdef INCLUDE_CN1_PUSH
+    NSLog( @"Handle push from foreground" );
+    // custom code to handle push while app is in the foreground
+    NSLog(@"%@", notification.request.content.userInfo);
+    NSDictionary *userInfo = notification.request.content.userInfo;
+    [self cn1RoutePush:userInfo];
+#endif
+
+   
+}
+
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler {
+
+
+#ifdef INCLUDE_CN1_PUSH
+    NSLog( @"Handle push from background or closed" );
+    // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background
+    NSLog(@"%@", response.notification.request.content.userInfo);
+    currentNotificationResponse = response;
+    [self cn1RoutePush:response.notification.request.content.userInfo withAction:response.actionIdentifier withCompletionHandler:completionHandler];
+    
+    // TODO:  Need to pass the completion handler somehow to the push callback to be called after that
+    // For now this hack to buy the EDT some time to run the push callback.
+    
+    //[NSTimer scheduledTimerWithTimeInterval:1000 repeats:NO block:^(NSTimer *timer) {
+    //    completionHandler();
+    //}];
+#endif
+
+}
+
+
+#endif
+
 #ifdef INCLUDE_CN1_PUSH
 UNNotificationResponse* currentNotificationResponse = nil;
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
@@ -509,30 +574,8 @@ int pushReceivedCount=0;
     }
 }
 
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler {
-    NSLog( @"Handle push from foreground" );
-    // custom code to handle push while app is in the foreground
-    NSLog(@"%@", notification.request.content.userInfo);
-    NSDictionary *userInfo = notification.request.content.userInfo;
-    [self cn1RoutePush:userInfo];
-    
-}
 
 
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler {
-    NSLog( @"Handle push from background or closed" );
-    // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background
-    NSLog(@"%@", response.notification.request.content.userInfo);
-    currentNotificationResponse = response;
-    [self cn1RoutePush:response.notification.request.content.userInfo withAction:response.actionIdentifier withCompletionHandler:completionHandler];
-    
-    // TODO:  Need to pass the completion handler somehow to the push callback to be called after that
-    // For now this hack to buy the EDT some time to run the push callback.
-    
-    //[NSTimer scheduledTimerWithTimeInterval:1000 repeats:NO block:^(NSTimer *timer) {
-    //    completionHandler();
-    //}];
-}
 
 
 

@@ -48,6 +48,8 @@ import java.util.ArrayList;
  * <li>{@code textComponentErrorColor} a hex RGB color which defaults to null in which case this has no effect. 
  *      When defined this will change the color of the border and label to the given color to match the material design
  *      styling.
+ * <li>{@code textComponentErrorLineBorderBool} when set to {@code false}, this will prevent the text component from
+ * applying an underline border when there is a validation error. Defaults to {@code true}.
  * <li>{@code textComponentOnTopBool} toggles the on top mode see {@link #onTopMode(boolean)}
  * <li>{@code textComponentFieldUIID} sets the UIID of the text field to something other than {@code TextField} 
  *      which is useful for platforms such as iOS where the look of the text field is different within the text component
@@ -312,6 +314,7 @@ public abstract class InputComponent extends Container {
      */
     public InputComponent errorMessage(String errorMessage) {
         String col = getUIManager().getThemeConstant("textComponentErrorColor", null);
+        boolean line = getUIManager().isThemeConstant("textComponentErrorLineBorderBool", true);
         if(errorMessage == null || errorMessage.length() == 0) {
             // no need for double showing of error
             if(this.errorMessageImpl.getText().length() == 0) {
@@ -330,8 +333,12 @@ public abstract class InputComponent extends Container {
             if(col != null) {
                 int val = Integer.parseInt(col, 16);
                 lbl.getAllStyles().setFgColor(val);
-                Border b = Border.createUnderlineBorder(2, val);
-                getEditor().getAllStyles().setBorder(b);
+
+                // only show the line border error if the component is designed to allow it
+                if (line) {
+                    Border b = Border.createUnderlineBorder(2, val);
+                    getEditor().getAllStyles().setBorder(b);
+                }
             }
         }
         refreshForGuiBuilder();

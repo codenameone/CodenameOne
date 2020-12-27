@@ -25,6 +25,7 @@ package java.lang;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Comparator;
 
 /**
  * The String class represents character strings. All string literals in Java programs, such as "abc", are implemented as instances of this class.
@@ -36,6 +37,13 @@ import java.util.ArrayList;
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
 public final class String implements java.lang.CharSequence, Comparable<String> {
+    
+    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new Comparator<String>() {
+        public int compare(String o1, String o2){
+            return o1.compareToIgnoreCase(o2);
+        }
+    };
+    
     private static ArrayList<String> str = new ArrayList<String>();
     
     private final char[] value;
@@ -458,7 +466,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * ) == ch is true. The String is searched backwards starting at the last character.
      */
     public int lastIndexOf(int ch){
-        for(int iter = count + offset - 1 ; iter > offset ; iter--) {
+        for(int iter = count + offset - 1 ; iter >= offset ; iter--) {
             if(value[iter] == ch) {
                 return iter - offset;
             }

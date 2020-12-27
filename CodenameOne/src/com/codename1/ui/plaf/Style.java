@@ -56,6 +56,15 @@ import com.codename1.ui.util.EventDispatcher;
  *       *         Margin         *
  *       **************************
  *</pre> 
+ * 
+ * <h3>Change Events</h3>
+ * 
+ * <p>Styles fire a change event for each style change that occurs.  {@link Component} listens to all changes events
+ * of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
+ * a {@link Container#revalidate() } call on the Style's Component's parent container, which is expensive.  You can disable this
+ * {@link Container#revalidate() } call by calling {@link CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will 
+ * likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
+ * to avoid regressions when the default is changed.</p>
  * @author Chen Fishbein
  */
 public class Style {

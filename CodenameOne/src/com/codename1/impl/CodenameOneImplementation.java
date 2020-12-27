@@ -4193,6 +4193,18 @@ public abstract class CodenameOneImplementation {
     public String getBrowserURL(PeerComponent browserPeer) {
         return null;
     }
+    
+    /**
+     * Captures a screenshot from a browser component asynchronously.
+     * @param browserPeer The browser instance
+     * @return AsyncResource resolving to an image of the snapshot.  If this returns null,
+     * then {@link BrowserComponent#captureScreenshot() } will just use {@link Component#toImage() }
+     * for screenshots.
+     * @since 7.0
+     */
+    public AsyncResource<Image> captureBrowserScreenshot(PeerComponent browserPeer) {
+        return null;
+    }
 
     /**
      * Sets a relative URL from the html hierarchy
@@ -6675,7 +6687,17 @@ public abstract class CodenameOneImplementation {
         
     }
 
-    
+    /**
+     * Sets connection to be insecure.  If platform supports it, this will turn off SSL cerficate checks for validity.
+     * @param connection
+     * @param insecure True to make connection insecure.
+     * @since 7.0
+     * @see ConnectionRequest#setInsecure(boolean) 
+     * @see ConnectionRequest#isInsecure() 
+     */
+    public void setInsecure(Object connection, boolean insecure) {
+        
+    }
 
     /**
      * Checks if this platform supports read timeout in network connections.

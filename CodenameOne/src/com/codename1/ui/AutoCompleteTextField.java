@@ -114,7 +114,7 @@ public class AutoCompleteTextField extends TextField {
                     popup.setEnabled(false);
                     Form f = getComponentForm();
                     if (f != null) {
-                        f.revalidateWithAnimationSafety();
+                        f.revalidateLater();
                     }
                 }
             }
@@ -330,7 +330,7 @@ public class AutoCompleteTextField extends TextField {
             if (parent != null) {
                 lay.removeComponent(parent);
                 popup.remove();
-                f.revalidateWithAnimationSafety();
+                f.revalidateLater();
             }
             
         }
@@ -554,7 +554,7 @@ public class AutoCompleteTextField extends TextField {
                     if(!pressInBounds && !pop.contains(evt.getX(), evt.getY())){
                         pop.setVisible(false);
                         pop.setEnabled(false);      
-                        f.revalidateWithAnimationSafety();
+                        f.revalidateLater();
                         evt.consume();
                     }else{
                         canOpenPopup = false;

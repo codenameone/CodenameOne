@@ -40,8 +40,8 @@ public class Enum<E extends Enum<E>> implements Comparable<E> {
         this.ordinal = ordinal;
     }
 
-    protected Object clone() throws CloneNotSupportedException {
-        throw new CloneNotSupportedException();
+    protected Object clone() {
+        return new RuntimeException("Clone not supported");
     }
 
     protected static final void setEnumValues(final Object[] values, final Class c) {

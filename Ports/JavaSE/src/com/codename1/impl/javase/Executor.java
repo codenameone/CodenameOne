@@ -22,7 +22,6 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.impl.javase.fx.JavaFXLoader;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -30,19 +29,14 @@ import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.awt.Desktop;
-import java.awt.EventQueue;
-import java.awt.Toolkit;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
@@ -137,6 +131,7 @@ public class Executor {
                                 return null;
                             }
                         });
+                        
                         setQuitHandler.invoke(Desktop.getDesktop(), new Object[]{quitProxy});
                         
 
@@ -305,20 +300,27 @@ public class Executor {
     
     public static void startApp(){
         if(c != null && app != null){
-            try {
-                Method start = c.getMethod("start", new Class[0]);
-                if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
-                    System.err.println("ERROR: the start method can't declare a throws clause");
-                    System.exit(1);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method start = c.getMethod("start", new Class[0]);
+                        if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                            System.err.println("ERROR: the start method can't declare a throws clause");
+                            System.exit(1);
+                        }
+                        start.invoke(app, new Object[0]);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
                 }
-                start.invoke(app, new Object[0]);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            } 
-        }
-    
+               
+            });
+        }    
     }
 
+    
+    
     public static void registerForPush(final String key){
         if(c != null && app != null){
             Display.getInstance().callSerially(new Runnable() {

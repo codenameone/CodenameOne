@@ -27,6 +27,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.util.AsyncResource;
 import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.Graphics2D;
@@ -44,12 +45,18 @@ import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Worker.State;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.event.EventHandler;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.SnapshotResult;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
 
 import javafx.scene.web.WebEngine;
 //import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
+import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
@@ -80,6 +87,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     private  JScrollBar hSelector, vSelector;
     private AdjustmentListener adjustmentListener;
     private BrowserComponent browserComp;
+    private boolean transparent;
     
     /**
      * A bridge to inject java methods into the webview.
@@ -113,8 +121,53 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
         }
     }
 
+    private void makePageBackgroundTransparent() {
+        try {
+            Class WebPage = Class.forName("com.sun.webkit.WebPage", true, SEBrowserComponent.class.getClassLoader());
+            Class Accessor = Class.forName("com.sun.javafx.webkit.Accessor", true, SEBrowserComponent.class.getClassLoader());
+            Method getPageFor = Accessor.getMethod("getPageFor", new Class[]{WebEngine.class});
+            Object webPage = getPageFor.invoke(null, web.getEngine());
+            Method setBackgroundColor = WebPage.getMethod("setBackgroundColor", new Class[]{int.class});
+            setBackgroundColor.invoke(webPage, 0);
+        } catch (Exception ex){}
+    }
     
-    
+    /**
+     * Captures a browser screenshot using the JavaFX WebView snapshot() method.  The benefit
+     * of this approach over {@link Component#toImage()} is that this can produce an image
+     * with transparency.
+     * @return AsyncResource resolving to an image.
+     */
+    public AsyncResource<Image> captureScreenshot() {
+        
+        final AsyncResource<Image> out = new AsyncResource<Image>();
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                panel.repaint();
+                Platform.runLater(new Runnable() {
+                    public void run() {
+                        SnapshotParameters params = new SnapshotParameters();
+                        params.setFill(Color.TRANSPARENT);
+
+                        web.snapshot(new javafx.util.Callback<SnapshotResult, Void>() {
+                            @Override
+                            public Void call(SnapshotResult p) {
+                                WritableImage wi = p.getImage();
+                                BufferedImage img = SwingFXUtils.fromFXImage(wi, null);
+
+                                out.complete(Image.createImage(img));
+                                return null;
+                            }
+
+                        }, params, null);
+
+                    }
+                });
+            }
+        });
+        
+        return out;
+    }
     
     
     
@@ -226,9 +279,17 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     }
     */
     
+    private void setZoom(double zoom) {
+        try {
+            Method setZoom = WebView.class.getMethod("setZoom", new Class[]{double.class});
+            setZoom.invoke(this, zoom);
+            System.out.println("Set zoom to "+zoom);
+        } catch (Exception ex) {}
+    }
+    
     private static void init(SEBrowserComponent self, BrowserComponent p) {
-        final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<>(self);
-        final WeakReference<BrowserComponent> weakP = new WeakReference<>(p);
+        final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<SEBrowserComponent>(self);
+        final WeakReference<BrowserComponent> weakP = new WeakReference<BrowserComponent>(p);
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 SEBrowserComponent self = weakSelf.get();
@@ -320,6 +381,23 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                 if (self == null || p == null) {
                     return;
                 }
+                /*
+                // DISABLING TRANSPARENCY BECAUSE IT CAUSES A MESS WHEN SCROLLING
+                // ORIGINALLY TRIED TO ADD THIS FOR CSS GENERATION, BUT LATER OPTED
+                // TO ONLY USE CEF FOR THAT ANYWAYS
+                // SINCE THIS FX COMPONENT IS DEPRECATED, WE'LL JUST LET IT DIE
+                self.transparent = p.getStyle().getBgTransparency() == 0;
+                if (self.transparent) {
+                    try {
+                        Class WebPage = Class.forName("com.sun.webkit.WebPage", true, SEBrowserComponent.class.getClassLoader());
+                        Class Accessor = Class.forName("com.sun.javafx.webkit.Accessor", true, SEBrowserComponent.class.getClassLoader());
+                        Method getPageFor = Accessor.getMethod("getPageFor", new Class[]{WebEngine.class});
+                        Object webPage = getPageFor.invoke(null, self.web.getEngine());
+                        Method setBackgroundColor = WebPage.getMethod("setBackgroundColor", new Class[]{int.class});
+                        setBackgroundColor.invoke(webPage, 0);
+                    } catch (Exception ex){}
+                }
+                */
                 String url = self.web.getEngine().getLocation();
                 if (newState == State.SCHEDULED) {
                     p.fireWebEvent("onStart", new ActionEvent(url));
@@ -327,6 +405,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                     p.fireWebEvent("onLoadResource", new ActionEvent(url));
                     
                 } else if (newState == State.SUCCEEDED) {
+                    
                     if (!p.isNativeScrollingEnabled()) {
                         self.web.getEngine().executeScript("document.body.style.overflow='hidden'");
                     }
@@ -417,9 +496,10 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
         this.web = web;
         this.instance = instance;
         this.frm = (JFrame)f.getTopLevelAncestor();
-        
+        this.transparent = p.getStyle().getBgTransparency() == 0;
         this.panel = fx;
         WebEngine we = web.getEngine();
+        
         try {
             File home = new File(System.getProperty("user.home") + File.separator + JavaSEPort.getAppHomeDir());
             File userdata = new File(home, ".fxuserdata");
@@ -712,20 +792,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
             public void run() {
                 Platform.runLater(new Runnable() {
                     public void run() {
-                        try {
-                            Method setZoom = web.getClass().getMethod("setZoom", new Class[]{double.class});
-                            setZoom.invoke(web, instance.zoomLevel);
-                        } catch (NoSuchMethodException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (SecurityException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (IllegalAccessException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (IllegalArgumentException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (InvocationTargetException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        }
+                        setZoom(instance.zoomLevel);
                     }
                 });
 

@@ -664,7 +664,11 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isImage(String name) {
-        byte b = ((Byte)resourceTypes.get(name)).byteValue();
+        Byte bt = (Byte)resourceTypes.get(name);
+        if(bt == null) {
+            return false;
+        }
+        byte b = bt.byteValue();
         return b == MAGIC_IMAGE_LEGACY || b == MAGIC_ANIMATION_LEGACY || 
                 b == MAGIC_INDEXED_IMAGE_LEGACY || b == MAGIC_IMAGE ||
                 b == MAGIC_TIMELINE;

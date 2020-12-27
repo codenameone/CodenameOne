@@ -31,7 +31,9 @@ import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
 import com.codename1.designer.css.CN1CSSCLI;
-import com.codename1.impl.javase.JavaFXLoader;
+import com.codename1.designer.css.MissingNativeBrowserException;
+import com.codename1.impl.javase.CN1Bootstrap;
+//import com.codename1.impl.javase.JavaFXLoader;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
@@ -250,15 +252,25 @@ public class ResourceEditorApp extends SingleFrameApplication {
         return (ResourceEditorApp) Application.getInstance();
     }
 
+    public static void main(String[] args) throws Exception {
+        try {
+            // First try to run without adding CEF to classpath
+            _main(args);
+        } catch (MissingNativeBrowserException ex) {
+            // If the CSS compiler tried to run and requires CEF because
+            // some CSS needs a browser component to generate 9-piece border
+            // it throws the MissingNativeBrowserException
+            // Catch it here and try to add CEF to the classpath, then run again.
+            System.out.println("Looks like this CSS file needs CEF on classpath... adding it now, and retrying...");
+            CN1Bootstrap.run(ResourceEditorApp.class, args);
+        }
+    }
+    
     /**
      * Main method launching the application.
      */
-    public static void main(String[] args) throws Exception {
-        // For JDK11 and newer, JavaFX isn't part of the JDK, so we need to 
-        // add it to the classpath at runtime.
-        if (JavaFXLoader.main(ResourceEditorApp.class, ResourceEditorApp.class, args)) {
-            return;
-        }
+    public static void _main(String[] args) throws Exception {
+        
         JavaSEPortWithSVGSupport.blockMonitors();
         JavaSEPortWithSVGSupport.setDesignMode(true);
         JavaSEPortWithSVGSupport.setShowEDTWarnings(false);
@@ -551,9 +563,10 @@ public class ResourceEditorApp extends SingleFrameApplication {
             }
             if (args.length >= 2 && args[0].equalsIgnoreCase("-css")) {
                 List<String> cssArgs = new ArrayList<String>(Arrays.asList(args));
-                cssArgs.remove(0);
                 
+                cssArgs.remove(0);
                 CN1CSSCLI.main(cssArgs.toArray(new String[cssArgs.size()]));
+                //CN1Bootstrap.run(cssArgs.toArray(new String[cssArgs.size()]));
                 
                 return;
                 

@@ -185,7 +185,7 @@ public class CN1Console {
                 return;
             }
             File lib = new File(GROOVY_HOME + File.separator + "lib");
-            List<URL> jars = new ArrayList<>();
+            List<URL> jars = new ArrayList<URL>();
             for (File jar : lib.listFiles()) {
                 if (jar.getName().endsWith(".jar")) {
                     jars.add(jar.toURI().toURL());
