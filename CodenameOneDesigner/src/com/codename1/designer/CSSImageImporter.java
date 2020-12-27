@@ -23,6 +23,7 @@
 package com.codename1.designer;
 
 import com.codename1.designer.css.CN1CSSCLI;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import java.io.File;
 import java.io.FileInputStream;
@@ -68,16 +69,14 @@ public class CSSImageImporter {
         return resourceFile;
     }
     
-    private File getSrcDir() {
-        return resourceFile.getParentFile();
-    }
+   
     
     private File getProjectDir() {
-        return getSrcDir().getParentFile();
+        return MavenHelper.getProjectDir(resourceFile);
     }
     
     private File getCSSDir() {
-        return new File(getProjectDir(), "css");
+        return MavenHelper.getCSSDir(resourceFile);
     }
     
     private File getCSSFile() {

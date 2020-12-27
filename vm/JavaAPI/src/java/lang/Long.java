@@ -28,6 +28,9 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0
  */
 public final class Long extends Number implements Comparable<Long> {
+    
+    public static Class<Long> TYPE = long.class;
+    
     /**
      * The largest value of type long.
      * See Also:Constant Field Values
@@ -75,7 +78,7 @@ public final class Long extends Number implements Comparable<Long> {
      * Computes a hashcode for this Long. The result is the exclusive OR of the two halves of the primitive long value represented by this Long object. That is, the hashcode is the value of the expression: (int)(this.longValue()^(this.longValue()>>>32))
      */
     public int hashCode(){
-        return (int)value; 
+        return (int)(this.value^(this.value>>>32));
     }
 
     /**
@@ -205,7 +208,9 @@ public final class Long extends Number implements Comparable<Long> {
     }
 
     public static int compare(long f1, long f2) {
-        return (int)(f1 - f2);
+       if (f1 > f2) return 1;
+       else if (f1 < f2) return -1;
+       return 0;
     }
 
     public int compareTo(Long another) {

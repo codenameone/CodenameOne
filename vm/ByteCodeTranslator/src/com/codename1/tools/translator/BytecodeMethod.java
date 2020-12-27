@@ -465,7 +465,7 @@ public class BytecodeMethod implements SignatureSet {
         b.append(prefix);
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -576,11 +576,11 @@ public class BytecodeMethod implements SignatureSet {
             int startOffset = 0;
             if(synchronizedMethod) {
                 if(staticMethod) {
-                    b.append("    monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
+                    b.append("    monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
                     b.append(clsName);
                     b.append(");\n");
                 } else {
-                    b.append("    monitorEnter(threadStateData, __cn1ThisObject);\n");
+                    b.append("    monitorEnterBlock(threadStateData, __cn1ThisObject);\n");
                 }
             }
             if(!staticMethod) {
@@ -631,6 +631,16 @@ public class BytecodeMethod implements SignatureSet {
                     localsOffset++;
                 }
             }
+        } else {
+            if(synchronizedMethod) {
+                if(staticMethod) {
+                    b.append("    monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
+                    b.append(clsName);
+                    b.append(");\n");
+                } else {
+                    b.append("    monitorEnterBlock(threadStateData, __cn1ThisObject);\n");
+                }
+            }
         }
         
         BasicInstruction.setSynchronizedMethod(synchronizedMethod, staticMethod, clsName);
@@ -678,7 +688,7 @@ public class BytecodeMethod implements SignatureSet {
         }
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -711,7 +721,7 @@ public class BytecodeMethod implements SignatureSet {
         } 
         b.append(clsName);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -766,6 +776,10 @@ public class BytecodeMethod implements SignatureSet {
         return forceVirtual;
     }
     
+    public String getFullCName() {
+        return this.clsName + "_"+this.getCMethodName();
+    }
+    
     public void appendVirtualMethodC(String cls, StringBuilder b, String offset, boolean includeStaticInitializer) {
         if(virtualOverriden) {
             return;
@@ -773,7 +787,7 @@ public class BytecodeMethod implements SignatureSet {
         StringBuilder bld = new StringBuilder();
         bld.append(cls);
         bld.append("_");
-        bld.append(methodName);
+        bld.append(getCMethodName());
         bld.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(bld);
@@ -827,7 +841,7 @@ public class BytecodeMethod implements SignatureSet {
         StringBuilder bld = new StringBuilder();
         bld.append(cls);
         bld.append("_");
-        bld.append(methodName);
+        bld.append(getCMethodName());
         bld.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(bld);
@@ -850,7 +864,7 @@ public class BytecodeMethod implements SignatureSet {
     public void appendFunctionPointer(StringBuilder b, String className) {
         b.append(className);
         b.append("_");
-        b.append(methodName);
+        b.append(getCMethodName());
         b.append("__");
         for(ByteCodeMethodArg args : arguments) {
             args.appendCMethodExt(b);
@@ -1066,6 +1080,20 @@ public class BytecodeMethod implements SignatureSet {
         return constructor && arguments.size() == 0;
     }
 
+    private String cMethodName;
+    
+    /**
+     * Gets the method name, mangled to be usable as the C method name.  This will replace illegal characters
+     * with underscores.
+     * @return 
+     */
+    public String getCMethodName() {
+        if (cMethodName == null) {
+            cMethodName = methodName.replace('-','_');
+        }
+        return cMethodName;
+    }
+    
     /**
      * @return the clsName
      */
@@ -1324,11 +1352,11 @@ public class BytecodeMethod implements SignatureSet {
                                 }
                                 if(synchronizedMethod) {
                                     if(staticMethod) {
-                                        sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                        sb.append("    monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
                                         sb.append(getClsName());
                                         sb.append(");\n");
                                     } else {
-                                        sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                        sb.append("    monitorExitBlock(threadStateData, __cn1ThisObject);\n");
                                     }
                                 }
                                 if(hasTryCatch) {
@@ -1386,11 +1414,11 @@ public class BytecodeMethod implements SignatureSet {
                                     }
                                     if(synchronizedMethod) {
                                         if(staticMethod) {
-                                            sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                            sb.append("    monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
                                             sb.append(getClsName());
                                             sb.append(");\n");
                                         } else {
-                                            sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                            sb.append("    monitorExitBlock(threadStateData, __cn1ThisObject);\n");
                                         }
                                     }
                                     if(hasTryCatch) {

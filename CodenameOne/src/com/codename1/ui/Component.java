@@ -27,27 +27,16 @@ import com.codename1.cloud.BindTarget;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
-import com.codename1.ui.util.EventDispatcher;
-import com.codename1.ui.geom.Point;
-import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.events.ComponentStateChangeEvent;
-import com.codename1.ui.events.FocusListener;
-import com.codename1.ui.events.ScrollListener;
-import com.codename1.ui.events.StyleListener;
+import com.codename1.ui.events.*;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.LookAndFeel;
-import com.codename1.ui.plaf.RoundBorder;
-import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.plaf.*;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
 
 import java.util.ArrayList;
@@ -60,6 +49,15 @@ import java.util.HashMap;
  * Component that contains Components effectively allowing us to nest Containers infinitely to build any type 
  * of visual hierarchy we want by nesting Containers.
  * </p>
+ * 
+ * <h3>Style Change Events</h3>
+ * 
+ * <p>Styles fire a change event for each style change that occurs.  {@link Component} listens to all changes events
+ * of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
+ * a {@link Container#revalidate() } call on the Style's Component's parent container, which is expensive.  You can disable this
+ * {@link Container#revalidate() } call by calling {@link CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will 
+ * likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
+ * to avoid regressions when the default is changed.</p>
  * 
  * @see Container
  * @author Chen Fishbein
@@ -292,7 +290,7 @@ public class Component implements Animation, StyleListener, Editable {
      * used as a cell renderer
      */
     private boolean cellRenderer;
-    private Rectangle bounds = new Rectangle(0, 0, new Dimension(0, 0));
+    private final Rectangle bounds = new Rectangle(0, 0, new Dimension(0, 0));
     private Rectangle painterBounds;
     private int scrollX;
     private int scrollY;
@@ -307,7 +305,6 @@ public class Component implements Animation, StyleListener, Editable {
     private Style allStyles;
     private Container parent;
     private Component owner;
-    private ArrayList<Component> owned;
     private boolean focused = false;
     private boolean handlesInput = false;
     boolean shouldCalcPreferredSize = true;
@@ -316,6 +313,15 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
+    
+    /**
+     * A flag to dictate whether style changes should trigger a revalidate() call
+     * on the component's parent.  Eventually we would like to phase this to be {@literal false}
+     * but for now, we'll leave it as {@literal true}.
+     * 
+     * Users can disable this with {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
+     */
+    static boolean revalidateOnStyleChange=true;
     
     // A flag to indicate whether to paint the component's background.
     // Setting this to false will cause the component's background to not be painted.
@@ -433,7 +439,7 @@ public class Component implements Animation, StyleListener, Editable {
     private String cloudDestinationProperty;
     boolean noBind;
     private Runnable refreshTask;
-    private ActionListener refreshTaskDragListener;
+    private ActionListener<?> refreshTaskDragListener;
     
     private double pinchDistance;
     static int restoreDragPercentage = -1;
@@ -607,7 +613,7 @@ public class Component implements Animation, StyleListener, Editable {
      * port to assist with user interaction on touch devices.  Text fields use native overlays to position
      * an invisible native text field above themselves so that the keyboard will be activated properly when
      * the user taps the text field.
-     * @return 
+     * @return The native overlay
      */
     public Object getNativeOverlay() {
         return nativeOverlay;
@@ -725,7 +731,8 @@ public class Component implements Animation, StyleListener, Editable {
      * Gets the UIID that would be used for this component if inline styles are used.
      * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
      * the component, and "name" is the name of the component. 
-     * @return 
+     * @return the style text or null
+     * @see #getInlineStylesUIID()
      */
     private String getInlineStylesUIID() {
         return getUIID()+"["+getName()+"]";
@@ -736,7 +743,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
      * the component, and "name" is the name of the component. 
      * @param id UIID to use as the base.
-     * @return 
+     * @return the style text or null
      * @see #getInlineStylesUIID() 
      */
     private String getInlineStylesUIID(String id) {
@@ -980,8 +987,8 @@ public class Component implements Animation, StyleListener, Editable {
         
         int w = getWidth();
         int h = getHeight();
-        int x = getAbsoluteX();
-        int y = getAbsoluteY();
+        int x = getAbsoluteX() + scrollX;
+        int y = getAbsoluteY() + scrollY;
         if (init) {
             r.setBounds(x, y, w, h);
             if (w <= 0 || h <= 0) {
@@ -1002,7 +1009,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         
     }
-    private static Rectangle tmpRect = new Rectangle();
+    private static final Rectangle tmpRect = new Rectangle();
     boolean isVisibleOnForm() {
         getVisibleRect(tmpRect, true);
         return (tmpRect.getWidth() > 0 && tmpRect.getHeight() > 0);   
@@ -1347,29 +1354,32 @@ public class Component implements Animation, StyleListener, Editable {
      * Returns the preferred size string that can be used to specify the preferred size of the component
      * using pixels or millimetres.  This string is applied to the preferred size just after is is initially
      * calculated using {@link #calcPreferredSize() }. 
-     * @return 
+     * @return the preferred size string
      * @deprecated This method is primarily for use by the GUI builder.  Use {@link #getPreferredSize() } to find
      * the preferred size of a component.
      */
     public String getPreferredSizeStr() {
         return preferredSizeStr;
     }
-    
+
+    /**
+     * Parses the preferred size given as a string
+     * @param preferredSize a string representing a width/height preferred size using common units e.g. mm, px etc.
+     * @param baseSize used as the starting point for the calculation, typically the preferred size of the component
+     * @return the parsed results
+     */
     public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
-        String strVal = (String)preferredSize;
-        int spacePos = strVal.indexOf(" ");
+        int spacePos = preferredSize.indexOf(" ");
         if (spacePos == -1) {
             return baseSize;
         }
-        String wStr = strVal.substring(0, spacePos).trim();
-        String hStr = strVal.substring(spacePos+1).trim();
-        int unitPos=-1;
+        String wStr = preferredSize.substring(0, spacePos).trim();
+        String hStr = preferredSize.substring(spacePos+1).trim();
+        int unitPos;
         float pixelsPerMM = Display.getInstance().convertToPixels(1000f)/1000f;
         try {
-            
-            
             if ((unitPos=wStr.indexOf("mm")) != -1) {
-                baseSize.setWidth((int)Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
+                baseSize.setWidth(Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
             } else if ((unitPos=wStr.indexOf("px")) != -1) {
                 baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
             } else if (!"inherit".equals(wStr)){
@@ -1379,7 +1389,7 @@ public class Component implements Animation, StyleListener, Editable {
         
         try {
             if ((unitPos=hStr.indexOf("mm")) != -1) {
-                baseSize.setHeight((int)Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
+                baseSize.setHeight(Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
             } else if ((unitPos=hStr.indexOf("px")) != -1) {
                 baseSize.setHeight(Integer.parseInt(hStr.substring(0, unitPos)));
             } else if (!"inherit".equals(hStr)){
@@ -1518,7 +1528,7 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Gets the preferred width removing horizontal padding.
-     * @return 
+     * @return preferred width
      */
     public int getInnerPreferredW() {
         return getPreferredW() - getStyle().getHorizontalPadding();
@@ -1668,8 +1678,8 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Registers inline styles that should be applied to all states of the component.  
-     * @param styles 
-     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     * @param styles a style in the format of {@code
+     * "fgColor:ff0000; font:18mm; border: 1px solid ff0000; bgType:none; padding: 3mm; margin: 1mm" }
      */
     public void setInlineAllStyles(String styles) {
         if (styles != null && styles.trim().length() == 0) {
@@ -1690,8 +1700,8 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Registers inline styles that should be applied to the unselected state of the component.  
-     * @param styles 
-     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     * @param styles style format
+     * @see #setInlineAllStyles(String)
      */
     public void setInlineUnselectedStyles(String styles) {
         if (styles != null && styles.trim().length() == 0) {
@@ -1714,8 +1724,8 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Registers inline styles that should be applied to the selected state of the component.  
-     * @param styles 
-     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     * @param styles style format
+     * @see #setInlineAllStyles(String)
      */
     public void setInlineSelectedStyles(String styles) {
         if (styles != null && styles.trim().length() == 0) {
@@ -1738,8 +1748,8 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Registers inline styles that should be applied to the disabled state of the component.  
-     * @param styles 
-     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     * @param styles style format
+     * @see #setInlineAllStyles(String)
      */
     public void setInlineDisabledStyles(String styles) {
         if (styles != null && styles.trim().length() == 0) {
@@ -1760,8 +1770,8 @@ public class Component implements Animation, StyleListener, Editable {
     
     /**
      * Registers inline styles that should be applied to the pressed state of the component.  
-     * @param styles 
-     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     * @param styles style format
+     * @see #setInlineAllStyles(String)
      */
     public void setInlinePressedStyles(String styles) {
         if (styles != null && styles.trim().length() == 0) {
@@ -1828,19 +1838,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #containsOrOwns(int, int) 
      */
     public void setOwner(Component owner) {
-        if (this.owner != null) {
-            if (this.owner.owned != null) {
-                this.owner.owned.remove(this);
-            }
-            
-        }
         this.owner = owner;
-        if (owner != null) {
-            if (owner.owned == null) {
-                owner.owned = new ArrayList<Component>();
-            }
-            owner.owned.add(this);
-        }
     }
     
     /**
@@ -1860,7 +1858,7 @@ public class Component implements Animation, StyleListener, Editable {
      * <li>{@literal B} contains {@literal A}'s owner.</li>
      * <li>{@literal A}'s owner is owned by {@literal B}</li>
      * </ul>
-     * @param cmp
+     * @param cmp the owner
      * @return True if this component is owned by {@literal cmp}.
      * @since 6.0
      * @see #setOwner(com.codename1.ui.Component) 
@@ -1909,11 +1907,7 @@ public class Component implements Animation, StyleListener, Editable {
         Form f = getComponentForm();
         if (f != null) {
             Component cmp = f.getComponentAt(x, y);
-            if (cmp != null) {
-                if (cmp.isOwnedBy(this)) {
-                    return true;
-                }
-            }
+            return cmp != null && cmp.isOwnedBy(this);
         }
         return false;
         
@@ -2520,7 +2514,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Returns the area of this component that is currently hidden by the virtual keyboard.
-     * @return 
+     * @return The height of the area under the virtual keyboard in pixels
      */
     private int getInvisibleAreaUnderVKB() {
         Form f = getComponentForm();
@@ -2855,7 +2849,6 @@ public class Component implements Animation, StyleListener, Editable {
         // the setter must always update the value regardless... 
         int scrollYtmp = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
-            Form parentForm = getComponentForm();
             int v = getInvisibleAreaUnderVKB();
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
@@ -3003,8 +2996,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return the calculated preferred size based on component content
      */
     protected Dimension calcPreferredSize() {
-        Dimension d = new Dimension(0, 0);
-        return d;
+        return new Dimension(0, 0);
     }
     
     /**
@@ -3213,7 +3205,7 @@ public class Component implements Animation, StyleListener, Editable {
      * sensible traversal orders by default.  If you have a custom layout manager, you can override its traversal
      * order by implementing the {@link com.codename1.ui.layouts.Layout#overridesTabIndices(com.codename1.ui.Container) } and
      * {@link com.codename1.ui.layouts.Layout#getChildrenInTraversalOrder(com.codename1.ui.Container) } methods.</p>
-     * @return 
+     * @return the tabbing index
      */
     public int getPreferredTabIndex() {
         if (isEnabled() && isVisible() && isFocusable()) {
@@ -3243,7 +3235,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Checks if this component should be traversable using the keyboard using tab, next, previous keys.
      * 
      * <p>Note: This method is marked final because it is just a convenience wrapper around {@link #getPreferredTabIndex() }</p>
-     * @return 
+     * @return true if traversable in tab indexing
      */
     public final boolean isTraversable() {
         return getPreferredTabIndex() >= 0;
@@ -3265,8 +3257,8 @@ public class Component implements Animation, StyleListener, Editable {
             this.shouldCalcPreferredSize = shouldCalcPreferredSize;
             this.shouldCalcScrollSize = shouldCalcPreferredSize;
             if (shouldCalcPreferredSize && getParent() != null) {
-                this.shouldCalcPreferredSize = shouldCalcPreferredSize;
-                getParent().setShouldLayout(shouldCalcPreferredSize);
+                this.shouldCalcPreferredSize = true;
+                getParent().setShouldLayout(true);
             }
         }
         if(shouldCalcPreferredSize) {
@@ -3661,76 +3653,74 @@ public class Component implements Animation, StyleListener, Editable {
     }
     
     ComponentAnimation createStyleAnimation(final Style sourceStyle, final Style destStyle, final int duration, final String destUIID) {
-        int d = duration;
-        
+
         Motion m = null;
         if(sourceStyle.getFgColor() != destStyle.getFgColor()) {
-            m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
+            m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), duration);
         }
         final Motion fgColorMotion = m;
         m = null;
         
         if(sourceStyle.getOpacity() != destStyle.getOpacity()) {
-            m = Motion.createLinearColorMotion(sourceStyle.getOpacity(), destStyle.getOpacity(), d);
+            m = Motion.createLinearColorMotion(sourceStyle.getOpacity(), destStyle.getOpacity(), duration);
         }
         final Motion opacityMotion = m;
         m = null;
         
         if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
             // allows for fractional font sizes
-            m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, d);
+            m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, duration);
         }
 
         final Motion fontMotion = m;
         m = null;
 
         if(sourceStyle.getPaddingTop() != destStyle.getPaddingTop()) {
-            m = Motion.createLinearMotion(sourceStyle.getPaddingTop(), destStyle.getPaddingTop(), d);
+            m = Motion.createLinearMotion(sourceStyle.getPaddingTop(), destStyle.getPaddingTop(), duration);
         }
         final Motion paddingTop = m;
         m = null;
 
         if(sourceStyle.getPaddingBottom() != destStyle.getPaddingBottom()) {
-            m = Motion.createLinearMotion(sourceStyle.getPaddingBottom(), destStyle.getPaddingBottom(), d);
+            m = Motion.createLinearMotion(sourceStyle.getPaddingBottom(), destStyle.getPaddingBottom(), duration);
         }
         final Motion paddingBottom = m;
         m = null;
 
         if(sourceStyle.getPaddingLeftNoRTL()!= destStyle.getPaddingLeftNoRTL()) {
-            m = Motion.createLinearMotion(sourceStyle.getPaddingLeftNoRTL(), destStyle.getPaddingLeftNoRTL(), d);
+            m = Motion.createLinearMotion(sourceStyle.getPaddingLeftNoRTL(), destStyle.getPaddingLeftNoRTL(), duration);
         }
         final Motion paddingLeft = m;
         m = null;
 
         if(sourceStyle.getPaddingRightNoRTL()!= destStyle.getPaddingRightNoRTL()) {
-            m = Motion.createLinearMotion(sourceStyle.getPaddingRightNoRTL(), destStyle.getPaddingRightNoRTL(), d);
+            m = Motion.createLinearMotion(sourceStyle.getPaddingRightNoRTL(), destStyle.getPaddingRightNoRTL(), duration);
         }
         final Motion paddingRight = m;
         m = null;
 
         if(sourceStyle.getMarginTop()!= destStyle.getMarginTop()) {
-            m = Motion.createLinearMotion(sourceStyle.getMarginTop(), destStyle.getMarginTop(), d);
+            m = Motion.createLinearMotion(sourceStyle.getMarginTop(), destStyle.getMarginTop(), duration);
         }
         final Motion marginTop = m;
         m = null;
 
         if(sourceStyle.getMarginBottom() != destStyle.getMarginBottom()) {
-            m = Motion.createLinearMotion(sourceStyle.getMarginBottom(), destStyle.getMarginBottom(), d);
+            m = Motion.createLinearMotion(sourceStyle.getMarginBottom(), destStyle.getMarginBottom(), duration);
         }
         final Motion marginBottom = m;
         m = null;
 
         if(sourceStyle.getMarginLeftNoRTL()!= destStyle.getMarginLeftNoRTL()) {
-            m = Motion.createLinearMotion(sourceStyle.getMarginLeftNoRTL(), destStyle.getMarginLeftNoRTL(), d);
+            m = Motion.createLinearMotion(sourceStyle.getMarginLeftNoRTL(), destStyle.getMarginLeftNoRTL(), duration);
         }
         final Motion marginLeft = m;
         m = null;
 
         if(sourceStyle.getMarginRightNoRTL()!= destStyle.getMarginRightNoRTL()) {
-            m = Motion.createLinearMotion(sourceStyle.getMarginRightNoRTL(), destStyle.getMarginRightNoRTL(), d);
+            m = Motion.createLinearMotion(sourceStyle.getMarginRightNoRTL(), destStyle.getMarginRightNoRTL(), duration);
         }
         final Motion marginRight = m;
-        m = null;
 
         if(paddingLeft != null || paddingRight != null || paddingTop != null || paddingBottom != null) {
             // convert the padding to pixels for smooth animation
@@ -3767,7 +3757,7 @@ public class Component implements Animation, StyleListener, Editable {
             sourceStyle.setBgPainter(ap);
         }
         
-        final Motion bgMotion = Motion.createLinearMotion(0, 255, d);
+        final Motion bgMotion = Motion.createLinearMotion(0, 255, duration);
         
         return new ComponentAnimation() {
             private boolean finished;
@@ -3789,9 +3779,7 @@ public class Component implements Animation, StyleListener, Editable {
             public void setStep(int step) {
                 stepMode = true;
                 if(!finished) {
-                    if(bgMotion != null) {
-                        bgMotion.setCurrentMotionTime(step);
-                    }
+                    bgMotion.setCurrentMotionTime(step);
                     if(fgColorMotion != null) {
                         fgColorMotion.setCurrentMotionTime(step);
                     }
@@ -3835,7 +3823,7 @@ public class Component implements Animation, StyleListener, Editable {
                     return true;
                 }
                 return stepMode ||
-                        !((bgMotion == null || bgMotion.isFinished()) && 
+                        !(bgMotion.isFinished() &&
                         (opacityMotion == null || opacityMotion.isFinished()) &&
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
                         (paddingLeft == null || paddingLeft.isFinished()) &&
@@ -3857,9 +3845,7 @@ public class Component implements Animation, StyleListener, Editable {
                 
                 if(!started && !stepMode) {
                     started = true;
-                    if(bgMotion != null) {
-                        bgMotion.start();
-                    }
+                    bgMotion.start();
                     if (opacityMotion != null) {
                         opacityMotion.start();
                     }
@@ -3907,9 +3893,7 @@ public class Component implements Animation, StyleListener, Editable {
                     if(fgColorMotion != null) {
                         sourceStyle.setFgColor(fgColorMotion.getValue());
                     }
-                    if(bgMotion != null) {
-                        ap.alpha = bgMotion.getValue();
-                    }
+                    ap.alpha = bgMotion.getValue();
                     if(fontMotion != null) {
                         Font fnt = sourceStyle.getFont();
                         fnt = fnt.derive(((float)fontMotion.getValue()) / 100.0f, fnt.getStyle());
@@ -3944,9 +3928,7 @@ public class Component implements Animation, StyleListener, Editable {
 
             @Override
             public void flush() {
-                if(bgMotion != null) {
-                    bgMotion.finish();
-                }
+                bgMotion.finish();
                 if (opacityMotion != null) {
                     opacityMotion.finish();
                 }
@@ -4015,7 +3997,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Disable smooth scrolling on all components
-     * @param disableSmoothScrolling 
+     * @param disableSmoothScrolling false to disable
      */
     static void setDisableSmoothScrolling(boolean disableSmoothScrolling) {
         Component.disableSmoothScrolling = disableSmoothScrolling;
@@ -4054,11 +4036,7 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 int hh = getScrollDimension().getHeight() - getHeight();
                 if (dmv > hh) {
-                    if(hh < 0) {
-                        setScrollY(0);
-                    } else {
-                        setScrollY(hh);
-                    }
+                    setScrollY(Math.max(0, hh));
                 }
             }
         }
@@ -4321,7 +4299,8 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if the pointer responds to pointer events.
      */
     public boolean respondsToPointerEvents() {
-        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents() || isDraggable());
+        boolean isScrollable = CN.isEdt() ? isScrollable() : (scrollableXFlag() || scrollableYFlag());
+        return isVisible() && isEnabled() && (isScrollable || isFocusable() || isGrabsPointerEvents() || isDraggable());
     }
     
     private boolean pointerReleaseMaterialPullToRefresh() {
@@ -4395,7 +4374,7 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
-                    p.addPointerReleasedListener(new ActionListener() {
+                    p.addPointerReleasedListener(new ActionListener<ActionEvent>() {
                         public void actionPerformed(ActionEvent evt) {
                             pointerReleaseMaterialPullToRefresh();
                             p.removePointerReleasedListener(this);
@@ -4415,7 +4394,7 @@ public class Component implements Animation, StyleListener, Editable {
                 opacityMotion.setCurrentMotionTime(y);
                 Style s = refreshLabel.getAllStyles();
                 s.setOpacity(opacityMotion.getValue());
-                Image i = ((FontImage)refreshLabel.getIcon()).rotate(rotationMotion.getValue());
+                Image i = refreshLabel.getIcon().rotate(rotationMotion.getValue());
                 refreshLabel.setIcon(i);
                 s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
                 s.setMarginTop(Math.min(getHeight() / 5, y - pullY));
@@ -4709,7 +4688,7 @@ public class Component implements Animation, StyleListener, Editable {
         if(leadParent.isDragAndDropOperation(x, y)) {
             int restore = Display.getInstance().getDragStartPercentage();
             if(restore > 1){
-                leadParent.restoreDragPercentage = restore;
+                Component.restoreDragPercentage = restore;
             }
             Display.getInstance().setDragStartPercentage(1);
         }
@@ -4740,9 +4719,6 @@ public class Component implements Animation, StyleListener, Editable {
         if (longPressListeners != null && longPressListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
             longPressListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
-                return;
-            }
         }
     }
 
@@ -4792,7 +4768,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Returns text selection support object for this component.  Only used by 
      * components that support text selection (e.g. Labels, un-editable text fields, etc..).
-     * @return 
+     * @return text selection support object
      * @since 7.0
      */
     public TextSelectionSupport getTextSelectionSupport() {
@@ -6283,6 +6259,11 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * Invoked to indicate a change in a propertyName of a Style
      * 
+     * <p><em>NOTE</em> By default this will trigger a call to {@link Container#revalidate() } on the parent
+     * container, which is expensive.  You can disable this behavior by calling {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
+     * The intention is to change this behavior so that the default is to "not" revalidate on style change, so we encourage you to 
+     * set this to "false" to ensure for future compatibility.</p>
+     * 
      * @param propertyName the property name that was changed
      * @param source The changed Style object
      */
@@ -6297,7 +6278,9 @@ public class Component implements Animation, StyleListener, Editable {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
-                parent.revalidate();
+                if (revalidateOnStyleChange) {
+                    parent.revalidateLater();
+                }
             }
         }
     }

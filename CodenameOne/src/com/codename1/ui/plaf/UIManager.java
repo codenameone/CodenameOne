@@ -470,6 +470,38 @@ public class UIManager {
             themeProps.put("SignatureButton.dis#derive", "SignatureButton");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("SignatureButtonBox.derive")) {
+            themeProps.put("SignatureButtonBox.fgColor", centerAlign);
+            themeProps.put("SignatureButtonBox.sel#derive", "SignatureButtonBox");
+            themeProps.put("SignatureButtonBox.press#derive", "SignatureButtonBox");
+            themeProps.put("SignatureButtonBox.dis#derive", "SignatureButtonBox");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("SignaturePanel.derive")) {
+            themeProps.put("SignaturePanel.bgColor", "ffffff");
+            themeProps.put("SignaturePanel.transparency", "255");
+            themeProps.put("SignaturePanel.sel#derive", "SignaturePanel");
+            themeProps.put("SignaturePanel.press#derive", "SignaturePanel");
+            themeProps.put("SignaturePanel.dis#derive", "SignaturePanel");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("SignaturePanelBox.derive")) {
+            themeProps.put("SignaturePanelBox.fgColor", "666666");
+            themeProps.put("SignaturePanelBox.transparency", "255");
+            themeProps.put("SignaturePanelBox.sel#derive", "SignaturePanelBox");
+            themeProps.put("SignaturePanelBox.press#derive", "SignaturePanelBox");
+            themeProps.put("SignaturePanelBox.dis#derive", "SignaturePanelBox");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("SignaturePanelSignature.derive")) {
+            themeProps.put("SignaturePanelSignature.fgColor", "0");
+            themeProps.put("SignaturePanelSignature.transparency", "255");
+            themeProps.put("SignaturePanelSignature.sel#derive", "SignaturePanelSignature");
+            themeProps.put("SignaturePanelSignature.press#derive", "SignaturePanelSignature");
+            themeProps.put("SignaturePanelSignature.dis#derive", "SignaturePanelSignature");
+        }
+        
+        
         if (installedTheme == null || !installedTheme.containsKey("ToastBar.derive")) {
             themeProps.put("ToastBar.margin", "0,0,0,0");
             if(darkMode) {

@@ -15,9 +15,153 @@
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
 #include "java_lang_ArrayIndexOutOfBoundsException.h"
+#import <mach/mach.h>
+#import <mach/mach_host.h>
+
+// The amount of memory allocated between GC cycle checks (generally 30 seconds)
+// that triggers "High-frequency" GC mode.  When "High-frequency" mode is triggered,
+// it will only wait 200ms before triggering another GC cycle after completing the
+// previous one.  Normally it's 30 seconds.
+// This value is in bytes
+long CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = 1024 * 1024;
+
+// "High frequency" GC mode won't be enabled until the "total" allocated memory
+// in the app reaches this threshold
+// This value is in bytes
+long CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = 10 * 1024 * 1024;
+
+
+// The number of allocations (not measured in bytes, but actual allocation count) made on
+// a thread that will result in the thread being treated as an aggressive allocator.
+// If, during GC, it hits a thread that is an aggressive allocator, GC will lock that thread
+// until the sweep is complete for all threads.  Normally, the thread is only locked while
+// its objects are being marked.
+// If the EDT is hitting this threshold, we'll have problems
+long CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD = 5000;
+
+long CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT = 10000;
+
+// The max number of allocations (not bytes, but number) on a thread before 
+// it will refuse to increase its size.  This is checked when allocating objects.
+// If the thread is at its max size during allocation, it will aggressively call
+// the GC and wait until the GC is complete before the allocation can occur.
+// On the EDT, this has usability consequences.
+// If the allocation array is maxed out, but hasn't reached this max size,
+// it will double the size of the allocation array and trigger a GC (but not wait
+// for the GC to complete).  
+long CN1_MAX_HEAP_SIZE = 10000;
+
+// Special value for the EDT to possibly allow for a larger allocation stack on the 
+// EDT.
+long CN1_MAX_HEAP_SIZE_EDT = 10000;
+
+// THE THREAD ID OF THE EDT.  We'll treat the EDT specially.
+long CN1_EDT_THREAD_ID = -1;
+
+// A flag to indicate if the GC thresholds are initialized yet
+// @see init_gc_thresholds
+static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;
+
+static JAVA_BOOLEAN isEdt(long threadId) {
+    return (CN1_EDT_THREAD_ID == threadId);
+}
+
+// Gets the amount of free memory in the system.
+ static natural_t get_free_memory(void)
+ {
+   mach_port_t host_port;
+   mach_msg_type_number_t host_size;
+   vm_size_t pagesize;
+   host_port = mach_host_self();
+   host_size = sizeof(vm_statistics_data_t) / sizeof(integer_t);
+   host_page_size(host_port, &pagesize);
+   vm_statistics_data_t vm_stat;
+   if (host_statistics(host_port, HOST_VM_INFO, (host_info_t)&vm_stat, &host_size) != KERN_SUCCESS)
+   {
+     NSLog(@"Failed to fetch vm statistics");
+     return 0;
+   }
+   /* Stats in bytes */
+   natural_t mem_free = vm_stat.free_count * pagesize;
+   return mem_free;
+ }
+
+// Initializes the GC thresholds based on the free memory on the device.
+// This is run inside the gc mark method.
+// Previously we had been hardcoding this stuff, but that causes us to miss out
+// on the greater capacity of newer devices.
+static void init_gc_thresholds() {
+    if (!GC_THRESHOLDS_INITIALIZED) {
+        GC_THRESHOLDS_INITIALIZED = JAVA_TRUE;
+        
+        // On iPhone X, this generally starts with a figure like 388317184 (i.e. ~380 MB)
+        long freemem = get_free_memory();
+        
+        // com.codename1.ui.Container is approx 900 bytes
+        // Most allocations are 32 bytes though... so we're making an estimate
+        // of the average size of an allocation.  This is based on experimentation and it is crude
+        // This is used for trying to estimate how many allocations can be made on a thread
+        // before we need to worry.
+        long avgAllocSize = 128;
+        
+        // Estimate the number of allocation slots available in all of memory
+        // On iPhone X, this will generally give around 38000 allocation slots
+        long maxAllocationSlots = freemem / avgAllocSize;
+        
+        
+        // Set the number of allocations allowed on a thread before it is considered
+        // an aggressive allocator.  Aggressive allocator status will cause
+        // the thread to lock until the sweep is complete, whereas other threads
+        // are only locked during the mark() method.
+        // The EDT is treated specially here
+        CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD = maxAllocationSlots / 3;
+        if (CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD < 5000) {
+            CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD = 5000;
+        }
+        
+        // For the EDT, experimenting with never declaring it aggressive (we don't want to block it)
+        // unless we've received a low memory warning
+        CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT = maxAllocationSlots * 10;
+        
+        // Set the high frequency allocation threshold.  If the app has allocated more
+        // than the given threshold (in bytes) between GC cycles, it will issue an additional
+        // GC cycle immediately after the last one (200ms) (sort of like doubling up.
+        // Kind of picking numbers out of the air here.  one fifth of free memory
+        // seems alright.
+        //CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = freemem / 5;
+        //if (CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD < 1024 * 1024) {
+        //    CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD = 1024 * 1024;
+        //}
+        
+        // Set the threshold of total allocated memory before the high-frequency GC cycles
+        // are started.
+        //CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = freemem/2;
+        //if (CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD < 10 * 1024 * 1024) {
+        //    CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD = 10 * 1024 * 1024;
+        //}
+        
+        // GC will be triggered if the the number of allocations on any thread
+        // reaches this threshold.  It is checked during malloc, so that
+        // if we try to allocate and the number of allocations exceeds this threshold
+        // then the thread is stopped until a GC cycle is completed.
+        CN1_MAX_HEAP_SIZE = maxAllocationSlots / 3;
+        if (CN1_MAX_HEAP_SIZE < 10000) {
+            CN1_MAX_HEAP_SIZE = 10000;
+        }
+
+        // This might be a bit permissive (allowing the EDT to grow) to the total 
+        // max allocation slots - but there are other safeguards in place that should
+        // mitigate the harm done.
+        CN1_MAX_HEAP_SIZE_EDT = maxAllocationSlots;
+        if (CN1_MAX_HEAP_SIZE_EDT < 10000) {
+            CN1_MAX_HEAP_SIZE_EDT = 10000;
+        }
+    }
+}
+
 //#define DEBUG_GC_OBJECTS_IN_HEAP
 
 struct clazz class_array1__JAVA_BOOLEAN = {
@@ -397,7 +541,7 @@ void collectThreadResources(struct ThreadLocalData *current)
  */
 void codenameOneGCMark() {
     currentGcMarkValue++;
-
+    init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
     struct ThreadLocalData* d = getThreadLocalData();
     //int marked = 0;
@@ -437,6 +581,12 @@ void codenameOneGCMark() {
                 }
                 
                 // place allocations from the local thread into the global heap list
+                if (!t->lightweightThread) {
+                    // For native threads, we need to actually lock them while we traverse the 
+                    // heap allocations because we can't use the usual locking mechanisms on
+                    // them.
+                    lockThreadHeapMutex();
+                }
                 for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
                     JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
                     if(obj) {
@@ -444,9 +594,24 @@ void codenameOneGCMark() {
                         placeObjectInHeapCollection(obj);
                     }
                 }
+                if (!t->lightweightThread) {
+                    unlockThreadHeapMutex();
+                }
                 
                 // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
-                JAVA_BOOLEAN agressiveAllocator = t->heapAllocationSize > 5000;
+                
+                JAVA_INT allocSize = t->heapAllocationSize;
+                JAVA_BOOLEAN agressiveAllocator = JAVA_FALSE;
+                if (isEdt(t->threadId) && !lowMemoryMode) {
+                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
+                } else {
+                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
+                }
+                if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
+                    long freeMemory = get_free_memory();
+                    NSLog(@"[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
+                    
+                }
                 
                 t->heapAllocationSize = 0;
                 
@@ -714,7 +879,7 @@ long long totalAllocations = 0;
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
     int alloc = allocationsSinceLastGC;
     allocationsSinceLastGC = 0;
-    return alloc > 1024 * 1024 && totalAllocations > 10 * 1024 * 1024;
+    return alloc > CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD && totalAllocations > CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD;
 }
 
 extern int mallocWhileSuspended;
@@ -778,14 +943,21 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
-        if(threadStateData->heapAllocationSize > 10000 && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+        long maxHeapSize = CN1_MAX_HEAP_SIZE;
+        if (isEdt(threadStateData->threadId) && !lowMemoryMode) {
+            maxHeapSize = CN1_MAX_HEAP_SIZE_EDT;
+        }
+        
+        
+        
+        if(threadStateData->heapAllocationSize > maxHeapSize && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
             }
             threadStateData->threadActive=JAVA_TRUE;
             
-            if(threadStateData->heapAllocationSize > 0) {
+            if(threadStateData->heapAllocationSize > 0 ) {
                 invokedGC = YES;
                 threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
@@ -806,12 +978,25 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             }
         } else {
             if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
+                
+                // Let's trigger a GC here.
+                if(!gcCurrentlyRunning && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+                    threadStateData->nativeAllocationMode = JAVA_TRUE;
+                    java_lang_System_gc__(threadStateData);
+                    threadStateData->nativeAllocationMode = JAVA_FALSE;
+                }
+                if (!threadStateData->lightweightThread) {
+                    lockThreadHeapMutex();
+                }
                 void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
                 threadStateData->threadHeapTotalSize *= 2;
                 free(threadStateData->pendingHeapAllocations);
                 threadStateData->pendingHeapAllocations = tmp;
+                if (!threadStateData->lightweightThread) {
+                    unlockThreadHeapMutex();
+                }
             }
         }
     }
@@ -1182,8 +1367,15 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     threadStateData->exception = exceptionArg; 
     threadStateData->tryBlockOffset--; 
     while(threadStateData->tryBlockOffset >= 0) { 
-        if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
-            int off = threadStateData->tryBlockOffset; 
+        if (threadStateData->blocks[threadStateData->tryBlockOffset].monitor != 0) {
+            // This tryblock was actually created by a synchronized method's monitorEnterBlock
+            // We need to exit the monitor since the exception will cause us to 
+            // leave the method.
+            monitorExitBlock(threadStateData, threadStateData->blocks[threadStateData->tryBlockOffset].monitor);
+            // Continue to search for a matching exception ...
+            continue;
+        } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
+            int off = threadStateData->tryBlockOffset;
             longjmp(threadStateData->blocks[off].destination, 1);
             return;
         } 

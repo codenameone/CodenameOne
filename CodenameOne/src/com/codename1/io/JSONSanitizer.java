@@ -674,7 +674,7 @@ final class JSONSanitizer {
         insert(pos, ',');
         return State.AFTER_ELEMENT;
     }
-    throw new AssertionError();
+    throw new RuntimeException();
   }
 
   private void insert(int pos, char ch) {
@@ -737,7 +737,7 @@ final class JSONSanitizer {
         case ',':
           elide(i, i+1);
           return;
-        default: throw new AssertionError("" + jsonish.charAt(i));
+        default: throw new RuntimeException("" + jsonish.charAt(i));
       }
     }
     assert sanitizedJson != null;
@@ -748,10 +748,10 @@ final class JSONSanitizer {
         case ',':
           sanitizedJson.setLength(i);
           return;
-        default: throw new AssertionError("" + sanitizedJson.charAt(i));
+        default: throw new RuntimeException("" + sanitizedJson.charAt(i));
       }
     }
-    throw new AssertionError(
+    throw new RuntimeException(
         "Trailing comma not found in " + jsonish + " or " + sanitizedJson);
   }
 
@@ -938,18 +938,22 @@ final class JSONSanitizer {
     if (fractionEnd == sanEnd) {
       expStart = expEnd = sanEnd;
     } else {
-      assert 'e' == (sanitizedJson.charAt(fractionEnd) | 32);
+      if (!('e' == (sanitizedJson.charAt(fractionEnd) | 32))) {
+          throw new RuntimeException("AssertionError: 'e' == (sanitizedJson.charAt(fractionEnd) | 32))");
+      }
       expStart = fractionEnd + 1;
       if (sanitizedJson.charAt(expStart) == '+') { ++expStart; }
       expEnd = sanEnd;
     }
 
-    assert
+    if (!(
          intStart      <= intEnd
       && intEnd        <= fractionStart
       && fractionStart <= fractionEnd
       && fractionEnd   <= expStart
-      && expStart      <= expEnd;
+      && expStart      <= expEnd)) {
+        throw new RuntimeException("Assertion error in JSONSanitizer: intStart <= intEnd, etc...");
+    }
 
     int exp;
     if (expEnd == expStart) {

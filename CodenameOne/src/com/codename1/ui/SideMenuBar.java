@@ -752,6 +752,7 @@ public class SideMenuBar extends MenuBar {
      * Returns true if the Menu is currently open
      *
      * @return true if menu open
+     * @deprecated this code references functionality that is no longer supported and currently always returns false
      */
     public boolean isMenuOpen() {
         return Display.getInstance().getCurrent() == menu;
@@ -1717,6 +1718,7 @@ public class SideMenuBar extends MenuBar {
 
         public CommandWrapper(Command cmd) {
             super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());
+            super.setIconFont(cmd.getIconFont()); //if defined, use cmd's IconFont
             super.setMaterialIcon(cmd.getMaterialIcon());
             super.setPressedIcon(cmd.getPressedIcon());
             super.setRolloverIcon(cmd.getRolloverIcon());

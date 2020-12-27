@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+       <parent>
+           <artifactId>codenameone</artifactId>
+           <groupId>com.codenameone</groupId>
+           <version>7.0-SNAPSHOT</version>
+       </parent>
+    <groupId>com.codenameone.tests</groupId>
+    <artifactId>testnativeinterfaces</artifactId>
+    <version>7.0-SNAPSHOT</version>
+    <packaging>cn1app</packaging>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <cn1.version>${project.version}</cn1.version>
+        <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+            <version>${cn1.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>read-project-properties</goal>
+                        </goals>
+                        <configuration>
+                            <files>
+                                <file>${basedir}/codenameone_settings.properties</file>
+                            </files>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+			
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${cn1.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <id>cn1-initialize</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>installcn1libs</goal>
+                            <goal>generate-gui-sources</goal>
+                        </goals>
+                        
+                    </execution>
+                    <execution>
+                        <id>cn1-process-classes</id>
+                    <phase>process-classes</phase>
+                        <goals>
+                            <goal>compliance-check</goal>
+                            <goal>compile-javase-sources</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+            </plugin>
+            
+            
+            
+        </plugins>
+
+        
+    </build>
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-guardsquare-proguard</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/guardsquare/proguard</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray-plugins</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <profiles>
+        <profile>
+            <id>kotlin</id>
+            <activation>
+                <property>
+                    <name>cn1.kotlin</name>
+                </property>
+            </activation>
+            <properties>
+                <kotlin.version>1.3.72</kotlin.version>
+                <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-stdlib</artifactId>
+                    <version>${kotlin.version}</version>
+                </dependency>
+        
+                <!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-annotations-jvm -->
+                <!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+                <dependency>
+                    <groupId>org.jetbrains</groupId>
+                    <artifactId>annotations</artifactId>
+                    <version>13.0</version>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.0.0</version>
+                        <executions>
+                            <execution>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>read-project-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <files>
+                                        <file>${basedir}/codenameone_settings.properties</file>
+                                    </files>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-plugin</artifactId>
+                        <version>${kotlin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>compile</id>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <configuration>
+                                    <sourceDirs>
+                                        <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                                    </sourceDirs>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>test-compile</id>
+                                <goals> 
+                                    <goal>test-compile</goal> 
+                                </goals>
+                                <configuration>
+                                    <sourceDirs>
+                                        <sourceDir>${project.basedir}/src/test/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/test/java</sourceDir>
+                                    </sourceDirs>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- 
+                For running in simulator in process use:
+                mvn cn1:java -P simulator
+                            
+                Fro running in simulator in forked process use:
+                mvn cn1:simulator -P simulator
+            -->
+                        
+            <id>simulator</id>
+            <properties>
+                
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-debug
+            -->
+            <id>ios-debug</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending iOS debug builds use:
+                mvn cn:build -P ios-release
+            -->
+            <id>ios-release</id>
+            <properties>
+                <!-- Build server target type -->
+                <codename1.targetType>iphone</codename1.targetType>
+                <codename1.production>true</codename1.production>
+                
+                <!-- Used for identifying native interfaces.  Should match correct subdirectory of native -->
+                <codename1.targetPlatform>ios</codename1.targetPlatform>
+                <codename1.appStoreBuild>true</codename1.appStoreBuild>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Javascript builds use:
+                mvn cn:build -P javascript
+            -->
+            <id>javascript</id>
+            <properties>
+                <codename1.targetType>javascript</codename1.targetType>
+                <codename1.targetPlatform>javascript</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Android builds use:
+                mvn cn:build -P android
+            -->
+            <id>android</id>
+            <properties>
+                <codename1.targetType>android</codename1.targetType>
+                <codename1.targetPlatform>android</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows UWP builds use:
+                mvn cn:build -P uwp
+            -->
+            <id>uwp</id>
+            <properties>
+                <codename1.targetType>windows</codename1.targetType>
+                <codename1.targetPlatform>win</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Windows desktop builds use:
+                mvn cn:build -P windows
+            -->
+            <id>windows</id>
+            <properties>
+                <codename1.targetType>desktop_windows</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+        <profile>
+            <!--
+                For sending Mac Desktop builds use:
+                mvn cn:build -P mac
+            -->
+            <id>mac</id>
+            <properties>
+                <codename1.targetType>desktop_macosx</codename1.targetType>
+                <codename1.targetPlatform>javase</codename1.targetPlatform>
+            </properties>
+        </profile>
+    </profiles>
+</project>

@@ -482,7 +482,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
             @Override
             public void run() {
                 final Form f = Display.getInstance().getCurrent();
-                ArrayList<Container> scrollables = new ArrayList<>();
+                ArrayList<Container> scrollables = new ArrayList<Container>();
                 findScrollableContainers(f.getContentPane(), scrollables);
                 if(scrollables.size() > 1) {
                     for(final Container cnt : scrollables) {

@@ -109,5 +109,9 @@ public class Random{
     public void setSeed(long seed){
         return; //TODO codavaj!!
     }
+    
+    public boolean nextBoolean() {
+        return false;
+    }
 
 }

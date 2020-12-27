@@ -71,11 +71,11 @@ public class TryCatch extends Instruction {
     }
     
     @Override
-    public void appendInstruction(StringBuilder b) {
+    public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         hasTryCatch = true;
         if(firstException) {
             // we need to append basic exception handling logic
-            b.append("    DEFINE_EXCEPTION_HANDLING_CONSTANTS();\n");
+            //b.append("    DEFINE_EXCEPTION_HANDLING_CONSTANTS();\n");
             firstException = false;
         }
         
@@ -104,6 +104,14 @@ public class TryCatch extends Instruction {
         b.append(counter);
         b.append(");\n");
         LabelInstruction.addTryEndLabel(end);
+        // We store the label catch depth so that we can explicitly use it 
+        // for TRY_EXIT()
+        // Originally, TRY_EXIT() just blindly decremented the tryBlockLevel
+        // but this is insufficient in cases where the catch handler
+        // points to a position *inside* the catch block, which happens
+        // where there is a synchronized() block surrounding an exception
+        // point.
+        LabelInstruction.getLabelCatchDepth(end, instructions);
         counter++;
 //        b.append("/* try/catch start: ");
 //        b.append(start);

@@ -52,6 +52,7 @@ public final class Character{
      * Since: JDK1.0.2 See Also:Constant Field Values
      */
     public static final char MIN_VALUE=(char)0;
+    
 
     /**
      * Constructs a Character object and initializes it so that it represents the primitive value argument.
@@ -946,6 +947,26 @@ public final class Character{
         return isWhitespace((int) c);
     }
 
+    
+    public static boolean isSpace(char ch) {
+        switch (ch) {
+            case '\t':
+            case '\n':
+            case '\f':
+            case '\r':
+            case ' ':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static boolean isSpaceChar(char ch) {
+        return false;
+    }
+
+    
+    
     /**
      * Returns true if the given code point is a Unicode whitespace character.
      * The exact set of characters considered as whitespace varies with Unicode version.

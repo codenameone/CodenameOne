@@ -47,7 +47,7 @@ public class LabelInstruction extends Instruction {
         }
     }
     private static Map<Label, List<Pair>> tryBeginLabels = new HashMap<Label, List<Pair>>();
-    private static Map<Label, Integer> tryEndLabels = new HashMap<Label, Integer>();
+    private static Map<Label, Integer> tryEndLabels = new HashMap<Label, Integer>();    
     private static Map<Label, Integer> labelCatchDepth = new HashMap<Label, Integer>();
     // [ddyer 4/2017] convert this from a tree of strings to use the label itself
     // this fixes the problem of mysterious "statement expected" errors from builds,
@@ -73,6 +73,12 @@ public class LabelInstruction extends Instruction {
         Integer i = labelCatchDepth.get(l);
         if(i == null) {
             int counter = 0;
+            if (BasicInstruction.isSynchronizedMethod()) {
+                // Synchronized methods wrap call monitorEnterBlock() which 
+                // pushes a block onto the tryBlock stack 
+                // that we need to account for.
+                counter++;
+            }
             for(Instruction is : inst) {
                 if(is instanceof LabelInstruction) {
                     LabelInstruction ll = (LabelInstruction)is;
@@ -128,22 +134,23 @@ public class LabelInstruction extends Instruction {
         }
         b.append("\nlabel_"); 
         b.append(parent); 
+        b.append(":\n");
         Integer tryCount = tryEndLabels.get(parent);
         if(tryCount != null) {
-            int v = tryCount.intValue();
-            v--;
-            //b.append(": END_TRY(); NSLog(@\"End try on:  %s %d off: %i\\n\", __FILE__, __LINE__, getThreadLocalData()->tryBlockOffset);");
-            b.append(": END_TRY();");
-            while(v > 0) {
-                //b.append(" END_TRY(); NSLog(@\"End try on:  %s %d off: %i\\n\", __FILE__, __LINE__, getThreadLocalData()->tryBlockOffset);");
-                b.append(" END_TRY();");
-                v--;
-            }
-            b.append("\n");
+            // NOTE: Oct. 19, 2020
+            // END_TRY() needs to explicitly pass the try block depth
+            // because sometimes an exception catch handler points
+            // to *inside* the try/catch block, which will cause the tryBlockLevel
+            // to be decremented twice when the exception is thrown (once when 
+            // the exception is thrown, and again when it leaves the TRY_CATCH block.
+            // This happens, for example, inside synchronized blocks for cleaning
+            // up monitors on exceptions thrown.
+            int depth = getLabelCatchDepth(parent, null);
+            b.append("END_TRY(").append(depth).append(");");
         } else {
             List<Pair> strs = tryBeginLabels.get(parent);
             if(strs != null) {
-                b.append(":");
+                //b.append(":");
                 for(int iter = strs.size() - 1;  iter >= 0 ; iter--) {
                     Pair s = strs.get(iter);
                     b.append(" tryBlockOffset");
@@ -165,8 +172,6 @@ public class LabelInstruction extends Instruction {
                     b.append(" = threadStateData->threadObjectStackOffset;\n");
                 }
                 b.append("\n");
-            } else {
-                b.append(":\n"); 
             }
         }
     }

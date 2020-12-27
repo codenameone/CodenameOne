@@ -211,7 +211,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         evt.consume();
                         removeAll();
                         add(BorderLayout.CENTER, new SpanLabel("Failed to initialize media recorder."));
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Initializing:
@@ -221,24 +221,24 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         evt.consume();
                         removeAll();
                         add(BorderLayout.CENTER, new SpanLabel("Preparing media.  Please wait..."));
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Initialized:
                         evt.consume();
                         removeAll();
                         add(BorderLayout.CENTER, buildUI());
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Accepted:
                         removeAll();
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Canceled:
                         removeAll();
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Paused:
@@ -255,7 +255,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         pause.setHidden(true);
                         pause.setVisible(false);
                         pause.setEnabled(false);
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                         
                     case Recording:
@@ -270,7 +270,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         pause.setHidden(false);
                         pause.setVisible(true);
                         pause.setEnabled(true);
-                        revalidateWithAnimationSafety();
+                        revalidateLater();
                         break;
                 }
             }

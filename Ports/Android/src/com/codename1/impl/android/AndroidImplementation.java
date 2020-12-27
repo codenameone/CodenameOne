@@ -286,6 +286,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private boolean statusBarHidden;
     private boolean superPeerMode = true;
+    
+    
+    private ValueCallback<Uri> mUploadMessage;
+    public ValueCallback<Uri[]> uploadMessage;
 
     /**
      * Keeps track of running contexts.
@@ -5223,6 +5227,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
 
             web.setWebViewClient(new WebViewClient() {
+                
+                
+                
                 public void onLoadResource(WebView view, String url) {
                     if (Display.getInstance().getProperty("syncNativeCookies", "false").equals("true")) {
                         try {
@@ -5355,6 +5362,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
             web.setWebChromeClient(new WebChromeClient(){
+                // For 3.0+ Devices (Start)
+                // onActivityResult attached before constructor
+                protected void openFileChooser(ValueCallback uploadMsg, String acceptType)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType(acceptType);
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Browser"), FILECHOOSER_RESULTCODE);
+                }
+
+
+                // For Lollipop 5.0+ Devices
+                public boolean onShowFileChooser(WebView mWebView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams)
+                {
+                    if (uploadMessage != null) {
+                        uploadMessage.onReceiveValue(null);
+                        uploadMessage = null;
+                    }
+
+                    uploadMessage = filePathCallback;
+
+                    Intent intent = fileChooserParams.createIntent();
+                    try
+                    {
+                        AndroidNativeUtil.getActivity().startActivityForResult(intent, REQUEST_SELECT_FILE);
+                    } catch (ActivityNotFoundException e)
+                    {
+                        uploadMessage = null;
+                        Toast.makeText(getActivity().getApplicationContext(), "Cannot Open File Chooser", Toast.LENGTH_LONG).show();
+                        return false;
+                    }
+                    return true;
+                }
+
+                //For Android 4.1 only
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType(acceptType);
+                    
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(intent, "File Browser"), FILECHOOSER_RESULTCODE);
+                }
+
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg)
+                {
+                    mUploadMessage = uploadMsg;
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("image/*");
+                    AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Chooser"), FILECHOOSER_RESULTCODE);
+                }
+
+                
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
@@ -5779,12 +5842,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((URLConnection)connection).setReadTimeout(readTimeout);
         }
     }
+    
+    
 
     @Override
     public boolean isReadTimeoutSupported() {
         return true;
     }
     
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        if (insecure) {
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                try {
+                    TrustModifier.relaxHostChecking(conn);
+                } catch (Exception ex) {
+                    com.codename1.io.Log.e(ex);
+                }
+            }
+        }
+    }
     
 
     /**
@@ -6344,6 +6422,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String removeFilePrefix(String file) {
+        if (file.contains("/files//storage/emulated/")) {
+            // TODO: Find a better fix for issue https://github.com/codenameone/CodenameOne/issues/3204
+            // The gallery is returning files inside the directory /storage/emulated/0/DCIM/Camera/...
+            // The path is translated wrong because this path is not listed in any of the root
+            // paths of the file system.
+            // This issue is related to scoped storage. in API 29.
+            // https://stackoverflow.com/questions/56992682/android-9-api-29-storage-emulated-0-pictures-mypic-png-open-failed-eacces
+            // 
+            // This hack works around the problem (and seems to fix it for my test device) by simply
+            // looking for this pattern in the path, and stripping everything before
+            // the /storage/emulated/...
+            // Not good.  Needs to be revisited. - SJH Sept 25, 2020
+            return file.substring(file.indexOf("/files//storage/emulated/")+ 7);
+        }
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -7731,6 +7823,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return filePath;
     }
     
+    
+    
+    
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 
@@ -7738,6 +7833,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((IntentResultListener) pur).onActivityResult(requestCode, resultCode, intent);
             return;
         }
+
+        if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                if (requestCode == REQUEST_SELECT_FILE) {
+                    if (uploadMessage == null) {
+                        return;
+                    }
+                    uploadMessage.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, intent));
+                    uploadMessage = null;
+                }
+            }
+            else if (requestCode == FILECHOOSER_RESULTCODE) {
+                if (null == mUploadMessage) {
+                    return;
+                }
+            // Use MainActivity.RESULT_OK if you're implementing WebView inside Fragment
+            // Use RESULT_OK only if you're implementing WebView inside an Activity
+                Uri result = intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
+                mUploadMessage.onReceiveValue(result);
+                mUploadMessage = null;
+            }
+            else {
+
+                Toast.makeText(getActivity().getApplicationContext(), "Failed to Upload File", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
         
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {

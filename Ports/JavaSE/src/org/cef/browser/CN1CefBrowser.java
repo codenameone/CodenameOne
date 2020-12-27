@@ -1,7 +1,25 @@
-// Copyright (c) 2014 The Chromium Embedded Framework Authors. All rights
-// reserved. Use of this source code is governed by a BSD-style license that
-// can be found in the LICENSE file.
-
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
 package org.cef.browser;
 
 /*
@@ -35,8 +53,11 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.io.File;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import javax.swing.MenuSelectionManager;
@@ -50,7 +71,7 @@ import org.cef.handler.CefScreenInfo;
  * CefBrowser instance, please use CefBrowserFactory.
  */
 public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
-    private CefRenderer renderer_;
+    //private CefRenderer renderer_;
     //private GLCanvas canvas_;
     private long window_handle_ = 0;
     private Rectangle browser_rect_ = new Rectangle(0, 0, 1, 1); // Work around CEF issue #1437.
@@ -58,7 +79,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     private boolean isTransparent_;
     private JPanel component_;
     //private BufferedImage bufferedImage_;
-    private PixelBuffer buffer_;
+    private WeakReference<PixelBuffer> bufferRef;
     private byte[] buf_;
     
 
@@ -70,12 +91,16 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             CefRequestContext context, CN1CefBrowser parent, Point inspectAt) {
         super(client, url, context, parent, inspectAt);
         isTransparent_ = transparent;
-        renderer_ = new CefRenderer(transparent);
+        //renderer_ = new CefRenderer(transparent);
         createComponent();
     }
     
+    /**
+     * Sets the buffer to which the browser should draw to.
+     * @param buf 
+     */
     public void setPeerComponentBuffer(PixelBuffer buf) {
-        buffer_ = buf;
+        bufferRef = new WeakReference<PixelBuffer>(buf);
     }
    
     @Override
@@ -84,6 +109,10 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         createBrowserIfRequired(false);
     }
 
+    /**
+     * Gets the swing component that the CEF browser uses for receiving events.
+     * @return 
+     */
     @Override
     public Component getUIComponent() {
         //return canvas_;
@@ -109,23 +138,35 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         return window_handle_;
     }
 
+    /**
+     * Pulled this straight from the CEF examples.  Looks like on Mac, it needs to keep the window
+     * handle.
+     * @param component
+     * @return 
+     */
     private static long getWindowHandle(Component component) {
-        if (OS.isMacintosh()) {
-            try {
-                Class<?> cls = Class.forName("org.cef.browser.mac.CefBrowserWindowMac");
-                CefBrowserWindow browserWindow = (CefBrowserWindow) cls.newInstance();
-                if (browserWindow != null) {
-                    return browserWindow.getWindowHandle(component);
+        try {
+            if (OS.isMacintosh()) {
+                try {
+                    Class<?> cls = Class.forName("org.cef.browser.mac.CefBrowserWindowMac");
+                    CefBrowserWindow browserWindow = (CefBrowserWindow) cls.newInstance();
+                    if (browserWindow != null) {
+                        return browserWindow.getWindowHandle(component);
+                    }
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                } catch (InstantiationException e) {
+                    e.printStackTrace();
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
                 }
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-            } catch (InstantiationException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
             }
+            return 0;
+        } catch (Throwable t) {
+            System.out.println("Exception in thread "+Thread.currentThread().getName());
+            t.printStackTrace();
+            return 0;
         }
-        return 0;
     }
 
     /*
@@ -145,10 +186,16 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     private static ComponentFactory componentFactory;
     private static UIPlatform platform;
+    
+    
+    
     private void createComponent() {
         component_ = componentFactory.createComponent(new ComponentDelegate() {
             @Override
             public void boundsChanged(int x, int y, int w, int h) {
+                if (browser_rect_.getX() == x && browser_rect_.getY() == y && browser_rect_.getWidth() == w && browser_rect_.getHeight() == h) {
+                    return;
+                }
                 browser_rect_.setBounds(x, y, w, h);
                 try {
                     screenPoint_ = component_.getLocationOnScreen();
@@ -280,7 +327,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
                 try {
                     // Dismiss any Java menus that are currently displayed.
                     MenuSelectionManager.defaultManager().clearSelectedPath();
-
                     setFocus(true);
                 } finally {
                     inFocusGained = false;
@@ -292,6 +338,23 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         // Connect the Canvas with a drag and drop listener.
         new DropTarget(component_, new CN1CefDropTargetListener(this));
     }
+
+    private boolean inSetFocus;
+    
+    @Override
+    public void setFocus(boolean enable) {
+        if (inSetFocus) {
+            return;
+        }
+        inSetFocus = true;
+        try {
+            super.setFocus(enable);
+        } finally {
+            inSetFocus = false;
+        }
+    }
+    
+    
     
     
     @Override
@@ -301,29 +364,57 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     @Override
     public Point getScreenPoint(CefBrowser browser, Point viewPoint) {
-        Point screenPoint = new Point(screenPoint_);
-        screenPoint.translate(viewPoint.x, viewPoint.y);
-        return screenPoint;
+        try {
+            Point screenPoint = new Point(screenPoint_);
+            screenPoint.translate(viewPoint.x, viewPoint.y);
+            return screenPoint;
+        } catch (Throwable t) {
+            System.out.println("Exception in thread "+Thread.currentThread().getName());
+            t.printStackTrace();
+            return new Point(screenPoint_);
+        }
     }
 
     @Override
     public void onPopupShow(CefBrowser browser, boolean show) {
-        if (!show) {
-            renderer_.clearPopupRects();
-            invalidate();
+        try {
+            if (!show) {
+                //renderer_.clearPopupRects();
+                invalidate();
+            }
+        } catch (Throwable t) {
+            System.out.println("Exception in thread "+Thread.currentThread().getName());
+            t.printStackTrace();
         }
     }
 
     @Override
     public void onPopupSize(CefBrowser browser, Rectangle size) {
-        renderer_.onPopupSize(size);
+        try {
+            //renderer_.onPopupSize(size);
+        } catch (Throwable t) {
+            System.out.println("Exception in thread "+Thread.currentThread().getName());
+            t.printStackTrace();
+        }
     }
 
     private boolean firstPaint=true;
     
     @Override
     public void onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
-            final ByteBuffer buffer, final int width, final int height) {        
+            final ByteBuffer buffer, final int width, final int height) {
+        try {
+            _onPaint(browser, popup, dirtyRects, buffer, width, height);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+    public void _onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
+            final ByteBuffer buffer, final int width, final int height) {    
+        final PixelBuffer buffer_ = bufferRef.get();
+        if (buffer_ == null) {
+            return;
+        }
         BufferedImage img = buffer_.getBufferedImage();
         boolean imgUpdated = false;
          if (img == null || img.getWidth() != width || img.getHeight() != height) {
@@ -372,7 +463,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
                         int dy2 = dy+rh;
                         for (int row=dy; row<dy2; row++) {
                             buffer.position(row * width * 4 + dx * 4);
-                           
                             buffer.get(buf_, rw * (row-dy) * 4, rw * 4);
                        }
                         int len = rw * rh * 4;
@@ -453,14 +543,20 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     @Override
     public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
-        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-        GraphicsConfiguration graphicsConfig = graphicsDevice.getDefaultConfiguration();
-        
-        screenInfo.Set(calcRetinaScale(),
-                    graphicsConfig.getColorModel().getPixelSize(),
-                    graphicsConfig.getColorModel().getComponentSize(0), 
-                    false, 
-                    graphicsConfig.getBounds(), graphicsConfig.getBounds());
+        try {
+            GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            GraphicsConfiguration graphicsConfig = graphicsDevice.getDefaultConfiguration();
+
+            screenInfo.Set(calcRetinaScale(),
+                        graphicsConfig.getColorModel().getPixelSize(),
+                        graphicsConfig.getColorModel().getComponentSize(0), 
+                        false, 
+                        graphicsConfig.getBounds(), graphicsConfig.getBounds());
+        } catch (Throwable t) {
+            System.out.println("Exception in thread "+Thread.currentThread().getName());
+            t.printStackTrace();
+            
+        }
         return true;
     }
     

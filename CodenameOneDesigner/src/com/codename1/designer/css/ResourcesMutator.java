@@ -1,22 +1,49 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
  */
 package com.codename1.designer.css;
 
 
 
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.processing.Result;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EditableResources;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.lang.reflect.Field;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -24,18 +51,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.concurrent.Worker;
-import javafx.embed.swing.SwingFXUtils;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.image.WritableImage;
-import javafx.scene.paint.Color;
-import javafx.scene.transform.Transform;
-import javafx.scene.web.WebView;
+
 import javax.imageio.ImageIO;
-import netscape.javascript.JSObject;
+
 
 /**
  *
@@ -450,65 +468,57 @@ public class ResourcesMutator {
         return b;
     }
     
-    private WebView web;
+    private BrowserComponent web;
     private boolean screenshotsComplete;
     private final Object screenshotsLock = new Object();
-    public void createScreenshotCallback_old(String id, int x, int y, int w, int h) {
-        Platform.runLater(()->{
-            //System.out.println("in screenshot callback id "+id);
-            //System.out.println(imageProcessors);
-            if (imageProcessors.containsKey(id)) {
-                double ratio = 1.0;
-                //this.targetDensity = Display.DENSITY_VERY_HIGH;
-                SnapshotParameters params = new SnapshotParameters();
-                //params.setTransform(Transform.scale(ratio, ratio));
-                params.setFill(Color.TRANSPARENT);
-                WritableImage wi = web.snapshot(params, null);
-
-                BufferedImage img = SwingFXUtils.fromFXImage(wi, null);
-                img = img.getSubimage((int)(x*ratio), (int)(y*ratio), (int)(w*ratio), (int)(h*ratio));
-                imageProcessors.get(id).process(img);
-                
-            }
-            web.getEngine().executeScript("window.captureScreenshots()");
-        });
-    }
+   
     
+    /**
+     * A callback function triggered inside capture.js Javascript file to take a screenshot
+     * of a particular rectangular region in the web view.  This would generally be the bounds
+     * of an element that we are generating a screenshot for.
+     * @param id THe ID of the element;
+     * @param x The x coordinate in browser space
+     * @param y The y coordinate in browser space
+     * @param w The width
+     * @param h The height
+     */
     public void createScreenshotCallback(String id, int x, int y, int w, int h) {
-        Platform.runLater(()->{
-            //System.out.println("in screenshot callback id "+id);
-            //System.out.println(imageProcessors);
+        //System.out.println("In createScreenshotsCallback("+id+","+x+","+y+","+w+","+h);
+        // There are 3 possibilities:
+        // 1. There is no registered image processor with ID=id -> call captureScreenshots()
+        // 2. There is a registered image processor with ID=id, but image generate fails -> call captureScreenshots()
+        // 3. There is a registered image proessor with ID=id.  -> call captureScreenshots()
+        //
+        // Notice in all cases we just call captureScreenshots() again.  The capture.js page will automatically
+        // increment to the next element in the list.  When done, it will fire finishedCaptureScreenshotsCallback().
+        CN.callSerially(()->{
             if (imageProcessors.containsKey(id)) {
                 double ratio = 1.0;
-                //this.targetDensity = Display.DENSITY_VERY_HIGH;
-                SnapshotParameters params = new SnapshotParameters();
-                //params.setTransform(Transform.scale(ratio, ratio));
-                params.setFill(Color.TRANSPARENT);
                 try {
-                    WebviewSnapshotter snapper = new WebviewSnapshotter(web, params);
+                    // Create a Snapshotter to snap a screenshot of the given bounds
+                    // in the webview.
+                    WebviewSnapshotter snapper = new WebviewSnapshotter(web);
                     snapper.setBounds(x, y, w, h);
                     snapper.snapshot(()-> {
                         BufferedImage img = snapper.getImage();
 
                         imageProcessors.get(id).process(img);
-                        Platform.runLater(()-> {
-                            web.getEngine().executeScript("window.captureScreenshots()");
+                        CN.callSerially(()-> {
+                            web.execute("window.captureScreenshots()");
                         });
 
                     });
                 } catch (Throwable t) {
                     Log.p("Failed to create snapshot for UIID "+id+": "+t.getMessage());
                     Log.e(t);
-                    Platform.runLater(()-> {
-                        web.getEngine().executeScript("window.captureScreenshots()");
+                    CN.callSerially(()-> {
+                        web.execute("window.captureScreenshots()");
                     });
                 }
-                
-                
-                
             } else {
-                Platform.runLater(()-> {
-                    web.getEngine().executeScript("window.captureScreenshots()");
+                CN.callSerially(()-> {
+                    web.execute("window.captureScreenshots()");
                 });
             }
             
@@ -523,80 +533,161 @@ public class ResourcesMutator {
         }
     }
     
-    private ChangeListener<Worker.State> changeListener;
-    public void createScreenshots(WebView web, String html, String baseURL) {
-        String captureSrc = this.getClass().getResource("capture.js").toExternalForm();
-        final String modifiedHtml = html.replace("</body>", /*"<script src=\"https://code.jquery.com/jquery-2.1.4.min.js\">"
-                + */"</script><script src=\""+captureSrc+"\"></script></body>");
+    private SimpleWebServer webServer;
+    
+    private void startWebServer(File docRoot) throws IOException {
+        if (webServer != null) {
+            throw new IllegalStateException("Cannot start webserver.  It is already running");
+        }
+        
+        webServer = new SimpleWebServer(0, docRoot);
+        webServer.start();
+    }
+    
+    ActionListener loadListener;
+    
+    /**
+     * Creates screenshots for the given HTML which was generated by {@link CSSTheme#generateCaptureHtml() }.
+     * @param web The web View used to render the HTML
+     * @param html The HTML to render in the webview.  Generated by {@link CSSTheme#generateCaptureHtml() }
+     * @param baseURL The BaseURL - general points to the CSS file location.  Used for loading resources from relative paths.
+     */
+    public void createScreenshots(BrowserComponent web, String html, String baseURL) {
+        //System.out.println("in createScreenshots");
+        try {
+            File baseURLFile = new File(new URL(baseURL).toURI());
+            if (!baseURLFile.isDirectory()) {
+                baseURLFile = baseURLFile.getParentFile();
+            }
+            startWebServer(baseURLFile);
+            boolean waitForServerResult[] = new boolean[1];
+            CN.invokeAndBlock(new Runnable() {
+                public void run() {
+                    waitForServerResult[0] = webServer.waitForServer(2000);
+               
+                }
+            });
+            if (!waitForServerResult[0]) {
+                throw new RuntimeException("Failed to start webserver after 2 seconds");
+            }
+            
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to start local webserver for creating screenshots", ex);
+        }
+        long timeout = 50000;
+        //String captureSrc = this.getClass().getResource("capture.js").toExternalForm();
+        String captureJS = null;
+        try {
+            captureJS = Util.readToString(this.getClass().getResourceAsStream("capture.js"));
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to read capture.js file.", ex);
+        }
+        //final String modifiedHtml = html.replace("</body>", /*"<script src=\"https://code.jquery.com/jquery-2.1.4.min.js\">"
+        //        + */"</script><script src=\""+captureSrc+"\"></script></body>");
+        final String modifiedHtml = html.replace("</head>", /*"<script src=\"https://code.jquery.com/jquery-2.1.4.min.js\">"
+                + */"<script>\n"+captureJS+"\n</script></head>");
         this.web = web;
         screenshotsComplete = false;
-        Platform.runLater(() -> {
+        CN.callSerially(() -> {
             
-            changeListener = (ObservableValue<? extends Worker.State> ov, Worker.State t, Worker.State t1) -> {
-                    
-                if (t1 == Worker.State.SUCCEEDED) {
-                    web.getEngine().getLoadWorker().stateProperty().removeListener(changeListener);
-                    try {
-                        // Use reflection to retrieve the WebEngine's private 'page' field.
-                        Field f = web.getEngine().getClass().getDeclaredField("page");
-                        f.setAccessible(true);
-                        com.sun.webkit.WebPage page = (com.sun.webkit.WebPage) f.get(web.getEngine());
-                        page.setBackgroundColor((new java.awt.Color(0, 0, 0, 0)).getRGB());
-                        JSObject window = (JSObject)web.getEngine().executeScript("window");
-                        window.setMember("app", ResourcesMutator.this);
-                        web.getEngine().executeScript("$(document).ready(function(){ captureScreenshots();});");
-                        //web.getEngine().executeScript("window.onload = function(){window.app.ready()};");
-                    } catch (IllegalArgumentException ex) {
-                        Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (IllegalAccessException ex) {
-                        Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (NoSuchFieldException ex) {
-                        Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (SecurityException ex) {
-                        Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-
+            loadListener = (ActionEvent evt) -> {
+                if (webServer != null) {
+                    webServer.stop();
+                    webServer = null;
                 }
-                
+                web.removeWebEventListener(BrowserComponent.onLoad, loadListener);
+                try {
+                    //System.out.println("In onLoad event");
+                    // Use reflection to retrieve the WebEngine's private 'page' field.
+                    web.addJSCallback("window.app = window.app || {}; window.app.createScreenshotCallback = function(id, x, y, w, h) {"
+                            + "callback.onSuccess(JSON.stringify({id:id, x:x, y:y, w:w, h:h}));"
+                            + "};", res -> {
+                        try {
+                            Result data = Result.fromContent(new StringReader(res.toString()), Result.JSON);
+
+                            createScreenshotCallback(
+                                    data.getAsString("id"),
+                                    data.getAsInteger("x"),
+                                    data.getAsInteger("y"),
+                                    data.getAsInteger("w"),
+                                    data.getAsInteger("h"));
+                        } catch (Exception ex) {
+                            Log.p("Failed to parse input to createScreenshotsCallback");
+                            Log.e(ex);
+                        }
+
+                    });
+                    web.addJSCallback("window.app.finishedCaptureScreenshotsCallback = function() {"
+                    + "callback.onSuccess(null);"
+                    + "};", res -> {
+                        finishedCaptureScreenshotsCallback();
+                    });
+                    web.execute("$(document).ready(function(){ captureScreenshots();});");
+                    //web.getEngine().executeScript("window.onload = function(){window.app.ready()};");
+                } catch (IllegalArgumentException ex) {
+                    Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
+                }  catch (SecurityException ex) {
+                    Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
+                }
 
             };
-            web.getEngine().getLoadWorker().stateProperty().addListener(changeListener);
-            web.getEngine().loadContent(modifiedHtml);
+                
+
+            
+            web.addWebEventListener(BrowserComponent.onLoad, loadListener);
+            //CN.setProperty("cef.setPage.useDataURI", "true");
+            webServer.route("/index.html", ()->{
+                try {
+                    return modifiedHtml.getBytes("UTF-8");
+                } catch (Exception ex) {
+                    Log.e(ex);
+                    try {
+                        return ("Error: "+ex.getMessage()).getBytes("UTF-8");
+                    } catch (Exception ex2) {
+                        Log.e(ex2);
+                        return new byte[0];
+                    }
+                            
+                }
+            });
+            web.setURL("http://localhost:"+webServer.getPort()+"/index.html");
             
         });
+        long startTime = System.currentTimeMillis();
+        while (!screenshotsComplete && System.currentTimeMillis() - startTime < timeout) {
+            CN.invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.wait(screenshotsLock, 50);
+                }
+            });
+            
+        }
         
-        while (!screenshotsComplete) {
-            synchronized(screenshotsLock) {
-                try {
-                    screenshotsLock.wait();
-                } catch (Exception ex){}
-            }
+        
+        if (!screenshotsComplete) {
+            throw new RuntimeException("Failed to create screenshots for HTML "+html+".  Timeout reached.  Likely there was a problem initializing the browser component.");
         }
         this.web = null;
-        this.changeListener = null;
+        this.loadListener = null;
         
     }
     
-    BufferedImage createHtmlScreenshot(WebView web, String html) {
+    BufferedImage createHtmlScreenshot(BrowserComponent web, String html) {
         final boolean[] complete = new boolean[1];
         final Object lock = new Object();
         final BufferedImage[] img = new BufferedImage[1];
         
         
         Runnable webpageLoadedCallback = () -> {
-            SnapshotParameters params = new SnapshotParameters();
-            params.setFill(Color.TRANSPARENT);
-            WritableImage wi = web.snapshot(params, null);
-
-            img[0] = SwingFXUtils.fromFXImage(wi, null);
+            img[0] = (BufferedImage)web.captureScreenshot().get().getImage();
             complete[0] = true;
             synchronized(lock) {
                 lock.notify();
             }
             
         };
-        Platform.runLater(()->{
-            web.getEngine().loadContent(html);
+        CN.callSerially(()->{
+            web.setPage(html, "");
         });
         
         

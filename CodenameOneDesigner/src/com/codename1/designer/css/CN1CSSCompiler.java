@@ -1,19 +1,35 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
  */
 package com.codename1.designer.css;
 
 
 import com.codename1.impl.javase.JavaSEPort;
-import com.codename1.tools.resourcebuilder.CodenameOneTask;
-import com.codename1.tools.resourcebuilder.ThemeTask;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.util.EditableResources;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import org.w3c.css.sac.*;  
 import org.w3c.css.sac.helpers.*;  
@@ -26,34 +42,13 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
-import javafx.concurrent.Worker;
-import javafx.concurrent.Worker.State;
-import javafx.embed.swing.SwingFXUtils;
 
-import javafx.scene.Scene;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.image.WritableImage;
-import javafx.scene.paint.Color;
-
-import javafx.scene.web.WebView;
-import javafx.stage.Stage;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
-import netscape.javascript.JSObject;
-import org.w3c.dom.Element;
-import org.w3c.dom.events.Event;
-import org.w3c.dom.events.EventListener;
-import org.w3c.dom.events.EventTarget;
+
 
 
 /**
@@ -62,9 +57,7 @@ import org.w3c.dom.events.EventTarget;
  */
 public class CN1CSSCompiler implements DocumentHandler {
     
-    static boolean fxLaunched = false;
-    static Object launchLock = new Object();
-    static Scene scene;
+    
     
     private Map<String, Selector> selectors = new HashMap<String,Selector>();
     
@@ -77,64 +70,7 @@ public class CN1CSSCompiler implements DocumentHandler {
     
     
     
-    public static class FXApplication extends Application {
-        
-        public void ready() {
-                //System.out.println("App ready");
-                if (webpageLoadedCallback != null) {
-                    webpageLoadedCallback.run();
-                }
-            }
-        @Override
-        public void start(Stage stage) throws Exception {
-            fxLaunched = true;
-            synchronized(launchLock) {
-                launchLock.notify();
-            }
-            web = new WebView();
-            web.getEngine().getLoadWorker().stateProperty().addListener(new ChangeListener<State>() {
-
-
-
-
-                @Override
-                public void changed(ObservableValue<? extends State> ov, State t, State t1) {
-                    
-                    //System.out.println("WEbview changed "+t1);
-                    if (t1 == Worker.State.SUCCEEDED) {
-                        try {
-                            // Use reflection to retrieve the WebEngine's private 'page' field.
-                            Field f = web.getEngine().getClass().getDeclaredField("page");
-                            f.setAccessible(true);
-                            com.sun.webkit.WebPage page = (com.sun.webkit.WebPage) f.get(web.getEngine());
-                            page.setBackgroundColor((new java.awt.Color(0, 0, 0, 0)).getRGB());
-                            JSObject window = (JSObject)web.getEngine().executeScript("window");
-                            window.setMember("app", FXApplication.this);
-                            web.getEngine().executeScript("setTimeout(function(){window.app.ready();}, 50);");
-                            //web.getEngine().executeScript("window.onload = function(){window.app.ready()};");
-                        } catch (IllegalArgumentException ex) {
-                            Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (IllegalAccessException ex) {
-                            Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (NoSuchFieldException ex) {
-                            Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (SecurityException ex) {
-                            Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-
-                    }
-                }
-
-            });
-            scene = new Scene(web, 750, 500, Color.web("#666670"));
-            stage.setScene(scene);
-            stage.show();
-            //stage.hide();
-            
-            
-        }
-        
-    }
+    
     
 
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_VERY_HIGH;
@@ -151,7 +87,7 @@ public class CN1CSSCompiler implements DocumentHandler {
     SelectorList currSelectors;
     EditableResources res;
     
-    static WebView web;
+    static BrowserComponent web;
     static Runnable webpageLoadedCallback;
     static JFrame frm;
     
@@ -172,22 +108,7 @@ public class CN1CSSCompiler implements DocumentHandler {
             frm.setVisible(false);
             Display.init(frm.getContentPane());
             System.setProperty("org.w3c.css.sac.parser", "org.w3c.flute.parser.Parser");
-            new Thread(new Runnable() {
-
-                @Override
-                public void run() {
-
-                    Application.launch(FXApplication.class);
-
-                }
-
-            }).start();
             
-            while (!fxLaunched) {
-                synchronized(launchLock) {
-                    launchLock.wait();
-                }
-            }
         //Platform.runLater(new Runnable() {
 
         //        @Override
@@ -205,7 +126,7 @@ public class CN1CSSCompiler implements DocumentHandler {
             parser.parseStyleSheet(source);
             stream.close();
         } finally {
-            Platform.exit();
+            
             frm.dispose();
             System.exit(0);
             //Display.getInstance().exitApplication();
@@ -875,11 +796,9 @@ public class CN1CSSCompiler implements DocumentHandler {
             @Override
             public void run() {
                 
-                SnapshotParameters params = new SnapshotParameters();
-                params.setFill(Color.TRANSPARENT);
-                WritableImage wi = web.snapshot(params, null);
+                com.codename1.ui.Image wi = web.toImage();
                 
-                img[0] = SwingFXUtils.fromFXImage(wi, null);
+                img[0] = (BufferedImage)wi.getImage();
                 complete[0] = true;
                 synchronized(lock) {
                     lock.notify();
@@ -887,11 +806,11 @@ public class CN1CSSCompiler implements DocumentHandler {
             }
             
         };
-        Platform.runLater(new Runnable() {
+        CN.callSerially(new Runnable() {
 
             @Override
             public void run() {
-                web.getEngine().loadContent(html);
+                web.setPage(html, "");
             }
             
         });

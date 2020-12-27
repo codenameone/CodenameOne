@@ -328,7 +328,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         removeComponent(iconWrapper);
         addComponent(t, iconWrapper);
         updateGap();
-        revalidateWithAnimationSafety();
+        revalidateLater();
         
     }
     
