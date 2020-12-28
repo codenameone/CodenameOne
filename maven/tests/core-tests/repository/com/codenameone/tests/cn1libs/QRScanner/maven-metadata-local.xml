@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.codenameone.tests.cn1libs</groupId>
+  <artifactId>QRScanner</artifactId>
+  <versioning>
+    <versions>
+      <version>1.0-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20201223200055</lastUpdated>
+  </versioning>
+</metadata>

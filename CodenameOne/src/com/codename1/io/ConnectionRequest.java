@@ -377,6 +377,11 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean checkSSLCertificates;
     
     /**
+     * A flag that turns off checking for invalid certificates.
+     */
+    private boolean insecure;
+    
+    /**
      * When set to true (the default), the global error handler in 
      * {@code NetworkManager} should receive errors for response code as well
      */
@@ -434,6 +439,24 @@ public class ConnectionRequest implements IOProgressListener {
     public ConnectionRequest(String url, boolean post) {
         this(url);
         setPost(post);
+    }
+    
+    /**
+     * Turns off checking to make sure that SSL certificate is valid.
+     * @param insecure 
+     * @since 7.0
+     */
+    public void setInsecure(boolean insecure) {
+        this.insecure = insecure;
+    }
+    
+    /**
+     * Checks if the request is insecure (default false).
+     * @return True if the request is insecure, i.e. does not check SSL certificate for validity.
+     * @since 7.0
+     */
+    public boolean isInsecure() {
+        return insecure;
     }
     
     /**
@@ -561,6 +584,9 @@ public class ConnectionRequest implements IOProgressListener {
         impl.setPostRequest(connection, isPost());
         if (readTimeout > 0) {
             impl.setReadTimeout(connection, readTimeout);
+        }
+        if (insecure) {
+            impl.setInsecure(connection, insecure);
         }
         impl.setConnectionId(connection, id);
 

@@ -5,7 +5,9 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.io.BufferedReader;
@@ -98,6 +100,13 @@ public class CSSWatcher implements Runnable {
         return false;
     }
     
+    private boolean isMavenProject() {
+        if (new File("pom.xml").exists()) {
+            return true;
+        }
+        return false;
+    }
+    
     private void watch() throws IOException {
         if (pulseSocket == null || pulseSocket.isClosed()) {
             // If the the Simulator is killed then the shutdown hook doesn't run
@@ -123,21 +132,26 @@ public class CSSWatcher implements Runnable {
             
         }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
-        final File srcFile = new File("css", "theme.css");
+        final File srcFile = isMavenProject() ?
+                new File("src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css") :
+                new File("css", "theme.css");
+        
         if (!srcFile.exists()) {
             //System.out.println("No theme.css file found.  CSSWatcher canceled");
             return;
         } else {
             System.out.println("Found theme.css file.  Watching for changes...");
         }
-        final File destFile = new File("src", "theme.res");
+        final File destFile = isMavenProject() ?
+                new File("target" + File.separator + "classes" + File.separator + "theme.res") :
+                new File("src", "theme.res");
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
-        
+        String cefDir = System.getProperty("cef.dir", cn1Home + File.separator + "cef");
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
+                "-jar", "-Dcli=true", "-Dcef.dir="+cefDir, "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
                 "-css",
                 srcFile.getAbsolutePath(),
                 destFile.getAbsolutePath(),
@@ -201,8 +215,11 @@ public class CSSWatcher implements Runnable {
                                 System.out.println("CSS File "+srcFile+" has been updated.  Reloading styles from "+destFile);
                                 Resources res = Resources.open(new FileInputStream(destFile));
                                 UIManager.getInstance().addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
-                                Display.getInstance().getCurrent().refreshTheme();
-                                Display.getInstance().getCurrent().revalidate();
+                                Form f = CN.getCurrentForm();
+                                if (f != null) {
+                                    f.refreshTheme();
+                                    f.revalidate();
+                                }
                             } catch(Exception err) {
                                 err.printStackTrace();
                             }

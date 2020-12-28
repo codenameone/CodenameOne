@@ -116,4 +116,8 @@ public class Object{
      * This method should only be called by a thread that is the owner of this object's monitor. See the notify method for a description of the ways in which a thread can become the owner of a monitor.
      */
     public native final void wait(long timeout, int nanos) throws java.lang.InterruptedException;
+    
+    protected Object clone() {
+        return null;
+    }
 }

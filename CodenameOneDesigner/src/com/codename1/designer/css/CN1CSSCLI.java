@@ -28,6 +28,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import com.codename1.designer.css.CSSTheme.WebViewProvider;
 import com.codename1.impl.javase.CN1Bootstrap;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
@@ -67,6 +68,7 @@ import java.nio.file.WatchService;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,7 @@ import java.util.Properties;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -95,7 +98,6 @@ public class CN1CSSCLI {
     }
     
     private static void startImpl() throws Exception {
-        //System.out.println("Opening JavaFX Webview to render some CSS styles");
         web = new BrowserComponent();
         web.addWebEventListener(BrowserComponent.onError, new ActionListener() {
             @Override
@@ -153,7 +155,6 @@ public class CN1CSSCLI {
             return "true".equals(props.getProperty("codename1.cssTheme"));
             
         } catch (IOException ex) {
-            
             return false;
         }
         
@@ -170,8 +171,58 @@ public class CN1CSSCLI {
         return contents;
     }
     
+    private static String getRelativePath(File file, File relativeTo) throws IOException {
+        File projectDir = getProjectDir(file);
+        if (!relativeTo.getAbsolutePath().startsWith(projectDir.getAbsolutePath())) {
+            throw new IllegalArgumentException("Relative file not in project: "+relativeTo);
+        }
+        if (!file.getAbsolutePath().startsWith(projectDir.getAbsolutePath())) {
+            throw new IllegalArgumentException("File not in project: "+file);
+        }
+        
+        List<String> fileAncestors = new ArrayList<String>();
+        File tmp = file;
+        while (tmp.getParentFile() != null) {
+            tmp = tmp.getParentFile();
+            fileAncestors.add(tmp.getAbsolutePath());
+            if (tmp.getAbsolutePath().equals(projectDir.getAbsolutePath())) {
+                break;
+            }
+            
+        }
+        List<String> relativeToAncestors = new ArrayList<String>();
+        tmp = relativeTo;
+        while (tmp.getParentFile() != null) {
+            tmp = tmp.getParentFile();
+            relativeToAncestors.add(tmp.getAbsolutePath());
+            if (tmp.getAbsolutePath().equals(projectDir.getAbsolutePath())) {
+                break;
+            }
+            
+        }
+        String commonAncestor = null;
+        for (String filePath : fileAncestors) {
+            int index = relativeToAncestors.indexOf(filePath);
+            if (index > -1) {
+                commonAncestor = filePath;
+                break;
+            }
+        }
+        if (commonAncestor == null) {
+            throw new IOException("No common ancestors found between "+file+" and "+relativeTo+".  FileAncestors: "+fileAncestors+", relativeToAncestors:"+relativeToAncestors);
+        }
+        int distanceUpToCommonAncestor = relativeTo.getAbsolutePath().substring(commonAncestor.length()+1).split(Pattern.quote(File.separator)).length-1;
+        StringBuilder sb = new StringBuilder();
+        for (int i=0; i<distanceUpToCommonAncestor; i++) {
+            sb.append("../");
+        }
+        sb.append(file.getAbsolutePath().substring(commonAncestor.length()+1).replace('\\', '/'));
+        return sb.toString();
+    }
+    
+    
+    
     private static void updateMergeFile(File inputFile, File mergedFile) throws IOException {
-        System.out.println("Updating merge file "+mergedFile);
         List<File> libCSSFiles = findLibCSSFiles(inputFile);
         boolean changed = false;
         if (!mergedFile.exists() || mergedFile.lastModified() < inputFile.lastModified()) {
@@ -189,15 +240,18 @@ public class CN1CSSCLI {
             return;
         }
         StringBuilder buf = new StringBuilder();
+        
+        File libCSSDir = getLibCSSDirectory(inputFile);
+        String relativePathToLibCSSDir = getRelativePath(libCSSDir, mergedFile);
+        
         for (File f : libCSSFiles) {
             String contents;
-            System.out.println("Merging "+f);
             try (FileInputStream fis = new FileInputStream(f)) {
                 byte[] buffer = new byte[(int)f.length()];
                 fis.read(buffer);
                 contents = new String(buffer, "UTF-8");
             }
-            contents = prefixUrls(contents, "../lib/impl/css/"+f.getParentFile().getName()+"/");
+            contents = prefixUrls(contents, relativePathToLibCSSDir+"/"+f.getParentFile().getName()+"/");
             buf.append("\n/* "+f.getAbsolutePath()+" */\n").append(contents).append("\n/* end "+f.getAbsolutePath()+"*/\n");
         }
         
@@ -206,6 +260,13 @@ public class CN1CSSCLI {
             byte[] buffer = new byte[(int)inputFile.length()];
             fis.read(buffer);
             String fileContents = new String(buffer, "UTF-8");
+            if (!mergedFile.getParentFile().getAbsolutePath().equals(inputFile.getParentFile().getAbsolutePath())) {
+                // Merged file is in a different directory than the theme.css file.
+                // We need to update the relative URL paths.
+                String relativePathToInputFileDir = getRelativePath(inputFile.getParentFile(), mergedFile);
+                fileContents = prefixUrls(fileContents, relativePathToInputFileDir+"/");
+
+            }
             buf.append(fileContents);
             buf.append("\n/* End ").append(inputFile.getAbsolutePath()).append(" */\n");
         }
@@ -216,15 +277,31 @@ public class CN1CSSCLI {
         
         
         
+        
     }
     
-    private static File getProjectDir(File inputFile) throws IOException {
-        return inputFile.getCanonicalFile().getParentFile().getParentFile();
+   
+    
+    private static  File getProjectDir(File start) {
+        File f = new File(start, "codenameone_settings.properties");
+        
+        while (!f.exists() && f.getParentFile().getParentFile() != null) {
+            f = new File(f.getParentFile().getParentFile(), "codenameone_settings.properties");
+            if (f.exists()) {
+                return f.getParentFile();
+            }
+        }
+        return f.exists() ? f.getParentFile() : null;
         
     }
     
     private static File getLibCSSDirectory(File inputFile) throws IOException {
-        
+        if (System.getProperty("cn1.libCSSDir", null) != null) {
+            return new File(System.getProperty("cn1.libCSSDir"));
+        }
+        if (isMavenProject(inputFile)) {
+            return new File(getProjectDir(inputFile), "target" + File.separator + "css");
+        }
         return new File(getProjectDir(inputFile), 
                 "lib" + File.separator + "impl" +File.separator + "css"
         );
@@ -248,14 +325,42 @@ public class CN1CSSCLI {
        
     }
     
+    private static boolean isMavenProject(File inputFile) throws IOException {
+        return new File(getProjectDir(inputFile), "pom.xml").exists();
+    }
+    
+    private static String getMergedFile(String inputPath) throws IOException {
+        if (System.getProperty("cn1.cssMergeFile") != null) {
+            System.getProperty("cn1.cssMergeFile");
+        }
+        File inputFile = new File(inputPath);
+        if (isMavenProject(inputFile)) {
+            return new File(getLibCSSDirectory(inputFile), inputFile.getName()+".merged").getAbsolutePath();
+        }
+        return inputPath + ".merged";
+    }
+    
+    private static boolean checkWatchMode(String[] args) {
+        for (int i=0; i<args.length; i++) {
+            if ("-watch".equals(args[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public static void main(String[] args) throws Exception {
         // We don't want media queries while editing CSS because we need to be 
         // editing the rules raw.
+        if (checkWatchMode(args) && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
+            // In watch mode we require 
+            throw new MissingNativeBrowserException();
+        }
         Resources.setEnableMediaQueries(false);
         mergeMode = isMergeMode(args);
         String inputPath = getInputFile(args);
         
-        String mergedFile = mergeMode ? inputPath + ".merged" : inputPath;
+        String mergedFile = mergeMode ? getMergedFile(inputPath) : inputPath;
         if (mergeMode) {
             updateMergeFile(new File(inputPath), new File(mergedFile));
         }
@@ -279,11 +384,10 @@ public class CN1CSSCLI {
             outputPath = tmpF.getAbsolutePath();
             
         }
-        System.out.println("Input: "+inputPath);
-        System.out.println("Output: "+outputPath);
         if (args.length > 2 && "-watch".equals(args[2])) {
             watchmode = true;
         }
+        
         if (!Display.isInitialized()) {
             JavaSEPort.setShowEDTViolationStacks(false);
             JavaSEPort.blockMonitors();
@@ -302,8 +406,8 @@ public class CN1CSSCLI {
         
         File inputFile = new File(inputPath);
         File outputFile = new File(outputPath);
-        
         if (watchmode && watchThread == null) {
+            
             watchThread = new Thread(new Runnable() {
 
                 @Override
@@ -339,77 +443,31 @@ public class CN1CSSCLI {
                         pulseThread.start();
                     }
                     
-                    boolean usePollingFileWatcher = true;
                     
-                    if (usePollingFileWatcher) {
-                        PollingFileWatcher watcher = new PollingFileWatcher(inputFile, 1000);
-                        while (true) {
+                    PollingFileWatcher watcher = new PollingFileWatcher(inputFile, 1000);
+                    while (true) {
+                        try {
+                            watcher.poll();
                             try {
-                                watcher.poll();
-                                try {
-                                    System.out.println("Changed detected in "+inputFile+".  Recompiling");
-                                    if (mergeMode) {
-                                        updateMergeFile(new File(inputPath), new File(mergedFile));
-                                        compile(new File(mergedFile), outputFile);
-                                    } else {
-                                        compile(inputFile, outputFile);
-                                    }
-                                    
-                                    System.out.println("CSS file successfully compiled.  "+outputFile);
-                                    System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
-                                } catch (Throwable t) {
-                                    System.err.println("Compile of "+inputFile+" failed");
-                                    t.printStackTrace();
+                                System.out.println("Changed detected in "+inputFile+".  Recompiling");
+                                if (mergeMode) {
+                                    updateMergeFile(new File(inputPath), new File(mergedFile));
+                                    compile(new File(mergedFile), outputFile);
+                                } else {
+                                    compile(inputFile, outputFile);
                                 }
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                            
-                        }
-                    } else {
-                        final Path path = inputFile.getParentFile().toPath();
-                    
-                        try (final WatchService watchService = FileSystems.getDefault().newWatchService()) {
-                            System.out.println("Watching file "+inputFile+" for changes...");
 
-                            final WatchKey watchKey = path.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
-                            while (true) {
-                                final WatchKey wk = watchService.take();
-                                for (WatchEvent<?> event : wk.pollEvents()) {
-                                    //we only register "ENTRY_MODIFY" so the context is always a Path.
-                                    final Path changed = (Path) event.context();
-                                    //System.out.println("Change detected at path "+changed);
-                                    File changedFile = new File(inputFile.getParentFile(), changed.toString());
-                                    if (inputFile.equals(changedFile)) {
-                                        try {
-                                            System.out.println("Changed detected in "+inputFile+".  Recompiling");
-                                            if (mergeMode) {
-                                                updateMergeFile(new File(inputPath), new File(mergedFile));
-                                                compile(new File(mergedFile), outputFile);
-                                            } else {
-                                                compile(inputFile, outputFile);
-                                            }
-                                            System.out.println("CSS file successfully compiled.  "+outputFile);
-                                            System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
-                                        } catch (Throwable t) {
-                                            System.err.println("Compile of "+inputFile+" failed");
-                                            t.printStackTrace();
-                                        }
-                                    }
-
-                                }
-                                // reset the key
-                                boolean valid = wk.reset();
-                                if (!valid) {
-                                    System.out.println("Key has been unregisterede");
-                                }
+                                System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
+                            } catch (Throwable t) {
+                                System.err.println("Compile of "+inputFile+" failed");
+                                t.printStackTrace();    
                             }
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
                         } catch (InterruptedException ex) {
                             Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
                         }
+
                     }
+
                     
                     
                 }
@@ -424,6 +482,7 @@ public class CN1CSSCLI {
                 compile(inputFile, outputFile);
             }
             System.out.println("CSS file successfully compiled.  "+outputFile);
+            
         } catch (Throwable t) {
             if (!CN1Bootstrap.isBootstrapped() && t instanceof MissingNativeBrowserException) {
                 // Rethrow MissingNativeBrowserException so that it can be handled in main
@@ -443,6 +502,7 @@ public class CN1CSSCLI {
                 watchThread.start();
                 watchThread.join();
             }
+            
         }
         
     }
@@ -460,13 +520,10 @@ public class CN1CSSCLI {
             throw new RuntimeException("Failed to create checksums file");
         }
         FileChannel channel = new RandomAccessFile(checksumsFile, "rw").getChannel();
-        System.out.println("Acquiring lock on CSS checksums file "+checksumsFile+"...");
         FileLock lock = channel.lock();
-        System.out.println("Lock obtained");
         try {
             Map<String,String> checksums = loadChecksums(baseDir);
-            //System.out.println("Loaded checksums["+baseDir+"]: "+checksums);
-            if (outputFile.exists()) {
+            if (outputFile.exists() && !isMavenProject(inputFile)) {
                 String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
                 String previousChecksum = checksums.get(inputFile.getName());
                 if (previousChecksum == null || !previousChecksum.equals(outputFileChecksum)) {
@@ -551,10 +608,8 @@ public class CN1CSSCLI {
 
 
                 File cacheFile = new File(theme.cssFile.getParentFile(), theme.cssFile.getName()+".checksums");
-                //System.out.println("Cache file: "+cacheFile+" [Exists="+(cacheFile.exists()+"]"));
                 if (outputFile.exists() && cacheFile.exists()) {
                     theme.loadResourceFile();
-                    //System.out.println("Loading cache file: "+cacheFile);
                     theme.loadSelectorCacheStatus(cacheFile);
                 }
 
@@ -566,7 +621,6 @@ public class CN1CSSCLI {
                 
                 String checksum = getMD5Checksum(outputFile.getAbsolutePath());
                 checksums.put(inputFile.getName(), checksum);
-                //System.out.println("Saving checksums ["+baseDir+"]: "+checksums);
                 saveChecksums(baseDir, checksums);
             
             } catch (MalformedURLException ex) {
@@ -574,7 +628,6 @@ public class CN1CSSCLI {
             } 
         } finally {
             if (lock != null) {
-                System.out.println("Releasing lock");
                 lock.release();
             }
             if (channel != null) {
@@ -646,6 +699,14 @@ public class CN1CSSCLI {
    }
    
    private static File getChecksumsFile(File baseDir) {
+        try {
+            if (isMavenProject(baseDir)) {
+                return new File(getProjectDir(baseDir), "target" + File.separator + ".cn1_css_checksums");
+            }
+        } catch (Exception ex) {
+            Log.e(ex);
+        }
+        
        return new File(baseDir, ".cn1_css_checksums");
    }
    

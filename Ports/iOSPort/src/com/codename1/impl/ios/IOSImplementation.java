@@ -7091,12 +7091,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         private String[] sslCertificates;
         private boolean connected;
         private boolean ensureConnectionLock;
+        private boolean insecure;
         String error;
         public final Object LOCK = new Object();
         
         public void setId(int id) {
             this.id = id;
             nativeInstance.setConnectionId(peer, id);
+        }
+        
+        public void setInsecure(boolean insecure) {
+            this.insecure = insecure;
+            if (insecure) {
+                //nativeInstance.setInsecure(peer, insecure);
+            }
         }
         
         public void setChunkedStreamingMode(int len) {
@@ -7462,6 +7470,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         NetworkConnection n = (NetworkConnection)connection;
         n.setId(id);
     }
+
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        NetworkConnection n = (NetworkConnection)connection;
+        n.setInsecure(insecure);
+    }
+    
+    
     
     
 

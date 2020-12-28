@@ -134,7 +134,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
                 request.setMethod("GET");
                 request.setURL(forwardTo);
                 request.setFirstPartyForCookies(forwardTo);
-                HashMap<String, String> headerMap = new HashMap<>();
+                HashMap<String, String> headerMap = new HashMap<String,String>();
                 request.getHeaderMap(headerMap);
                 headerMap.remove("Content-Type");
                 headerMap.remove("Origin");

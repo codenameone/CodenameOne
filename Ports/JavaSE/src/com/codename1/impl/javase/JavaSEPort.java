@@ -8793,6 +8793,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        if (insecure) {
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                try {
+                    TrustModifier.relaxHostChecking(conn);
+                } catch (Exception ex) {
+                    Log.e(ex);
+                }
+            }
+        }
+    }
+
+    
+    
     
     
     @Override
