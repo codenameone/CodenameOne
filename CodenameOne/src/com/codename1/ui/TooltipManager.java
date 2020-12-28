@@ -105,8 +105,10 @@ public class TooltipManager {
                 pendingTooltip = null;
             }
         });
-        pendingTooltip.schedule(tooltipShowDelay, false, cmp.getComponentForm());
-        
+        Form f = cmp.getComponentForm();
+        if(f != null) {
+            pendingTooltip.schedule(tooltipShowDelay, false, f);
+        }
     }
     
     /**
