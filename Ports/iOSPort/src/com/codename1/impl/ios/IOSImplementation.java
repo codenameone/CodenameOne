@@ -7103,7 +7103,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void setInsecure(boolean insecure) {
             this.insecure = insecure;
             if (insecure) {
-                //nativeInstance.setInsecure(peer, insecure);
+                nativeInstance.setInsecure(peer, insecure);
             }
         }
         
