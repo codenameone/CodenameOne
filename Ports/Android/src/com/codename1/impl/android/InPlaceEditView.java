@@ -76,10 +76,12 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 //import java.util.Timer;
 //import java.util.TimerTask;
 //import java.util.logging.Level;
@@ -1519,6 +1521,17 @@ public class InPlaceEditView extends FrameLayout{
         }
     }
 
+    private static TextArea getCurrentTextArea() {
+        InPlaceEditView ev = sInstance;
+        EditView editView = ev != null ? ev.mEditText : null;
+        return editView != null ? editView.mTextArea : null;
+    }
+    
+    private static EditView getCurrentEditView() {
+        InPlaceEditView ev = sInstance;
+        return ev != null ? ev.mEditText : null;
+    }
+    
     /**
      * Entry point for using this class
      * @param impl The current running activity
@@ -1742,8 +1755,46 @@ public class InPlaceEditView extends FrameLayout{
 
         final String[] out = new String[1];
 
-
-
+        // In case the contents of the text area are changed while editing is in progress
+        // we should propagate the changes to the native text field.
+        final DataChangedListener textAreaDataChanged = new DataChangedListener() {
+            @Override
+            public void dataChanged(int type, int index) {
+                TextArea currTextArea = getCurrentTextArea();
+                if (currTextArea != textArea) {
+                    // This is not the active text area anymore
+                    textArea.removeDataChangedListener(this);
+                    return;
+                }
+                String newText = textArea.getText();
+                EditView currEditView = getCurrentEditView();
+                if (currEditView == null || currEditView.mTextArea != textArea) {
+                    textArea.removeDataChangedListener(this);
+                    return;
+                }
+                
+                String existingText = currEditView.getText().toString();
+                if (!Objects.equals(newText, existingText)) {
+                    impl.getActivity().runOnUiThread(new Runnable() {
+                        public void run() {
+                            TextArea currTextArea = getCurrentTextArea();
+                            EditView currEditView = getCurrentEditView();
+                            if (currTextArea != textArea || currEditView == null || currEditView.mTextArea != textArea) {
+                                return;
+                            }
+                            String newText = textArea.getText();
+                            String existingText = currEditView.getText().toString();
+                            if (!Objects.equals(newText, existingText)) {
+                                currEditView.setText(newText);
+                            }
+                            
+                        }
+                    });
+                }
+                
+            }
+        };
+        textArea.addDataChangedListener(textAreaDataChanged);
 
         // In order to reuse the code the runs after edit completion, we will wrap it in a runnable
         // For sync edit mode, we will just run onComplete.run() at the end of this method.  For
@@ -1751,6 +1802,7 @@ public class InPlaceEditView extends FrameLayout{
         // when editing eventually completes.
         Runnable onComplete = new Runnable() {
             public void run() {
+                textArea.removeDataChangedListener(textAreaDataChanged);
                 if (!impl.isAsyncEditMode() && textArea instanceof TextField) {
                     ((TextField) textArea).setEditable(true);
                 }
