@@ -31,13 +31,7 @@ public class OpenDesignerMojo extends AbstractCN1Mojo {
     }
  
     
-     private File getDesignerJar() {
-        File home = new File(System.getProperty("user.home"));
-        File codenameone = new File(home, ".codenameone");
-        File settingsJar = new File(codenameone, "designer_1.jar");
-        
-        return settingsJar;
-    }
+    
      
     private File getResourceFile() {
         return new File(project.getProperties().getProperty("cn1.resourceFile", project.getCompileSourceRoots().get(0) + File.separator + "theme.res"));

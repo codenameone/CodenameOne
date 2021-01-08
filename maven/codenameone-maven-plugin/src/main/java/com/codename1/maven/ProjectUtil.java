@@ -63,6 +63,10 @@ public class ProjectUtil {
                 if (f.exists()) {
                     return f.getParentFile();
                 }
+                f = new File(f.getParentFile(), "codenameone_library_appended.properties");
+                if (f.exists()) {
+                    return f.getParentFile();
+                }
             }
         }
         return null;

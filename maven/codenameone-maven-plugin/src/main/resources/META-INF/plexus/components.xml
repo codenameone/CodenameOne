@@ -29,7 +29,8 @@
                                 org.apache.maven.plugins:maven-surefire-plugin:test
                             </test>
                             <package>
-                                com.codenameone:codenameone-maven-plugin:cn1lib
+                                <!--com.codenameone:codenameone-maven-plugin:cn1lib-->
+                                org.apache.maven.plugins:maven-jar-plugin:jar
                             </package>
                             <install>
                                 org.apache.maven.plugins:maven-install-plugin:install
@@ -58,9 +59,9 @@
                                 com.codenameone:codenameone-maven-plugin:css
                             </process-resources>
                             <compile>
+                                <!--com.codenameone:codenameone-maven-plugin:add-nativese-dependencies,-->
                                 org.apache.maven.plugins:maven-compiler-plugin:compile,
-                                
-                                com.codenameone:codenameone-maven-plugin:prepare-simulator-classpath
+                                <!--com.codenameone:codenameone-maven-plugin:prepare-simulator-classpath-->
                             </compile>
                             <process-test-resources>
                                 org.apache.maven.plugins:maven-resources-plugin:testResources

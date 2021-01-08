@@ -99,7 +99,9 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         zip.setCompress(true);
         zip.setDestFile(artifact);
         zip.execute();
-        this.project.getArtifact().setFile(artifact);
+        //this.project.getArtifact().setFile(artifact);
+        projectHelper.attachArtifact(project, "jar", "cn1lib", artifact);
+        
     }
     
     private String str(String str) {

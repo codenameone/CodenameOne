@@ -170,12 +170,30 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             java.createArg().setPath(new Path(antProject, complianceCheckJar.getAbsolutePath()));
             
         }
-        java.createArg().setValue("-keep");
-        String keep = "class "+properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName")+" {\n" +
-"            *;\n" +
-"            }";
-        //getLog().info("Addin -keep directive "+keep);
-        java.createArg().setValue(keep);
+        
+        if (properties != null && properties.getProperty("codename1.mainName") != null) {
+            String keep = "class "+properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName")+" {\n" +
+    "            *;\n" +
+    "            }";
+            //getLog().info("Addin -keep directive "+keep);
+            java.createArg().setValue("-keep");
+            java.createArg().setValue(keep);
+        } else {
+            List<String> keeps = new ArrayList<String>();
+            for (String sourceRoot : project.getCompileSourceRoots()) {
+                File sourceRootFile = new File(sourceRoot);
+                findClassesInDirectory(sourceRootFile.getAbsolutePath(), sourceRootFile, keeps);
+            }
+            getLog().info("Keep classes: "+keeps);
+            for (String keepClass : keeps) {
+                String keep = "class "+keepClass+" {\n" +
+        "            *;\n" +
+        "            }";
+                //getLog().info("Addin -keep directive "+keep);
+                java.createArg().setValue("-keep");
+                java.createArg().setValue(keep);
+            }
+        }
         if (passNum == 0) {
             java.createArg().setValue("-dontwarn");
             java.createArg().setValue("**");
@@ -189,7 +207,23 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
 
     }
     
-    
+    private void findClassesInDirectory(String sourceRootAbsolutePath, File file, List<String> out) {
+        String fileName = file.getAbsolutePath();
+        if (fileName.endsWith(".java") || fileName.endsWith(".kt")) {
+            String className = fileName.substring(0, fileName.lastIndexOf("."))
+                    .substring(sourceRootAbsolutePath.length())
+                    .replace('/', '.')
+                    .replace('\\', '.');
+            if (className.startsWith(".")) {
+                className = className.substring(1);
+            }
+            out.add(className);
+        } else if (file.isDirectory()) {
+            for (File child : file.listFiles()) {
+                findClassesInDirectory(sourceRootAbsolutePath, child, out);
+            }
+        }
+    }
 
     private File getJavaRuntimeJar() {
         for (Artifact artifact : project.getArtifacts()) {

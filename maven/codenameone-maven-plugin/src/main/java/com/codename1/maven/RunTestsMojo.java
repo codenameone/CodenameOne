@@ -45,20 +45,21 @@ public class RunTestsMojo extends AbstractCN1Mojo {
     private boolean prepareTests() throws MojoExecutionException {
         try {
             List<File> paths = new ArrayList<File>();
+            File cn1ProjectDir = getCN1ProjectDir();
+            
             paths.add(new File(project.getBuild().getTestOutputDirectory()));
             paths.add(new File(project.getBuild().getOutputDirectory()));
             
             for (Artifact artifact : project.getArtifacts()) {
-                //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
                 paths.add(getJar(artifact));
-                //}
             }
-            getLog().info("Looking for test cases in "+paths);
             Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
                 return false;
             }
-            DataOutputStream fo = new DataOutputStream(new FileOutputStream(getMetaDataFile()));
+            File metadataFile = getMetaDataFile();
+            metadataFile.getParentFile().mkdir();
+            DataOutputStream fo = new DataOutputStream(new FileOutputStream(metadataFile));
             
             Arrays.sort(testCases, new Comparator<Class>() {
                 @Override
@@ -82,7 +83,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         }
     }
     
-     private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
+    private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for(int iter = 0 ; iter < urls.length ; iter++) {
             urls[iter] = classesDirectories[iter].toURI().toURL();
@@ -94,6 +95,37 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         
         List<Class> classList = new ArrayList<Class>();
         findTestCasesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
+        
+        if (project.getArtifactId().endsWith("-javase")) {
+            project.getArtifacts().stream().filter(artifact->{
+                String artifactId = project.getArtifactId();
+                artifactId = artifactId.substring(0, artifactId.lastIndexOf("-javase")) + "-common";
+                return project.getGroupId().equals(artifact.getGroupId()) && artifactId.equals(artifact.getArtifactId()) && "tests".equals(artifact.getClassifier());
+            }).findFirst().ifPresent(artifact -> {
+                try {
+                    FileInputStream zipFile = new FileInputStream(getJar(artifact));
+                        ZipInputStream zip = new ZipInputStream(zipFile);
+                        ZipEntry entry;
+                        while ((entry = zip.getNextEntry()) != null) {
+                            if (entry.isDirectory()) {
+                                continue;
+                            }
+                            String baseDir = "";
+                            String entryName = entry.getName();
+                            if (entryName.endsWith(".class") && entryName.indexOf('$') < 0) {
+                                String className = entryName.substring(0, entryName.length() - 6);
+                                className = className.replace('/', '.');
+                                isTestCase(cl, className, classList);
+                            } 
+                        }
+                        zip.close();
+                } catch (IOException ex) {
+                    getLog().error("Failed to scan jar of artifact "+artifact+" for test cases");
+                    getLog().error(ex);
+                }
+            });
+        }
+        
         Class[] arr = new Class[classList.size()];
         classList.toArray(arr);
         return arr;
@@ -107,6 +139,9 @@ public class RunTestsMojo extends AbstractCN1Mojo {
                         || file.getName().endsWith(".jar");
             }
         });
+        if (files == null) {
+            return;
+        }
         for(File f : files) {
             if(f.isDirectory()) {
                 findTestCasesInDir(baseDir, f, cl, classList);

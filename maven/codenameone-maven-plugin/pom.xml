@@ -28,7 +28,13 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-designer</artifactId>
+            <version>${project.version}</version>
+            <type>zip</type>
+            <classifier>jar-with-dependencies</classifier>
+        </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
@@ -87,10 +93,15 @@
         </dependency>            
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-io -->
         <dependency>
-            <groupId>org.apache.commons</groupId>
+            <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
     
         </dependency>
+        <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                
+            </dependency>
         <dependency>
             <groupId>com.guardsquare</groupId>
             <artifactId>proguard-core</artifactId>

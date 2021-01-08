@@ -30,22 +30,30 @@ import java.io.File;
  */
 public class PollingFileWatcher  {
 
-    private File file;
+    private File[] files;
     private long interval;
     private long lastMtime;
     private boolean stop;
     
-    public PollingFileWatcher(File file, long interval) {
-        this.file = file;
+    public PollingFileWatcher(File[] files, long interval) {
+        this.files = files;
         this.interval = interval;
-        this.lastMtime = file.lastModified();
+        this.lastMtime = lastModified();
+    }
+    
+    private long lastModified() {
+        long out = 0;
+        for (File f : files) {
+            out = Math.max(out, f.lastModified());
+        }
+        return out;
     }
     
     public synchronized void poll() throws InterruptedException {
-        while (!stop && file.lastModified() == lastMtime) {
+        while (!stop && lastModified() == lastMtime) {
             wait(interval);
         }
-        lastMtime = file.lastModified();
+        lastMtime = lastModified();
     }
     
     public synchronized void stop() {

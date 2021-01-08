@@ -5,18 +5,27 @@
  */
 package com.codename1.maven;
 
+
 import java.io.File;
+import org.apache.commons.io.FileUtils;
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.tools.ant.taskdefs.Copy;
+import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Java;
+import org.apache.tools.ant.types.FileSet;
 
 /**
  *
  * @author shannah
  */
-@Mojo(name = "css", defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
+@Mojo(name = "css", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, 
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
+        requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class CompileCSSMojo extends AbstractCN1Mojo {
 
     @Override
@@ -41,23 +50,72 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
             return;
         }
         
+        final StringBuilder inputs = new StringBuilder();
+        
+        project.getArtifacts().forEach(artifact->{
+            if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
+                File zip = findArtifactFile(artifact);
+                if (zip == null || !zip.exists()) {
+                    return;
+                }
+                
+                File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
+                if (!extracted.exists()) {
+                    Expand expand = (Expand)antProject.createTask("unzip");
+                    expand.setSrc(zip);
+                    expand.setDest(extracted);
+                    expand.execute();
+                }
+                if (extracted.exists()) {
+                    File theme = new File(extracted, "theme.css");
+                    if (theme.exists()) {
+                        if (inputs.length() > 0) {
+                            inputs.append(",");
+                        }
+                        inputs.append(theme.getAbsolutePath());
+                    }
+                }
+            }
+        });
         
         File cssTheme = new File(cssDirectory, "theme.css");
+        if (cssTheme.exists()) {
+            if (inputs.length() > 0) {
+                inputs.append(",");
+            }
+            inputs.append(cssTheme.getAbsolutePath());
+        }
         
         File cssImplDir = new File(project.getBuild().getDirectory() + File.separator + "css");
         cssImplDir.mkdirs();
+        File mergeFile = new File(cssImplDir, "theme.css");
+        
+        Copy copy = (Copy)antProject.createTask("copy");
+        copy.setTodir(cssImplDir);
+        FileSet fileset = new FileSet();
+        fileset.setProject(antProject);
+        fileset.setDir(cssDirectory);
+        copy.addFileset(fileset);
+        copy.execute();
+        
         Java java = createJava();
         java.setDir(getCN1ProjectDir());
         java.setJar(getDesignerJar());
         java.setFork(true);
         java.setFailonerror(true);
+        setupCef();
         String cefDir = System.getProperty("cef.dir", System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         java.createJvmarg().setValue("-Dcli=true");
         java.createJvmarg().setValue("-Dcef.dir="+cefDir);
-        java.createJvmarg().setValue("-Dcn1.libCSSDir="+cssImplDir.getAbsolutePath());
         java.createArg().setValue("-css");
-        java.createArg().setFile(cssTheme);
+        java.createArg().setValue("-input");
+        java.createArg().setValue(inputs.toString());
+        
+        java.createArg().setValue("-output");
         java.createArg().setFile(new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res"));
+        
+        java.createArg().setValue("-merge");
+        java.createArg().setFile(mergeFile);
         java.executeJava();
     }
     
@@ -90,17 +148,8 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         return null;
     }
     
-    protected File getDesignerJar() throws MojoExecutionException{
-        File cn1Home = new File(System.getProperty("user.home") + File.separator + ".codenameone");
-        File designerJar = new File(cn1Home, "designer_1.jar");
-        if (!designerJar.exists()) {
-            updateCodenameOne(true);
-        }
-        
-        if (!designerJar.exists()) {
-            throw new MojoExecutionException("Failed to find designer_1.jar even after running codename one update.");
-        }
-        return designerJar;
-    }
+    
+    
+    
     
 }

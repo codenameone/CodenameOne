@@ -36,6 +36,7 @@ import org.apache.tools.ant.Project;
 import org.apache.tools.ant.input.DefaultInputHandler;
 import org.apache.tools.ant.input.InputHandler;
 import org.apache.tools.ant.taskdefs.Copy;
+import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.taskdefs.Redirector;
 import org.apache.tools.ant.types.FileSet;
@@ -105,11 +106,15 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (getCN1ProjectDir() != null) {
             properties = new Properties();
-            try {
-                properties.load(new FileInputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties")));
-            } catch (IOException ex) {
-                throw new MojoExecutionException("Failed to find codenameone_settings.properties file.", ex);
+            File cn1Properties = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+            if (cn1Properties.exists()) {
+                try {
+                    properties.load(new FileInputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties")));
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to find codenameone_settings.properties file.", ex);
+                }
             }
+            
         } else {
             getLog().warn("Failed to find CN1 Project directory.  codenameone_settings.properties will not be loaded");
             getLog().warn("Checking from project root and source compile root: "+project.getCompileSourceRoots().get(0));
@@ -123,7 +128,21 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected abstract void executeImpl()  throws MojoExecutionException, MojoFailureException;
     
     
+    
+    
     protected File getCN1ProjectDir() {
+        if (project.getBasedir().getName().equals("javase")) {
+            File commonSettings = new File(project.getBasedir(), ".." + File.separator + "common" + File.separator + "codenameone_settings.properties");
+            if (commonSettings.exists()) {
+                return commonSettings.getParentFile();
+            }
+            commonSettings = new File(project.getBasedir(), ".." + File.separator + "common" + File.separator + "codenameone_library_appended.properties");
+            if (commonSettings.exists()) {
+                return commonSettings.getParentFile();
+            }
+            
+        }
+        
         File f = getCN1ProjectDir(project.getBasedir());
         if (f != null) return f;
         f = getCN1ProjectDir(new File(project.getCompileSourceRoots().get(0)).getParentFile());
@@ -139,6 +158,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (f.exists()) {
                 return f.getParentFile();
             }
+            f = new File(f.getParentFile().getParentFile(), "codenameone_library_appended.properties");
+            if (f.exists()) {
+                return f.getParentFile();
+            }
+            
+            
         }
         return f.exists() ? f.getParentFile() : null;
         
@@ -669,6 +694,101 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
 
         }
+    }
+    protected static String OS = System.getProperty("os.name").toLowerCase();
+    protected static boolean isWindows = (OS.indexOf("win") >= 0);
+    
+
+    protected static boolean isMac =  (OS.indexOf("mac") >= 0);
+    protected static final String ARCH = System.getProperty("os.arch");
+
+    protected static boolean isUnix = (OS.indexOf("nux") >= 0);
+    protected static final boolean is64Bit = is64Bit();
+    protected static final boolean is64Bit() {
+        
+        String model = System.getProperty("sun.arch.data.model",
+                                          System.getProperty("com.ibm.vm.bitmode"));
+        if (model != null) {
+            return "64".equals(model);
+        }
+        if ("x86-64".equals(ARCH)
+            || "ia64".equals(ARCH)
+            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
+            || "sparcv9".equals(ARCH)
+            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
+            || "amd64".equals(ARCH)
+            || "aarch64".equals(ARCH)) {
+            return true;
+        }
+        return false;
+    }
+    
+     protected String getCefPlatform() {
+        if (isMac) return "mac";
+        if (isWindows) return is64Bit ? "win64" : "win32";
+        if (isUnix && is64Bit) return "linux64";
+        return null;
+    }
+    
+    protected boolean isCefSetup() {
+        
+        String path = System.getProperty("cef.dir", null);
+        if (path == null) return false;
+        return new File(path).exists();
+    }
+     
+    protected void setupCef() {
+        if (isCefSetup()) {
+            return;
+        }
+        String platform = getCefPlatform();
+        if (platform == null) {
+            getLog().warn("CEF not supported on this platform.  Not adding dependency");
+            return;
+        }
+        File cefZip = getJar("com.codenameone", "codenameone-cef", platform);
+        if (cefZip == null || !cefZip.exists()) {
+            getLog().warn("codenameone-cef not found in dependencies.  Not adding CEF dependency");
+            return;
+        }
+        File extractedDir = new File(cefZip.getParentFile(), cefZip.getName()+"-extracted");
+        if (!extractedDir.exists() || extractedDir.lastModified() < cefZip.lastModified()) {
+            if (extractedDir.exists()) {
+                delTree(extractedDir);
+            }
+            Expand expand = (Expand)antProject.createTask("unzip");
+            expand.setDest(extractedDir);
+            expand.setSrc(cefZip);
+            expand.execute();
+        }
+        
+        project.getProperties().setProperty("cef.dir", extractedDir.getAbsolutePath());
+        System.setProperty("cef.dir", extractedDir.getAbsolutePath());
+        
+    }
+    
+    protected File getDesignerJar() throws MojoExecutionException{
+        Artifact artifact = getArtifact("com.codenameone", "codenameone-designer", "jar-with-dependencies");
+        if (artifact == null) {
+            throw new MojoExecutionException("Could not find designer jar");
+        }
+        File file = findArtifactFile(artifact);
+        if (file == null) {
+            throw new MojoExecutionException("Could not find designer jar");
+        }
+        /*
+        File cn1Home = new File(System.getProperty("user.home") + File.separator + ".codenameone");
+        File designerJar = new File(cn1Home, "designer_1.jar");
+        if (!designerJar.exists()) {
+            updateCodenameOne(true);
+        }
+        
+        if (!designerJar.exists()) {
+            throw new MojoExecutionException("Failed to find designer_1.jar even after running codename one update.");
+        }
+        return designerJar;
+        */
+        return file;
     }
    
 }

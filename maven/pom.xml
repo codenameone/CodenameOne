@@ -75,8 +75,12 @@
         <module>core</module>
         <module>factory</module>
         <module>javase</module>
+        <module>javase-svg</module>
+        <module>android</module>
+        <module>designer</module>
         <module>codenameone-maven-plugin</module>
         <module>codenameone-archetypes</module>
+        
 		    
     </modules>
 		  
@@ -161,12 +165,18 @@
                 <artifactId>maven-invoker-plugin</artifactId>
                 <version>3.2.1</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-io -->
+            <!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.7</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>1.3.2</version>
+                <artifactId>commons-text</artifactId>
+                <version>1.9</version>
             </dependency>
+            
             <dependency>
                 <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-core</artifactId>
@@ -248,8 +258,16 @@
                     <version>3.1.1</version>
                 </plugin>
                 <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-invoker-plugin -->
+                <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>1.7</version>
                 
-
+        </plugin>
             </plugins>
         </pluginManagement>
     </build>
