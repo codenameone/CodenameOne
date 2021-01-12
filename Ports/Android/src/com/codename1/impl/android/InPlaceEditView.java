@@ -1760,13 +1760,19 @@ public class InPlaceEditView extends FrameLayout{
         final DataChangedListener textAreaDataChanged = new DataChangedListener() {
             @Override
             public void dataChanged(int type, int index) {
+                if (suppressDataChangedEvent) {
+                    // We ignore changed events that were actually initiated by
+                    // the user typing in the text field.  
+                    // https://github.com/codenameone/CodenameOne/issues/3343
+                    return;
+                }
                 TextArea currTextArea = getCurrentTextArea();
                 if (currTextArea != textArea) {
                     // This is not the active text area anymore
                     textArea.removeDataChangedListener(this);
                     return;
                 }
-                String newText = textArea.getText();
+                final String newText = textArea.getText();
                 EditView currEditView = getCurrentEditView();
                 if (currEditView == null || currEditView.mTextArea != textArea) {
                     textArea.removeDataChangedListener(this);
@@ -1774,7 +1780,9 @@ public class InPlaceEditView extends FrameLayout{
                 }
                 
                 String existingText = currEditView.getText().toString();
-                if (!Objects.equals(newText, existingText)) {
+                // We use the com.codename1.compat version
+                // because Objects.equals was not available until API 19
+                if (!com.codename1.compat.java.util.Objects.equals(newText, existingText)) {
                     impl.getActivity().runOnUiThread(new Runnable() {
                         public void run() {
                             TextArea currTextArea = getCurrentTextArea();
@@ -1782,9 +1790,10 @@ public class InPlaceEditView extends FrameLayout{
                             if (currTextArea != textArea || currEditView == null || currEditView.mTextArea != textArea) {
                                 return;
                             }
-                            String newText = textArea.getText();
                             String existingText = currEditView.getText().toString();
-                            if (!Objects.equals(newText, existingText)) {
+                            // We use the com.codename1.compat version
+                            // because Objects.equals was not available until API 19
+                            if (!com.codename1.compat.java.util.Objects.equals(newText, existingText)) {
                                 currEditView.setText(newText);
                             }
                             
@@ -1948,6 +1957,12 @@ public class InPlaceEditView extends FrameLayout{
 
     }
 
+    // flag to suppress CN1 data changed events.  This is used to prevent the 
+    // data changed listener from processing changes to the text that were initiated
+    // by the user typing.  
+    // Necessary to fix https://github.com/codenameone/CodenameOne/issues/3343
+    private static boolean suppressDataChangedEvent;
+
     class EditView extends AutoCompleteTextView {
 
         private InPlaceEditView mInPlaceEditView;
@@ -2035,7 +2050,12 @@ public class InPlaceEditView extends FrameLayout{
                             @Override
                             public void run() {
                                 if (!actualString.equals(mTextArea.getText())) {
+                                    // Prevent data change event
+                                    // https://github.com/codenameone/CodenameOne/issues/3343
+                                    suppressDataChangedEvent = true; 
+                                       
                                     mTextArea.setText(actualString);
+                                    suppressDataChangedEvent = false;
                                 }
                             }
                         });
