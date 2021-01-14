@@ -49,6 +49,7 @@ public class AsyncResource<V> extends Observable  {
     private SuccessCallback<Throwable> errorCallback;
     private boolean done;
     private boolean cancelled;
+    private final Object lock = new Object();
     
 
     /**
@@ -57,13 +58,19 @@ public class AsyncResource<V> extends Observable  {
      * @return True if the resource loading was cancelled.  False if the loading was already done.
      */
     public boolean cancel(boolean mayInterruptIfRunning) {
-        if (done) {
-            return false;
+        boolean changed = false;
+        synchronized(lock) {
+            if (done) {
+                return false;
+            }
+            if (!cancelled) {
+                cancelled = true;
+                done = true;
+                error = new CancellationException();
+                changed = true;
+            }
         }
-        if (!cancelled) {
-            cancelled = true;
-            done = true;
-            error = new CancellationException();
+        if (changed) {
             setChanged();
         }
         return true;
@@ -113,6 +120,7 @@ public class AsyncResource<V> extends Observable  {
      */
     public V get(final int timeout) throws InterruptedException {
         final long startTime = (timeout > 0) ? System.currentTimeMillis() : 0;
+
         if (done && error == null) {
             return value;
         }
@@ -286,7 +294,6 @@ public class AsyncResource<V> extends Observable  {
 
         @Override
         public void onSucess(final T value) {
-
             if (edt && !CN.isEdt()) {
                 CN.callSerially(new Runnable() {
                     public void run() {
@@ -306,7 +313,6 @@ public class AsyncResource<V> extends Observable  {
                 return;
                 
             }
-            
             cb.onSucess(value);
                 
         }
@@ -327,20 +333,28 @@ public class AsyncResource<V> extends Observable  {
      * @return Self for chaining
      */
     public AsyncResource<V> ready(final SuccessCallback<V> callback, EasyThread t) {
-        if (done && error == null) {
-            new AsyncCallback(callback, t).onSucess(value);
-        } else {
-            if (successCallback == null) {
-                successCallback = new AsyncCallback<V>(callback, t);
+        AsyncCallback runImmediately = null;
+        synchronized(lock) {
+            if (done && error == null) {
+                runImmediately = new AsyncCallback(callback, t);
             } else {
-                final SuccessCallback<V> oldCallback = successCallback;
-                successCallback = new AsyncCallback<V>(new SuccessCallback<V>(){ public void onSucess(V res){
-                    oldCallback.onSucess(res);
-                    callback.onSucess(res);
-                }}, t);
+                if (successCallback == null) {
+                    successCallback = new AsyncCallback<V>(callback, t);
+                } else {
+                    final SuccessCallback<V> oldCallback = successCallback;
+                    successCallback = new AsyncCallback<V>(new SuccessCallback<V>(){ public void onSucess(V res){
+                        oldCallback.onSucess(res);
+                        callback.onSucess(res);
+                    }}, t);
+                }
             }
+            
+        }
+        if (runImmediately != null) {
+            runImmediately.onSucess(value);
         }
         return this;
+        
     }
     
     /**
@@ -367,19 +381,25 @@ public class AsyncResource<V> extends Observable  {
      * @return Self for chaining.
      */
     public AsyncResource<V> except(final SuccessCallback<Throwable> callback, EasyThread t) {
-        if (done && error != null) {
-            callback.onSucess(error);
-        } else {
-            if (errorCallback == null) {
-                errorCallback = new AsyncCallback<Throwable>(callback, t);
+        AsyncCallback runImmediately = null;
+        synchronized(lock) {
+            if (done && error != null) {
+                runImmediately = new AsyncCallback<Throwable>(callback, t);
             } else {
-                final SuccessCallback<Throwable> oldErrorCallback = errorCallback;
-                errorCallback = new AsyncCallback<Throwable>(new SuccessCallback<Throwable>(){ public void onSucess(Throwable res){
-                    oldErrorCallback.onSucess(res);
-                    callback.onSucess(res);
-                }}, t);
+                if (errorCallback == null) {
+                    errorCallback = new AsyncCallback<Throwable>(callback, t);
+                } else {
+                    final SuccessCallback<Throwable> oldErrorCallback = errorCallback;
+                    errorCallback = new AsyncCallback<Throwable>(new SuccessCallback<Throwable>(){ public void onSucess(Throwable res){
+                        oldErrorCallback.onSucess(res);
+                        callback.onSucess(res);
+                    }}, t);
+                }
+
             }
-            
+        }
+        if (runImmediately != null) {
+            runImmediately.onSucess(error);
         }
         return this;
     }
@@ -400,12 +420,19 @@ public class AsyncResource<V> extends Observable  {
      * @param value The value to set for the resource.
      */
     public void complete(final V value) {
-        this.value = value;
-        done = true;
+        SuccessCallback cb = null;
+        synchronized(lock) {
+            this.value = value;
+            done = true;
+            if (successCallback != null) {
+                cb = successCallback;
+            }
+        }
+        
         setChanged();
         notifyObservers();
-        if (successCallback != null) {
-            successCallback.onSucess(value);
+        if (cb != null) {
+            cb.onSucess(value);
         }
     }
     
@@ -415,12 +442,18 @@ public class AsyncResource<V> extends Observable  {
      * @param t 
      */
     public void error(Throwable t) {
-        this.error = t;
-        done = true;
+        SuccessCallback cb = null;
+        synchronized(lock) {
+            this.error = t;
+            done = true;
+            if (errorCallback != null) {
+                cb = errorCallback;
+            }
+        }
         setChanged();
         notifyObservers();
-        if (errorCallback != null) {
-            errorCallback.onSucess(error);
+        if (cb != null) {
+            cb.onSucess(error);
         }
     }
     
@@ -459,6 +492,7 @@ public class AsyncResource<V> extends Observable  {
                         if (complete[0]) {
                             return;
                         }
+                        pending.remove(res);
                         complete[0] = true;
                     }
 
@@ -532,13 +566,17 @@ public class AsyncResource<V> extends Observable  {
                 invokeAndBlock(new Runnable() {
                     public void run() {
                         synchronized (complete) {
-                            Util.wait(complete);
+                            if (!complete[0]) {
+                                Util.wait(complete);
+                            }
                         }
                     }
                 });
             } else {
                 synchronized (complete) {
-                    Util.wait(complete);
+                    if (!complete[0]) {
+                        Util.wait(complete);
+                    }
                 }
             }
         }
@@ -546,7 +584,6 @@ public class AsyncResource<V> extends Observable  {
         if (t[0] != null) {
             throw new AsyncExecutionException(t[0]);
         }
-
     }
     
     /**

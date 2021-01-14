@@ -168,5 +168,9 @@ public class Thread implements java.lang.Runnable{
     public static void yield(){
         return; //TODO codavaj!!
     }
+    
+     public StackTraceElement[] getStackTrace() {
+        return new StackTraceElement[0];
+    }
 
 }

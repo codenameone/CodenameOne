@@ -61,13 +61,17 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
     private void appendSynchronized(StringBuilder b) {
         if(synchronizedMethod) {
             if(staticMethod) {
-                b.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                b.append("    monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
                 b.append(className);
                 b.append(");\n");
             } else {
-                b.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                b.append("    monitorExitBlock(threadStateData, __cn1ThisObject);\n");
             }
         }
+    }
+    
+    public static boolean isSynchronizedMethod() {
+        return synchronizedMethod;
     }
 
     @Override

@@ -397,7 +397,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
     public <T> T[] toArray(T[] contents) {
         Object[] arr = contents;
         if (size() > arr.length) {
-            arr = new Object[size()];
+            arr = (Object[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), size());
         }
         Iterator it = iterator();
         for(int iter = 0 ; iter < arr.length ; iter++) {

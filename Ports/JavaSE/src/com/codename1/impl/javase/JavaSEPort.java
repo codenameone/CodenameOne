@@ -28,6 +28,8 @@ import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.components.AudioRecorderComponent;
 import com.codename1.components.AudioRecorderComponent.RecorderState;
+import com.codename1.components.SpanLabel;
+import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -115,7 +117,9 @@ import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.CN;
+import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Sheet;
@@ -1974,9 +1978,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
                     }
-                });
-                
+                });                
             }
+
         }
         
         
@@ -2612,15 +2616,64 @@ public class JavaSEPort extends CodenameOneImplementation {
         return rect;
     }
     
-    
+    private JMenuItem debugInChromeMenuItem;
+    public void setChromeDebugPort(int port) {
+        System.setProperty("cef.debugPort", ""+port);
+        if (debugInChromeMenuItem != null) {
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    debugInChromeMenuItem.setEnabled(true);
+                }
+            });
+            
+        }
+    }
     
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
             
-            JMenu simulatorMenu = new JMenu("Simulate");
+            JMenu simulatorMenu = new JMenu("Simulator");
             simulatorMenu.setDoubleBuffered(true);
             simulatorMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            JMenu simulateMenu = new JMenu("Simulate");
+            simulateMenu.setDoubleBuffered(true);
+            simulateMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            JMenu toolsMenu = new JMenu("Tools");
+            toolsMenu.setDoubleBuffered(true);
+            toolsMenu.addMenuListener(new MenuListener(){
 
                 @Override
                 public void menuSelected(MenuEvent e) {
@@ -2646,7 +2699,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(zoomMenu);
 
             JMenu debugEdtMenu = new JMenu("Debug EDT");
-            simulatorMenu.add(debugEdtMenu);
+            toolsMenu.add(debugEdtMenu);
             
             zoomMenu.setEnabled(!desktopSkin);
 
@@ -2870,7 +2923,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
             JMenu networkDebug = new JMenu("Network");
-            simulatorMenu.add(networkDebug);
+            toolsMenu.add(networkDebug);
             
             JMenuItem networkMonitor = new JMenuItem("Network Monitor");
             networkMonitor.addActionListener(new ActionListener() {
@@ -3119,6 +3172,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             
+            
             scriptingConsole.setToolTipText("Open interactive console");
             
             JMenuItem appArg = new JMenuItem("Send App Argument");
@@ -3140,7 +3194,77 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Executor.startApp();
                 }
             });
-            simulatorMenu.add(appArg);
+            simulateMenu.add(appArg);
+            
+            
+            JMenuItem debugWebViews = new JMenuItem("Debug Web Views");
+            debugWebViews.setEnabled(false);
+            debugInChromeMenuItem = debugWebViews;
+            debugWebViews.setToolTipText("Debug app's BrowserComponents' Javascript and DOM inside Chrome's debugger");
+            debugWebViews.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            String port = System.getProperty("cef.debugPort", null);
+                            if (port != null) {
+                                final Sheet sheet = new Sheet(null, "Debug Web Views");
+                                SpanLabel info = new SpanLabel("You can debug this app's web views in Chrome's "
+                                        + "debugger by opening the following URL in Chrome:");
+                                
+                                SpanLabel warning = new SpanLabel("Debugging only works in Chrome.  If Chrome is not your default browser "
+                                        + "then you'll need to copy and paste the URL above into Chrome");
+                                ComponentSelector.select("*", warning).add(warning, true)
+                                        .selectAllStyles()
+                                        .setFontSizeMillimeters(2)
+                                        .setFgColor(0x555555);
+                                FontImage.setMaterialIcon(warning, FontImage.MATERIAL_WARNING, 3);
+                                final com.codename1.ui.TextField tf = new com.codename1.ui.TextField("http://localhost:"+port);
+                                tf.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+                                    @Override
+                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                        Display.getInstance().copyToClipboard(tf.getText());
+                                        ToastBar.showInfoMessage("URL Copied to Clipboard");
+                                        sheet.back();
+                                    }
+                                });
+                                tf.setEditable(false);
+                                
+                                com.codename1.ui.Button copy = new com.codename1.ui.Button(com.codename1.ui.FontImage.MATERIAL_CONTENT_COPY);
+                                copy.addActionListener(new com.codename1.ui.events.ActionListener() {
+                                    @Override
+                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                        Display.getInstance().copyToClipboard(tf.getText());
+                                        ToastBar.showInfoMessage("URL Copied to Clipboard");
+                                        sheet.back();
+                                    }
+                                });
+                                
+                                com.codename1.ui.Button open = new com.codename1.ui.Button("Open In Default Browser");
+                                open.addActionListener(new com.codename1.ui.events.ActionListener() {
+                                    @Override
+                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                        CN.execute(tf.getText());
+                                        sheet.back();
+                                    }
+                                });
+                                
+                                sheet.getContentPane().setLayout(com.codename1.ui.layouts.BoxLayout.y());
+                                sheet.getContentPane().add(info);
+                                sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.centerEastWest(tf, copy, null));
+                                sheet.getContentPane().add(open);
+                                sheet.getContentPane().add(warning);
+                                sheet.setPosition(com.codename1.ui.layouts.BorderLayout.CENTER);
+                                sheet.show();
+                                
+                                
+                            } else {
+                                ToastBar.showErrorMessage("Debugger not available.  The Chrome debugger is only available in apps that contain a BrowserComponent");
+                            }
+                        }
+                    });
+                }
+            });
+            toolsMenu.add(debugWebViews);
             
             JMenuItem locactionSim = new JMenuItem("Location Simulation");
             locactionSim.addActionListener(new ActionListener() {
@@ -3158,7 +3282,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     
                 }
             });
-            simulatorMenu.add(locactionSim);
+            simulateMenu.add(locactionSim);
             
             JMenuItem pushSim = new JMenuItem("Push Simulation");
             pushSim.addActionListener(new ActionListener() {
@@ -3171,10 +3295,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pushSimulation.setVisible(true);
                 }
             });
-            simulatorMenu.add(pushSim);
+            simulateMenu.add(pushSim);
 
-            simulatorMenu.add(componentTreeInspector);
-            simulatorMenu.add(scriptingConsole);
+            toolsMenu.add(componentTreeInspector);
+            toolsMenu.add(scriptingConsole);
             
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
@@ -3187,8 +3311,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            simulatorMenu.add(testRecorderMenu);
+            toolsMenu.add(testRecorderMenu);
 
+            /*
             JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
             simulatorMenu.add(darkLightModeMenu);
             final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
@@ -3218,13 +3343,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.darkMode = null;
                 }
             });
-
+            */
+            
             manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
             managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
             subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
             refundSupported = pref.getBoolean("refundSupported", true);
             JMenu purchaseMenu = new JMenu("In App Purchase");
-            simulatorMenu.add(purchaseMenu);
+            simulateMenu.add(purchaseMenu);
             final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
             manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
             final JCheckBoxMenuItem managedPurchaseSupportedMenu = new JCheckBoxMenuItem("Managed Purchase");
@@ -3278,7 +3404,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-            simulatorMenu.add(performanceMonitor);
+            toolsMenu.add(performanceMonitor);
             
             JMenuItem clean = new JMenuItem("Clean Storage");
             clean.addActionListener(new ActionListener() {
@@ -3302,7 +3428,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 }
             });
-            simulatorMenu.add(clean);
+            toolsMenu.add(clean);
             
             
 
@@ -3329,28 +3455,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             
 
-            final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
-            simulatorMenu.add(touchFlag);
-            final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
-            simulatorMenu.add(nativeInputFlag);
-
-            final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
+            //final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
+            //simulatorMenu.add(touchFlag);
+            //final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
+            //simulatorMenu.add(nativeInputFlag);
+            //final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
             //simulatorMenu.add(simulateAndroidVKBFlag);
 
-            final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
-            simulatorMenu.add(scrollFlag);
-            scrollFlag.setEnabled(!desktopSkin);
-
-            final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
-            simulatorMenu.add(slowMotionFlag);
+            /*final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
+            toolsMenu.add(slowMotionFlag);
             slowMotionFlag.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent e) {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
-            });
+            });*/
+            
             final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
-            simulatorMenu.add(permFlag);
+            simulateMenu.add(permFlag);
             permFlag.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent e) {
@@ -3362,7 +3484,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             pause = new JMenuItem("Pause App");
-            simulatorMenu.add(pause);
+            simulateMenu.addSeparator();            
+            simulateMenu.add(pause);
             pause.addActionListener(new ActionListener() {
 
                 @Override
@@ -3461,7 +3584,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/build-server.html"));
+                        Desktop.getDesktop().browse(new URI("https://cloud.codenameone.com/buildapp/index.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -3534,6 +3657,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             if (showMenu) {
                 bar.add(simulatorMenu);
+                bar.add(simulateMenu);
+                bar.add(toolsMenu);
                 bar.add(skinMenu);
                 bar.add(helpMenu);
             }
@@ -3583,12 +3708,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             
-            simulateAndroidVKBFlag.addItemListener(new ItemListener() {
+            /*simulateAndroidVKBFlag.addItemListener(new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
                     simulateAndroidKeyboard = !simulateAndroidKeyboard;
                 }
-            });
+            });*/
             
             ItemListener zoomListener = new ItemListener() {
 
@@ -3633,10 +3758,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             zoomMenu.addItemListener(zoomListener);
             
-            scrollFlag.addItemListener(zoomListener);
-
-
-
             exit.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
@@ -3910,7 +4031,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         skinsTable.setRowHeight(112);
                         skinsTable.getTableHeader().setReorderingAllowed(false);
                         final JTextField filter = new JTextField();
-                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(((DefaultTableModel) skinsTable.getModel())); 
+                        final TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(((DefaultTableModel) skinsTable.getModel())); 
                         
                         filter.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
                             
@@ -6099,6 +6220,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
     
+    static BufferedImage deepCopy(BufferedImage bi) {
+        java.awt.image.ColorModel cm = bi.getColorModel();
+        boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
+        java.awt.image.WritableRaster raster = bi.copyData(null);
+        return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+    }
+  
     private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
         if (cmp instanceof Peer) {
             Peer peer = (Peer)cmp;
@@ -7380,6 +7508,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     
+
 
     @Override
     public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
@@ -8664,6 +8793,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        if (insecure) {
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                try {
+                    TrustModifier.relaxHostChecking(conn);
+                } catch (Exception ex) {
+                    Log.e(ex);
+                }
+            }
+        }
+    }
+
+    
+    
     
     
     @Override
@@ -11730,7 +11875,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private boolean matchCN1Style;
         
-        
+        private Image peerImage;
+        private boolean lightweightMode;
         private PeerComponentBuffer peerBuffer;
         
         // Buffered image that will be drawn to by AWT and read from
@@ -11792,8 +11938,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             
         }
 
+        @Override
+        public Image toImage() {
+            if (getWidth() <= 0 || getHeight() <= 0) {
+                return null;
+            }
+            Image image = Image.createImage(getWidth(), getHeight(),0x0);
+            Graphics g = image.getGraphics();
+
+            g.translate(-getX(), -getY());
+            //paintComponentBackground(g);
+            paint(g);
+
+            g.translate(getX(), getY());
+            return image;
+        }
+        
+        
+
         private void applyStyle() {
-            System.out.println("Applying CN1 styles");
             Style source = getStyle();
             
             if (true) {
@@ -11932,6 +12095,47 @@ public class JavaSEPort extends CodenameOneImplementation {
             allowSetCntBounds = false;
         }
         
+        private static JPanel createPanel(Peer p) {
+            final java.lang.ref.WeakReference<Peer> selfRef = new java.lang.ref.WeakReference<Peer>(p);
+            return new JPanel() {
+                @Override
+                public void paint(java.awt.Graphics g) {
+                    final Peer self = selfRef.get();
+                    if (self == null) {
+                        return;
+                    }
+                    if (self.peerBuffer != null) {
+                        //peerBuffer.paint((Graphics2D)g, cnt);
+                        // If we are using a peer buffer, we won't *actually* paint the 
+                        // component because the peer buffer will be painted
+                        // in the CN1 paint cycle on the CN1 context
+                        return;
+                    }
+                    self.paintOnBuffer();
+
+                    // We need to tell CN1 to repaint now
+                    // since the native peer has been updated
+                    // There should be a new buffer to paint now.
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            self.repaint();
+                        }
+                    });
+                }
+
+                @Override
+                public void setBounds(int x, int y, int w, int h) {
+                    Peer self = selfRef.get();
+                    if (self == null) {
+                        return;
+                    }
+                    if (self.allowSetCntBounds) {
+                        super.setBounds(x, y, w, h);
+                    } 
+                }   
+            };
+        }
+        
         public Peer(JFrame f, java.awt.Component c) {
             super(null);
             this.frm = f;
@@ -11946,35 +12150,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-                    cnt = new JPanel() {
-                        @Override
-                        public void paint(java.awt.Graphics g) {
-                            if (peerBuffer != null) {
-                                //peerBuffer.paint((Graphics2D)g, cnt);
-                                // If we are using a peer buffer, we won't *actually* paint the 
-                                // component because the peer buffer will be painted
-                                // in the CN1 paint cycle on the CN1 context
-                                return;
-                            }
-                            paintOnBuffer();
-                            
-                            // We need to tell CN1 to repaint now
-                            // since the native peer has been updated
-                            // There should be a new buffer to paint now.
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    Peer.this.repaint();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void setBounds(int x, int y, int w, int h) {
-                            if (allowSetCntBounds) {
-                                super.setBounds(x, y, w, h);
-                            } 
-                        }   
-                    };
+                    cnt = createPanel(Peer.this);
                     cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, cmp);
@@ -11992,7 +12168,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastH=0;
             lastW=0;
             lastZoom=1;
+            peerImage = null;
             super.initComponent();
+            if (!init) {
+                addNativeCnt();
+            }
+            
         }
 
         @Override
@@ -12002,33 +12183,127 @@ public class JavaSEPort extends CodenameOneImplementation {
                 instance.testRecorder.dispose();
                 instance.testRecorder = null;
             }
-            SwingUtilities.invokeLater(new Runnable() {
+            if (init) {
+                removeNativeCnt();
+            }
+            
+            // We set visibility to false, and then schedule removal
+            // for 1000ms from now.  This will deal with the situation where
+            // a modal dialog is shown to avoid having to fully remove the native 
+            // container.
+            //cnt.setVisible(false);
+            //removeNativeCnt(3000);
+        }
+        
+        /**
+         * Adds the native container to the swing component hierarchy.
+         * 
+         * This can be called off the Swing event thread, in which case it will just schedule a call
+         * to itself later.
+         * 
+         * 
+         */
+        protected void addNativeCnt() {
+            
+            if (!EventQueue.isDispatchThread()) {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        addNativeCnt();
+                    }
+                });
+                return;
+            }
+            
+            if (!init && isInitialized()) {
 
-                @Override
-                public void run() {
-                    frm.remove(cnt);
-                    frm.repaint();
-                }
-            });
+                init = true;
+                cnt.setVisible(true);
+                frm.add(cnt, 0);
+                frm.repaint();
+            }
+            
+        }
+        
+        /**
+         * Removes the native container from the Swing component hierarchy.
+         * This can be called on or off the swing event thread.  If called off the swing event
+         * thread, it will just schedule itself on the event thread later - async.
+         */
+        protected void removeNativeCnt() {
+            if (!EventQueue.isDispatchThread()) {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        removeNativeCnt();
+                    }
+                });
+                return;
+            }
+            if (peerImage == null) {
+                peerImage = generatePeerImage();
+            }
+            init = false;
+            frm.remove(cnt);
+            frm.repaint();
+            
         }
 
+        @Override
+        protected com.codename1.ui.Image generatePeerImage() {
+            if (peerImage != null) {
+                return peerImage;
+            }
+            if (peerBuffer != null) {
+                peerBuffer.modifyBuffer(new Runnable() {
+                    public void run() {
+                        BufferedImage bimg = peerBuffer.getBufferedImage();
+                        peerImage = instance.new NativeImage(bimg);
+                    }
+                   
+                });
+            }
+            return super.generatePeerImage();
+        }
+
+        @Override
+        protected boolean shouldRenderPeerImage() {
+            return lightweightMode && peerImage != null;
+        }
+        
+        
+        
+        
+
         protected void setLightweightMode(final boolean l) {
+            if (lightweightMode == l) {
+                if (l || init) {
+                    return;
+                }
+            }
+            lightweightMode = l;
+            if (l) {
+                if (peerImage == null) {
+                    peerImage = generatePeerImage();
+                } 
+            } else {
+                peerImage = null;
+            }
             SwingUtilities.invokeLater(new Runnable() {
 
                 @Override
                 public void run() {
-
                     if (!l) {
                         if (!init) {
                             init = true;
                             cnt.setVisible(true);
                             frm.add(cnt, 0);
                             frm.repaint();
+                            peerImage = null;
                         } else {
-                            cnt.setVisible(false);
+                            cnt.setVisible(true);
                         }
                     } else {
                         if (init) {
+                            
                             cnt.setVisible(false);
                         }
                     }
@@ -12043,8 +12318,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
         }
 
+        
         @Override
         public void paint(final Graphics g) {
+            if (lightweightMode) {
+                super.paint(g);
+                return;
+            }
             if (init) {
                 onPositionSizeChange();
                 instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
@@ -12159,7 +12439,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean checkForPermission(String permission, String description){
         return checkForPermission(permission, description, false);
     }
-    
+
     public static boolean checkForPermission(String permission, String description, boolean forceAsk){
                
         if(!android6PermissionsFlag){

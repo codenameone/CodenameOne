@@ -616,9 +616,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             if (firstKeyModCount == backingMap.modCount) {
                 return;
             }
-            if ( backingMap.comparator == null && NumberComparator.isNumber(startKey)){
-                backingMap.comparator = NumberComparator.createComparator(startKey.getClass());
-            }
             java.lang.Comparable<K> object = backingMap.comparator == null ? toComparable((K) startKey)
                     : null;
             K key = (K) startKey;
@@ -764,9 +761,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         private void setLastKey() {
             if (lastKeyModCount == backingMap.modCount) {
                 return;
-            }
-            if ( backingMap.comparator == null && NumberComparator.isNumber(endKey)){
-                backingMap.comparator = NumberComparator.createComparator(endKey.getClass());
             }
             java.lang.Comparable<K> object = backingMap.comparator == null ? toComparable((K) endKey)
                     : null;
@@ -956,9 +950,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
                 setLastKey();
                 to = lastKeyNode;
                 toIndex = lastKeyIndex;
-                if ( backingMap.comparator == null && NumberComparator.isNumber(endKey)){
-                    backingMap.comparator = NumberComparator.createComparator(endKey.getClass());
-                }
                 java.lang.Comparable<K> object = backingMap.comparator == null ? toComparable((K) endKey)
                         : null;
                 if (to == null){
@@ -1078,9 +1069,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
                 if (node == this.finalNode && offset >= this.finalOffset) {
                     node = null;
                 } else if (this.finalOffset < this.finalNode.right_idx) {
-                    if ( backingMap.comparator == null && NumberComparator.isNumber(startNode.keys[startOffset])){
-                        backingMap.comparator = NumberComparator.createComparator(startNode.keys[startOffset].getClass());
-                    }
                     java.lang.Comparable<K> object = backingMap.comparator == null ? toComparable((K) startNode.keys[startOffset])
                             : null;
                     if (this.backingMap.cmp(object, node.keys[offset],
@@ -1219,9 +1207,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             subMap.setLastKey();
             Node<K, V> to = subMap.lastKeyNode;
-            if ( subMap.backingMap.comparator == null && NumberComparator.isNumber(subMap.endKey)){
-                subMap.backingMap.comparator = NumberComparator.createComparator(subMap.endKey.getClass());
-            }
             java.lang.Comparable<K> object = subMap.backingMap.comparator == null ? toComparable((K) subMap.endKey)
                     : null;
             int toIndex = subMap.lastKeyIndex
@@ -1280,9 +1265,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             subMap.setLastKey();
             Node<K, V> to = subMap.lastKeyNode;
-            if ( subMap.backingMap.comparator == null && NumberComparator.isNumber(subMap.endKey)){
-                subMap.backingMap.comparator = NumberComparator.createComparator(subMap.endKey.getClass());
-            }
             java.lang.Comparable<K> object = subMap.backingMap.comparator == null ? toComparable((K) subMap.endKey)
                     : null;
             int toIndex = subMap.lastKeyIndex
@@ -1677,9 +1659,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             
             if (!map.checkLowerBound(node.key)){
-                if ( map.m.comparator == null && NumberComparator.isNumber(e.getKey())){
-                    map.m.comparator = NumberComparator.createComparator(e.getKey().getClass());
-                }
                 java.lang.Comparable<K> object = map.m.comparator == null ? toComparable((K) e.getKey())
                         : null;
                 TreeMap.Entry<K, V> first = map.hiInclusive ? map.m.findCeilingEntry(map.hi) :map.m.findHigherEntry(map.hi);
@@ -1770,9 +1749,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             Entry<K,V> node =  map.m.findHigherEntry(e.getKey());
             if (node != null && !map.checkUpperBound(node.key)){
                 node =  map.loInclusive? map.findCeilingEntryImpl(map.hi):map.findHigherEntryImpl(map.hi);
-            }
-            if ( map.m.comparator == null && NumberComparator.isNumber(e.getKey())){
-                map.m.comparator = NumberComparator.createComparator(e.getKey().getClass());
             }
             java.lang.Comparable<K> object = map.m.comparator == null ? toComparable((K) e.getKey())
                     : null;
@@ -2659,9 +2635,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             
             if (node != null && fromStart && !checkLowerBound(node.key)){
-                if ( m.comparator == null && NumberComparator.isNumber(key)){
-                    m.comparator = NumberComparator.createComparator(key.getClass());
-                }
                 java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                         : null;
                 if (cmp(object, key, this.lo) > 0){
@@ -2787,9 +2760,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             
             if (toEnd && !checkUpperBound(node.key)){
-                if ( m.comparator == null && NumberComparator.isNumber(key)){
-                    m.comparator = NumberComparator.createComparator(key.getClass());
-                }
                 java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                         : null;
                 if (cmp(object, key, this.hi) < 0){
@@ -2943,9 +2913,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             
             if (fromStart && !checkLowerBound(node.key)){
-                if ( m.comparator == null && NumberComparator.isNumber(key)){
-                    m.comparator = NumberComparator.createComparator(key.getClass());
-                }
                 java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                         : null;
                 if (cmp(object, key, this.lo) > 0){
@@ -2975,9 +2942,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             }
             
             if (toEnd && !checkUpperBound(node.key)){
-                if ( m.comparator == null && NumberComparator.isNumber(key)){
-                    m.comparator = NumberComparator.createComparator(key.getClass());
-                }
                 java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                         : null;
                 if (cmp(object, key, this.hi) < 0){
@@ -2998,9 +2962,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         }
         
         TreeMap.Entry<K, V> findHigherEntryImpl(K key) {
-            if ( m.comparator == null && NumberComparator.isNumber(key)){
-                m.comparator = NumberComparator.createComparator(key.getClass());
-            }
             java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                     : null;
             K keyK = (K) key;
@@ -3474,9 +3435,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
 
         @Override
         public Map.Entry<K, V> ceilingEntry(K key) {
-            if ( m.comparator == null && NumberComparator.isNumber(key)){
-                m.comparator = NumberComparator.createComparator(key.getClass());
-            }
             java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                     : null;
             TreeMap.Entry<K, V> entry = null;
@@ -3493,9 +3451,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
 
         @Override
         public Map.Entry<K, V> floorEntry(K key) {
-            if ( m.comparator == null && NumberComparator.isNumber(key)){
-                m.comparator = NumberComparator.createComparator(key.getClass());
-            }
             java.lang.Comparable<K> object = m.comparator == null ? toComparable((K) key)
                     : null;
             TreeMap.Entry<K, V> entry = null;
@@ -3828,9 +3783,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
     @SuppressWarnings("unchecked")
     @Override
     public boolean containsKey(Object key) {
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -3932,9 +3884,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
 
     @SuppressWarnings("unchecked")
     Entry<K, V> find(Object keyObj) {
-        if ( comparator == null && NumberComparator.isNumber(keyObj)){
-            comparator = NumberComparator.createComparator(keyObj.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) keyObj)
                 : null;
         K keyK = (K) keyObj;
@@ -4009,9 +3958,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         if (root == null) {
             return null;
         }
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -4076,9 +4022,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         if (root == null) {
             return null;
         }
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -4142,9 +4085,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         if (root == null) {
             return null;
         }
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -4201,9 +4141,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
     TreeMap.Entry<K, V> findHigherEntry(K key) {
         if (root == null) {
             return null;
-        }
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
         }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
@@ -4276,10 +4213,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
     }
 
     Node<K, V> findNode(K key) {
-                if ( comparator == null && NumberComparator.isNumber(key)){
-                    comparator = NumberComparator.createComparator(key.getClass());
-                }
-		java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
+                java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
 				: null;
 		K keyK = (K) key;
 		Node<K, V> node = root;
@@ -4321,9 +4255,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
     @SuppressWarnings("unchecked")
     @Override
     public V get(Object key) {
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -4486,9 +4417,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             modCount++;
             return null;
         }    
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key)
                 : null;
         K keyK = (K) key;
@@ -4888,9 +4816,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
     @SuppressWarnings("unchecked")
     @Override
     public V remove(Object key) {
-        if ( comparator == null && NumberComparator.isNumber(key)){
-            comparator = NumberComparator.createComparator(key.getClass());
-        }
         java.lang.Comparable<K> object = comparator == null ? toComparable((K) key) : null;
         if (size == 0) {
             return null;
@@ -5638,9 +5563,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
      *             the specified range is outside of its range.
      */
     public SortedMap<K, V> subMap(K startKey, K endKey) {
-        if ( comparator == null && NumberComparator.isNumber(startKey)){
-            comparator = NumberComparator.createComparator(startKey.getClass());
-        }
         if (comparator == null) {
             if (toComparable(startKey).compareTo(endKey) <= 0) {
                 return new SubMap<K, V>(startKey, this, endKey);

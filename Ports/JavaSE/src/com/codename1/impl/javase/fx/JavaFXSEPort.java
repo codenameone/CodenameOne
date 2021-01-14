@@ -12,6 +12,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import static com.codename1.impl.javase.JavaSEPort.checkForPermission;
 import static com.codename1.impl.javase.JavaSEPort.retinaScale;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.media.AbstractMedia;
 import com.codename1.media.AsyncMedia;
 import com.codename1.media.Media;
@@ -22,6 +23,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.AsyncResource;
@@ -1046,6 +1048,20 @@ public class JavaFXSEPort extends JavaSEPort {
 
         }
     }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public AsyncResource<Image> captureBrowserScreenshot(PeerComponent browserPeer) {
+        if (!(browserPeer instanceof SEBrowserComponent)) {
+            return null;
+        }
+        SEBrowserComponent sebc = (SEBrowserComponent)browserPeer;
+        return sebc.captureScreenshot();
+    }
+    
+    
     
     public PeerComponent createFXBrowserComponent(final Object parent) {
         java.awt.Container cnt = canvas.getParent();
@@ -1071,6 +1087,7 @@ public class JavaFXSEPort extends JavaSEPort {
             public void run() {
                 StackPane root = new StackPane();
                 final WebView webView = new WebView();
+                
                 root.getChildren().add(webView);
                 webContainer.setScene(new Scene(root));
                 
@@ -1099,20 +1116,16 @@ public class JavaFXSEPort extends JavaSEPort {
             }
         });
         if (bc[0] == null && err[0] == null) {
+
             Display.getInstance().invokeAndBlock(new Runnable() {
 
-            @Override
-            public void run() {
-                synchronized (bc) {
-                    while (bc[0] == null && err[0] == null) {
-                        try {
-                            bc.wait(20);
-                        } catch (InterruptedException ex) {
-                        }
+                @Override
+                public void run() {
+                    while (bc[0] == null && err[0] == null) {	
+                        Util.wait(bc, 20);		
                     }
                 }
-            }
-        });
+            });
         }
         
         return bc[0];

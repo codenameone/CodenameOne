@@ -10,6 +10,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.ImageObserver;
+import java.lang.ref.WeakReference;
 
 /**
  *
@@ -18,7 +19,7 @@ import java.awt.image.ImageObserver;
 public class PeerComponentBuffer {
     private BufferedImage bufferedImage_;
     private Object lock = new Object();
-    private Peer peer;
+    private WeakReference<Peer> peerRef;
     
     public void paint(Graphics2D g, ImageObserver obs) {
         BufferedImage img;
@@ -45,12 +46,14 @@ public class PeerComponentBuffer {
     }
     
     public void repaint() {
+        Peer peer = peerRef.get();
         if (peer != null) {
             peer.repaint();
         }
     }
     
     public void repaint(int x, int y, int w, int h) {
+        Peer peer = peerRef.get();
         if (peer != null) {
             double scale = JavaSEPort.instance.zoomLevel;
             peer.repaint((int)(peer.getAbsoluteX()+x/scale), (int)(peer.getAbsoluteY()+y/scale), (int)((w+1)/scale), (int)((h+1)/scale));
@@ -59,7 +62,7 @@ public class PeerComponentBuffer {
     }
     
     public void setPeer(Peer peer) {
-        this.peer = peer;
+        this.peerRef = new WeakReference<Peer>(peer);
     }
     
     public void modifyBuffer(Runnable r) {

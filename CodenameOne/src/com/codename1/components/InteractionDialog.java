@@ -294,7 +294,7 @@ public class InteractionDialog extends Container {
                     p.remove();
                 }
                 //pp.removeAll();
-                pp.revalidateWithAnimationSafety();
+                pp.revalidateLater();
                 cleanupLayer(f);
             }
         }
@@ -678,6 +678,7 @@ public class InteractionDialog extends Container {
         rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
         rect.setY(rect.getY() - getLayeredPane(f).getAbsoluteY());
         disposed = false;
+        pressedOutOfBounds = false;
         getUnselectedStyle().setOpacity(255);
         if(getUIID().equals("Dialog")) {
             setUIID("PopupDialog");
@@ -786,9 +787,10 @@ public class InteractionDialog extends Container {
             if(rect.getY() + rect.getHeight() < availableHeight / 2) {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
-                int height = Math.min(prefHeight, availableHeight - y);
+                int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
                 padOrientation(contentPaneStyle, TOP, 1);
-                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                show(y, Math.max(0, availableHeight - height - y), 
+                        Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
             } else if (rect.getY() > availableHeight / 2){
                 // popup upwards
@@ -803,14 +805,16 @@ public class InteractionDialog extends Container {
                 
                 int height = Math.min(prefHeight, availableHeight - y);
                 padOrientation(contentPaneStyle, BOTTOM, 1);
-                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                show(y, Math.max(0, availableHeight - height - y), 
+                        Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, BOTTOM, -1);
             } else {
                 // popup over aligned with bottom of rect but inset a few mm
                 y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
                 int height = prefHeight;
                 padOrientation(contentPaneStyle, TOP, 1);
-                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                show(y, Math.max(0, availableHeight - height - y), 
+                        Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
             }
         } else {

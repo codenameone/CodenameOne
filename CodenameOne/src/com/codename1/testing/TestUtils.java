@@ -43,6 +43,7 @@ import com.codename1.ui.spinner.GenericSpinner;
 import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
 import java.util.ArrayList;
+import com.codename1.compat.java.util.Objects;
 
 /**
  * Various utility classes to automate UI testing
@@ -1231,7 +1232,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected.equals(actual), "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(Objects.equals(expected, actual), "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1242,7 +1243,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected.equals(actual), errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(Objects.equals(expected, actual), errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1380,7 +1381,10 @@ public class TestUtils {
         if(verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ")");
         }
-        TestUtils.assertBool(!expected.equals(actual));
+        if (Objects.equals(expected, actual)) {
+            TestUtils.fail("Assertion failed.  Expected not equal, but found that "+expected+" equals "+actual);
+        }
+        
     }
 
     /**
@@ -1391,7 +1395,9 @@ public class TestUtils {
         if(verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        TestUtils.assertBool(!expected.equals(actual), errorMessage);
+        if (Objects.equals(expected, actual)) {
+            TestUtils.fail("Assertion failed.  Expected not equal, but found that "+expected+" equals "+actual+".  "+errorMessage);
+        }
     }
 
     /**

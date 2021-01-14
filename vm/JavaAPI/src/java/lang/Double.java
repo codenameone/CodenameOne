@@ -28,6 +28,8 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.1
  */
 public final class Double extends Number implements Comparable<Double> {
+    
+    public static final Class<Double> TYPE = double.class;
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values
@@ -37,7 +39,7 @@ public final class Double extends Number implements Comparable<Double> {
     /**
      * The smallest positive value of type double. It is equal to the value returned by Double.longBitsToDouble(0x1L).
      */
-    public static final double MIN_VALUE=0.0d;
+    public static final double MIN_VALUE=0x0.0000000000001P-1022;
 
     /**
      * A Not-a-Number (NaN) value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7ff8000000000000L).
@@ -56,6 +58,10 @@ public final class Double extends Number implements Comparable<Double> {
      * See Also:Constant Field Values
      */
     public static final double POSITIVE_INFINITY=1d/0d;
+    
+    public static final int MAX_EXPONENT = 1023;
+    public static final int MIN_EXPONENT = -1022;
+    public static final int SIZE = 64;
 
     private double value;
     
@@ -97,10 +103,26 @@ public final class Double extends Number implements Comparable<Double> {
      * Note that in most cases, for two instances of class Double, d1 and d2, the value of d1.equals(d2) is true if and only if
      * d1.doubleValue()
      * == d2.doubleValue()
-     * also has the value true. However, there are two exceptions: If d1 and d2 both represent Double.NaN, then the equals method returns true, even though Double.NaN==Double.NaN has the value false. If d1 represents +0.0 while d2 represents -0.0, or vice versa, the equals test has the value false, even though +0.0==-0.0 has the value true. This allows hashtables to operate properly.
+     * also has the value true. However, there are two exceptions: If d1 and d2 both represent Double.NaN, then the equals method returns true, even though Double.NaN==Double.NaN has the value false. 
+     * If d1 represents +0.0 while d2 represents -0.0, or vice versa, the equals test has the value false, even though +0.0==-0.0 has the value true. This allows hashtables to operate properly.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Double)obj).value == value;
+        if (obj == null || !(obj.getClass().equals(Double.class))) {
+            return false;
+        }
+        
+        Double d = (Double)obj;
+        if (d.isNaN() && isNaN()) {
+            // Exception #1.  If both doubles represent NaN, then they are treated equal here
+            // even though NaN!=NaN
+            return true;
+        }
+        if (value == 0.0 && d.value == 0.0) {
+            // Exception #2. If one Double represents -0.0 and the other represents +0.0, then
+            // they should be Not equal even though +0.0==-0.0
+            return doubleToLongBits(d.value) == doubleToLongBits(value);
+        }
+        return d.value == value;
     }
 
     /**
@@ -228,12 +250,14 @@ public final class Double extends Number implements Comparable<Double> {
      */
     public static java.lang.String toString(double d){
         double m = Math.abs(d);
-        if ( d == POSITIVE_INFINITY ){
+        if (isNaN(d)) {
+            return "NaN";
+        } else if ( d == POSITIVE_INFINITY ){
             return "Infinity";
         } else if ( d == NEGATIVE_INFINITY ){
             return "-Infinity";
         } else if ( d == 0 ){
-            return "0.0";
+            return doubleToLongBits(d) == POSITIVE_ZERO_BITS ? "0.0" : "-0.0";
         } else if ( m >= 1e-3 && m < 1e7 ){
             String str = toStringImpl(d, false);
             char[] chars = str.toCharArray();
@@ -283,17 +307,37 @@ public final class Double extends Number implements Comparable<Double> {
         return new Double(i);
     }
 
+    
+    private static final long POSITIVE_ZERO_BITS = doubleToLongBits(0.0);
+    private static final long NEGATIVE_ZERO_BITS = doubleToLongBits(-0.0);
+    
+    
     public static int compare(double f1, double f2) {
-        if(f1 == f2) {
+        if (isNaN(f1) && isNaN(f2)) {
             return 0;
-        }
-        if(f1 > f2) {
+        } else if (isNaN(f1)) {
+            return 1;
+        } else if (isNaN(f2)) {
             return -1;
+        } else if (f1 == 0.0 && f2 == 0.0) {
+            long f1bits = doubleToLongBits(f1);
+            long f2bits = doubleToLongBits(f2);
+            return f1bits == f2bits ? 0 :
+                    f1bits == NEGATIVE_ZERO_BITS ? -1 : 1;
+        } else {
+            return f1 < f2 ? -1 : f1 > f2 ? 1 : 0;
         }
-        return 1;
+        
+        
     }
 
+    /**
+     * Double.NaN is considered by this method to be equal to itself and greater than all other double values (including Double.POSITIVE_INFINITY).
+     * 
+     * 0.0d is considered by this method to be greater than -0.0d.
+     * 
+    */
     public int compareTo(Double another) {
-        return value < another.value ? -1 : value > another.value ? 1 : 0;
+        return compare(value, another.value);
     }
 }

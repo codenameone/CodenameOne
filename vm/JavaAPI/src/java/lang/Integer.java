@@ -28,6 +28,9 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0
  */
 public final class Integer extends Number implements Comparable<Integer> {
+    
+    public static final Class<Integer> TYPE = int.class;
+    
     private static final char[] DIGITS = {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
@@ -136,6 +139,10 @@ public final class Integer extends Number implements Comparable<Integer> {
         }
         boolean negative = string.charAt(i) == '-';
         if (negative && ++i == length) {
+            throw invalidInt(string);
+        }
+        boolean positive = string.charAt(i) == '+';
+        if (positive && ++i == length) {
             throw invalidInt(string);
         }
 
@@ -324,10 +331,42 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public static int compare(int f1, int f2) {
-        return f1 - f2;
+        
+        if (f1 > f2) return 1;
+        else if (f1 < f2) return -1;
+        return 0;    
+        
     }
 
     public int compareTo(Integer another) {
         return value < another.value ? -1 : value > another.value ? 1 : 0;
+    }
+    
+     public static int numberOfLeadingZeros(int i) {
+        if (i == 0) {
+            return 32;
+        }
+        int n = 0;
+        if (i >>> 16 != 0) {
+            i >>>= 16;
+            n |= 16;
+        }
+        if (i >>> 8 != 0) {
+            i >>>= 8;
+            n |= 8;
+        }
+        if (i >>> 4 != 0) {
+            i >>>= 4;
+            n |= 4;
+        }
+        if (i >>> 2 != 0) {
+            i >>>= 2;
+            n |= 2;
+        }
+        if (i >>> 1 != 0) {
+            i >>>= 1;
+            n |= 1;
+        }
+        return 32 - n - 1;
     }
 }

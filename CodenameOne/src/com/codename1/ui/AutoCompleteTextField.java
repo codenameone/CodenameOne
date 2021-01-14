@@ -114,7 +114,7 @@ public class AutoCompleteTextField extends TextField {
                     popup.setEnabled(false);
                     Form f = getComponentForm();
                     if (f != null) {
-                        f.revalidateWithAnimationSafety();
+                        f.revalidateLater();
                     }
                 }
             }
@@ -169,11 +169,13 @@ public class AutoCompleteTextField extends TextField {
      */
     public void showPopup() {
         if(shouldShowPopup()) {
+            pressInBounds = true;
             requestFocus();
             int m = minimumLength;
             minimumLength = 0;
-            setText(getText());
+            setTextImpl(getText(), true);
             minimumLength = m;
+            
         }
     }
     
@@ -186,11 +188,17 @@ public class AutoCompleteTextField extends TextField {
      */
     @Override
     public void setText(String text) {
+        setTextImpl(text, false);
+    }
+    
+    private void setTextImpl(String text, boolean forceUpdate) {
         String old = getText();
         super.setText(text);
-        if (text == null || text.equals(old) || (pickedText != null && pickedText.equals(text))) {
-            pickedText = null;
-            return;
+        if (!forceUpdate) {
+            if (text == null || text.equals(old) || (pickedText != null && pickedText.equals(text))) {
+                pickedText = null;
+                return;
+            }
         }
         pickedText = null;
         Form f = getComponentForm();
@@ -330,7 +338,7 @@ public class AutoCompleteTextField extends TextField {
             if (parent != null) {
                 lay.removeComponent(parent);
                 popup.remove();
-                f.revalidateWithAnimationSafety();
+                f.revalidateLater();
             }
             
         }
@@ -554,7 +562,7 @@ public class AutoCompleteTextField extends TextField {
                     if(!pressInBounds && !pop.contains(evt.getX(), evt.getY())){
                         pop.setVisible(false);
                         pop.setEnabled(false);      
-                        f.revalidateWithAnimationSafety();
+                        f.revalidateLater();
                         evt.consume();
                     }else{
                         canOpenPopup = false;

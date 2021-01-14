@@ -23,16 +23,13 @@
  */
 package com.codename1.impl.javase;
 
-import java.awt.EventQueue;
 import java.io.File;
-import java.lang.management.ManagementFactory;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.StringTokenizer;
 
 /**
@@ -77,7 +74,11 @@ public class Simulator {
             System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
         }
         
-        StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
+        String classPathStr = System.getProperty("java.class.path");
+        if (System.getProperty("cn1.class.path") != null) {
+            classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");
+        }
+        StringTokenizer t = new StringTokenizer(classPathStr, File.pathSeparator);
         if(argv.length > 0) {
             System.setProperty("MainClass", argv[0]);
         }
@@ -108,7 +109,8 @@ public class Simulator {
             fxSupported = true;
         } catch (Throwable ex) {}
         boolean fxOnSystemPath = fxSupported;
-        File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
+        
+        File cef = System.getProperty("cef.dir") != null ? new File(System.getProperty("cef.dir")) : new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
         if (cef.exists()) {
             if (isUnix && !is64Bit) {
                 System.out.println("Found CEF, but not using because CEF is only supported on 64 bit platforms.  Try running inside a 64 bit JVM");
@@ -125,7 +127,7 @@ public class Simulator {
                 // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
                 System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
                 for (File jar : cef.listFiles()) {
-                    if (jar.getName().endsWith(".jar")) {
+                    if (jar.getName().endsWith(".jar") && !jar.getName().endsWith("-tests.jar")) {
                         files.add(jar);
                     }
                 }

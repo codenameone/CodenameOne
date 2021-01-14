@@ -5842,12 +5842,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((URLConnection)connection).setReadTimeout(readTimeout);
         }
     }
+    
+    
 
     @Override
     public boolean isReadTimeoutSupported() {
         return true;
     }
     
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        if (insecure) {
+            if (connection instanceof HttpsURLConnection) {
+                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                try {
+                    TrustModifier.relaxHostChecking(conn);
+                } catch (Exception ex) {
+                    com.codename1.io.Log.e(ex);
+                }
+            }
+        }
+    }
     
 
     /**
@@ -6407,6 +6422,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String removeFilePrefix(String file) {
+        if (file.contains("/files//storage/emulated/")) {
+            // TODO: Find a better fix for issue https://github.com/codenameone/CodenameOne/issues/3204
+            // The gallery is returning files inside the directory /storage/emulated/0/DCIM/Camera/...
+            // The path is translated wrong because this path is not listed in any of the root
+            // paths of the file system.
+            // This issue is related to scoped storage. in API 29.
+            // https://stackoverflow.com/questions/56992682/android-9-api-29-storage-emulated-0-pictures-mypic-png-open-failed-eacces
+            // 
+            // This hack works around the problem (and seems to fix it for my test device) by simply
+            // looking for this pattern in the path, and stripping everything before
+            // the /storage/emulated/...
+            // Not good.  Needs to be revisited. - SJH Sept 25, 2020
+            return file.substring(file.indexOf("/files//storage/emulated/")+ 7);
+        }
         if (file.startsWith("file://")) {
             return file.substring(7);
         }

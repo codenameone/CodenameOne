@@ -173,6 +173,32 @@ public class BrowserComponent extends Container {
         this.browserNavigationCallback = callback;
     }
 
+    
+    /**
+     * Async method for capturing a screenshot of the browser content.  Currently only supported
+     * in the simulator.  Also, only displays the visible rectangle of the BrowserComponent,
+     * not the entire page.
+     * @return AsyncResource resolving to an Image of the webview contents.
+     * @since 7.0
+     */
+    public AsyncResource<Image> captureScreenshot() {
+        if (internal != null) {
+            AsyncResource<Image> i = Display.impl.captureBrowserScreenshot(internal);
+            if (i != null) {
+                return i;
+            }
+        }
+        AsyncResource<Image> out = new AsyncResource<Image>();
+        if (internal != null) {
+            out.complete(internal.toImage());
+        } else {
+            out.complete(toImage());
+        }
+        return out;
+    }
+    
+    
+
     /**
      * The browser navigation callback interface allows handling a case where 
      * a URL invocation can be delegated to Java code. This allows binding 
@@ -542,7 +568,7 @@ public class BrowserComponent extends Container {
                 addComponent(BorderLayout.CENTER, internal);
                 
                 onReady();
-                revalidateWithAnimationSafety();
+                revalidateLater();
             }
         });
         onReady(new Runnable() {
@@ -620,7 +646,7 @@ public class BrowserComponent extends Container {
     public AsyncResource<BrowserComponent> ready() {
         return ready(5000);
     }
-    
+
     /**
      * Returns a promise that will complete when the browser component is "ready".  It is considered to be 
      * ready once it has received the start or load event from at least one page.

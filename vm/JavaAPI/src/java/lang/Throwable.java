@@ -128,7 +128,7 @@ public class Throwable{
      * with no error message string, then the name of the actual class of this object is returned.
      */
     public java.lang.String toString(){
-        return getClass().getName() + ": " + message;
+        return getClass().getName() + (message != null ? (": " + message):"");
     }
     
     public final void addSuppressed(Throwable exception){

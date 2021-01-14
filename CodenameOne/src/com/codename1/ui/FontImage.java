@@ -7908,6 +7908,7 @@ public class FontImage extends Image {
      * 
      * @param l a label or subclass (e.g. Button etc.)
      * @param icon one of the MATERIAL_* icons
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setMaterialIcon(Label l, char icon) {
         setMaterialIcon(l, icon, -1);
@@ -7965,13 +7966,14 @@ public class FontImage extends Image {
      * @param font a font with icons
      * @param icon an icon in the font
      * @param size the size of the icon in millimeters, or -1 to use the default height of the font
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char icon, float size) {
         setIcon((IconHolder)l, font, icon, size);
     }
     
     
-        /**
+    /**
      * <p>Applies an icon from the font to the given label using the 
      * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
      * will be set appropriately.</p>
@@ -8024,6 +8026,7 @@ public class FontImage extends Image {
      * in the list for the remaining expected icons.
      * @param size The font size.
      * @since 7.0
+     * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char[] icons, float size) {
         FontImage.setIcon((IconHolder)l, font, icons, size);
@@ -8050,15 +8053,16 @@ public class FontImage extends Image {
             if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
-                b.setRolloverIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
+                b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
             } else {
-                b.setRolloverIcon(null);
+                b.setRolloverPressedIcon(null);
             }
+            
             if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
-                b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(3, icons.length-1)], pre));
+                //b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(3, icons.length-1)], pre));
             } else {
                 b.setPressedIcon(null);
             }

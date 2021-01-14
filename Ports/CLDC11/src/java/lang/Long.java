@@ -28,6 +28,7 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0
  */
 public final class Long extends Number implements Comparable<Long>{
+    public static Class<Long> TYPE = long.class;
     /**
      * The largest value of type long.
      * See Also:Constant Field Values

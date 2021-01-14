@@ -1,0 +1,329 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone</artifactId>
+    <version>7.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>CodenameOne</name>
+    <description>Codename One aggregate project</description>
+    <url>https://www.codenameone.com</url>
+
+    <licenses>
+        <license>
+            <name>GPL v2 With Classpath Exception</name>
+            <url>https://openjdk.java.net/legal/gplv2+ce.html</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>shai</id>
+            <name>Shai Almog</name>
+            <email>shai.almog@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>chen</id>
+            <name>Chen Fishbein</name>
+            <email>chen.fishbein@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>shannah</id>
+            <name>Steve Hannah</name>
+            <email>steve.hannah@codenameone.com</email>
+            <timezone>-8</timezone>
+        </developer>
+    </developers>
+	
+    <scm>
+        <url>https://github.com/codenameone/CodenameOne</url>
+        <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
+    </scm>
+    <!--
+  <distributionManagement>
+      <snapshotRepository>
+        <id>sonatype-nexus-snapshots</id>
+        <name>Sonatype Nexus Snapshots</name>
+        <url>${sonatypeOssDistMgmtSnapshotsUrl}</url>
+      </snapshotRepository>
+      <repository>
+        <id>sonatype-nexus-staging</id>
+        <name>Nexus Release Repository</name>
+        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      </repository>
+    </distributionManagement>-->
+	  
+    <properties>
+        <cn1.version>7.0-SNAPSHOT</cn1.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <sonatypeOssDistMgmtSnapshotsUrl>https://oss.sonatype.org/content/repositories/snapshots/</sonatypeOssDistMgmtSnapshotsUrl>
+	      
+        <java.version>1.8</java.version>
+        <java-tests.version>11</java-tests.version>
+        <rhino.version>1.7.11</rhino.version>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
+    </properties>
+    <modules>
+        <module>java-runtime</module>
+        <module>core</module>
+        <module>factory</module>
+        <module>javase</module>
+        <module>javase-svg</module>
+        <module>android</module>
+        <module>designer</module>
+        <module>codenameone-maven-plugin</module>
+        <module>codenameone-archetypes</module>
+        
+		    
+    </modules>
+		  
+		  
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-factory</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.13.1</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-plugin-api</artifactId>
+                <version>3.3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven.plugin-tools</groupId>
+                <artifactId>maven-plugin-annotations</artifactId>
+                <version>3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-core</artifactId>
+                <version>3.3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-artifact</artifactId>
+                <version>3.3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.ant</groupId>
+                <artifactId>ant</artifactId>
+                <version>1.10.9</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>stubber</artifactId>
+                <version>6.0.0</version>
+                <type>pom</type>
+            </dependency>
+           
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-buildclient</artifactId>
+                <version>${project.version}</version>
+               
+            </dependency>
+
+                  
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase</artifactId>
+                <version>${project.version}</version>
+                
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>java-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
+            <dependency>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.twdata.maven</groupId>
+                <artifactId>mojo-executor</artifactId>
+                <version>2.3.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-invoker-plugin</artifactId>
+                <version>3.2.1</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.7</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                <version>1.9</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.guardsquare</groupId>
+                <artifactId>proguard-core</artifactId>
+                <version>7.0.1</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.guardsquare/proguard-base -->
+            <dependency>
+                <groupId>com.guardsquare</groupId>
+                <artifactId>proguard-base</artifactId>
+                <version>7.0.1</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+    
+			
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.0.1</version>
+                    <executions>
+                        <execution>
+                            <id>build-javadoc</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                            <phase>post-integration-test</phase>
+                            <configuration>
+                                <quiet>true</quiet>
+                            </configuration>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <show>protected</show>
+                        <failOnError>false</failOnError>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.0.1</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <phase>post-integration-test</phase>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>2.21.0</version>
+                </plugin>
+			        
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.0.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>3.1.1</version>
+                </plugin>
+                <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-invoker-plugin -->
+                <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>1.7</version>
+                
+        </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+    <distributionManagement>
+        <repository>
+            <id>bintray-codenameone-codenameone</id>
+            <name>codenameone-codenameone</name>
+            <url>https://api.bintray.com/maven/codenameone/codenameone/CodenameOne/;publish=1</url>
+        </repository>
+    </distributionManagement>
+			
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-guardsquare-proguard</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/guardsquare/proguard</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray-plugins</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <profiles>
+        <profile>
+            <id>build-client</id>
+            <modules>
+                <module>build-client</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>tests</id>
+            <modules>
+                <module>tests/core-tests</module>
+                <module>tests/signindemo</module>
+                <module>tests/testnativeinterfaces</module>
+            </modules>
+        
+        </profile>
+    </profiles>
+    
+
+</project>

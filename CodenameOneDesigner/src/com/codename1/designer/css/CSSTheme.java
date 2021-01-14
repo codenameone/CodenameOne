@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
  */
 package com.codename1.designer.css;
 
@@ -59,8 +76,7 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.scene.paint.Color;
-import javafx.scene.web.WebView;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.metadata.IIOMetadata;
@@ -510,12 +526,12 @@ public class CSSTheme {
             if (linearGradientFunc == null) {
                 return;
             }
-            //System.out.println("Step 2");
+            
             ScaledUnit params = (ScaledUnit)linearGradientFunc.getParameters();
             if (params == null) {
                 return;
             }
-            //System.out.println("Step 3");
+            
             
             ScaledUnit param1 = params;
             switch (param1.getLexicalUnitType()) {
@@ -602,7 +618,7 @@ public class CSSTheme {
             if (param2 == null) {
                 return;
             }
-            //System.out.println("Step 4");
+            
             if (param2.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                 param2 = (ScaledUnit)param2.getNextLexicalUnit();
             }
@@ -626,7 +642,7 @@ public class CSSTheme {
                     System.err.println("Expected color for 2nd parameter of linear-gradient");
                     return;
             }
-            //System.out.println("Stemp 5");
+            
             ScaledUnit param3 = (ScaledUnit)param2.getNextLexicalUnit();
             if (param3 == null) {
                 return;
@@ -637,7 +653,7 @@ public class CSSTheme {
             if (param3 == null) {
                 return;
             }
-            //System.out.println("Step 6");
+            
             switch (param3.getLexicalUnitType()) {
                 case LexicalUnit.SAC_IDENT:
                 case LexicalUnit.SAC_FUNCTION:
@@ -659,11 +675,14 @@ public class CSSTheme {
                     
                     
                 default: 
-                    System.err.println("Expecting color for param 3 of linear-gradient");
+                    System.err.println("Error processing background rule "+background+" for selector "+currentId);
+                    System.err.println("Expecting color for param 3 of linear-gradient but found "+param3+" of type "+param3.getLexicalUnitType());
+                    System.err.println("This gradient will need to be generated as an image border, which will slow down CSS compilation.");
+                    //new RuntimeException("Error processing background rule "+background).printStackTrace(System.err);
                     return;
             }
            
-            //System.out.println("Step 8");
+            
             this.startColor = startColor;
             this.endColor = endColor;
             this.type = gradientType;
@@ -677,7 +696,7 @@ public class CSSTheme {
                 0f,
                 0f
             };
-            System.out.println("Gradient: "+Arrays.toString(out));
+            
             */
             
         }
@@ -878,8 +897,8 @@ public class CSSTheme {
                             
                 gradient = new CN1Gradient();
                 gradient.parse(this);
-                if (!gradient.valid) {
-                    System.err.println("Gradient not valid: "+gradient.reason);
+                if (!gradient.valid && gradient.reason != null) {
+                    System.err.println("Selector with id "+currentId+" Gradient not valid: "+gradient.reason);
                 }
                
             }
@@ -1328,7 +1347,11 @@ public class CSSTheme {
     
     public String generateCaptureHtml() {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!doctype html>\n<html><base href=\""+baseURL.toExternalForm()+"\"/> <head><style type=\"text/css\">body {padding:0; margin:0} div.element {margin: 0 !important; padding: 0 !important; }</style></head><body>");
+        sb.append("<!doctype html>\n<html>"
+                + "<head><style type=\"text/css\">* {background-color: transparent;} "
+                + "body {padding:0; margin:0} "
+                + "div.element {margin: 0 !important; padding: 0 !important; }"
+                + "</style></head><body>");
         for (String name : elements.keySet()) {
             if (!isModified(name)) {
                 continue;
@@ -1362,7 +1385,7 @@ public class CSSTheme {
         Map<String,String> out = new LinkedHashMap<String,String>();
         for (String id : elements.keySet()) {
             Element el = elements.get(id);
-            //System.out.println("Checksum("+id+") is "+el.getChecksum());
+            
             out.put(id, el.getChecksum());
         }
        
@@ -1370,15 +1393,21 @@ public class CSSTheme {
     }
     
     public void saveSelectorChecksums(File output) throws FileNotFoundException, IOException {
+        
         try (ObjectOutputStream fos = new ObjectOutputStream(new FileOutputStream(output))) {
             fos.writeObject(calculateSelectorChecksums());
         }
     }
     
     public Map<String, String> loadSelectorChecksums(File input) throws FileNotFoundException, IOException, ClassNotFoundException {
+        Map<String,String> out;
         try (ObjectInputStream fis = new ObjectInputStream(new FileInputStream(input))) {
-            return (Map<String,String>)fis.readObject();
+            out = (Map<String,String>)fis.readObject();
         }
+        
+        
+        return out;
+        
     }
     
     public static enum CacheStatus {
@@ -1426,21 +1455,24 @@ public class CSSTheme {
             String selectedDerive = el.getThemeDerive(el.getFlattenedSelectedStyle(), "");
             String pressedDerive = el.getThemeDerive(el.getFlattenedPressedStyle(), "");
             String disabledDerive = el.getThemeDerive(el.getFlattenedDisabledStyle(), "");
-            if (derive != null && isModified(derive)) {
+            if (derive != null && selectorCacheStatus.containsKey(derive) &&  isModified(derive)) {
+                
                 return true;
             }
-            if (unselectedDerive != null && isModified(unselectedDerive)) {
+            if (unselectedDerive != null && selectorCacheStatus.containsKey(unselectedDerive) && isModified(unselectedDerive)) {
+                
                 return true;
             }
-            if (selectedDerive != null && isModified(selectedDerive)) {
+            if (selectedDerive != null && selectorCacheStatus.containsKey(selectedDerive) && isModified(selectedDerive)) {
                 return true;
             }
-            if (pressedDerive != null && isModified(pressedDerive)) {
+            if (pressedDerive != null && selectorCacheStatus.containsKey(pressedDerive) && isModified(pressedDerive)) {
                 return true;
             }
-            if (disabledDerive != null && isModified(disabledDerive)) {
+            if (disabledDerive != null && selectorCacheStatus.containsKey(disabledDerive) && isModified(disabledDerive)) {
                 return true;
             }
+            
             return false;
         }
         return true;
@@ -1672,10 +1704,10 @@ public class CSSTheme {
                 currToken = "disabled opacity";
                 res.setThemeProperty(themeName, disabledId+"#opacity", el.getThemeOpacity(disabledStyles));
 
-               //System.out.println("Checking if background image is here for "+unselectedStyles);
+               
                currToken = "bgImage";
                if (el.hasBackgroundImage(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles) && !el.requiresImageBorder(unselectedStyles)) {
-                   //System.out.println("Getting background image... it is here"); 
+                   
                    Image[] imageId = getBackgroundImages(unselectedStyles);
                     if (imageId != null && imageId.length > 0) {
 
@@ -1745,7 +1777,6 @@ public class CSSTheme {
                             im = getResourceImage(lu.getStringValue());
                         }
                         if (im == null) {
-                            //System.out.println(Arrays.toString(res.getImageResourceNames()));
                             System.err.println("Error processing file "+this.baseURL);
                             throw new RuntimeException("Failed to set constant value "+constantKey+" to value "+ lu.getStringValue()+" because no such image was found in the resource file");
                         }
@@ -1820,7 +1851,6 @@ public class CSSTheme {
                     }
                 }
             }
-            //System.out.println("Referenced names "+referencedImageNames);
         }
         return referencedImageNames.contains(imageName);
     }
@@ -1833,7 +1863,6 @@ public class CSSTheme {
             }
         }
         
-        //System.out.println("Unused images: "+images);
         for (String im : images) {
             res.remove(im);
         }
@@ -1924,7 +1953,6 @@ public class CSSTheme {
             xDPI = Math.round(25.4f / Float.parseFloat(item.getNodeValue()) / 0.45f);
             
         } else {
-            //System.out.println("xDPI: -");
         }
         if (nodes.getLength() > 0) {
             nodes = root.getElementsByTagName("VerticalPixelSize");
@@ -1932,9 +1960,6 @@ public class CSSTheme {
             NamedNodeMap nnm = dpcHeight.getAttributes();
             Node item = nnm.item(0);
             yDPI = Math.round(25.4f / Float.parseFloat(item.getNodeValue()) / 0.45f);
-            //System.out.println("yDPI: " + yDPI);
-        } else {
-            //System.out.println("yDPI: -");
         }
 
         return new int[]{xDPI, yDPI};
@@ -2268,7 +2293,6 @@ public class CSSTheme {
             
             
             if (styles.containsKey("cn1-source-dpi")) {
-                //System.out.println("Using cn1-source-dpi "+styles.get("cn1-source-dpi").getFloatValue());
                 double densityVal = ((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
                 sourceDpi = (int)Math.round(densityVal);
                 if (Math.abs(densityVal) < 0.5) {
@@ -2294,13 +2318,9 @@ public class CSSTheme {
             
             
             
-            //System.out.println("Target density for image is "+resm.targetDensity);
-            
-            //System.out.println("Loading image from "+url+" with density "+resm.targetDensity);
+
             Image im = resm.storeImage(encImg, imageIdStr, false);
             im.setImageName(imageIdStr);
-            //System.out.println("Finished storing image "+url);
-            //System.out.println("Storing image "+url+" at id "+imageIdStr);
             loadedImages.put(url, im);
             ImageMetadata md = new ImageMetadata(imageIdStr, sourceDpi);
             imagesMetadata.addImageMetadata(md);
@@ -2331,9 +2351,9 @@ public class CSSTheme {
     }
     
     public static interface WebViewProvider {
-        WebView getWebView();
+        com.codename1.ui.BrowserComponent getWebView();
     }
-    
+    private static String currentId;
     public void createImageBorders(WebViewProvider webviewProvider) {
         if (res == null) {
             res = new EditableResourcesForCSS(resourceFile);
@@ -2347,10 +2367,7 @@ public class CSSTheme {
         List<Runnable> onComplete = new ArrayList<Runnable>();
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
-                //System.out.println("id "+id+" not modified in createImageBorders");
                 continue;
-            } else {
-                //System.out.println("id "+id +" IS modified in createImageBorders");
             }
             Element e = (Element)elements.get(id);
             
@@ -2358,13 +2375,13 @@ public class CSSTheme {
             Map<String,LexicalUnit> unselectedStyles = (Map<String,LexicalUnit>)unselected.getFlattenedStyle();
             Border b = unselected.createBorder(unselectedStyles);
             Border unselectedBorder = b;
+            currentId = id;
             if (e.requiresImageBorder(unselectedStyles)) {
                 if (!borders.contains(b)) {
                     borders.add(b);
                     resm.addImageProcessor(id, (img) -> {
                         
                         Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
-                        //System.out.println("Creating 9 piece for image "+img.getWidth()+", "+img.getHeight()+" with insets "+insets.top+", "+insets.right+","+insets.bottom+","+insets.left);
                         resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
                         com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
                         resm.put(id+".border", border);
@@ -2386,7 +2403,6 @@ public class CSSTheme {
                             i++;
                         }
                         String prefix = id + "_" + i + ".png";
-                        //System.out.println("Generating image "+prefix);
                         resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
                         Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
                         unselectedBorder.image = im;
@@ -2431,7 +2447,7 @@ public class CSSTheme {
                             i++;
                         }
                         String prefix = id + "_" + i + ".png";
-                        //System.out.println("Generating image "+prefix);
+
                         resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
                         Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
                         selectedBorder.image = im;
@@ -2448,7 +2464,7 @@ public class CSSTheme {
             
             Element pressed = e.getPressed();
             Map<String,LexicalUnit> pressedStyles = (Map<String,LexicalUnit>)pressed.getFlattenedStyle();
-            //System.out.println("Pressed styles "+pressedStyles);
+            
             b = pressed.createBorder(pressedStyles);
             Border pressedBorder = b;
             if (e.requiresImageBorder(pressedStyles)) {
@@ -2456,7 +2472,7 @@ public class CSSTheme {
                     borders.add(b);
                     resm.addImageProcessor(id+".press", (img) -> {
                         Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
-                        //System.out.println("Getting pressed images with insets "+insets);
+                        
                         resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
                         com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
                         
@@ -2495,7 +2511,7 @@ public class CSSTheme {
             
             Element disabled = e.getDisabled();
             Map<String,LexicalUnit> disabledStyles = (Map<String,LexicalUnit>)disabled.getFlattenedStyle();
-            //System.out.println(id+" disabled "+disabledStyles);
+            
             b = disabled.createBorder(disabledStyles);
             Border disabledBorder = b;
             if (e.requiresImageBorder(disabledStyles)) {
@@ -2541,14 +2557,14 @@ public class CSSTheme {
             }
             
         }
-        //System.out.println(generateCaptureHtml());
+        
         if (requiresCaptureHtml()) {
             resm.createScreenshots(webviewProvider.getWebView(), generateCaptureHtml(), this.baseURL.toExternalForm());
         }
         for (Runnable r : onComplete) {
             r.run();
         }
-        //System.out.println(res.getTheme("Theme"));
+        
     }
     
     public void save(File outputFile) throws IOException {
@@ -2666,7 +2682,7 @@ public class CSSTheme {
                 if (u != null && u.getPixelValue() != 0) {
                     if (val != null && val.getPixelValue() != u.getPixelValue()) {
                         // We have more than one non-zero corner radius
-                        //System.out.println("Failed corner test");
+                        
                         return false;
                         
                     }
@@ -2697,7 +2713,7 @@ public class CSSTheme {
                 ScaledUnit uWidth = (ScaledUnit)styles.get(widthAtt);
                 if (uWidth != null) {
                     if (borderWidthSet && uWidth.getPixelValue() != borderWidth) {
-                        ///System.out.println("Failed the width test");
+                        
                         return false;
                     }
                     borderWidthSet = true;
@@ -2709,7 +2725,7 @@ public class CSSTheme {
                 LexicalUnit uColor = styles.get(colorAtt);
                 if (uColor != null) {
                     if (borderColorSet && (getColorInt(uColor) != colorInt || getColorAlphaInt(uColor) != alphaInt)) {
-                        //System.out.println("Failed the color test");
+                        
                         return false;
                     } 
                     borderColorSet = true;
@@ -2718,7 +2734,7 @@ public class CSSTheme {
                 }
             }
             
-            //System.out.println("Can be achieved");
+            
             // We should be able to achieve this with a roundrect border
             return true;
             
@@ -2902,7 +2918,7 @@ public class CSSTheme {
                     .append(";SELECTED=").append(this.getFlattenedSelectedStyle())
                     .append(";PRESSED=").append(this.getFlattenedPressedStyle())
                     .append(";DISABLED=").append(this.getFlattenedDisabledStyle());
-            //System.out.println(sb);
+            
             return generateMD5(sb.toString());
         }
         
@@ -2916,18 +2932,18 @@ public class CSSTheme {
                     boxShadow = tmp;
                 }
             }
-            //System.out.println("Trying to get box shadow: "+boxShadow);
+            
             
             if (isNone(boxShadow)) {
                 return i;
             }
             
-            //System.out.println("It is not none "+boxShadow);
+            
             
             ScaledUnit insetUnit = boxShadow;
             while (insetUnit != null) {
                 if ("inset".equals(insetUnit.getStringValue())) {
-                    //System.out.println("it is inset");
+                    
                     return i;
                 }
                 insetUnit = (ScaledUnit)insetUnit.getNextLexicalUnit();
@@ -2935,7 +2951,7 @@ public class CSSTheme {
             
             
             double hShadow = boxShadow.getPixelValue();
-            //System.out.println("hShadow is "+hShadow);
+            
             boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
             
             double vShadow = boxShadow.getPixelValue();
@@ -3025,7 +3041,7 @@ public class CSSTheme {
             if (this.isSelectedStyle() || this.isDisabledStyle() || this.isDisabledStyle() || this.isUnselectedStyle()) {
                 self = this.parent;
             }
-            //System.out.println("Setting parent of "+self+" to "+name);
+            
             self.parent = parentEl;
         }
         
@@ -3362,19 +3378,16 @@ public class CSSTheme {
          * @return 
          */
 //        int tryGetCN1GradientType(Map<String, LexicalUnit> styles) {
-//            //System.out.println("Trying to get gradient type");
 //            LexicalUnit background = styles.get("background");
 //            if (background == null) {
 //                return -1;
 //            }
-//            //System.out.println("Step 1");
 //            int gradientType = -1;
 //            if (background.getFunctionName() != null && background.getFunctionName().equals("linear-gradient")) {
 //                ScaledUnit params = (ScaledUnit)background.getParameters();
 //                if (params == null) {
 //                    return -1;
 //                }
-//                //System.out.println("Step 2");
 //                switch (params.getLexicalUnitType()) {
 //                    case LexicalUnit.SAC_DEGREE:
 //                    case LexicalUnit.SAC_RADIAN:
@@ -3413,7 +3426,6 @@ public class CSSTheme {
 //                if (params == null) {
 //                    return -1;
 //                }
-//                //System.out.println("Step 3");
 //                switch (params.getLexicalUnitType()) {
 //                    case LexicalUnit.SAC_FUNCTION:
 //                    case LexicalUnit.SAC_IDENT:
@@ -3425,8 +3437,7 @@ public class CSSTheme {
 //                        System.err.println("2nd param for linear-gradient needs to be a color but found "+params+" type "+params.getLexicalUnitType());
 //                        return -1;
 //                }
-//                //System.out.println("gradientType so far is "+gradientType);
-//                //System.out.println("Params is "+params);
+
 //                params = (ScaledUnit)params.getNextLexicalUnit();
 //                if (params == null) {
 //                    
@@ -3438,7 +3449,7 @@ public class CSSTheme {
 //                if (params == null) {
 //                    return -1;
 //                }
-//                //System.out.println("Step 4");
+
 //                switch (params.getLexicalUnitType()) {
 //                    case LexicalUnit.SAC_FUNCTION:
 //                    case LexicalUnit.SAC_IDENT:
@@ -3450,7 +3461,7 @@ public class CSSTheme {
 //                }
 //                
 //            }
-//            //System.out.println("And gradient type is "+gradientType);
+
 //            return gradientType;
 //        
 //        
@@ -3511,7 +3522,7 @@ public class CSSTheme {
             if (!isNone(borderBottomWidth)) {
                 i.bottom = borderBottomWidth.getPixelValue();
             }
-            //System.out.println("Border insets "+i);
+            
             return i;
         }
         
@@ -3657,7 +3668,7 @@ public class CSSTheme {
                 i.right = width/2-1;
             }
             
-            //System.out.println("Insets for 9-piece border: "+i);
+            
             //i.top = 10;
             //i.bottom = 10;
             //i.left = 10;
@@ -4292,7 +4303,7 @@ public class CSSTheme {
                                 /*
                                 if (fontFile != null) {
                                     Font sys = Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-                                    //System.out.println("TTF Font "+fontFile+" "+ttfFontSize + " " +actualSize + " "+sys);
+                                    
                                     ttfFont = new EditorTTFFont(fontFile, ttfFontSize, actualSize, sys);
                                     break loop;
                                 }
@@ -4647,7 +4658,7 @@ public class CSSTheme {
 
 
 
-            //System.out.println("Round border: "+out.getShadowX()+", "+out.getShadowY()+", "+out.getShadowSpread()+", "+out.getShadowOpacity());
+            
             return out;
         }
         
@@ -4673,7 +4684,7 @@ public class CSSTheme {
             
             for (String cornerStyle : radiusAtts) {
                 ScaledUnit u = (ScaledUnit)styles.get(cornerStyle);
-                //System.out.println("Checking corner style "+cornerStyle+" with value "+u);
+                
                 if (u != null && u.getPixelValue() != 0) {
                     return u;
                 }
@@ -4818,13 +4829,13 @@ public class CSSTheme {
             }
             
             ScaledUnit borderImage = (ScaledUnit)styles.get("border-image");
-            //System.out.println("Border image "+borderImage);
+            
             if (!isNone(borderImage)) {
                 Image img = getBorderImage(styles);
                 ScaledUnit sliceUnit = (ScaledUnit)styles.get("border-image-slice");
                 List<Double> slices = new ArrayList<>();
                 while (!isNone(sliceUnit)) {
-                    //System.out.println("Found next unit "+sliceUnit);
+                    
                     
                     if (sliceUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                         slices.add(sliceUnit.getNumericValue() / 100.0);
@@ -4834,7 +4845,7 @@ public class CSSTheme {
                     sliceUnit = (ScaledUnit)sliceUnit.getNextLexicalUnit();
                     
                 }
-                //System.out.println("Slices: "+slices);
+                
                 if (slices.isEmpty()) {
                     slices.add(0.4);
                 }
@@ -4871,8 +4882,8 @@ public class CSSTheme {
             ScaledUnit topRightRadius = getBorderRadius(styles, "top-right");
             ScaledUnit bottomLeftRadius = getBorderRadius(styles, "bottom-left");
             ScaledUnit bottomRightRadius = getBorderRadius(styles, "bottom-right");
-            //System.out.println("TopLeftRadius is : "+topLeftRadius+" isZero? "+isZero(topLeftRadius));
-            //System.out.println("BottomRight Radius is : "+bottomRightRadius+" isZero? "+isZero(bottomRightRadius));
+            
+            
             //if (!isZero(bottomLeftRadius) && !isZero(bottomRightRadius) && isZero(topLeftRadius) && isZero(topRightRadius)) {
             //    out.bottomOnlyMode(true);
             //} else if (isZero(bottomLeftRadius) && isZero(bottomRightRadius) && !isZero(topLeftRadius) && !isZero(topRightRadius)) {
@@ -5005,7 +5016,7 @@ public class CSSTheme {
 
 
 
-            //System.out.println("Round border: "+out.getShadowX()+", "+out.getShadowY()+", "+out.getShadowSpread()+", "+out.getShadowOpacity());
+            
             return out;
         }
         public com.codename1.ui.plaf.Border getThemeBorder(Map<String,LexicalUnit> styles) {
@@ -5026,7 +5037,7 @@ public class CSSTheme {
             //    return createUnderlineBorder(styles);
             //}
             if (b.hasUnequalBorders()) {
-                //System.out.println("We have unequal borders");
+                
                 return com.codename1.ui.plaf.Border.createCompoundBorder(
                         getThemeBorder(styles, "top"),
                         getThemeBorder(styles, "bottom"),
@@ -5034,7 +5045,7 @@ public class CSSTheme {
                         getThemeBorder(styles, "right")
                 );    
             } else {
-                //System.out.println("Web have equal borders");
+                
                 return getThemeBorder(styles, "top");
             }
         }
@@ -5045,7 +5056,7 @@ public class CSSTheme {
         public String getThemeDerive(Map<String,LexicalUnit> styles, String suffix) {
             
             LexicalUnit derive = styles.get("cn1-derive");
-            //System.out.println("Cn1 derive "+derive);
+            
             if (derive != null) {
                 return derive.getStringValue()+suffix;
             }
@@ -5100,9 +5111,9 @@ public class CSSTheme {
                 //case "dotted" :
                 //    return com.codename1.ui.plaf.Border.createDottedBorder(thickness, color);
                 //case "dashed" :
-                //    System.out.println("Creating dashed border with thickness "+thickness+" and color "+color);
+                
                 //    com.codename1.ui.plaf.Border br =  com.codename1.ui.plaf.Border.createDashedBorder(thickness, color);
-                //    System.out.println("Dashed border created "+br);
+                
                 //    return br;
                 case "etched" :
                     return com.codename1.ui.plaf.Border.createEtchedLowered(0xffffff, color);
@@ -5186,7 +5197,7 @@ public class CSSTheme {
     
     
     public void apply(Element style, String property, LexicalUnit value) {
-        //System.out.println("Applying property "+property);
+        
         switch (property) {
             case "refresh-images":
                 refreshImages = true;
@@ -5208,7 +5219,7 @@ public class CSSTheme {
             }
             
             case "cn1-derive" : {
-                //System.out.println("In cn1-derive");
+                
                 String parentName = value.getStringValue();
                 style.setParent(value.getStringValue());
                 style.put("cn1-derive", value);
@@ -5507,11 +5518,11 @@ public class CSSTheme {
             }
             
             case "background" : {
-                //System.out.println("Setting background");
+                
                 
                 while (value != null) {
-                    //System.out.println(value);
-                    //System.out.println(value.getLexicalUnitType());
+                    
+                    
                     switch (value.getLexicalUnitType()) {
                         case LexicalUnit.SAC_IDENT:
                             switch (value.getStringValue()) {
@@ -5548,7 +5559,7 @@ public class CSSTheme {
                         // no break here because ident could be a color too 
                         // so we let proceed to next (RGB_COLOR).
                         case LexicalUnit.SAC_RGBCOLOR :
-                            //System.out.println("Setting background color "+value);
+                            
                             apply(style, "background-color", value);
                             break;
                         case LexicalUnit.SAC_URI :
@@ -6472,10 +6483,6 @@ public class CSSTheme {
             switch (color.getLexicalUnitType()) {
                 case LexicalUnit.SAC_IDENT:
                 case LexicalUnit.SAC_RGBCOLOR: {
-                    
-                    //System.out.println("Lex type "+color.getLexicalUnitType());
-                    //System.out.println("Color: "+color.getStringValue());
-                    //System.out.println(color);
                     String colorStr = color.getStringValue();
                     if (colorStr == null) {
                         colorStr = ""+color;
@@ -6490,7 +6497,7 @@ public class CSSTheme {
                     if ("none".equals(colorStr)) {
                         return null;
                     }
-                    //System.out.println("Decoding color "+colorStr);
+                    
                     Color c = Color.web(colorStr);
                     return String.format( "%02X%02X%02X",
                     (int)( c.getRed() * 255 ),
@@ -6500,24 +6507,7 @@ public class CSSTheme {
                 }
                 case LexicalUnit.SAC_FUNCTION: {
                     if ("rgba".equals(color.getFunctionName())) {
-                        /*
-                        System.out.println("RGBA value " + color + " "+color.getClass());
-                        ScaledUnit param = (ScaledUnit)color.getParameters();
-                        System.out.println("Params "+param);
-                        System.out.println(param.getLexicalUnitType());
-                        
-                        double r = param.getNumericValue();
-                        param = (ScaledUnit)param.getNextNumericUnit();
-                        
-                        double g = param.getNumericValue();
-                        param = (ScaledUnit)param.getNextNumericUnit();
-                        
-                        double b = param.getNumericValue();
-                        param = (ScaledUnit)param.getNextNumericUnit();
-                        
-                        double a = param.getNumericValue();
-                        System.out.println(r+","+g+","+b+","+a);
-                        */
+                       
                         Color c = Color.web(color+"");
                         return String.format( "%02X%02X%02X",
                             (int)( c.getRed() * 255 ),
@@ -6602,9 +6592,9 @@ public class CSSTheme {
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
             String stringContents = Util.readToString(stream);
-            //System.out.println("Contents before: "+stringContents);
+            
             stringContents = stringContents.replaceAll("([\\(\\W])(--[a-zA-Z0-9\\-]+)", "$1cn1$2");
-            //System.out.println("Contents after: "+stringContents);
+            
             source.setCharacterStream(new CharArrayReader(stringContents.toCharArray()));
             source.setURI(uri.toString());
             source.setEncoding("UTF-8");
@@ -6734,7 +6724,7 @@ public class CSSTheme {
                 }
                 private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
                     if (string.startsWith("cn1--")) {
-                        //System.out.println("Registering variable "+string+" with value "+lu);
+                        
                         variables.put(string, lu);
                         return;
                     }
@@ -6742,7 +6732,6 @@ public class CSSTheme {
                         
                         LexicalUnit parameters = lu.getParameters();
                         String varname = parameters.getStringValue();
-                        //System.out.println("Found variable property: "+varname);
                         if (variables.containsKey(varname)) {
                             property(string, variables.get(varname), bln);
                             return;

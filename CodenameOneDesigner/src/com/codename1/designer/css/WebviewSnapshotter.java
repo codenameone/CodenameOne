@@ -1,22 +1,38 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
  */
 package com.codename1.designer.css;
 
+import com.codename1.io.Log;
+import com.codename1.processing.Result;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.Image;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Platform;
-import javafx.embed.swing.SwingFXUtils;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.image.WritableImage;
-import javafx.scene.web.WebView;
-import netscape.javascript.JSObject;
+
 
 /**
  *
@@ -24,7 +40,7 @@ import netscape.javascript.JSObject;
  */
 public class WebviewSnapshotter {
     private int x, y, w, h;
-    private WebView web;
+    private BrowserComponent web;
     final LinkedList<Runnable> eventQueue = new LinkedList<Runnable>();
     Thread eventThread;
     Runnable onDone;
@@ -32,12 +48,9 @@ public class WebviewSnapshotter {
     BufferedImage image;
     Graphics2D imageGraphics;
     
-    SnapshotParameters snapshotParams;
     
-    public WebviewSnapshotter(WebView web, SnapshotParameters params) {
+    public WebviewSnapshotter(BrowserComponent web) {
         this.web = web;
-        this.snapshotParams = params;
-        //this.onDone = onDone;
     }
     
     public void setBounds(int x, int y, int w, int h) {
@@ -48,16 +61,33 @@ public class WebviewSnapshotter {
     }
     
     private void fireJSSnap(int x, int y, int w, int h) {
-        if (!Platform.isFxApplicationThread()) {
-            Platform.runLater(()-> {
+        //System.out.println("[WebviewSnapshotter::fireJSSnap("+x+","+y+","+w+","+h);
+        if (!CN.isEdt()) {
+            CN.callSerially(()-> {
                 fireJSSnap(x, y, w, h);
             });
             return;
         } 
-        //System.out.println("in FireJSSnap "+x+","+y+","+w+","+h);
-        JSObject window = (JSObject)web.getEngine().executeScript("window");
-        window.setMember("snapper", this);
-        web.getEngine().executeScript("getRectSnapshot("+x+","+y+","+w+","+h+");");
+        
+        web.execute("window.snapper = window.snapper || {}; "
+                + "window.snapper.handleJSSnap = function(scrollX, scrollY, x, y, w, h) {"
+                + "  callback.onSuccess(JSON.stringify({scrollX:scrollX, scrollY:scrollY, x:x, y:y, w:w, h:h}));"
+                + "}; window.getRectSnapshot("+x+","+y+","+w+","+h+");", res -> {
+                    try {
+                        Result data = Result.fromContent(res.toString(), Result.JSON);
+                        handleJSSnap(
+                                data.getAsInteger("scrollX"),
+                                data.getAsInteger("scrollY"),
+                                data.getAsInteger("x"),
+                                data.getAsInteger("y"),
+                                data.getAsInteger("w"),
+                                data.getAsInteger("h")
+                        );
+                    } catch (Exception ex) {
+                        Log.p("Failed to parse callback in fireJSSnap");
+                        Log.e(ex);
+                    }
+                });
     }
     
     private boolean isEventThread() {
@@ -76,23 +106,18 @@ public class WebviewSnapshotter {
     }
     
     public final void handleJSSnap(int scrollX, int scrollY, int x, int y, int w, int h) {
-        //System.out.println("In handleJSSnap before thread check");
+        //System.out.println("[WebviewSnapshotter::handleJSSnap("+scrollX+","+scrollY+","+x+","+y+","+w+","+h+")");
         if (!isEventThread()) {
             runLater(()-> {
                 handleJSSnap(scrollX, scrollY, x, y, w, h);
             });
             return;
         }
-        
-        //System.out.println("In handleJSSnap "+scrollX+", "+scrollY+", "+x+","+y+","+w+","+h);
-        Platform.runLater(()-> {
-            //snapshotParams.
-            WritableImage wi = web.snapshot(snapshotParams, null);
-
-            BufferedImage img = SwingFXUtils.fromFXImage(wi, null);
+        CN.callSerially(()-> {
+            Image wi = web.captureScreenshot().get();
+            BufferedImage img = (BufferedImage)wi.getImage();
             
             runLater(()-> {
-                //System.out.println("Getting subImag "+(x-scrollX)+", "+(y-scrollY)+", "+w+", "+h+" for image "+img.getWidth()+", "+img.getHeight());
                 int remw = Math.min(w, 320);
                 int remh = Math.min(h, 480);
                 //remw = Math.min(remw, 320);
@@ -110,18 +135,13 @@ public class WebviewSnapshotter {
                     fireDone();
                 }
             });
-            
-            //
+
         });
-       
-        
-        
-        
-        
+
     }
     
     public final void fireDone() {
-        
+        //System.out.println("[WebViewSnapshotter::fireDone()]");
         if (!isEventThread()) {
             runLater(()-> {
                 fireDone();
@@ -139,6 +159,7 @@ public class WebviewSnapshotter {
     }
     
     public void snapshot(Runnable onDone) {
+        //System.out.println("[WebviewSnapshotter::snapshot()]");
         if (eventThread != null) {
             throw new RuntimeException("Snapshot event thread already created");
         }
@@ -179,16 +200,20 @@ public class WebviewSnapshotter {
                 lock.notify();
             }
         });
-        
-        while (!complete[0]) {
-            synchronized(lock) {
-                try {
-                    lock.wait();
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(WebviewSnapshotter.class.getName()).log(Level.SEVERE, null, ex);
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                while (!complete[0]) {
+                    synchronized(lock) {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(WebviewSnapshotter.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
                 }
             }
-        }
+        });
+        
     }
     
     public BufferedImage getImage() {

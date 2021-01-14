@@ -5,7 +5,9 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.io.BufferedReader;
@@ -18,8 +20,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -98,6 +104,31 @@ public class CSSWatcher implements Runnable {
         return false;
     }
     
+    
+    public String unescapeXSI(final String s) throws IOException {
+        StringBuilder sb = new StringBuilder();
+
+
+        int segmentStart = 0;
+        int searchOffset = 0;
+        while (true) {
+            final int pos = s.indexOf('\\', searchOffset);
+            if (pos == -1) {
+                if (segmentStart < s.length()) {
+                    sb.append(s.substring(segmentStart));
+                }
+                break;
+            }
+            if (pos > segmentStart) {
+                sb.append(s.substring(segmentStart, pos));
+            }
+            segmentStart = pos + 1;
+            searchOffset = pos + 2;
+        }
+
+        return sb.toString();
+    }
+
     private void watch() throws IOException {
         if (pulseSocket == null || pulseSocket.isClosed()) {
             // If the the Simulator is killed then the shutdown hook doesn't run
@@ -124,27 +155,58 @@ public class CSSWatcher implements Runnable {
         }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
         final File srcFile = new File("css", "theme.css");
-        if (!srcFile.exists()) {
+        String overrideInputs = System.getProperty("codename1.css.compiler.args.input", null);
+        
+        if (!srcFile.exists() && overrideInputs == null) {
             //System.out.println("No theme.css file found.  CSSWatcher canceled");
             return;
         } else {
-            System.out.println("Found theme.css file.  Watching for changes...");
+            if (overrideInputs == null) {
+                System.out.println("Found theme.css file.  Watching for changes...");
+            } else {
+                System.out.println("Watching CSS files for changes: "+overrideInputs);
+            }
         }
-        final File destFile = new File("src", "theme.res");
+        File destFile = new File("src", "theme.res");
+        String overrideOutputs = System.getProperty("codename1.css.compiler.args.output", null);
+        if (overrideOutputs != null) {
+            destFile = new File(overrideOutputs);
+        }
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
+        if (System.getProperty("codename1.designer.jar", null) != null) {
+            designerJar = new File(System.getProperty("codename1.designer.jar", null));
+        }
+        String cefDir = System.getProperty("cef.dir", cn1Home + File.separator + "cef");
         
+        //List<String> args = new ArrayList<String>();
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", "-Dparent.port="+pulseSocket.getLocalPort(), designerJar.getAbsolutePath(), 
-                "-css",
-                srcFile.getAbsolutePath(),
-                destFile.getAbsolutePath(),
-                "-watch",
-                "-Dprism.order=sw"
-                
+                "-jar", "-Dcli=true", 
+                "-Dcef.dir="+cefDir, 
+                "-Dparent.port="+pulseSocket.getLocalPort(), 
+                designerJar.getAbsolutePath(), 
+                "-css"    
         );
+        List<String> args = pb.command();
+        if (overrideInputs != null) {
+            args.add("-input");
+            args.add(overrideInputs);
+            args.add("-output");
+            args.add(overrideOutputs);
+            args.add("-merge");
+            args.add(System.getProperty("codename1.css.compiler.args.merge", null));
+            args.add("-watch");
+            
+        } else {
+            args.add(srcFile.getAbsolutePath());
+            args.add(destFile.getAbsolutePath());
+            args.add("-watch");
+            args.add("-Dprism.order=sw");
+        }
+        
+        
         
         Process p = pb.start();
         
@@ -181,7 +243,8 @@ public class CSSWatcher implements Runnable {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(stdout));
         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));
-        
+        final File fDestFile = destFile;
+        final String fOverrideInputs = overrideInputs;
         while (true) {
             try {
                 String l = reader.readLine();
@@ -198,11 +261,18 @@ public class CSSWatcher implements Runnable {
                         @Override
                         public void run() {
                             try {
-                                System.out.println("CSS File "+srcFile+" has been updated.  Reloading styles from "+destFile);
-                                Resources res = Resources.open(new FileInputStream(destFile));
+                                if (fOverrideInputs != null) {
+                                    System.out.println("CSS File "+fOverrideInputs+" has been updated.  Reloading styles from "+fDestFile);
+                                } else {
+                                    System.out.println("CSS File "+srcFile+" has been updated.  Reloading styles from "+fDestFile);
+                                }
+                                Resources res = Resources.open(new FileInputStream(fDestFile));
                                 UIManager.getInstance().addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
-                                Display.getInstance().getCurrent().refreshTheme();
-                                Display.getInstance().getCurrent().revalidate();
+                                Form f = CN.getCurrentForm();
+                                if (f != null) {
+                                    f.refreshTheme();
+                                    f.revalidate();
+                                }
                             } catch(Exception err) {
                                 err.printStackTrace();
                             }

@@ -154,6 +154,9 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
 
     public java.lang.StringBuilder append(StringBuffer sb) {
+        if (sb == null) {
+            return append("null");
+        }
         return append(sb.toString());
     }
     
@@ -390,6 +393,9 @@ public final class StringBuilder implements CharSequence, Appendable {
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string builder.
      */
     public java.lang.StringBuilder insert(int offset, java.lang.Object obj){
+        if (obj == null) {
+            return insert(offset, "null");
+        }
         return insert(offset, obj.toString());
     }
 
@@ -562,6 +568,9 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
 
     public StringBuilder append(final java.lang.CharSequence cs) {
+        if (cs == null) {
+            return append("null");
+        }
         return append(cs, 0, cs.length());
     }
 
@@ -593,10 +602,16 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
 
     public StringBuilder insert(final int offset, final java.lang.CharSequence cs) {
+        if (cs == null) {
+            return insert(offset, "null");
+        }
         return insert(offset, cs.toString());
     }
 
     public StringBuilder insert(final int offset, final CharSequence cs, final int start, final int end) {
+        if (cs == null) {
+            return insert(offset, "null", start, end);
+        }
         return insert(offset, cs.toString(), start, end);
     }
 

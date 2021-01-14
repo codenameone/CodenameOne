@@ -6,6 +6,7 @@ package com.codename1.impl.javase.cef;
 
 
 import com.codename1.ui.events.BrowserNavigationCallback;
+import java.lang.ref.WeakReference;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.callback.CefQueryCallback;
@@ -24,6 +25,7 @@ public class MessageRouterHandler extends CefMessageRouterHandlerAdapter {
         if (request.startsWith("shouldNavigate:")) {
             
             String url = request.substring(request.indexOf(":")+1);
+            //BrowserNavigationCallback navigationCallback_ = navigationCallbackRef.get();
             if (navigationCallback_ != null) {
                 boolean res = navigationCallback_.shouldNavigate(url);
                 callback.success(""+res);

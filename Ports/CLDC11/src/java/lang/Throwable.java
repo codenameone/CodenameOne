@@ -107,4 +107,21 @@ public class Throwable{
 
     public final void addSuppressed(Throwable exception) {
     }
+    
+    public StackTraceElement[] getStackTrace() {
+        return new StackTraceElement[0];
+    }
+    
+    public void setStackTrace(StackTraceElement[] el) {
+        
+    }
+    
+    public final Throwable[] getSuppressed() {
+        return null;
+    }
+    
+    public String getLocalizedMessage() {
+        return null;
+    }
+
 }

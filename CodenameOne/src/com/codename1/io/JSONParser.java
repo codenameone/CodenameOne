@@ -206,7 +206,7 @@ public class JSONParser implements JSONParseCallback {
     private boolean useLongs = useLongsDefault;
     private static boolean useLongs(JSONParseCallback callback) {
         if (callback instanceof JSONParser) {
-            return ((JSONParser)callback).isUseLongs();
+            return ((JSONParser)callback).isUseLongsInstance();
         }
         return useLongsDefault;
     }
@@ -218,7 +218,7 @@ public class JSONParser implements JSONParseCallback {
     private boolean useBoolean = useBooleanDefault;
     private static boolean useBoolean(JSONParseCallback callback) {
         if (callback instanceof JSONParser) {
-            return ((JSONParser)callback).isUseBoolean();
+            return ((JSONParser)callback).isUseBooleanInstance();
         }
         return useBooleanDefault;
     }

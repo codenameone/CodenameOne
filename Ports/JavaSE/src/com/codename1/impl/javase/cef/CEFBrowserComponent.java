@@ -8,14 +8,15 @@ package com.codename1.impl.javase.cef;
 import com.codename1.impl.javase.IBrowserComponent;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.JavaSEPort.Peer;
-import com.codename1.impl.javase.cef.BrowserPanel;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.EventQueue;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,10 +33,10 @@ import org.cef.browser.CefBrowserFactory;
 public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     
-    private static String OS = System.getProperty("os.name").toLowerCase();
-    private static boolean isWindows = isWindows();
-    private static boolean isMac = isMac();
-    private static boolean isUnix = isUnix();
+    private static final String OS = System.getProperty("os.name").toLowerCase();
+    private static final boolean isWindows = isWindows();
+    private static final boolean isMac = isMac();
+    private static final boolean isUnix = isUnix();
     private static final boolean is64Bit = is64Bit();
     private static final String ARCH = System.getProperty("os.arch");
     private static final boolean is64Bit() {
@@ -78,30 +79,53 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private boolean ready;
     private List<Runnable> readyCallbacks = new LinkedList<Runnable>();
     
+    
+    private com.codename1.ui.events.FocusListener focusListener = new com.codename1.ui.events.FocusListener() {
+        @Override
+        public void focusGained(com.codename1.ui.Component cmp) {
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    panel.requestFocus();
+                }
+            });
+
+        }
+
+        @Override
+        public void focusLost(com.codename1.ui.Component cmp) {
+
+        }
+
+
+    };
+    
     public CEFBrowserComponent(JFrame frame, BrowserPanel browserPanel) {
         super(frame, browserPanel);
         this.panel = browserPanel;
         setFocusable(true);
-        addFocusListener(new com.codename1.ui.events.FocusListener() {
-            @Override
-            public void focusGained(com.codename1.ui.Component cmp) {
-                EventQueue.invokeLater(new Runnable() {
-                    public void run() {
-                        panel.requestFocus();
-                    }
-                });
-                
-            }
 
-            @Override
-            public void focusLost(com.codename1.ui.Component cmp) {
-                
-            }
-            
-            
-        });
         
     }
+
+    @Override
+    protected void finalize() throws Throwable {
+        cleanup();
+        super.finalize();
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        addFocusListener(focusListener);
+    }
+
+    @Override
+    protected void deinitialize() {
+        removeFocusListener(focusListener);
+        super.deinitialize();
+    }
+
+    
     
     
     
@@ -159,7 +183,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         //args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         args.add("--enable-usermedia-screen-capturing");
-        System.out.println("CEF Args: "+args);
+        //System.out.println("CEF Args: "+args);
         return args.toArray(new String[args.size()]);
     }
     
@@ -176,6 +200,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         // Perform startup initialization on platforms that require it.
         if (!"true".equals(System.getProperty("cef.started", "false"))) {
             if (!CefApp.startup(args)) {
+                System.err.println("CEFStartup initialization failed");
                 throw new RuntimeException("CEF Startup initialization failed!");
 
             }
@@ -201,37 +226,47 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
         
         CEFPeerComponentBuffer buffer = new CEFPeerComponentBuffer();
+        final WeakReference<CEFBrowserComponentListener> parentRef = new WeakReference<CEFBrowserComponentListener>(parent);
         BrowserNavigationCallback navigationCallback = new BrowserNavigationCallback() {
+            private CEFBrowserComponentListener l = parentRef.get();
             @Override
             public boolean shouldNavigate(String url) {
                 //System.out.println("in shouldNavigate "+url);
-                return parent.shouldNavigate(url);
+                //CEFBrowserComponentListener l = parentRef.get();
+                if (l != null) {
+                    return l.shouldNavigate(url);
+                }
+                return false;
             }
             
         };
         final BrowserPanel panel = new BrowserPanel(
                 startingURL, buffer, navigationCallback,  osrEnabledArg, transparentPaintingEnabledArg, createImmediately, args) {
-            @Override
+            
+            private CEFBrowserComponentListener p = parentRef.get();
+                    @Override
             protected void onError(ActionEvent l) {
-                parent.onError(l);
+                //CEFBrowserComponentListener p = parentRef.get();
+                if (p != null) {
+                    p.onError(l);
+                }
             }
 
             @Override
             protected void onStart(ActionEvent l) {
-                parent.onStart(l);
+                if (p != null) {
+                    p.onStart(l);
+                }
             }
 
             @Override
             protected void onLoad(ActionEvent l) {
-                parent.onLoad(l);
+                if (p != null) {
+                    p.onLoad(l);
+                }
             }
-
-            
-            
-            
-            
-                    
-                };
+          
+        };
         
 
         java.awt.Container cnt = JavaSEPort.instance.getCanvas().getParent();
@@ -239,15 +274,22 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         while (!(cnt instanceof JFrame)) {
             cnt = cnt.getParent();
             if (cnt == null) {
+                System.err.println("CEFBrowserComponent requires a JFrame as an ancestor.  None found.  Returning null");
                 return null;
             }
         }
         
         final CEFBrowserComponent out =  new CEFBrowserComponent((JFrame)cnt, panel);
         out.setPeerComponentBuffer(buffer);
+        
+        final WeakReference<CEFBrowserComponent> weakRef = new WeakReference<CEFBrowserComponent>(out);
         panel.setReadyCallback(new Runnable() {
             public void run() {
-                out.fireReady();
+                CEFBrowserComponent callback = weakRef.get();
+                if (callback != null) {
+                    callback.fireReady();
+                }
+                
             }
         });
         return out;
@@ -282,6 +324,10 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     @Override
     public void setPage(String html, String baseUrl) {
         //String url = "data:text/html,"+com.codename1.io.Util.encodeUrl(html);
+        if (Display.getInstance().getProperty("cef.setPage.useDataURI", "false").equals("true")) {
+            setURL("data:text/html,"+com.codename1.io.Util.encodeUrl(html));
+            return;
+        }
         try {
             byte[] bytes = html.getBytes("UTF-8");
             StreamWrapper stream = new StreamWrapper(new ByteArrayInputStream(bytes), "text/html" , bytes.length);
@@ -313,19 +359,20 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
 
     private String url_;
     private String title_;
+    private final Object readyLock = new Object();
     
     @Override
     public void setURL(final String url) {
-        if (!ready) {
-            System.out.println("Setting URL but not ready "+url);
-            url_ = url;
-            readyCallbacks.add(new Runnable() {
-                public void run() {
-                    System.out.println("Setting url "+url);
-                    setURL(url);
-                }
-            });
-            return;
+        synchronized(readyLock) {
+            if (!ready) {
+                url_ = url;
+                readyCallbacks.add(new Runnable() {
+                    public void run() {
+                        setURL(url);
+                    }
+                });
+                return;
+            }
         }
         url_ = url;
         panel.getBrowser().loadURL(url);
@@ -424,14 +471,22 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             });
             return;
         }
-        if (!ready) {
-            ready = true;
-            System.out.println("Running ready callbacks");
-            while (!readyCallbacks.isEmpty()) {
-                readyCallbacks.remove(0).run();
+        List<Runnable> toRun = null;
+        synchronized(readyLock) {
+            if (!ready) {
+                ready = true;
+                if (!readyCallbacks.isEmpty()) {
+                    toRun = new ArrayList<Runnable>(readyCallbacks);
+                    readyCallbacks.clear();
+                }
             }
-            
         }
+        if (toRun != null && !toRun.isEmpty()) {
+            while (!toRun.isEmpty()) {
+                toRun.remove(0).run();
+            }
+        }
+       
     }
 
     @Override

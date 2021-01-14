@@ -205,4 +205,21 @@ public final class Math{
         }
         return (int) floor(f + 0.5f);
     }
+    
+    public static double nextDown(double d) {
+        if (Double.isNaN(d)) {
+            return d;
+        }
+        if (d == Double.NEGATIVE_INFINITY) {
+            return d;
+        }
+        long bits = Double.doubleToLongBits(d);
+        boolean negative = (bits & (1L << 63)) != 0;
+        if (negative) {
+            bits++;
+        } else {
+            bits--;
+        }
+        return Double.longBitsToDouble(bits);
+    }
 }

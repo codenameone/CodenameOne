@@ -24,6 +24,7 @@
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
 #include "CodenameOne_GLViewController.h"
+#include "java_lang_StringToReal.h"
 #import <mach/mach.h>
 
 extern JAVA_BOOLEAN lowMemoryMode;
@@ -502,7 +503,14 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
     JAVA_ARRAY srcArr = (JAVA_ARRAY)src;
     JAVA_ARRAY dstArr = (JAVA_ARRAY)dst;
-
+    if (src == JAVA_NULL || dst == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+        return;
+    }
+    if (srcOffset < 0 || dstOffset < 0 || srcOffset + length > srcArr->length || dstOffset + length > dstArr->length || length < 0) {
+        THROW_ARRAY_INDEX_EXCEPTION(-1);
+        return;
+    }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
     memcpy( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
@@ -619,6 +627,9 @@ JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CO
             break;
         }
     }
+    if (strcmp(s, "NAN") == 0) {
+        s[1] = 'a';
+    }
     return newStringFromCString(threadStateData, s);
 }
 
@@ -670,7 +681,9 @@ JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODE
             break;
         }
     }
-    
+    if (strcmp(s, "NAN") == 0) {
+        s[1] = 'a';
+    }
     return newStringFromCString(threadStateData, s);
 }
 
@@ -925,10 +938,15 @@ JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lan
 }
 
 JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    char s[32];
-    sprintf(s, "Obj[%i]", ((int)obj));
-    return newStringFromCString(threadStateData, s);
-    
+    if (obj == JAVA_NULL) {
+        return newStringFromCString(threadStateData, "null");
+    } else {
+        struct clazz* cls = obj->__codenameOneParentClsReference;
+        const char* className = cls->clsName;
+        char s[strlen(className) + 32];
+        sprintf(s, "%s@%llX", className, ((JAVA_LONG)obj));
+        return newStringFromCString(threadStateData, s);
+    }
 }
 
 void initClazzClazz() {
@@ -1055,6 +1073,22 @@ void lockCriticalSection() {
 void unlockCriticalSection() {
     pthread_mutex_unlock(criticalSection);
 }
+pthread_mutex_t* threadHeapMutex = NULL;
+pthread_mutex_t* getThreadHeapMutex() {
+    if(threadHeapMutex == NULL) {
+        threadHeapMutex = malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(threadHeapMutex, NULL);
+    }
+    return threadHeapMutex;
+}
+
+void lockThreadHeapMutex() {
+    pthread_mutex_lock(getThreadHeapMutex());
+}
+
+void unlockThreadHeapMutex() {
+    pthread_mutex_unlock(getThreadHeapMutex());
+}
 
 extern void flushReleaseQueue();
 long gcThreadId = -1;
@@ -1119,7 +1153,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
         ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = own;
         while (threadStateData->threadBlockedByGC) {
-            usleep(1000);
+            usleep(100);
         }
         threadStateData->threadActive = JAVA_TRUE;
         
@@ -1130,6 +1164,17 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     if(err != 0) {
         NSLog(@"Error with lock %i EINVAL %i, ETIMEDOUT %i, EPERM %i", err, EINVAL, ETIMEDOUT, EPERM);
     }
+}
+
+// monitorEnterBlock is used for synchronized methods because the JVM bytecode
+// doesn't actually generate the "try/catch" blocks for us like they do with 
+// synchronized blocks.  monitorEnterBlock will add a "block" to the block
+// stack so that throwException() can exit the block in the case that an exception
+// is thrown.
+JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    monitorEnter(threadStateData, obj);
+    threadStateData->blocks[threadStateData->tryBlockOffset].monitor = obj;
+    threadStateData->tryBlockOffset++;
 }
 
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
@@ -1144,6 +1189,16 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     if(err != 0) {
         NSLog(@"Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i", err, EINVAL, ETIMEDOUT, EPERM);
     }
+}
+
+// monitorEnterBlock is used for synchronized methods because the JVM bytecode
+// doesn't actually generate the "try/catch" blocks for us like they do with 
+// synchronized blocks.  monitorEnterBlock will add a "block" to the block
+// stack so that throwException() can exit the block in the case that an exception
+// is thrown.
+JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    threadStateData->tryBlockOffset--;
+    monitorExit(threadStateData, obj);
 }
 
 JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {
@@ -1329,16 +1384,35 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
         data[iter] = (char)chrs[iter];
     }
     data[length] = 0;
-    JAVA_DOUBLE db = strtod(data, NULL);
+    char *err;
+    JAVA_DOUBLE db = strtod(data, &err);
+    if (data == err) {
+        JAVA_OBJECT numberFormatException = java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(threadStateData, s, JAVA_TRUE);
+        throwException(threadStateData,numberFormatException);
+    }
     JAVA_LONG exp = 1;
     if(e != 0) {
         if(e < 0) {
+            while (e < -18) {
+                // Long accumulator will overflow past 18 digits so we do
+                // floating point math until we get there.
+                // fixes https://github.com/codenameone/CodenameOne/issues/3250
+                e++;
+                db /= 10;
+            }
             while(e < 0) {
                 e++;
                 exp *= 10;
             }
             db /= exp;
         } else {
+            while (e > 18) {
+                // Long accumulator will overflow past 18 digits so we do
+                // floating point math until we get there.
+                // fixes https://github.com/codenameone/CodenameOne/issues/3250
+                e--;
+                db /= 10;
+            }
             while(e > 0) {
                 e--;
                 exp *= 10;

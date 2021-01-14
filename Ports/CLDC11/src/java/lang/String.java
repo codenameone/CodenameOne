@@ -22,6 +22,9 @@
  * have any questions.
  */
 package java.lang;
+
+import java.util.Comparator;
+
 /**
  * The String class represents character strings. All string literals in Java programs, such as "abc", are implemented as instances of this class.
  * Strings are constant; their values cannot be changed after they are created. String buffers support mutable strings. Because String objects are immutable they can be shared. For example:
@@ -31,7 +34,13 @@ package java.lang;
  * The Java language provides special support for the string concatenation operator (+), and for conversion of other objects to strings. String concatenation is implemented through the StringBuffer class and its append method. String conversions are implemented through the method toString, defined by Object and inherited by all classes in Java. For additional information on string concatenation and conversion, see Gosling, Joy, and Steele, The Java Language Specification.
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
-public final class String implements CharSequence {
+public final class String implements CharSequence, Comparable<String> {
+    
+    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new Comparator<String>() {
+        public int compare(String o1, String o2){
+            return o1.compareToIgnoreCase(o2);
+        }
+    };
     /**
      * Initializes a newly created String object so that it represents an empty character sequence.
      */
@@ -534,4 +543,26 @@ public final class String implements CharSequence {
     public boolean isEmpty() {
         return false; //TODO codavaj!!
     }
+    
+    /**
+     * Compares the specified string to this string and compares the specified
+     * range of characters to determine if they are the same.
+     *
+     * @param thisStart
+     *            the starting offset in this string.
+     * @param string
+     *            the string to compare.
+     * @param start
+     *            the starting offset in the specified string.
+     * @param length
+     *            the number of characters to compare.
+     * @return {@code true} if the ranges of characters are equal, {@code false}
+     *         otherwise
+     * @throws NullPointerException
+     *             if {@code string} is {@code null}.
+     */
+    public boolean regionMatches(int thisStart, String string, int start, int length) {
+        return false;
+    }
+
 }
