@@ -394,8 +394,6 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
         {
             CN1Log(@"Received local notification while running: %@", notification);
 
-            NSString* alertValue = [notification.request.content.userInfo valueForKey:@"__ios_id__"];
-            com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
             if (completionHandler != nil) {
                 if ([notification.request.content.userInfo valueForKey:@"foreground"] != NULL) {
                     completionHandler(UNNotificationPresentationOptionAlert);
@@ -419,8 +417,20 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler {
+#ifdef CN1_INCLUDE_NOTIFICATIONS
+    UIApplicationState state = [[UIApplication sharedApplication] applicationState];
+    if(state == UIApplicationStateActive)
+    {
+        if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
+        {
+            CN1Log(@"Received local notification while running: %@", response.notification);
 
-
+            NSString* alertValue = [response.notification.request.content.userInfo valueForKey:@"__ios_id__"];
+            if ([response.notification.request.content.userInfo valueForKey:@"foreground"] != NULL)
+                com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
+        }
+    }
+#endif
 #ifdef INCLUDE_CN1_PUSH
     NSLog( @"Handle push from background or closed" );
     // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background
@@ -589,11 +599,6 @@ extern void repaintUI();
 
 - (void)application:(UIApplication*)application didReceiveLocalNotification:(UILocalNotification*)notification {
     CN1Log(@"Received local notification while running: %@", notification);
-    if( [notification.userInfo valueForKey:@"__ios_id__"] != NULL)
-    {
-        NSString* alertValue = [notification.userInfo valueForKey:@"__ios_id__"];
-        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
-    }
 }
 
 #ifndef CN1_USE_ARC
