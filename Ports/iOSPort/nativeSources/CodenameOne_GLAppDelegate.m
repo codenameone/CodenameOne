@@ -420,7 +420,7 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 #ifdef CN1_INCLUDE_NOTIFICATIONS
     if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
     {
-        CN1Log(@"Received local notification while running: %@", response.notification);
+        CN1Log(@"Tapped on locally initiated notification: %@", response.notification);
         NSString* alertValue = [response.notification.request.content.userInfo valueForKey:@"__ios_id__"];
         if ([response.notification.request.content.userInfo valueForKey:@"foreground"] != NULL)
             com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
