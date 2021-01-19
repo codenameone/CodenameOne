@@ -16,4 +16,5 @@
       <!--<module>cn1lib-archetype</module>-->
       <module>cn1app-archetype</module>
   </modules>
+
 </project>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+      <groupId>${groupId}</groupId>
+      <artifactId>${rootArtifactId}</artifactId>
+      <version>${version}</version>
+  </parent>
+  <groupId>${groupId}</groupId>
+  <artifactId>${artifactId}</artifactId>
+  <version>${version}</version>
+
+  <name>${artifactId}</name>
+  <build>
+          <resources>
+              <resource>
+                  <directory>src/main/java</directory>
+              </resource>
+              <resource>
+                  <directory>src/main/resources</directory>
+              </resource>
+          </resources>
+          <plugins>
+          <plugin>
+
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-antrun-plugin</artifactId>
+
+                          
+                      <executions>
+                          <execution>
+                              <phase>package</phase>
+                              <configuration>
+                                  <target>
+                                      <delete file="${project.build.directory}/${project.build.finalName}.jar" />
+                                      <mkdir dir="${basedir}/src/main/resources"/>
+                                      <mkdir dir="${basedir}/src/main/java"/>
+                                      <jar destfile="${project.build.directory}/${project.build.finalName}.jar" compress="true">
+                                          <fileset dir="${basedir}/src/main/resources" />
+                                          <fileset dir="${basedir}/src/main/java" />
+                                      </jar>
+
+                                  </target>
+                              </configuration>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+      </build>
+
+  <dependencies>
+      <dependency>
+          <groupId>${project.groupId}</groupId>
+          <artifactId>${cn1lib.name}-common</artifactId>
+          <version>${project.version}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-android</artifactId>
+          <scope>provided</scope>
+          <version>${cn1.version}</version>
+
+          <classifier>with-android-dependencies</classifier>
+
+      </dependency>
+  </dependencies>
+  <profiles>
+      <profile>
+          <id>kotlin</id>
+          <activation>
+              <file>
+                  <!-- To enable Kotlin, add the following file to the project base dir -->
+                  <exists>codenameone_kotlin.properties</exists>
+              </file>
+          </activation>
+          <dependencies>
+              <dependency>
+                  <groupId>org.jetbrains.kotlin</groupId>
+                  <artifactId>kotlin-stdlib</artifactId>
+              </dependency>
+              <dependency>
+                  <groupId>org.jetbrains</groupId>
+                  <artifactId>annotations</artifactId>
+              </dependency>
+          </dependencies>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.jetbrains.kotlin</groupId>
+                      <artifactId>kotlin-maven-plugin</artifactId>
+                  </plugin>
+              </plugins>
+          </build>
+      </profile>
+  </profiles>
+
+  
+</project>

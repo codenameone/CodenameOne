@@ -12,14 +12,38 @@ import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 
 /**
- *
+ * A goal to generate a GUI form.
  * @author shannah
  */
 @Mojo(name = "create-gui-form")
 public class CreateGuiFormMojo extends AbstractCN1Mojo {
 
+    /**
+     * The fully-qualified class name of the form to generate.
+     */
+    @Parameter(property="className", required = true)
+    private String className;
+
+    /**
+     * Use autolayout mode.
+     */
+    @Parameter(property="autoLayout", required = false, defaultValue = "true")
+    private boolean autoLayout;
+
+    /**
+     * The guiType.  Default is "Form".  "Container", and "Dialog" also supported values.
+     */
+    @Parameter(property="guiType", required = true, defaultValue = "Form")
+    private String guiType;
+
+    /**
+     * Validates a class name.
+     * @param className
+     * @throws MojoExecutionException
+     */
     private void validateClassName(String className) throws MojoExecutionException {
         String[] classNameParts = className.split("\\.");
         int len = classNameParts.length;
@@ -39,10 +63,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        String className = System.getProperty("className", null);
-        if (className == null) {
-            throw new MojoExecutionException("className is a required property.");
-        }
+
         validateClassName(className);
         File guibuilderDir = new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "guibuilder");
 
@@ -105,7 +126,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
     }
 
     protected String getGUIType() {
-        return System.getProperty("guiType", "Form");
+        return guiType;
     }
 
     protected String getAutoLayout() {
@@ -120,7 +141,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
     }
 
     private boolean isAutoLayout() {
-        return ("true".equals(System.getProperty("autoLayout", "true")));
+        return autoLayout;
     }
 
 }

@@ -21,6 +21,8 @@ import org.apache.tools.ant.taskdefs.Javac;
 import org.apache.tools.ant.types.Path;
 
 /**
+ * Mojo used in the compliance check.  This uses proguard strip out all unused classes, then check the remaining
+ * classes to ensure that they don't use any APIs that aren't available in Codename One.
  *
  * @author shannah
  */
@@ -31,77 +33,34 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
         getLog().info("Running compliance check against Codename One Java Runtime API");
         getLog().info("See https://www.codenameone.com/javadoc/ for supported Classes and Methods");
-        
-        if (true) {
-            // Using the proguard check because it works even for code that has already been compiled
-            // such as kotlin, or other java libraries.
-            copyKotlinIncrementalCompileOutputToOutputDir();
-            runProguard();
-            return;
-        }
 
-        File javaRuntimeJar = getJar(GROUP_ID, JAVA_RUNTIME_ARTIFACT_ID);
-        if (javaRuntimeJar == null) {
-            getLog().info("Skipping compliance check because " + JAVA_RUNTIME_ARTIFACT_ID + " is not listed in dependencies");
-            return;
-        }
+        // Kotlin incrementable compilation seems to store its output in a different directory.
+        // We need to copy it into the classes directory for proguard to work.
+        copyKotlinIncrementalCompileOutputToOutputDir();
 
-//        <mkdir dir="build/tmp"/>
-//        <javac destdir="build/tmp"
-//            source="1.8"
-//            target="1.8"
-//            bootclasspath="lib/CLDC11.jar"
-//            classpath="${javac.classpath}:${build.classes.dir}">
-//            <src path="${src.dir}"/>
-//        </javac>    
-        File build = new File(project.getBuild().getDirectory());
-        File tmp = new File(build, "tmp");
-        tmp.mkdirs();
-
-        Javac javac = (Javac) antProject.createTask("javac");
-        javac.setDestdir(tmp);
-        javac.setSource("1.8");
-        javac.setTarget("1.8");
-        javac.setBootclasspath(new Path(antProject, javaRuntimeJar.getAbsolutePath()));
-        Path path = new Path(antProject);
-        project.getArtifacts().forEach(artifact -> {
-            if (isSupportedScope(artifact.getScope())) {
-                path.add(new Path(antProject, getJar(artifact).getAbsolutePath()));
-            }
-        });
-
-        javac.setClasspath(path);
-        Path srcPath = javac.createSourcepath();
-        srcPath.setPath(project.getCompileSourceRoots().get(0));
-        javac.setSrcdir(srcPath);
-        javac.setErrorProperty("complianceLog");
-        try {
-            javac.execute();
-        } catch (Throwable t) {
-            getLog().error("API compliance check failed.  This project uses APIs that are not currently available in Codename One's java runtime.");
-            getLog().error("See https://www.codenameone.com/javadoc/ for available APIs");
-            getLog().error(antProject.getProperty("complianceLog"));
-            throw new MojoExecutionException("API Compliance check failed", t);
-        }
+        // Run proguard.
+        runProguard();
     }
 
-    protected boolean isSupportedScope(String scope) {
-        switch (scope) {
-            case Artifact.SCOPE_COMPILE:
-            case Artifact.SCOPE_PROVIDED:
-            case Artifact.SCOPE_SYSTEM:
-                return true;
-            default:
-                return false;
-        }
-    }
-    
+    /**
+     * Runs proguard on the compiled classes directory in two passes.  The first pass disables warnings
+     * and strips out all unused code.  The second pass runs the remaining code against the java-runtime library
+     * and will result in an error if there is any API usage that isn't supported.
+     * @throws MojoExecutionException
+     */
     private void runProguard() throws MojoExecutionException {
         runProguard(0); // First pass strips code without warnings
         runProguard(1); // Second pass checks the stripped jar generated in the first pass to make sure there are 
                         // no warnings - which would result from missing classes
     }
 
+    /**
+     * Runs a single pass of proguard.
+     * @param passNum The pass number.  0 or 1.  0 if this is the first pass.  1 if this is the second pass.
+     *                In pass 0, it disables warnings and strips out all code that isn't used.  In pass 1, it
+     *                enables warnings and checks remaining code against the java-runtime lib.
+     * @throws MojoExecutionException
+     */
     private void runProguard(int passNum) throws MojoExecutionException{
         Java java = createJava();
         Path classPath = java.createClasspath();
@@ -115,27 +74,32 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         java.setFailonerror(true);
         java.setFork(true);
         
-        //List<String> args = new ArrayList<String>();
-        /*
-        -verbose
-            -dontobfuscate
-            -libraryjars lib/CLDC11.jar:lib/CodenameOne.jar
-            -injars build/tmp:lib/impl/cls
-            -outjars build/tmp.jar
-            -keep class ${codename1.packageName}.${codename1.mainName} {
-            *;
-            }
-            -dontwarn **
+        // The following proguard options are used for the first pass
+        //        -verbose
+        //            -dontobfuscate
+        //            -libraryjars lib/CLDC11.jar:lib/CodenameOne.jar
+        //            -injars build/tmp:lib/impl/cls
+        //            -outjars build/tmp.jar
+        //            -keep class ${codename1.packageName}.${codename1.mainName} {
+        //            *;
+        //            }
+        //            -dontwarn **
 
-        */
+
         java.createArg().setValue("-dontobfuscate");
         if (passNum == 1) {
             //java.createArg().setValue("-verbose");
             java.createArg().setValue("-dontnote");
         } else {
             java.createArg().setValue("-dontnote");
-            java.createArg().setValue("-dontwarn");
+            java.createArg().setValue("-dontwarn");  // First pass disables warnings because
+                                                    // we aren't interested in warnings yet.  Just want to strip
+                                                    // unused
         }
+
+        // -library jars is the allowed APIs that they build against.
+        // We build against java-runtime (formerly CLDC11.jar) and CodenameOne which
+        // has the core Codename One api.
         java.createArg().setValue("-libraryjars");
         Path libraryJarsPath = new Path(antProject, getJavaRuntimeJar().getAbsolutePath());
         libraryJarsPath.add(new Path(antProject, getCodenameOneJar().getAbsolutePath()));
@@ -144,14 +108,17 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         java.createArg().setValue("-keepattributes");
         java.createArg().setValue("Signature");
         if (passNum == 0) {
+            // The -injars parameter of proguard is the list of jars/directories that
+            // we want to operate on.  We will operate on all dependencies, stripping out unused
+            // code and place the result into a complianceCheck jar file.  This jar file
+            // will be checked for consistency on the second pass.
             Path inJars = new Path(antProject, project.getBuild().getOutputDirectory());
-            
+
             project.getArtifacts().forEach(artifact -> {
                 getLog().info("artifact "+artifact);
                 if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("codenameone-core")) {
                     return;
                 }
-
                 if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
                     getLog().info("Adding to injars: "+getJar(artifact));
                     inJars.add(new Path(antProject, getJar(artifact).getAbsolutePath()+"(!META-INF/**)"));
@@ -161,24 +128,27 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             java.createArg().setValue("-injars");
             java.createArg().setPath(inJars);
             java.createArg().setValue("-outjars");
-
-            
             java.createArg().setPath(new Path(antProject, complianceCheckJar.getAbsolutePath()));
-            
         } else if (passNum == 1) {
+            // On pass 2 we only have one input: the compliance check jar that we generated in the first pass
             java.createArg().setValue("-injars");
             java.createArg().setPath(new Path(antProject, complianceCheckJar.getAbsolutePath()));
-            
         }
-        
+
+        // The -keep parameter specifies which classes we need to keep.  These are used as a starting
+        // point for proguard to crawl through the code and find out what is used.
+        // For application projects, the starting point is just the main class.
+        // For library projects, we keep all classes in the immediate project.
         if (properties != null && properties.getProperty("codename1.mainName") != null) {
+
             String keep = "class "+properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName")+" {\n" +
-    "            *;\n" +
-    "            }";
+                "            *;\n" +
+                "            }";
             //getLog().info("Addin -keep directive "+keep);
             java.createArg().setValue("-keep");
             java.createArg().setValue(keep);
         } else {
+
             List<String> keeps = new ArrayList<String>();
             for (String sourceRoot : project.getCompileSourceRoots()) {
                 File sourceRootFile = new File(sourceRoot);
@@ -195,13 +165,19 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             }
         }
         if (passNum == 0) {
+
+            // In the first pass we don't want any warnings or errors.
+            // So let's pile on here anything necessary to make that happen.
             java.createArg().setValue("-dontwarn");
             java.createArg().setValue("**");
             java.createArg().setValue("-ignorewarnings");
         }
         
         int result = java.executeJava();
+
         if (result != 0) {
+            // The result will be non-zero if proguard ran into a problem of any kind, including
+            // if there are APIs used that aren't in either the CodenameOne jar or the java-runtime jar.
             throw new MojoExecutionException("Compliance check failed");
         }
 
@@ -225,6 +201,10 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         }
     }
 
+    /**
+     * Gets the java-runtime jar (formerly CLDC11) which defines the supported API.
+     * @return
+     */
     private File getJavaRuntimeJar() {
         for (Artifact artifact : project.getArtifacts()) {
             if (JAVA_RUNTIME_ARTIFACT_ID.equals(artifact.getArtifactId()) && GROUP_ID.equals(artifact.getGroupId())) {
@@ -239,7 +219,11 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         throw new RuntimeException(JAVA_RUNTIME_ARTIFACT_ID + " not found in dependencies");
         
     }
-    
+
+    /**
+     * Gets the codename one jar.
+     * @return
+     */
     private File getCodenameOneJar() {
         String codenameOneCoreId = "codenameone-core";
         for (Artifact artifact : project.getArtifacts()) {
@@ -254,7 +238,12 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         }
         throw new RuntimeException(codenameOneCoreId + " not found in dependencies");
     }
-    
+
+    /**
+     * Gets the proguard jars.
+     * @return
+     * @throws MojoExecutionException
+     */
     private List<File> getProguardJars() throws MojoExecutionException {
 
         List<Artifact> proguardArtifacts = new ArrayList<Artifact>();

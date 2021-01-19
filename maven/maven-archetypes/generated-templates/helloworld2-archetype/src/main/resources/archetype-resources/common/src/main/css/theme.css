@@ -1,0 +1,9 @@
+#Constants {
+    includeNativeBool: true;
+}
+Button {
+    color:green;
+    border:1px solid green;
+    border-radius: 2mm;
+    margin: 5mm;
+}

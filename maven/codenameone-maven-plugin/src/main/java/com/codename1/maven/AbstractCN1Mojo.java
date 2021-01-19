@@ -91,7 +91,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     private void setupAnt()  throws MojoExecutionException, MojoFailureException {
         
         antProject = new Project();
-        antProject.setBaseDir(project.getBasedir());
+        if (project.getBasedir() != null) {
+            antProject.setBaseDir(project.getBasedir());
+        } else {
+            antProject.setBaseDir(new File("."));
+        }
         antProject.setDefaultInputStream(System.in);
         
         InputHandler handler = new DefaultInputHandler();
@@ -117,7 +121,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             
         } else {
             getLog().warn("Failed to find CN1 Project directory.  codenameone_settings.properties will not be loaded");
-            getLog().warn("Checking from project root and source compile root: "+project.getCompileSourceRoots().get(0));
+            if (project.getCompileSourceRoots() != null && !project.getCompileSourceRoots().isEmpty()) {
+                getLog().warn("Checking from project root and source compile root: " + project.getCompileSourceRoots().get(0));
+            }
         }
         
         
@@ -131,6 +137,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     
     protected File getCN1ProjectDir() {
+        if (project == null || project.getBasedir() == null) {
+            return null;
+        }
         if (project.getBasedir().getName().equals("javase")) {
             File commonSettings = new File(project.getBasedir(), ".." + File.separator + "common" + File.separator + "codenameone_settings.properties");
             if (commonSettings.exists()) {
@@ -153,7 +162,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     private File getCN1ProjectDir(File start) {
         File f = new File(start, "codenameone_settings.properties");
         
-        while (!f.exists() && f.getParentFile().getParentFile() != null) {
+        while (!f.exists() && f.getParentFile() != null && f.getParentFile().getParentFile() != null) {
             f = new File(f.getParentFile().getParentFile(), "codenameone_settings.properties");
             if (f.exists()) {
                 return f.getParentFile();
@@ -766,7 +775,18 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         System.setProperty("cef.dir", extractedDir.getAbsolutePath());
         
     }
-    
+
+    /**
+     * Get the designer jar from the dependencies.  This is equivalent to the designer_1.jar located in
+     * the user's home directory, but this is retrieved from maven dependencies (the codenameone-designer project
+     * is a dependency of the codenameone-maven-plugin project).
+     *
+     * This is the jar that contains the CSS compiler used by the {@link CompileCSSMojo}.
+     *
+     * @return The Codename One designer jar with all dependencies.
+     * @throws MojoExecutionException If the designer jar could not be found.  This might occur if calling this
+     * method before dependencies have been resolved.
+     */
     protected File getDesignerJar() throws MojoExecutionException{
         Artifact artifact = getArtifact("com.codenameone", "codenameone-designer", "jar-with-dependencies");
         if (artifact == null) {
@@ -776,18 +796,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (file == null) {
             throw new MojoExecutionException("Could not find designer jar");
         }
-        /*
-        File cn1Home = new File(System.getProperty("user.home") + File.separator + ".codenameone");
-        File designerJar = new File(cn1Home, "designer_1.jar");
-        if (!designerJar.exists()) {
-            updateCodenameOne(true);
-        }
-        
-        if (!designerJar.exists()) {
-            throw new MojoExecutionException("Failed to find designer_1.jar even after running codename one update.");
-        }
-        return designerJar;
-        */
+
         return file;
     }
    

@@ -5,6 +5,7 @@
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
     <version>7.0-SNAPSHOT</version>
+
     <packaging>pom</packaging>
 
     <name>CodenameOne</name>
@@ -79,7 +80,7 @@
         <module>android</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
-        <module>codenameone-archetypes</module>
+        <module>maven-archetypes</module>
         
 		    
     </modules>
@@ -258,6 +259,7 @@
                     <version>3.1.1</version>
                 </plugin>
                 <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-invoker-plugin -->
+
                 <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>3.0.0</version>
@@ -317,9 +319,7 @@
         <profile>
             <id>tests</id>
             <modules>
-                <module>tests/core-tests</module>
-                <module>tests/signindemo</module>
-                <module>tests/testnativeinterfaces</module>
+                <module>tests</module>
             </modules>
         
         </profile>
