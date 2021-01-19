@@ -1794,7 +1794,11 @@ public class InPlaceEditView extends FrameLayout{
                             // We use the com.codename1.compat version
                             // because Objects.equals was not available until API 19
                             if (!com.codename1.compat.java.util.Objects.equals(newText, existingText)) {
+                                // We need to suppress the Android text change events
+                                // to prevent weird things from happening.  E.g. https://github.com/codenameone/CodenameOne/issues/3349
+                                suppressTextChangeEvent = true;
                                 currEditView.setText(newText);
+                                suppressTextChangeEvent = false;
                             }
                             
                         }
@@ -1962,6 +1966,12 @@ public class InPlaceEditView extends FrameLayout{
     // by the user typing.  
     // Necessary to fix https://github.com/codenameone/CodenameOne/issues/3343
     private static boolean suppressDataChangedEvent;
+    
+    // flag to suppress (native android) text change events.  This is used
+    // to prevent the beforeTextChanged() and afterTextChanged() methods from
+    // executing on changes that we initiated programmatically. 
+    // It fixes https://github.com/codenameone/CodenameOne/issues/3349
+    private static boolean suppressTextChangeEvent;
 
     class EditView extends AutoCompleteTextView {
 
@@ -1993,7 +2003,12 @@ public class InPlaceEditView extends FrameLayout{
 
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
+                if (suppressTextChangeEvent) {
+                    // If this change was initiated programmatically in a datachanged event
+                    // then we don't want to process the change here as it causes weird things to happen.
+                    // E.g https://github.com/codenameone/CodenameOne/issues/3349
+                    return;
+                }
                 // We use this hook to catch keyboard strokes in async edit mode while the
                 // edit text field is hidden.
                 currChange = new TextChange();
@@ -2012,6 +2027,12 @@ public class InPlaceEditView extends FrameLayout{
 
             @Override
             public void afterTextChanged(final Editable s) {
+                if (suppressTextChangeEvent) {
+                    // If this change was initiated programmatically in a datachanged event
+                    // then we don't want to process the change here as it causes weird things to happen.
+                    // E.g https://github.com/codenameone/CodenameOne/issues/3349
+                    return;
+                }
                 if (isEditing() && mTextArea != null) {
                     try {
                         final String actualString = s.toString();
