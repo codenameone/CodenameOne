@@ -11,6 +11,9 @@ import java.util.Properties;
 import java.io.File;
 import com.codename1.maven.ProjectUtil;
 
+/**
+ * Test the {@link CreateGuiFormMojo}, which creates GUI Forms.
+ */
 public class CreateGuiFormMojoTest {
 
     private String path(String... parts) {
@@ -24,6 +27,10 @@ public class CreateGuiFormMojoTest {
         return sb.toString();
     }
 
+    /**
+     * A test create Form
+     * @throws Exception
+     */
     @Test
     void testCreateGuiForm() throws Exception {
 
@@ -36,6 +43,56 @@ public class CreateGuiFormMojoTest {
         File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
         Assert.assertTrue(helloFormJava.exists());
         Assert.assertTrue(helloFormGui.exists());
+        String javaContents = FileUtils.readFileToString(helloFormJava, "UTF-8");
+        Assert.assertTrue(javaContents.contains("extends com.codename1.ui.Form"));
+
+        // Now make sure it compiles
+        ProjectUtil.executeGoal(projectDir, "package");
+
+    }
+
+    /**
+     * A test create Container
+     * @throws Exception
+     */
+    @Test
+    void testCreateGuiContainer() throws Exception {
+
+        File projectDir = new File("target/tests/HelloWorld");
+        FileUtils.deleteDirectory(projectDir);
+        projectDir.getParentFile().mkdirs();
+        ProjectUtil.generateHelloWorldProject(projectDir, "com.codename1.tests");
+        ProjectUtil.executeGoal(projectDir, "cn1:create-gui-form", "className=com.codename1.tests.HelloForm", "guiType=Container");
+        File helloFormJava = new File(projectDir, path("src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
+        File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
+        Assert.assertTrue(helloFormJava.exists());
+        Assert.assertTrue(helloFormGui.exists());
+        String javaContents = FileUtils.readFileToString(helloFormJava, "UTF-8");
+        Assert.assertTrue(javaContents.contains("extends com.codename1.ui.Container"));
+        // Now make sure it compiles
+        ProjectUtil.executeGoal(projectDir, "package");
+
+    }
+
+    /**
+     * A test create Container
+     * @throws Exception
+     */
+    @Test
+    void testCreateGuiDialog() throws Exception {
+
+        File projectDir = new File("target/tests/HelloWorld");
+        FileUtils.deleteDirectory(projectDir);
+        projectDir.getParentFile().mkdirs();
+        ProjectUtil.generateHelloWorldProject(projectDir, "com.codename1.tests");
+        ProjectUtil.executeGoal(projectDir, "cn1:create-gui-form", "className=com.codename1.tests.HelloForm", "guiType=Dialog");
+        File helloFormJava = new File(projectDir, path("src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
+        File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
+        Assert.assertTrue(helloFormJava.exists());
+        Assert.assertTrue(helloFormGui.exists());
+
+        String javaContents = FileUtils.readFileToString(helloFormJava, "UTF-8");
+        Assert.assertTrue(javaContents.contains("extends com.codename1.ui.Dialog"));
 
         // Now make sure it compiles
         ProjectUtil.executeGoal(projectDir, "package");
