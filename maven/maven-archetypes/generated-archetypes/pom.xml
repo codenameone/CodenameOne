@@ -15,5 +15,6 @@
     <modules>
 <module>helloworld3-archetype</module>
 <module>helloworld2-archetype</module>
+<module>helloworld-guibuilder-archetype</module>
 </modules>
 </project>

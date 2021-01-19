@@ -14,9 +14,10 @@
         <profile>
             <id>kotlin</id>
             <activation>
-                <property>
-                    <name>cn1.kotlin</name>
-                </property>
+                <file>
+                    <!-- To enable Kotlin, add the following file to the project base dir -->
+                    <exists>${basedir}/src/main/kotlin</exists>
+                </file>
             </activation>
             <properties>
                 <kotlin.version>1.3.72</kotlin.version>
@@ -268,13 +269,19 @@
                     </execution>
                 </executions>
             </plugin>
-			
+
             <plugin>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
 
                 <executions>
-                    
+                    <execution>
+                        <id>generate-gui-sources</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>generate-gui-sources</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>

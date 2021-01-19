@@ -181,6 +181,30 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
         return extractSectionFrom(str, "css");
     }
 
+    private class FileContent {
+        private String path;
+        private String content;
+
+        FileContent(String path, String content) {
+            this.path = path;
+            this.content = content;
+        }
+    }
+
+    private List<FileContent> extractFiles(String str) throws TemplateParseException {
+        List<FileContent> out = new ArrayList<FileContent>();
+        java.util.Scanner scanner = new java.util.Scanner(extractSectionFrom(str, "files"));
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine();
+            if (line == null || line.trim().isEmpty()) {
+                continue;
+            }
+            String content = extractSectionFrom(str, "file:"+line.trim());
+            out.add(new FileContent(line, content));
+        }
+        return out;
+    }
+
     /**
      * Replaces variables in a string.
      * @param content The string to replace variables in.
@@ -277,9 +301,17 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
 
 
 
+
+
             if (!pomContents.equals(origPomContents)) {
                 getLog().info("Writing changes to "+pomFile);
                 FileUtils.writeStringToFile(pomFile, pomContents, "UTF-8");
+            }
+
+            for (FileContent file : extractFiles(contents)) {
+                File f = new File(commonProjectDir, file.path);
+                f.getParentFile().mkdirs();
+                FileUtils.writeStringToFile(f, file.content, "UTF-8");
             }
 
 

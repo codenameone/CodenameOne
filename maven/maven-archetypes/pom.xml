@@ -16,7 +16,7 @@
     <modules>
         <module>helloworld-archetype</module>
         <module>cn1lib-archetype</module>
-        <module>generated-archetypes</module>
+
 
     </modules>
 
@@ -27,6 +27,17 @@
                 <module>archetype-generator</module>
             </modules>
         </profile>
+
+        <profile>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <id>build-generated-archetypes</id>
+            <modules>
+                <module>generated-archetypes</module>
+            </modules>
+        </profile>
     </profiles>
+
 
 </project>

@@ -31,6 +31,9 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
 
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         getLog().info("Running compliance check against Codename One Java Runtime API");
         getLog().info("See https://www.codenameone.com/javadoc/ for supported Classes and Methods");
 

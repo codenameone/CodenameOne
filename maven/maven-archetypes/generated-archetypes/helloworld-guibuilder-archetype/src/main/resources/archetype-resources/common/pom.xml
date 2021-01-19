@@ -241,12 +241,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <dependency>
-    <groupId>com.codenameone.libs</groupId>
-    <artifactId>filechooser-lib</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <type>pom</type>
-</dependency>
+        <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
     <build>
