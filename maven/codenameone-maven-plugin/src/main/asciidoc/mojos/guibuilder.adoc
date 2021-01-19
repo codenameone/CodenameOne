@@ -1,0 +1,22 @@
+== GUIBuilder Goal
+
+The `guibuilder` goal opens the Codename One GUI builder to edit a specified GUIBuilder form.
+
+=== Usage
+
+[source,bash]
+----
+mvn cn1:guibuilder -DclassName=com.example.MyForm
+----
+
+This will open the gui builder to edit the form whose class is `com.example.MyForm`.
+
+=== Parameters
+
+className::
+
+The fully-qualified name to the form class that you wish to edit.  This must have been previously generated using the link:create-gui-form.adoc[create-gui-form] goal.
+
+=== References
+
+. link:../../java/com/codename1/maven/OpenGuiBuilderMojo.java[OpenGuiBuilderMojo.java source]
