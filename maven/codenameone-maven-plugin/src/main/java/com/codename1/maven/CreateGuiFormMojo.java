@@ -64,8 +64,23 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
 
+        if (getCN1ProjectDir() == null) {
+            getLog().debug("Skipping create-gui-form because this is not a CN1 project");
+            return;
+        }
+        try {
+            if (!getCN1ProjectDir().getCanonicalFile().equals(project.getBasedir().getCanonicalFile())) {
+                getLog().debug("Skipping create-gui-form because this is not a CN1 project");
+                return;
+            }
+        } catch (IOException ex) {
+
+            getLog().error("Error trying to convert to canonical paths", ex);
+            return;
+        }
+
         validateClassName(className);
-        File guibuilderDir = new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "guibuilder");
+        File guibuilderDir = new File(getCN1ProjectDir(),  "src" + File.separator + "main" + File.separator + "guibuilder");
 
         String path = className.replace(".", File.separator);
 
@@ -76,7 +91,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
         File guiFileDir = guiFile.getParentFile();
         guiFileDir.mkdirs();
 
-        File javaSrcRoot = new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "java");
+        File javaSrcRoot = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "java");
         File javaFile = new File(javaSrcRoot, path + ".java");
         if (javaFile.exists()) {
             throw new MojoExecutionException("Java source file already exists at "+javaFile);

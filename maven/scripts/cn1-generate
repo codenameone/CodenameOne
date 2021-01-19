@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+VERSION=$(cat $SCRIPTPATH/../version.txt)
+IFS=':'; read -ra PARTS <<< "$1"
+echo "groupId: ${PARTS[0]}"
+echo "artifactId: ${PARTS[1]}"
+MAINNAME=${PARTS[1]}
+MAINNAME=$(echo $MAINNAME | perl -nE 'say ucfirst join "", map {ucfirst lc} split /[^[:alnum:]]+/')
+
+echo "mainName: $MAINNAME"
+mvn archetype:generate \
+    -DarchetypeArtifactId=helloworld-archetype \
+        -DarchetypeGroupId=com.codenameone \
+             -DarchetypeVersion=$VERSION \
+                 -DgroupId=${PARTS[0]} \
+                     -DartifactId=${PARTS[1]} \
+                         -Dversion=1.0-SNAPSHOT \
+                             -DmainName=$MAINNAME

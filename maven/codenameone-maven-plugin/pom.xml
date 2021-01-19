@@ -31,9 +31,8 @@
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-designer</artifactId>
-            <version>${project.version}</version>
-            <type>zip</type>
             <classifier>jar-with-dependencies</classifier>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -193,6 +192,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.1</version>
+            </plugin>
+            <plugin>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>codenameone-designer-maven-plugin</artifactId>
+                <version>${project.version}</version>
             </plugin>
         </plugins>
     </build>

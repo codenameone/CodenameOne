@@ -101,19 +101,16 @@
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
-            <version>2.3.1</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-impl -->
         <dependency>
             <groupId>com.sun.xml.bind</groupId>
             <artifactId>jaxb-impl</artifactId>
-            <version>2.3.1</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-core -->
         <dependency>
             <groupId>com.sun.xml.bind</groupId>
             <artifactId>jaxb-core</artifactId>
-            <version>2.3.0.1</version>
         </dependency>
         
         
@@ -327,8 +324,13 @@
                             <phase>package</phase>
                             <configuration>
                               <target>
+                                  <delete dir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
+                                  <mkdir dir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
                                   <move file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"
-                                      tofile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.zip"/>
+                                      tofile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies/designer_1.jar"/>
+                                      <zip destfile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" basedir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
+                                          
+                                          
 
                               </target>
                             </configuration>
@@ -352,8 +354,8 @@
                                   <configuration>
                                     <artifacts>
                                       <artifact>
-                                        <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.zip</file>
-                                        <type>zip</type>
+                                        <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</file>
+                                        <type>jar</type>
                                         <classifier>jar-with-dependencies</classifier>
                                       </artifact>
                                       

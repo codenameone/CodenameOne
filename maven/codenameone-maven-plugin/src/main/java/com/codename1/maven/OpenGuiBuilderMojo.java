@@ -15,6 +15,7 @@ import java.util.UUID;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.DefaultInvoker;
 import org.apache.maven.shared.invoker.InvocationRequest;
@@ -23,21 +24,23 @@ import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.apache.tools.ant.taskdefs.Java;
 
 /**
- *
+ * Goal to open the gui builder.
  * @author shannah
  */
 @Mojo(name = "guibuilder")
 public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
     private File guibuilderInput = new File(System.getProperty("user.home") + File.separator + ".guiBuilder" + File.separator + "guibuilder.input");
+
+    @Parameter(property="className", required=true)
+    private String className;
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         try {
             
-            String className = System.getProperty("className", null);
-            if (className == null) {
-                getLog().error("className is required");
-                throw new MojoExecutionException("Please specify a class name for the form to open using the -DclassName=com.example.MyForm syntax");
-            }
+
             File sourceFile = findSourceFile(className);
             if (!sourceFile.exists()) {
                 throw new MojoExecutionException("Cannot find source file "+sourceFile);

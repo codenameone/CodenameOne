@@ -70,8 +70,11 @@
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
+        
+        <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
+        <module>build-client</module>
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
@@ -189,7 +192,25 @@
                 <artifactId>proguard-base</artifactId>
                 <version>7.0.1</version>
             </dependency>
-
+            <dependency>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+                <version>${jaxb.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-impl -->
+            <dependency>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-impl</artifactId>
+                <version>${jaxb.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-core -->
+            <dependency>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-core</artifactId>
+                <version>2.3.0.1</version>
+            </dependency>
+        
+        
         </dependencies>
     </dependencyManagement>
     
@@ -202,8 +223,8 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <source>1.8</source>
+                        <target>1.8</target>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -223,7 +244,7 @@
                         </execution>
                     </executions>
                     <configuration>
-                        <source>${java.version}</source>
+                        <source>1.8</source>
                         <show>protected</show>
                         <failOnError>false</failOnError>
                     </configuration>

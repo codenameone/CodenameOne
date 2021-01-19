@@ -151,6 +151,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
             
         }
+        File commonSubdir = new File(project.getBasedir(), "common");
+        if (!new File("codenameone_settings.properties").exists() && commonSubdir.exists()) {
+            if (new File(commonSubdir, "codenameone_settings.properties").exists()) {
+                return commonSubdir;
+            }
+        }
         
         File f = getCN1ProjectDir(project.getBasedir());
         if (f != null) return f;
@@ -335,6 +341,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         
         return out[0];
     }
+
+
     
     private File cn1libProjectDir;
    
@@ -797,7 +805,37 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             throw new MojoExecutionException("Could not find designer jar");
         }
 
-        return file;
+        File extracted = new File(file.getParentFile(), file.getName()+"-extracted");
+        File designerJar = new File(extracted, "designer_1.jar");
+        if (!designerJar.exists() || designerJar.lastModified() < file.lastModified()) {
+            Expand expand = (Expand)antProject.createTask("unzip");
+            expand.setSrc(file);
+            expand.setDest(extracted);
+            expand.execute();
+        }
+
+
+        if (!designerJar.exists()) {
+            throw new MojoExecutionException("Failed to extract designer_1.jar from artifact "+artifact);
+        }
+        return designerJar;
+    }
+
+    protected boolean isCN1ProjectDir() {
+        if (getCN1ProjectDir() == null) {
+            getLog().debug("Skipping guibuilder because this is not a CN1 project");
+            return false;
+        }
+        try {
+            if (!getCN1ProjectDir().getCanonicalFile().equals(project.getBasedir().getCanonicalFile())) {
+                getLog().debug("Skipping guibuilder because this is not a CN1 project");
+                return false;
+            }
+        } catch (IOException ex) {
+            getLog().error("Failed to get canonical paths for project dir", ex);
+            return false;
+        }
+        return true;
     }
    
 }

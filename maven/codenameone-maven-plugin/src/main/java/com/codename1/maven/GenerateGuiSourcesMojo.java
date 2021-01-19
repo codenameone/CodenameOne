@@ -13,7 +13,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 
 /**
- *
+ * Goal to generate java sources from the guibuilder files.
  * @author shannah
  */
 @Mojo(name="generate-gui-sources", defaultPhase = LifecyclePhase.INITIALIZE)
@@ -21,11 +21,14 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         System.setProperty("javax.xml.bind.context.factory", "com.sun.xml.bind.v2.ContextFactory");
                 
         GenerateGuiSources g = new GenerateGuiSources();
-        g.setSrcDir(new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "java"));
-        g.setGuiDir(new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "guibuilder"));
+        g.setSrcDir(new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "java"));
+        g.setGuiDir(new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "guibuilder"));
         g.execute();
     }
     

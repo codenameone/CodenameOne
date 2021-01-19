@@ -264,13 +264,19 @@
                     </execution>
                 </executions>
             </plugin>
-			
+
             <plugin>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
 
                 <executions>
-                    
+                    <execution>
+                        <id>generate-gui-sources</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>generate-gui-sources</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>

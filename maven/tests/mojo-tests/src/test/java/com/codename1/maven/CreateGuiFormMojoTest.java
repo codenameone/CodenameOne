@@ -41,8 +41,16 @@ public class CreateGuiFormMojoTest {
         ProjectUtil.executeGoal(projectDir, "cn1:create-gui-form", "className=com.codename1.tests.HelloForm");
         File helloFormJava = new File(projectDir, path("src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
         File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
+        // We don't want them created in the root project.
+        // We want them in the common project
+        Assert.assertTrue(!helloFormJava.exists());
+        Assert.assertTrue(!helloFormGui.exists());
+
+        helloFormJava = new File(projectDir, path("common", "src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
+        helloFormGui = new File(projectDir, path("common", "src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
         Assert.assertTrue(helloFormJava.exists());
         Assert.assertTrue(helloFormGui.exists());
+
         String javaContents = FileUtils.readFileToString(helloFormJava, "UTF-8");
         Assert.assertTrue(javaContents.contains("extends com.codename1.ui.Form"));
 
@@ -65,6 +73,13 @@ public class CreateGuiFormMojoTest {
         ProjectUtil.executeGoal(projectDir, "cn1:create-gui-form", "className=com.codename1.tests.HelloForm", "guiType=Container");
         File helloFormJava = new File(projectDir, path("src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
         File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
+        // We don't want them created in the root project.
+        // We want them in the common project
+        Assert.assertTrue(!helloFormJava.exists());
+        Assert.assertTrue(!helloFormGui.exists());
+
+        helloFormJava = new File(projectDir, path("common", "src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
+        helloFormGui = new File(projectDir, path("common", "src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
         Assert.assertTrue(helloFormJava.exists());
         Assert.assertTrue(helloFormGui.exists());
         String javaContents = FileUtils.readFileToString(helloFormJava, "UTF-8");
@@ -88,6 +103,13 @@ public class CreateGuiFormMojoTest {
         ProjectUtil.executeGoal(projectDir, "cn1:create-gui-form", "className=com.codename1.tests.HelloForm", "guiType=Dialog");
         File helloFormJava = new File(projectDir, path("src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
         File helloFormGui = new File(projectDir, path("src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
+        // We don't want them created in the root project.
+        // We want them in the common project
+        Assert.assertTrue(!helloFormJava.exists());
+        Assert.assertTrue(!helloFormGui.exists());
+
+        helloFormJava = new File(projectDir, path("common", "src", "main", "java", "com", "codename1", "tests", "HelloForm.java"));
+        helloFormGui = new File(projectDir, path("common", "src", "main", "guibuilder", "com", "codename1", "tests", "HelloForm.gui"));
         Assert.assertTrue(helloFormJava.exists());
         Assert.assertTrue(helloFormGui.exists());
 
