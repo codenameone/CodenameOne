@@ -594,6 +594,11 @@ extern void repaintUI();
 
 - (void)application:(UIApplication*)application didReceiveLocalNotification:(UILocalNotification*)notification {
     CN1Log(@"Received local notification while running: %@", notification);
+    if( [notification.userInfo valueForKey:@"__ios_id__"] != NULL)
+    {
+        NSString* alertValue = [notification.userInfo valueForKey:@"__ios_id__"];
+        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
+    }
 }
 
 #ifndef CN1_USE_ARC
