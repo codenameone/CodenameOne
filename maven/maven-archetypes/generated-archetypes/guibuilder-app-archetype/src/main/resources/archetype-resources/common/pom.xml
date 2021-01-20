@@ -305,13 +305,6 @@
     <repositories>
         <repository>
             <snapshots>
-            </snapshots>
-            <id>cn1libs</id>
-            <name>cn1libs</name>
-            <url>file:${project.basedir}/../cn1libs</url>
-        </repository>
-        <repository>
-            <snapshots>
                 <enabled>false</enabled>
             </snapshots>
             <id>bintray-codenameone-codenameone</id>

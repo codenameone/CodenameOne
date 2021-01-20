@@ -116,6 +116,18 @@
             <url>https://dl.bintray.com/codenameone/codenameone</url>
         </pluginRepository>
     </pluginRepositories>
-    
+    <profiles>
+        <profile>
+            <id>cn1libs</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/cn1libs/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>cn1libs</module>
+            </modules>
+        </profile>
+    </profiles>
 
 </project>

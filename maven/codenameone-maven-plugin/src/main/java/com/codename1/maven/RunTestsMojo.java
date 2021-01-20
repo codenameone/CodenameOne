@@ -51,7 +51,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
 
     private File getCommonProjectBaseDir() {
         if (isJavaSEProject()) {
-            return new File(project.getBasedir().getParentFile(), "common");
+            return new File(project.getParent().getBasedir(), "common");
         }
         if (isCommonProject()) {
             return project.getBasedir();

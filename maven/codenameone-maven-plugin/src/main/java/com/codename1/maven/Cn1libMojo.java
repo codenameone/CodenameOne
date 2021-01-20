@@ -30,7 +30,12 @@ import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.selectors.FilenameSelector;
 
 /**
+ * This was an early attempt at building a cn1lib format that was based on the legacy cn1lib format.  Ultimately
+ * I decided to change to a completely different strategy for building cn1libs using the cn1lib-archetype
+ * which is a pom project.
  *
+ *
+ * @deprecated To be removed.
  * @author shannah
  */
 @Mojo(name = "cn1lib", defaultPhase = LifecyclePhase.PACKAGE)

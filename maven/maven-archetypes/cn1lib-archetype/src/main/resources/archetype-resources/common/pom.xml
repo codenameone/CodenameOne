@@ -185,10 +185,12 @@
                                         <target>
                                             <mkdir dir="${basedir}/src/main/css" />
                                             <touch file="${basedir}/src/main/css/index.txt" />
-                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}/css" />
-
-                                            <zip destfile="${project.build.directory}/${project.build.finalName}-cn1css.zip" compress="true">
+                                            <mkdir dir="${project.build.directory}/cn1css/META-INF/codenameone/${project.groupId}/${project.artifactId}/css" />
+                                            <copy todir="${project.build.directory}/cn1css/META-INF/codenameone/${project.groupId}/${project.artifactId}/css" >
                                                 <fileset dir="${basedir}/src/main/css" />
+                                            </copy>
+                                            <zip destfile="${project.build.directory}/${project.build.finalName}-cn1css.zip" compress="true">
+                                                <fileset dir="${project.build.directory}/cn1css" />
                                             </zip>
                                             
                                         </target>

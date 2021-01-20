@@ -11,7 +11,7 @@ MAINNAME=$(echo $MAINNAME | perl -nE 'say ucfirst join "", map {ucfirst lc} spli
 echo "mainName: $MAINNAME"
 mvn archetype:generate \
     -DarchetypeArtifactId=cn1app-archetype \
-        -DarchetypeGroupId=com.codenameone \
+        -DarchetypeGroupId=com.codenameone.archetypes \
              -DarchetypeVersion=$VERSION \
                  -DgroupId=${PARTS[0]} \
                      -DartifactId=${PARTS[1]} \

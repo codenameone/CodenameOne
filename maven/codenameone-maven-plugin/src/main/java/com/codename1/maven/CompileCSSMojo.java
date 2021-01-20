@@ -19,6 +19,8 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.FileSet;
 
+import static com.codename1.maven.PathUtil.path;
+
 /**
  * Compiles the project's CSS files, generating a theme.res file which is placed in the build/classes directory.
  *
@@ -41,7 +43,9 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         if (properties.getProperty("codename1.cssTheme", null) == null) {
             getLog().info("CSS themes not activated for this project.  Skipping CSS compilation");
             return;
@@ -76,15 +80,19 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                     expand.execute();
                 }
                 if (extracted.exists()) {
-                    // We expect that the cn1css artifact has a theme.css file at its root
-                    // If found, we add it to the list of inputs.
-                    File theme = new File(extracted, "theme.css");
-                    if (theme.exists()) {
-                        if (inputs.length() > 0) {
-                            inputs.append(",");
+                    File extractedCssDir = new File(extracted, path("META-INF","codenameone", artifact.getGroupId(), artifact.getArtifactId(), "css"));
+                    if (extractedCssDir.exists()) {
+                        // We expect that the cn1css artifact has a theme.css file at its root
+                        // If found, we add it to the list of inputs.
+                        File theme = new File(extractedCssDir, "theme.css");
+                        if (theme.exists()) {
+                            if (inputs.length() > 0) {
+                                inputs.append(",");
+                            }
+                            inputs.append(theme.getAbsolutePath());
                         }
-                        inputs.append(theme.getAbsolutePath());
                     }
+
                 }
             }
         });

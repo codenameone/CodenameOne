@@ -261,7 +261,8 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
             String dependencies = extractDependencies(contents);
             if (!dependencies.isEmpty()) {
                 getLog().info("Injecting dependencies:\n" + dependencies+" \ninto "+pomFile);
-                pomContents = pomContents.replace("<!-- INJECT DEPENDENCIES -->", dependencies);
+                String marker = "<!-- INJECT DEPENDENCIES -->";
+                pomContents = pomContents.replace(marker, dependencies + "\n" + marker);
             }
 
             String properties = extractProperties(contents);

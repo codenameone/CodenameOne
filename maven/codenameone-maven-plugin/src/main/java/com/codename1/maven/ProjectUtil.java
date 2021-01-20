@@ -143,7 +143,8 @@ public class ProjectUtil {
             throw new MojoExecutionException("Failed to run goal "+goalName+" on project at "+projectDir, ex);
         }
     }
-    
+
+
     
     
 }

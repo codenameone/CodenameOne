@@ -95,7 +95,7 @@ If you add a dependency to a library that uses unsupported APIs, you may receive
 There is a large selection of Codename One libraries (i.e. cn1libs) that you can use in your projects that are guaranteed to support the Codename One API.  It is recommended that you use to these libraries rather than "any old java library" you find on Maven central because they have been specially designed to work well on mobile.
 ====
 
-TODO: Add documentation on Adding dependencies, building cn1libs, importing legacy cn1libs, and adding cn1lib maven projects as dependencies.
+
 
 
 
