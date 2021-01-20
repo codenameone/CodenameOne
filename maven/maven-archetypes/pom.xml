@@ -14,7 +14,7 @@
 
 
     <modules>
-        <module>helloworld-archetype</module>
+        <module>cn1app-archetype</module>
         <module>cn1lib-archetype</module>
 
 

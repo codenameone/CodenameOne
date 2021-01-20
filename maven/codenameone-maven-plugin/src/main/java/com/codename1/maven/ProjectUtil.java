@@ -77,7 +77,7 @@ public class ProjectUtil {
     }
 
     /**
-     * Generates a hello world project from the helloworld-archetype at the given location.
+     * Generates a hello world project from the cn1app-archetype at the given location.
      * @param destDir The destination directory where the project should be created.  The name of this file will be used as the archetypeId, and the mainName
      * @param groupId The groupId for the project
      * @throws MojoExecutionException If it fails to generate the project.
@@ -90,7 +90,7 @@ public class ProjectUtil {
         req.setGoals(Collections.singletonList("archetype:generate"));
         Properties props = new Properties();
         props.setProperty("archetypeGroupId", "com.codenameone.archetypes");
-        props.setProperty("archetypeArtifactId", "helloworld-archetype");
+        props.setProperty("archetypeArtifactId", "cn1app-archetype");
         String version = System.getProperty("codename1.version");
         if (version == null) {
             throw new IllegalStateException("generateHelloProject requires that the codename1.version System property be set.");

@@ -38,7 +38,7 @@ package ${package};
 /*
 [archetype] <1>
 ----
-extends=../helloworld-archetype <2>
+extends=../cn1app-archetype <2>
 groupId=com.codenameone.archetypes
 artifactId=helloworld2-archetype
 version=7.0-SNAPSHOT
@@ -138,7 +138,7 @@ This is a required section and specifies both the location of the base archetype
 -----
 [archetype]
 ----
-extends=../helloworld-archetype
+extends=../cn1app-archetype
 groupId=com.codenameone.archetypes
 artifactId=helloworld2-archetype
 version=7.0-SNAPSHOT
@@ -148,7 +148,7 @@ version=7.0-SNAPSHOT
 **Properties**
 
 extends::
-Required. The path to the archetype project that this is based on.  This should usually be the `helloworld-archetype` project as it includes the placeholders that this generator relies on for injecting content into the pom.xml file and its project structure was used as a basis for developing this mojo.
+Required. The path to the archetype project that this is based on.  This should usually be the `cn1app-archetype` project as it includes the placeholders that this generator relies on for injecting content into the pom.xml file and its project structure was used as a basis for developing this mojo.
 
 groupId::
 The groupID of the resulting archetype project.  You can alternatively use the `id` property to specify `groupId`, `artifactId` and `version` in a single string.

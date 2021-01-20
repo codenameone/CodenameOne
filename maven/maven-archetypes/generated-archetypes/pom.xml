@@ -13,8 +13,6 @@
     <packaging>pom</packaging>
     
     <modules>
-<module>helloworld3-archetype</module>
-<module>helloworld2-archetype</module>
-<module>helloworld-guibuilder-archetype</module>
+<module>guibuilder-app-archetype</module>
 </modules>
 </project>
