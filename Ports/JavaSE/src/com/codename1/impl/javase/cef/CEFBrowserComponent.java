@@ -155,9 +155,14 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static String[] createArgs() {
         List<String> args = new ArrayList<String>();
         if (isMac) {
-            args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
-            args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
-            args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
+            if (!"true".equals(System.getProperty("cn1.cef.bundled"))) {
+                // The cn1.cef.bundled flag is set in SEWrapper to indicate that CEF is bundled in the .app
+                // Otherwise it needs to get CEF from the central location specified 
+                args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
+                args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
+                args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
+            }
+            
             args.add("--disable-gpu");
         } else if (isWindows) {
             // no extra stuff here
