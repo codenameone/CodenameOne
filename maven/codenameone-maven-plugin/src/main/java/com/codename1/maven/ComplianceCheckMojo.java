@@ -168,14 +168,14 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             }
         }
         if (passNum == 0) {
-
+            getLog().debug("Compliance check pass 0");
             // In the first pass we don't want any warnings or errors.
             // So let's pile on here anything necessary to make that happen.
-            java.createArg().setValue("-dontwarn");
-            java.createArg().setValue("**");
+            java.createArg().setValue("-dontwarn **");
+            //java.createArg().setValue("**");
             java.createArg().setValue("-ignorewarnings");
         }
-        
+
         int result = java.executeJava();
 
         if (result != 0) {
