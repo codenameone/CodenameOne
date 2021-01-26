@@ -65,3 +65,5 @@ node_modules
 **/genfiles.properties
 **/private/private.properties
 .idea/
+target
+pom.xml.versionsBackup
