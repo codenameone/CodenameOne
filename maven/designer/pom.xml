@@ -128,6 +128,9 @@
         <resources>
             <resource>
                 <directory>${src.dir}</directory>
+                <excludes>
+                    <exclude>**/*.java</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
@@ -141,159 +144,21 @@
             <id>cn1-binaries</id>
             <activation>
                 <file>
-                    <exists>${basedir}/../../../cn1-binaries</exists>
+                    <exists>${maven.multiModuleProjectDirectory}/target/cn1-binaries</exists>
                 </file>
             </activation>
             <properties>
-                <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
+                <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
             </properties>
             <dependencies>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-appcompat</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-appcompat.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-cardview</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-cardview.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-gridlayout</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-gridlayout.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>google-services</artifactId>
-                    <version>3.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/google-services-3.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-auth</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-auth-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-base</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-base-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-basement</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-basement-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-location</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-location-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>facebook</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/facebook.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>google-play-services</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/google-play-services.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>zooz_iap</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/zooz_iap.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-v4</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-v4-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-compat-v4</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-compat-v4-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-media-compat</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-media-compat-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-core-utils</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-core-utils-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-annotations</artifactId>
-                    <version>26.1.0-alpha1</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-annotations-26.0.0-alpha1.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-core-ui</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-core-ui-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-fragment</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-fragment-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-tasks</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-tasks-12.0.0.jar</systemPath>
-                </dependency>
+
             </dependencies>
             <build>
                 <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
+                    <version>3.3.0</version>
                     <executions>
                         <execution>
                             <phase>package</phase>

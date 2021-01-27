@@ -67,6 +67,13 @@
                 <artifactId>codenameone-javase</artifactId>
                 <version>${cn1.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-buildclient</artifactId>
+                <version>${cn1.version}</version>
+                <scope>system</scope>
+                <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+            </dependency>
             
 
         </dependencies>

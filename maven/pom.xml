@@ -69,12 +69,12 @@
         <java-tests.version>11</java-tests.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
-        <cn1.binaries>${basedir}/../../cn1-binaries</cn1.binaries>
+        <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
         
         <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
-        <module>build-client</module>
+
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
@@ -134,12 +134,6 @@
                 <type>pom</type>
             </dependency>
            
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-buildclient</artifactId>
-                <version>${project.version}</version>
-               
-            </dependency>
 
                   
             <dependency>
@@ -331,6 +325,7 @@
         </pluginRepository>
     </pluginRepositories>
     <profiles>
+
         <profile>
             <id>download-cn1-binaries</id>
             <activation>
@@ -341,16 +336,18 @@
                     <plugin>
 
                         <artifactId>maven-antrun-plugin</artifactId>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
+
                         <executions>
                             <execution>
                                 <id>download-cn1-binaries</id>
                                 <phase>initialize</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
                                 <configuration>
                                     <target>
-                                        <exec executable="git" dir="${basedir}/../..">
+                                        <mkdir dir="${maven.multiModuleProjectDirectory}/target"/>
+                                        <exec executable="git" dir="${maven.multiModuleProjectDirectory}/target">
                                             <arg value="clone"/>
                                             <arg value="https://github.com/codenameone/cn1-binaries"/>
                                         </exec>
@@ -362,12 +359,37 @@
                 </plugins>
             </build>
         </profile>
-
         <profile>
             <id>build-client</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/../../BuildClient</exists>
+                </file>
+            </activation>
             <modules>
                 <module>build-client</module>
             </modules>
+
+        </profile>
+        <profile>
+            <id>add-client-dependency</id>
+            <activation>
+                <file>
+                    <missing>${basedir}/../../BuildClient</missing>
+                </file>
+
+            </activation>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <version>${project.version}</version>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-buildclient</artifactId>
+                        <scope>system</scope>
+                        <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
         </profile>
         <profile>
             <id>tests</id>
@@ -375,6 +397,44 @@
                 <module>tests</module>
             </modules>
         
+        </profile>
+        <profile>
+            <id>install-cn1</id>
+            <activation>
+                <file>
+                    <missing>${user.home}/.codenameone/CodeNameOneBuildClient.jar</missing>
+                </file>
+
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <id>install-cn1</id>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${user.home}/.codenameone"/>
+                                        <mkdir dir="${project.build.directory}/generated-sources/project" />
+                                        <mkdir dir="${project.build.directory}/generated-sources/project/lib" />
+                                        <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar" dest="${user.home}/.codenameone/UpdateCodenameOne.jar" skipexisting="true"/>
+                                        <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
+                                            <arg value="${project.build.directory}/generated-sources/project"/>
+                                            <arg value="force" />
+                                        </java>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
     

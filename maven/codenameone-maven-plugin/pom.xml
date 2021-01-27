@@ -74,6 +74,9 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
+            <version>${cn1.version}}</version>
+            <scope>system</scope>
+            <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
         
         <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->

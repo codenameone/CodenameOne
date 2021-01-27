@@ -27,6 +27,7 @@
         <maven.compiler.target>6</maven.compiler.target>
         <src.dir>../../Ports/Android/src</src.dir>
 		<android.sdk.version>25.3.0</android.sdk.version>
+        <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
     </properties>
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>
@@ -42,16 +43,13 @@
    
     
     <profiles>
+
         <profile>
             <id>cn1-binaries</id>
             <activation>
-                <file>
-                    <exists>${basedir}/../../../cn1-binaries</exists>
-                </file>
+                <property><name>java.home</name></property>
             </activation>
-            <properties>
-                <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
-            </properties>
+
             <dependencies>
                 <dependency>
                     <groupId>com.codenameone.cn1binaries</groupId>
