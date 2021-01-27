@@ -25,31 +25,41 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>6</maven.compiler.source>
         <maven.compiler.target>6</maven.compiler.target>
-        <src.dir>../../Ports/Android/src</src.dir>
+        <src.dir>src/main/java</src.dir>
+        <real.src.dir>../../Ports/Android/src</real.src.dir>
 		<android.sdk.version>25.3.0</android.sdk.version>
-        <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
     </properties>
+
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>
-        <resources>
-            <resource>
-                <directory>${src.dir}</directory>
-            </resource>
-        </resources>
-        <plugins>
-            
-        </plugins>
     </build>
-   
     
     <profiles>
-
         <profile>
-            <id>cn1-binaries</id>
             <activation>
-                <property><name>java.home</name></property>
+                <activeByDefault>true</activeByDefault>
             </activation>
+            <id>bundle-android</id>
 
+            <build>
+
+
+                <resources>
+                    <resource>
+                        <directory>${real.src.dir}</directory>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+        <profile>
+            <id>compile-android</id>
+            <activation>
+                <file><exists>${cn1.binaries}</exists></file>
+                <property><name>cn1.binaries</name></property>
+            </activation>
+            <properties>
+                <src.dir>../../Ports/Android/src</src.dir>
+            </properties>
             <dependencies>
                 <dependency>
                     <groupId>com.codenameone.cn1binaries</groupId>
@@ -192,8 +202,19 @@
                     <systemPath>${cn1.binaries}/android/play-services-tasks-12.0.0.jar</systemPath>
                 </dependency>
             </dependencies>
+
             <build>
+
+
+                    <resources>
+                        <resource>
+                            <directory>${src.dir}</directory>
+                        </resource>
+                    </resources>
+
+
                 <plugins>
+
                     <plugin>
                         <artifactId>maven-assembly-plugin</artifactId>
                         <version>3.3.0</version>

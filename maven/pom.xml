@@ -326,6 +326,7 @@
     </pluginRepositories>
     <profiles>
 
+        <!--
         <profile>
             <id>download-cn1-binaries</id>
             <activation>
@@ -391,6 +392,7 @@
                 </dependencies>
             </dependencyManagement>
         </profile>
+        -->
         <profile>
             <id>tests</id>
             <modules>

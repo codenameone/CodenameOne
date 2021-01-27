@@ -134,27 +134,7 @@
             </resource>
         </resources>
         <plugins>
-            
-        </plugins>
-    </build>
-   
-    
-    <profiles>
-        <profile>
-            <id>cn1-binaries</id>
-            <activation>
-                <file>
-                    <exists>${maven.multiModuleProjectDirectory}/target/cn1-binaries</exists>
-                </file>
-            </activation>
-            <properties>
-                <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
-            </properties>
-            <dependencies>
 
-            </dependencies>
-            <build>
-                <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
@@ -231,7 +211,6 @@
                             </plugin>
                   </plugins>
             </build>
-        </profile>
-    </profiles>
+
     
 </project>
