@@ -64,9 +64,11 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -307,6 +309,17 @@ public class Util {
             out.writeInt(size);
             for(int iter = 0 ; iter < size ; iter++) {
                 writeObject(v.elementAt(iter), out);
+            }
+            return;
+        }
+
+        if(o instanceof Set) {
+            Collection v = (Collection)o;
+            out.writeUTF("java.util.Set");
+            int size = v.size();
+            out.writeInt(size);
+            for(Object cur : v) {
+                writeObject(cur, out);
             }
             return;
         }
@@ -688,6 +701,14 @@ public class Util {
                 int size = input.readInt();
                 for(int iter = 0 ; iter < size ; iter++) {
                     v.put(readObject(input), readObject(input));
+                }
+                return v;
+            }
+            if ("java.util.Set".equals(type)) {
+                Collection v = new HashSet();
+                int size = input.readInt();
+                for (int iter = 0; iter < size; iter++) {
+                    v.add(readObject(input));
                 }
                 return v;
             }
