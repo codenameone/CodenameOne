@@ -630,6 +630,10 @@ public class CN1CSSCLI {
                 throw new IllegalArgumentException("Output path is required.  Use -o [filepath] or -output [filepath]");
             }
             watchmode = "true".equals(getArgByName(args, "watch"));
+            if (watchmode && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
+                // In watch mode we require CEF to be loaded
+                throw new MissingNativeBrowserException();
+            }
             mergedFile = getArgByName(args, "m", "merge");
             
             mergeMode = inputPath.contains(",") || mergedFile != null;
