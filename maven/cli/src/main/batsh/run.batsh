@@ -1,0 +1,28 @@
+function simulator() {
+    call("mvn", "verify", "-Psimulator", "-DskipTests", "-Dcodename1.platform=javase");
+}
+
+function desktop() {
+    call("mvn", "verify", "-Prun-desktop", "-DskipTests", "-Dcodename1.platform=javase");
+}
+
+function settings() {
+    call("mvn", "cn:settings");
+}
+
+function help() {
+    println("run.sh [COMMAND]");
+    println("Commands:");
+    println("  simulator");
+    println("    Runs app using Codename One Simulator");
+    println("  desktop");
+    println("    Runs app as a desktop app.");
+}
+
+
+bash("CMD=$1");
+batch("SET CMD=%1");
+if (CMD=="") {
+    CMD = "simulator";
+}
+call(CMD);

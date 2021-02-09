@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>7.0-SNAPSHOT</version>
+    </parent>
+    <groupId>com.codenameone</groupId>
+    <artifactId>maven-cli-wrapper</artifactId>
+    <version>7.0-SNAPSHOT</version>
+
+    <name>Maven CLI Wrapper</name>
+    <packaging>pom</packaging>
+
+
+
+
+
+    <build>
+
+        <plugins>
+                <plugin>
+                    <artifactId>maven-antrun-plugin</artifactId>
+
+                    <executions>
+                       <execution>
+                           <id>Compile batsh files</id>
+                           <phase>package</phase>
+                           <goals><goal>run</goal></goals>
+                           <configuration>
+                               <target>
+                                   <mkdir dir="${project.build.directory}"/>
+                                   <exec dir="${project.build.directory}" executable="php" failonerror="true">
+                                       <arg path="${project.basedir}/tools/batsh.php"/>
+                                       <arg path="${project.basedir}/src/main/batsh/run.batsh"/>
+                                   </exec>
+                                   <exec dir="${project.build.directory}" executable="php" failonerror="true">
+                                       <arg path="${project.basedir}/tools/batsh.php"/>
+                                       <arg path="${project.basedir}/src/main/batsh/build.batsh"/>
+                                   </exec>
+                                   <mkdir dir="${project.build.directory}/generated-sources/bash"/>
+                                   <mkdir dir="${project.build.directory}/generated-sources/bat"/>
+
+                                   <copy todir="${project.build.directory}/generated-sources/bash">
+                                       <fileset dir="${project.build.directory}/build" includes="*.sh"/>
+                                   </copy>
+                                   <copy todir="${project.build.directory}/generated-sources/bat">
+                                       <fileset dir="${project.build.directory}/build" includes="*.bat"/>
+                                   </copy>
+                                   <delete dir="${project.build.directory}/build"/>
+                               </target>
+
+                           </configuration>
+                       </execution>
+                        <execution>
+                            <id>install-into-archetype</id>
+                            <phase>install</phase>
+                            <goals><goal>run</goal></goals>
+                            <configuration>
+                                <target>
+                                    <copy todir="${project.basedir}/../maven-archetypes/cn1app-archetype/src/main/resources/archetype-resources" overwrite="true">
+                                        <fileset dir="${project.build.directory}/generated-sources/bat" includes="*.bat"/>
+                                        <fileset dir="${project.build.directory}/generated-sources/bash" includes="*.sh"/>
+                                    </copy>
+                                    <chmod perm="755">
+                                        <fileset dir="${project.basedir}/../maven-archetypes/cn1app-archetype/src/main/resources/archetype-resources" includes="*.sh, *.bat" />
+
+                                    </chmod>
+                                </target>
+                            </configuration>
+                        </execution>
+
+                    </executions>
+
+                </plugin>
+        </plugins>
+    </build>
+</project>

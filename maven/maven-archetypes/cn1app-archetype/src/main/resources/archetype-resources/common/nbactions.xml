@@ -1,23 +1,24 @@
-#set( $symbol_pound = '#' )
-#set( $symbol_dollar = '$' )
-#set( $symbol_escape = '\' )
 <?xml version="1.0" encoding="UTF-8"?>
 <actions>
         <action>
             <actionName>run</actionName>
-            <preAction>build-with-dependencies</preAction>
             <packagings>
                 <packaging>jar</packaging>
             </packagings>
             <goals>
-                <goal>org.codehaus.mojo:exec-maven-plugin:3.0.0:exec</goal>
+                <goal>cn1:run</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>debug</actionName>
+            <packagings>
+                <packaging>jar</packaging>
+            </packagings>
+            <goals>
+                <goal>cn1:debug</goal>
             </goals>
             <properties>
-                <exec.executable>${symbol_dollar}{Env.M2_HOME}/bin/mvn</exec.executable>
-                <exec.args>verify -P simulator -Dcodename1.platform=javase</exec.args>
-                <exec.workingdir>../javase</exec.workingdir>
-                
-                
+                <jpda.listen>true</jpda.listen>
             </properties>
         </action>
     </actions>

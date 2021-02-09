@@ -7,6 +7,8 @@ package com.codename1.maven;
 
 
 import java.io.File;
+import java.io.IOException;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -55,6 +57,22 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         if (cssDirectory == null || !cssDirectory.exists()) {
             getLog().warn("CSS compilation skipped because no CSS theme was found");
             return;
+        }
+        File themeResOutput = new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res");
+        // target/css
+        File cssBuildDir = new File(project.getBuild().getDirectory() + File.separator + "css");
+        cssBuildDir.mkdirs();
+
+        // target/css/theme.css - the merged CSS file
+        File mergeFile = new File(cssBuildDir, "theme.css");
+        mergeFile.getParentFile().mkdirs();
+        try {
+            if (themeResOutput.exists() && getCSSSourcesModificationTime() < themeResOutput.lastModified()) {
+                getLog().info("CSS sources unchanged since last compile.  Skipping CSS compilation");
+                return;
+            }
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to check CSS file modification times", ex);
         }
 
         // Compile a comma-delimited list a CSS files that will be sent to the CSS compiler as inputs.
@@ -108,13 +126,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
             inputs.append(cssTheme.getAbsolutePath());
         }
 
-        // target/css
-        File cssBuildDir = new File(project.getBuild().getDirectory() + File.separator + "css");
-        cssBuildDir.mkdirs();
 
-        // target/css/theme.css - the merged CSS file
-        File mergeFile = new File(cssBuildDir, "theme.css");
-        mergeFile.getParentFile().mkdirs();
 
         // Run the CSS compiler which is contained inside the codenameone-designer jar
         // NOTE: The codenameone-designer.jar is a dependency of the codenameone-maven-plugin as
@@ -135,7 +147,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         java.createArg().setValue(inputs.toString());
         
         java.createArg().setValue("-output");
-        java.createArg().setFile(new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res"));
+        java.createArg().setFile(themeResOutput);
         
         java.createArg().setValue("-merge");
         java.createArg().setFile(mergeFile);

@@ -46,6 +46,7 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
             <version>${cn1.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
     <profiles>

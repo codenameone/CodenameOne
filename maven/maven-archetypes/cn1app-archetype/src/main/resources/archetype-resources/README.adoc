@@ -1,0 +1,111 @@
+= Codename One Project
+
+This project is a multi-module Maven project that was generated from a Maven archetype.
+
+== Run Instructions
+
+This project can be run from the command line using maven directly, or using the `run.[sh|bat]` wrapper script.
+
+=== Using the `run.[sh|bat]` wrapper script
+
+Run in simulator::
++
+[source,bash]
+----
+./run.sh
+----
+
+Run Desktop App::
++
+[source,bash]
+----
+./run.sh desktop
+----
+
+== Build Instructions
+
+This project can be built from the command line using maven directly, or using the `build.[sh|bat]` wrapper script.
+
+=== Using the `build.[sh|bat]` wrapper script
+
+==== Local Build Targets
+
+The following build targets will be run on your local machine.
+
+jar::
+Builds a portable executable Jar that runs on any platform supporting JavaSE (e.g. Mac, Windows, Linux, etc..).  **Default target**
++
+====
+*Example*
+
+.Building an executable jar
+[source,bash]
+----
+./build.sh jar
+----
+
+Since "jar" is the default target, the above is equivalent to running:
+
+[source,bash]
+----
+./build.sh
+----
+====
+
+ios_source::
+Generates an Xcode project for an iOS app that can be opened and built in Xcode.  *Requires that you have a Mac with Xcode installed*.  Project will be created in the `ios/generated-sources` directory.
++
+====
+**Example**
+
+.Generating an Xcode project
+[source,bash]
+----
+./build.sh ios_source
+----
+====
+
+android_source::
+Generates an adroid gradle project for an Android app that can be opened and built in Android Studio.  *Requires that you have Android developer tools and gradle installed.  `ANDROID_HOME` environment variable should point to android sdk.  Either `GRADLE_HOME` environment variable should point to gradle home, or gradle should be in your PATH.  Project will be created in the `android/generated-sources` directory.
++
+====
+**Example**
+
+.Generating a gradle android project
+[source,bash]
+----
+ANDROID_HOME=/path/to/android-sdk ./build.sh android_source
+----
+====
+
+==== Build Server Targets
+
+The following targets will intiate a build on the Codename One build server.
+
+ios::
+Build for iOS using the Codename One build server.
+
+ios-release::
+Build an iOS app for submission to Apple app store.
+
+android::
+Build apk/aab for Android using the Codename One build server.
+
+mac_desktop::
+Build a Mac desktop app.
++
+*Mac desktop builds Require a Pro account*
+
+windows_desktop::
+Build a Windows desktop app.
++
+*Windows desktop builds require a Pro account*
+
+windows_device::
+Build a Windows (UWP) app.
+
+javascript::
+Build a web app (compiled to javascript using TeaVM).
++
+*Javascript builds require an Enterprise Account*
+

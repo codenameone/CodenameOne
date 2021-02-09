@@ -17,16 +17,13 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <codename1.platform>javase</codename1.platform>
+      <codename1.projectPlatform>javase</codename1.projectPlatform>
   </properties>
     <build>
     <testSourceDirectory>${project.basedir}/../common/src/test/java</testSourceDirectory>
     </build>
 
   <dependencies>
-      <dependency>
-          <groupId>com.codenameone</groupId>
-          <artifactId>codenameone-javase</artifactId>
-      </dependency>
       <dependency>
           <groupId>${project.groupId}</groupId>
           <artifactId>${cn1app.name}-common</artifactId>
@@ -39,19 +36,231 @@
           <classifier>tests</classifier>
           <scope>test</scope>
       </dependency>
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-core</artifactId>
+          <scope>test</scope>
+      </dependency>
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-javase</artifactId>
+          <scope>test</scope>
+      </dependency>
 
   </dependencies>
   
   <profiles>
       <profile>
+          <id>executable-jar</id>
+          <properties>
+              <codename1.platform>javase</codename1.platform>
+              <exec.mainClass>${package}.${mainName}Stub</exec.mainClass>
+          </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+
+          </dependencies>
+          <build>
+              <resources>
+                  <resource><directory>src/main/resources</directory></resource>
+                  <resource><directory>src/desktop/resources</directory></resource>
+              </resources>
+              <plugins>
+                  <plugin>
+                      <groupId>org.codehaus.mojo</groupId>
+                      <artifactId>properties-maven-plugin</artifactId>
+                      <version>1.0.0</version>
+                      <executions>
+                          <execution>
+                              <phase>initialize</phase>
+                              <goals>
+                                  <goal>read-project-properties</goal>
+                              </goals>
+                              <configuration>
+                                  <files>
+                                      <file>${basedir}/../common/codenameone_settings.properties</file>
+                                  </files>
+                              </configuration>
+                          </execution>
+                      </executions>
+                  </plugin>
+                  <plugin>
+                      <groupId>com.codenameone</groupId>
+                      <artifactId>codenameone-maven-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>generate-icons</id>
+                              <phase>generate-sources</phase>
+                              <goals>
+                                  <goal>generate-desktop-app-wrapper</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-dependency-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>copy-dependencies</id>
+                              <phase>prepare-package</phase>
+                              <goals>
+                                  <goal>copy-dependencies</goal>
+                              </goals>
+                              <configuration>
+                                  <outputDirectory>
+                                      ${project.build.directory}/libs
+                                  </outputDirectory>
+                              </configuration>
+                          </execution>
+                      </executions>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-jar-plugin</artifactId>
+                      <configuration>
+                          <archive>
+                              <manifest>
+                                  <addClasspath>true</addClasspath>
+                                  <classpathPrefix>libs/</classpathPrefix>
+                                  <mainClass>
+                                      ${codename1.packageName}.${codename1.mainName}Stub
+                                  </mainClass>
+                              </manifest>
+                          </archive>
+                      </configuration>
+                  </plugin>
+
+              </plugins>
+          </build>
+      </profile>
+      <profile>
+          <id>run-desktop</id>
+          <properties>
+              <codename1.platform>javase</codename1.platform>
+              <exec.mainClass>${package}.${mainName}Stub</exec.mainClass>
+          </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+
+          </dependencies>
+          <build>
+              <resources>
+                  <resource><directory>src/main/resources</directory></resource>
+                  <resource><directory>src/desktop/resources</directory></resource>
+              </resources>
+              <plugins>
+                  <plugin>
+                      <groupId>com.codenameone</groupId>
+                      <artifactId>codenameone-maven-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>generate-icons</id>
+                              <phase>generate-sources</phase>
+                              <goals>
+                                  <goal>generate-desktop-app-wrapper</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.codehaus.mojo</groupId>
+                      <artifactId>exec-maven-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>run-desktop</id>
+                              <phase>verify</phase>
+                              <goals>
+                                  <goal>java</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </profile>
+      <profile>
+          <id>desktop_build</id>
+          <activation>
+              <property>
+                  <name>codename1.buildTarget</name>
+              </property>
+          </activation>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>provided</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>provided</scope>
+              </dependency>
+
+          </dependencies>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>com.codenameone</groupId>
+                      <artifactId>codenameone-maven-plugin</artifactId>
+                      <version>${cn1.version}</version>
+                      <executions>
+                          <execution>
+                              <id>build-desktop-macosx</id>
+                              <phase>package</phase>
+                              <goals>
+                                  <goal>build</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+
+              </plugins>
+          </build>
+      </profile>
+      <profile>
           <id>test</id>
           <activation>
-              <activeByDefault>true</activeByDefault>
+              <property>
+                      <name>!skipTests</name>
+              </property>
           </activation>
           <properties>
               <codename1.platform>javase</codename1.platform>
               <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
           </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+          </dependencies>
           <build>
               <plugins>
                   <plugin>
@@ -76,14 +285,80 @@
       </profile>
       <profile>
           <id>debug-simulator</id>
-          <activation>
-              <property><name>debug</name></property>
-          </activation>
           <properties>
-              <codename1.exec.args.debug>-Xdebug</codename1.exec.args.debug>
-              <codename1.jdwp.port>8888</codename1.jdwp.port>
-              <codename1.exec.args.runjdwp.transport>-Xrunjdwp:transport=dt_socket,address=${codename1.jdwp.port},server=y,suspend=n</codename1.exec.args.runjdwp.transport>
+              <codename1.platform>javase</codename1.platform>
+              <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+              <jpda.listen>true</jpda.listen>
           </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+          </dependencies>
+          <build>
+              <plugins>
+                  <plugin>
+                      <!-- Set some properties required by the simulator, such as the
+                            main class, and the CSS args. -->
+                      <groupId>com.codenameone</groupId>
+                      <artifactId>codenameone-maven-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>prepare-simulator-environment</id>
+                              <phase>initialize</phase>
+                              <goals>
+                                  <goal>prepare-simulator-classpath</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+
+                  <plugin>
+                      <groupId>org.codehaus.mojo</groupId>
+                      <artifactId>exec-maven-plugin</artifactId>
+                      <configuration>
+                          <workingDirectory>${basedir}/../common</workingDirectory>
+
+                          <executable>java</executable>
+                          <longClasspath>true</longClasspath>
+                          <arguments>
+                              <argument>-XX:MaxPermSize=128M</argument>
+                              <argument>-Xdebug</argument>
+                              <argument>-Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address}</argument>
+                              <argument>-Xmx1024M</argument>
+                              <argument>-Xmx1024M</argument>
+                              <argument>-Dcef.dir=${cef.dir}</argument>
+                              <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
+                              <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
+                              <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
+                              <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
+                              <argument>${codename1.exec.args.debug}</argument>
+                              <argument>${codename1.exec.args.runjdwp.transport}</argument>
+                              <argument>-classpath</argument>
+                              <classpath />
+                              <argument>${exec.mainClass}</argument>
+                              <argument>${codename1.mainClass}</argument>
+                          </arguments>
+                      </configuration>
+                      <executions>
+                          <execution>
+                              <id>run-in-simulator</id>
+                              <phase>verify</phase>
+                              <goals>
+                                  <goal>exec</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
       </profile>
       <profile>
           <id>simulator</id>
@@ -91,6 +366,18 @@
               <codename1.platform>javase</codename1.platform>
               <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
           </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+          </dependencies>
           <build>
               <plugins>
                   <plugin>

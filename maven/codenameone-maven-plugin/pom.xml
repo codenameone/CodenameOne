@@ -132,6 +132,74 @@
             <version>5.4.2</version>
             <scope>test</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-vfs2 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-vfs2</artifactId>
+
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-util -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-util</artifactId>
+
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-commons</artifactId>
+
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/javassist/javassist -->
+        <dependency>
+            <groupId>javassist</groupId>
+            <artifactId>javassist</artifactId>
+
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-builder-resources-common</artifactId>
+            <scope>runtime</scope>
+
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-builder-resources-android</artifactId>
+
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-ios</artifactId>
+            <version>${cn1.version}</version>
+            <classifier>bundle</classifier>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${cn1.version}</version>
+            <classifier>bundle</classifier>
+        </dependency>
 
     </dependencies>
 

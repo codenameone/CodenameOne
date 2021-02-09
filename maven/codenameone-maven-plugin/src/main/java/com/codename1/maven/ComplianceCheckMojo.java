@@ -6,10 +6,13 @@
 package com.codename1.maven;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -20,6 +23,8 @@ import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.taskdefs.Javac;
 import org.apache.tools.ant.types.Path;
 
+import static com.codename1.maven.PathUtil.path;
+
 /**
  * Mojo used in the compliance check.  This uses proguard strip out all unused classes, then check the remaining
  * classes to ensure that they don't use any APIs that aren't available in Codename One.
@@ -29,13 +34,21 @@ import org.apache.tools.ant.types.Path;
 @Mojo(name = "compliance-check", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.TEST)
 public class ComplianceCheckMojo extends AbstractCN1Mojo {
 
+    private File complianceOutputFile;
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (!isCN1ProjectDir()) {
             return;
         }
+        complianceOutputFile = new File(path(project.getBuild().getDirectory(), "codenameone", "compliance_check.txt"));
         getLog().info("Running compliance check against Codename One Java Runtime API");
         getLog().info("See https://www.codenameone.com/javadoc/ for supported Classes and Methods");
+
+        if (!hasChangedSinceLastCheck()) {
+            getLog().info("Sources haven't changed since the last compliance check. Skipping check");
+            return;
+        }
+
 
         // Kotlin incrementable compilation seems to store its output in a different directory.
         // We need to copy it into the classes directory for proguard to work.
@@ -43,6 +56,29 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
 
         // Run proguard.
         runProguard();
+        complianceOutputFile.getParentFile().mkdirs();
+        try {
+            FileUtils.writeStringToFile(complianceOutputFile, "Completed compliance check on " + project.getName(), "UTF-8");
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to write compliance file");
+        }
+    }
+
+    private boolean hasChangedSinceLastCheck() {
+
+        if (!complianceOutputFile.exists()) {
+            return true;
+        }
+        try {
+            if (getSourcesModificationTime(true) > complianceOutputFile.lastModified()) {
+                return true;
+            }
+        } catch (IOException ex) {
+            getLog().error("Failed to check sources modification time for compliance check", ex);
+        }
+
+        return false;
+
     }
 
     /**

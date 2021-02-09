@@ -22,7 +22,6 @@
 
     <modules>
         <module>common</module>
-        <module>javase</module>
     </modules>
     <!--
   <distributionManagement>
@@ -67,6 +66,7 @@
                 <artifactId>codenameone-javase</artifactId>
                 <version>${cn1.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-buildclient</artifactId>
@@ -124,6 +124,30 @@
         </pluginRepository>
     </pluginRepositories>
     <profiles>
+        <profile>
+            <id>javascript</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javascript</value>
+                </property>
+            </activation>
+            <modules>
+                <module>javascript</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>javase</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
+            </activation>
+            <modules>
+                <module>javase</module>
+            </modules>
+        </profile>
         <profile>
             <id>cn1libs</id>
             <activation>

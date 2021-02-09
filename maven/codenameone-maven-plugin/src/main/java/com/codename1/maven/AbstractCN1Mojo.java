@@ -6,6 +6,8 @@
 package com.codename1.maven;
 
 import com.codename1.ant.SortedProperties;
+
+import static com.codename1.maven.PathUtil.path;
 import static com.codename1.maven.ProjectUtil.wrap;
 import java.io.File;
 import java.io.FileInputStream;
@@ -87,7 +89,70 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     protected Properties properties;
 
-    
+    protected long getSourcesModificationTime() throws IOException {
+        return getSourcesModificationTime(false);
+    }
+
+    protected long getCSSSourcesModificationTime() throws IOException {
+        long mTime = 0;
+        File root = getCN1ProjectDir().getCanonicalFile().getParentFile();
+        File commonSources = new File(root, path("common", "src", "main", "css"));
+        if (commonSources.exists()) {
+            mTime = Math.max(mTime, lastModifiedRecursive(commonSources, ALL_FILES_FILTER));
+        }
+
+
+        File codenameOneSettings = new File(root, "common" + File.separator + "codenameone_settings.properties");
+        if (codenameOneSettings.exists()) {
+            mTime = Math.max(mTime, codenameOneSettings.lastModified());
+        }
+
+        File pomFile = new File(root, "common" + File.separator + "pom.xml");
+        if (pomFile.exists()) {
+            mTime = Math.max(mTime, pomFile.lastModified());
+        }
+
+        return mTime;
+    }
+
+    protected long getSourcesModificationTime(boolean commonOnly) throws IOException {
+        long mTime = 0;
+        File root = getCN1ProjectDir().getCanonicalFile().getParentFile();
+        File commonSources = new File(root, "common" + File.separator + "src");
+        if (commonSources.exists()) {
+            mTime = Math.max(mTime, lastModifiedRecursive(commonSources, ALL_FILES_FILTER));
+        }
+        if (!commonOnly) {
+            String platform = project.getProperties().getProperty("codename1.platform");
+            if (platform != null) {
+                File platformSourcesDir = new File(root, platform + File.separator + "src");
+                if (platformSourcesDir.exists()) {
+                    mTime = Math.max(mTime, lastModifiedRecursive(platformSourcesDir, ALL_FILES_FILTER));
+                }
+            }
+        }
+
+        File codenameOneSettings = new File(root, "common" + File.separator + "codenameone_settings.properties");
+        if (codenameOneSettings.exists()) {
+            mTime = Math.max(mTime, codenameOneSettings.lastModified());
+        }
+
+        File pomFile = new File(root, "common" + File.separator + "pom.xml");
+        if (pomFile.exists()) {
+            mTime = Math.max(mTime, pomFile.lastModified());
+        }
+
+        if (!commonOnly) {
+            String platform = project.getProperties().getProperty("codename1.platform");
+            pomFile = new File(root, platform + File.separator + "pom.xml");
+            if (pomFile.exists()) {
+                mTime = Math.max(mTime, pomFile.lastModified());
+            }
+        }
+        return mTime;
+    }
+
+
     private void setupAnt()  throws MojoExecutionException, MojoFailureException {
         
         antProject = new Project();
@@ -132,15 +197,22 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     protected abstract void executeImpl()  throws MojoExecutionException, MojoFailureException;
-    
-    
-    
+
+
+    protected static boolean contains(String needle, String... haystack) {
+        for (String s : haystack) {
+            if (s.equals(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
     
     protected File getCN1ProjectDir() {
         if (project == null || project.getBasedir() == null) {
             return null;
         }
-        if (project.getBasedir().getName().equals("javase")) {
+        if (contains(project.getBasedir().getName(), "javase", "javascript", "android", "ios", "win")) {
             File commonSettings = new File(project.getBasedir(), ".." + File.separator + "common" + File.separator + "codenameone_settings.properties");
             if (commonSettings.exists()) {
                 return commonSettings.getParentFile();
@@ -355,7 +427,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     
-    
+    protected static long lastModifiedRecursive(File file) {
+        return lastModifiedRecursive(file, ALL_FILES_FILTER);
+    }
+
     protected static long lastModifiedRecursive(File file, FilenameFilter filter) {
         long lastModified = 0L;
         if (file.isDirectory()) {

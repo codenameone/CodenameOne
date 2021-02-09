@@ -18,6 +18,12 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.tools.ant.taskdefs.Expand;
 
 /**
+ * A mojo that should be called sometime before simulator runs.  It sets properties
+ * that the simulator requires to run properly, including:
+ * codename1.mainClass
+ * codename1.css.compiler.args.input
+ * codename1.css.compiler.args.output
+ * codename1.css.compiler.args.output
  *
  * @author shannah
  */

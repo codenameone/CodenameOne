@@ -24,6 +24,7 @@
       <dependency>
           <groupId>com.codenameone</groupId>
           <artifactId>codenameone-javase</artifactId>
+          <scope>provided</scope>
       </dependency>
       <dependency>
           <groupId>${project.groupId}</groupId>

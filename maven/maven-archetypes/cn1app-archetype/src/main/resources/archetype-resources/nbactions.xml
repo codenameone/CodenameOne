@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+        <action>
+            <actionName>run</actionName>
+            <goals>
+                <goal>verify</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>javase</codename1.platform>
+            </properties>
+            <activatedProfiles>
+                <activatedProfile>simulator</activatedProfile>
+            </activatedProfiles>
+        </action>
+        <action>
+            <actionName>debug</actionName>
+            <goals>
+                <goal>verify</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>javase</codename1.platform>
+                <jpda.listen>true</jpda.listen>
+                
+                
+                
+                
+                
+                
+                
+                
+            </properties>
+            <activatedProfiles>
+                <activatedProfile>debug-simulator</activatedProfile>
+            </activatedProfiles>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build iOS App</actionName>
+            <displayName>Build iOS App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <codename1.platform>ios</codename1.platform>
+                <codename1.buildTarget>ios-device</codename1.buildTarget>
+                <skipTests>true</skipTests>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build iOS App (Release)</actionName>
+            <displayName>Build iOS App (Release)</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>ios</codename1.platform>
+                <codename1.buildTarget>ios-device-release</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build Android App</actionName>
+            <displayName>Build Android App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>android</codename1.platform>
+                <codename1.buildTarget>android-device</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build Web App</actionName>
+            <displayName>Build Web App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>javascript</codename1.platform>
+                <codename1.buildTarget>javascript</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build Mac Desktop App</actionName>
+            <displayName>Build Mac Desktop App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>javase</codename1.platform>
+                <codename1.buildTarget>mac-os-x-desktop</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build Windows Desktop App</actionName>
+            <displayName>Build Windows Desktop App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>javase</codename1.platform>
+                <codename1.buildTarget>windows-desktop</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Build Windows UWP App</actionName>
+            <displayName>Build Windows UWP App</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+            <properties>
+                <skipTests>true</skipTests>
+                <codename1.platform>win</codename1.platform>
+                <codename1.buildTarget>windows-device</codename1.buildTarget>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-Open Control Center</actionName>
+            <displayName>Open Control Center</displayName>
+            <goals>
+                <goal>cn1:settings</goal>
+            </goals>
+        </action>
+    </actions>

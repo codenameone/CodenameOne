@@ -81,6 +81,8 @@
         <module>javase</module>
         <module>javase-svg</module>
         <module>android</module>
+        <module>ios</module>
+        <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
         <module>maven-archetypes</module>
@@ -91,6 +93,57 @@
 		  
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>cn1-builder-resources-common</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>cn1-builder-resources-android</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/javassist/javassist -->
+            <dependency>
+                <groupId>javassist</groupId>
+                <artifactId>javassist</artifactId>
+                <version>3.12.1.GA</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-util -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-util</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-commons</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-vfs2 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-vfs2</artifactId>
+                <version>2.7.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.3</version>
+            </dependency>
+
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-factory</artifactId>
