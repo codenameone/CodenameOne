@@ -144,10 +144,11 @@
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
+            <id>github</id>
+            <name>Github Maven Packages</name>
+            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
         </repository>
+
         <repository>
             <snapshots>
                 <enabled>false</enabled>
@@ -159,12 +160,13 @@
     </repositories>
     <pluginRepositories>
         <pluginRepository>
+
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray-plugins</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
+            <id>github</id>
+            <name>Github Maven Packages</name>
+            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
         </pluginRepository>
     </pluginRepositories>
     

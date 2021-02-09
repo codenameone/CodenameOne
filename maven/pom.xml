@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0-SNAPSHOT</version>
+    <version>7.0.1-test4</version>
 
     <packaging>pom</packaging>
 
@@ -46,19 +46,7 @@
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
-    <!--
-  <distributionManagement>
-      <snapshotRepository>
-        <id>sonatype-nexus-snapshots</id>
-        <name>Sonatype Nexus Snapshots</name>
-        <url>${sonatypeOssDistMgmtSnapshotsUrl}</url>
-      </snapshotRepository>
-      <repository>
-        <id>sonatype-nexus-staging</id>
-        <name>Nexus Release Repository</name>
-        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-      </repository>
-    </distributionManagement>-->
+
 	  
     <properties>
         <cn1.version>7.0-SNAPSHOT</cn1.version>
@@ -343,9 +331,9 @@
     </build>
     <distributionManagement>
         <repository>
-            <id>bintray-codenameone-codenameone</id>
-            <name>codenameone-codenameone</name>
-            <url>https://api.bintray.com/maven/codenameone/codenameone/CodenameOne/;publish=1</url>
+            <id>github</id>
+            <name>Github Maven Packages</name>
+            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
         </repository>
     </distributionManagement>
 			
@@ -354,9 +342,9 @@
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
+            <id>github</id>
+            <name>Github Maven Packages</name>
+            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
         </repository>
         <repository>
             <snapshots>
@@ -369,12 +357,14 @@
     </repositories>
     <pluginRepositories>
         <pluginRepository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray-plugins</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
+
+                <snapshots>
+                    <enabled>false</enabled>
+                </snapshots>
+                <id>github</id>
+                <name>Github Maven Packages</name>
+                <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
+
         </pluginRepository>
     </pluginRepositories>
     <profiles>

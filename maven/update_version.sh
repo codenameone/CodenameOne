@@ -4,12 +4,11 @@ if [ -z "$1" ]; then
 	echo "No version supplied"
 	exit 1
 fi
-mvn versions:set -DnewVersion=$1
-cd factory
-mvn versions:set -DnewVersion=$1
-cd ../core
-mvn versions:set -DnewVersion=$1
-cd ../javase
-mvn versions:set -DnewVersion=$1
-cd ../codenameone-maven-plugin
+currdir=$(pwd)
+for d in android build-client codenameone-maven-plugin core designer factory ios java-runtime javase javase-svg maven-archetypes parparvm tests
+do
+    cd "$d"
+    mvn versions:set -DnewVersion=$1
+    cd "$currdir"
+done
 mvn versions:set -DnewVersion=$1

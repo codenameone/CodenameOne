@@ -4,12 +4,12 @@
   <parent>
     <artifactId>maven-archetypes</artifactId>
     <groupId>com.codenameone</groupId>
-    <version>7.0-SNAPSHOT</version>
+    <version>7.0.1-test4</version>
   </parent>
 
   <groupId>com.codenameone</groupId>
   <artifactId>archetype-generator</artifactId>
-  <version>7.0-SNAPSHOT</version>
+  <version>7.0.1-test4</version>
 
   <name>archetype-generator</name>
   <description>A simple archetype-generator.</description>
