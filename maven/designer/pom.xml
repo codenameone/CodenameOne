@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.8-b1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-designer</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.8-b1</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -21,12 +21,12 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase-svg</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-server -->
         <dependency>

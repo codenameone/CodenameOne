@@ -4,30 +4,29 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.8-b1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-javase</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.8-b1</version>
     <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <dependency>
-            <groupId>com.codenameone</groupId>
+            <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.7.15</version>
-            <type>jar</type>
+            <version>3.7.15-M1</version>
         </dependency>
         <dependency>
-            <groupId>com.codenameone</groupId>
+            <groupId>com.jhlabs</groupId>
             <artifactId>filters</artifactId>
-            <version>6.0.0</version>
+            <version>2.0.235-1</version>
         </dependency>
         <dependency>
             <groupId>javax.media</groupId>
@@ -39,13 +38,15 @@
             <groupId>com.codenameone</groupId>
             <artifactId>jfxrt</artifactId>
             <version>8</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${cn1.binaries}/jfxrt.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>jcef</artifactId>
             <version>6.0.0</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
         </dependency>
     </dependencies>
     <properties>

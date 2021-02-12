@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.8-b1</version>
 
     <packaging>pom</packaging>
 
@@ -41,24 +41,24 @@
             <timezone>-8</timezone>
         </developer>
     </developers>
-	
+
     <scm>
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
 
-	  
+
     <properties>
-        <cn1.version>7.0-SNAPSHOT</cn1.version>
+        <cn1.version>${project.version}</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <sonatypeOssDistMgmtSnapshotsUrl>https://oss.sonatype.org/content/repositories/snapshots/</sonatypeOssDistMgmtSnapshotsUrl>
-	      
+
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
-        
+
         <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
@@ -73,23 +73,85 @@
         <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
-        <module>maven-archetypes</module>
-        
-		    
+
+
     </modules>
-		  
-		  
+
+
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase-svg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-designer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-buildclient</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-resources-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-resources-android</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-android</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-ios</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-parparvm</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-designer</artifactId>
+                <version>${project.version}</version>
+                <classifier>jar-with-dependencies</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-ios</artifactId>
+                <version>${project.version}</version>
+                <classifier>bundle</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-parparvm</artifactId>
+                <version>${project.version}</version>
+                <classifier>bundle</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
                 <artifactId>cn1-builder-resources-common</artifactId>
-                <version>${cn1.version}</version>
+                <version>7.0</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>cn1-builder-resources-android</artifactId>
-                <version>${cn1.version}</version>
+                <version>7.0</version>
             </dependency>
 
             <!-- https://mvnrepository.com/artifact/javassist/javassist -->
@@ -168,20 +230,14 @@
                 <artifactId>ant</artifactId>
                 <version>1.10.9</version>
             </dependency>
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>stubber</artifactId>
-                <version>6.0.0</version>
-                <type>pom</type>
-            </dependency>
-           
 
-                  
+
+
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
                 <version>${project.version}</version>
-                
+
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -215,17 +271,11 @@
                 <artifactId>commons-text</artifactId>
                 <version>1.9</version>
             </dependency>
-            
+
             <dependency>
-                <groupId>com.guardsquare</groupId>
-                <artifactId>proguard-core</artifactId>
-                <version>7.0.1</version>
-            </dependency>
-            <!-- https://mvnrepository.com/artifact/com.guardsquare/proguard-base -->
-            <dependency>
-                <groupId>com.guardsquare</groupId>
+                <groupId>net.sf.proguard</groupId>
                 <artifactId>proguard-base</artifactId>
-                <version>7.0.1</version>
+                <version>6.3.0beta1</version>
             </dependency>
             <dependency>
                 <groupId>javax.xml.bind</groupId>
@@ -244,13 +294,14 @@
                 <artifactId>jaxb-core</artifactId>
                 <version>2.3.0.1</version>
             </dependency>
-        
-        
+
+
         </dependencies>
     </dependencyManagement>
-    
-			
+
+
     <build>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -303,7 +354,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>2.21.0</version>
                 </plugin>
-			        
+
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
@@ -324,36 +375,39 @@
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>build-helper-maven-plugin</artifactId>
             <version>1.7</version>
-                
+
         </plugin>
+
             </plugins>
         </pluginManagement>
+
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+
     </build>
     <distributionManagement>
         <repository>
-            <id>github</id>
-            <name>Github Maven Packages</name>
-            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
+            <id>nexus-staging</id>
+            <name>Nexus Release Repository</name>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
-			
+
     <repositories>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>github</id>
-            <name>Github Maven Packages</name>
-            <url>https://maven.pkg.github.com/codenameone/CodenameOne</url>
-        </repository>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-guardsquare-proguard</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/guardsquare/proguard</url>
-        </repository>
+
+
     </repositories>
     <pluginRepositories>
         <pluginRepository>
@@ -369,7 +423,30 @@
     </pluginRepositories>
     <profiles>
 
-        <!--
+        <profile>
+            <id>sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <passphrase>${gpg.passphrase}</passphrase>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>download-cn1-binaries</id>
             <activation>
@@ -403,18 +480,7 @@
                 </plugins>
             </build>
         </profile>
-        <profile>
-            <id>build-client</id>
-            <activation>
-                <file>
-                    <exists>${basedir}/../../BuildClient</exists>
-                </file>
-            </activation>
-            <modules>
-                <module>build-client</module>
-            </modules>
 
-        </profile>
         <profile>
             <id>add-client-dependency</id>
             <activation>
@@ -435,7 +501,7 @@
                 </dependencies>
             </dependencyManagement>
         </profile>
-        -->
+
         <profile>
             <id>tests</id>
             <modules>
@@ -479,6 +545,41 @@
                         </executions>
                     </plugin>
                 </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>sonatype-release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
+
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.5</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+
             </build>
         </profile>
     </profiles>

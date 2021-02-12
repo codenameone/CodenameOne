@@ -8,6 +8,7 @@ package com.codename1.maven;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.Attributes;
@@ -28,6 +29,7 @@ import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.selectors.FilenameSelector;
+import org.codehaus.plexus.util.FileUtils;
 
 /**
  * This was an early attempt at building a cn1lib format that was based on the legacy cn1lib format.  Ultimately
@@ -146,34 +148,25 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
     */
     
     
-    private Artifact findStubberArtifact() {
-        //Dependency dep = findStubberDependency();
-        //getLog().info("Stubber dep: "+dep);
-        Artifact art = repositorySystem.createPluginArtifact(getSelf());
-        art.setArtifactId(STUBBER_ARTIFACT_ID);
-        art.setGroupId(GROUP_ID);
-        art.setVersion("6.0.0");
-        return art;
-        
-        
-    }
+
     
     private File findStubberJar() {
-        File[] out = new File[1];
-        Artifact artifact = findStubberArtifact();
-        
-        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
-                
-        .setLocalRepository(localRepository)
-        .setRemoteRepositories(new ArrayList<>(remoteRepositories))
-        .setResolveTransitively(true)
-        .setArtifact(artifact));
 
-        if (result.isSuccess()) {
-            out[0] = artifact.getFile().getAbsoluteFile();
+        File mavenPluginJar = getJar("com.codenameone", "codenameone-maven-plugin");
+        if (mavenPluginJar == null || !mavenPluginJar.exists()) {
+            throw new RuntimeException("Cannot find codenameone-maven-plugin jar");
         }
-        
-        return out[0];
+
+        File stubberJar = new File(mavenPluginJar.getParentFile(), "Stubber.jar");
+        if (!stubberJar.exists() || mavenPluginJar.lastModified() > stubberJar.lastModified()) {
+            // Stubber needs to be updated
+            try {
+                FileUtils.copyURLToFile(getClass().getResource("/Stubber.jar"), stubberJar);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to copy Stubber.jar from resource stream to file at "+stubberJar);
+            }
+        }
+        return stubberJar;
     }
     
    private Path prepareStubberClassPath() {

@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.8-b1</version>
     </parent>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-maven-plugin</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.8-b1</version>
     <packaging>maven-plugin</packaging>
     <name>codenameone-maven-plugin</name>
   
@@ -32,7 +32,6 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-designer</artifactId>
             <classifier>jar-with-dependencies</classifier>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -57,12 +56,6 @@
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
-            <artifactId>stubber</artifactId>
-            <type>pom</type>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
             <artifactId>java-runtime</artifactId>
             <scope>runtime</scope>
         </dependency>
@@ -74,7 +67,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
-            <version>${cn1.version}}</version>
+
             <scope>system</scope>
             <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
@@ -105,17 +98,13 @@
                 
             </dependency>
         <dependency>
-            <groupId>com.guardsquare</groupId>
-            <artifactId>proguard-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.guardsquare</groupId>
+            <groupId>net.sf.proguard</groupId>
             <artifactId>proguard-base</artifactId>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-cef</artifactId>
-            <version>84.4.1</version>
+            <version>84.4.1-M1</version>
             <type>pom</type>
         </dependency>
 
@@ -179,26 +168,26 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-builder-resources-android</artifactId>
-
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-android</artifactId>
-            <version>${cn1.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>
-            <version>${cn1.version}</version>
             <classifier>bundle</classifier>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-parparvm</artifactId>
-            <version>${cn1.version}</version>
             <classifier>bundle</classifier>
+            <scope>runtime</scope>
         </dependency>
 
     </dependencies>
@@ -265,9 +254,25 @@
                 <version>2.22.1</version>
             </plugin>
             <plugin>
-                <groupId>${project.groupId}</groupId>
-                <artifactId>codenameone-designer-maven-plugin</artifactId>
-                <version>${project.version}</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>add-stubber-jar</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.outputDirectory}"/>
+                                <copy file="${cn1.binaries}/Stubber.jar" todir="${project.build.outputDirectory}"/>
+                            </target>
+                        </configuration>
+
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

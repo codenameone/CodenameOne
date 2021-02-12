@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.8-b1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-android</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.8-b1</version>
     <packaging>jar</packaging>
 
     <name>Codename One Android Port</name>
@@ -18,7 +18,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
        
         
@@ -78,6 +78,19 @@
 
         </profile>
         <profile>
+            <!-- This profile is not build by default.  It builds an uber artifact with all of the android
+                 dependencies that can be added to android native modules to add sanity check, autocompletion
+                 etc...
+
+                 To build you need to do:
+
+                 Clone the cn1-binaries repo at https://github.com/codenameone/cn1-binaries
+
+                 mvn install -Dcn1.binaries=/path/to/cn1-binaries
+
+            -->
+
+
             <id>compile-android</id>
             <activation>
                 <file><exists>${cn1.binaries}</exists></file>

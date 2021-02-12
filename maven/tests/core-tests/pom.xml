@@ -14,7 +14,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <cn1.version>${project.version}</cn1.version>
         <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
     </properties>
     <dependencies>
@@ -98,22 +97,8 @@
         <url>file://${project.basedir}/repository</url>
     </repository>
 
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
-        </repository>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-guardsquare-proguard</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/guardsquare/proguard</url>
-        </repository>
+
+
     </repositories>
     <pluginRepositories>
         <pluginRepository>

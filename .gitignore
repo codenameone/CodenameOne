@@ -67,3 +67,5 @@ node_modules
 .idea/
 target
 pom.xml.versionsBackup
+pom.xml.releaseBackup
+pom.xml.tag

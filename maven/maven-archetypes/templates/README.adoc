@@ -1,4 +1,0 @@
-= Maven Archetype Templates
-
-This directory contains templates for Codename One archetype projects.  The templates in this directory are converted into full Maven archetype projects by the link:../archetype-generator/README.adoc[archetype-generator project].
-
