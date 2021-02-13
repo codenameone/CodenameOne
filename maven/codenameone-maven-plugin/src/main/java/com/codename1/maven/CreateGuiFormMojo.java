@@ -12,14 +12,38 @@ import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 
 /**
- *
+ * A goal to generate a GUI form.
  * @author shannah
  */
 @Mojo(name = "create-gui-form")
 public class CreateGuiFormMojo extends AbstractCN1Mojo {
 
+    /**
+     * The fully-qualified class name of the form to generate.
+     */
+    @Parameter(property="className", required = true)
+    private String className;
+
+    /**
+     * Use autolayout mode.
+     */
+    @Parameter(property="autoLayout", required = false, defaultValue = "true")
+    private boolean autoLayout;
+
+    /**
+     * The guiType.  Default is "Form".  "Container", and "Dialog" also supported values.
+     */
+    @Parameter(property="guiType", required = true, defaultValue = "Form")
+    private String guiType;
+
+    /**
+     * Validates a class name.
+     * @param className
+     * @throws MojoExecutionException
+     */
     private void validateClassName(String className) throws MojoExecutionException {
         String[] classNameParts = className.split("\\.");
         int len = classNameParts.length;
@@ -39,12 +63,24 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        String className = System.getProperty("className", null);
-        if (className == null) {
-            throw new MojoExecutionException("className is a required property.");
+
+        if (getCN1ProjectDir() == null) {
+            getLog().debug("Skipping create-gui-form because this is not a CN1 project");
+            return;
         }
+        try {
+            if (!getCN1ProjectDir().getCanonicalFile().equals(project.getBasedir().getCanonicalFile())) {
+                getLog().debug("Skipping create-gui-form because this is not a CN1 project");
+                return;
+            }
+        } catch (IOException ex) {
+
+            getLog().error("Error trying to convert to canonical paths", ex);
+            return;
+        }
+
         validateClassName(className);
-        File guibuilderDir = new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "guibuilder");
+        File guibuilderDir = new File(getCN1ProjectDir(),  "src" + File.separator + "main" + File.separator + "guibuilder");
 
         String path = className.replace(".", File.separator);
 
@@ -55,7 +91,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
         File guiFileDir = guiFile.getParentFile();
         guiFileDir.mkdirs();
 
-        File javaSrcRoot = new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "java");
+        File javaSrcRoot = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "java");
         File javaFile = new File(javaSrcRoot, path + ".java");
         if (javaFile.exists()) {
             throw new MojoExecutionException("Java source file already exists at "+javaFile);
@@ -105,7 +141,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
     }
 
     protected String getGUIType() {
-        return System.getProperty("guiType", "Form");
+        return guiType;
     }
 
     protected String getAutoLayout() {
@@ -120,7 +156,7 @@ public class CreateGuiFormMojo extends AbstractCN1Mojo {
     }
 
     private boolean isAutoLayout() {
-        return ("true".equals(System.getProperty("autoLayout", "true")));
+        return autoLayout;
     }
 
 }

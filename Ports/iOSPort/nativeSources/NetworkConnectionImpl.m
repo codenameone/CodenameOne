@@ -45,6 +45,7 @@ int connections = 0;
         sslCertificates = nil;
         pendingDataPos = 0;
         pendingData = nil;
+        insecure = NO;
     }
     
     return self;
@@ -77,6 +78,10 @@ int connections = 0;
 
 -(NSCachedURLResponse*)connection:(NSURLConnection*)connection willCacheResponse:(NSCachedURLResponse *)cachedResponse {
     return nil;
+}
+
+-(void)setInsecure:(BOOL)ins {
+    insecure = ins;
 }
 
 - (void)setMethod:(NSString*)mtd {
@@ -152,7 +157,10 @@ int connections = 0;
     SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
     SecTrustEvaluate(trustRef, NULL);
     NSMutableString* certs = [NSMutableString string];
-    //    [challenge.sender continueWithoutCredentialForAuthenticationChallenge:challenge];
+    if (insecure) {
+        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:[[challenge protectionSpace] serverTrust]] forAuthenticationChallenge:challenge];
+        return;
+    }
     //[connection cancel];
     
     CFIndex count = SecTrustGetCertificateCount(trustRef);

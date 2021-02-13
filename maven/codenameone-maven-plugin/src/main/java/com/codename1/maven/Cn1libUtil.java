@@ -32,6 +32,7 @@ public class Cn1libUtil {
         }
         try {
             JarFile jarFile = new JarFile(jar);
+            
             Manifest mf = jarFile.getManifest();
             if (mf == null) {
                 return false;

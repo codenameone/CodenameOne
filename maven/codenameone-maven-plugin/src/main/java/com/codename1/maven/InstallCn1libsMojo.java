@@ -574,66 +574,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
     }
    
     
-    private String getCefPlatform() {
-        if (isMac) return "mac";
-        if (isWindows) return is64Bit ? "win64" : "win32";
-        if (isUnix && is64Bit) return "linux64";
-        return null;
-    }
+   
     
-    private void setupCef() {
-        String platform = getCefPlatform();
-        if (platform == null) {
-            getLog().warn("CEF not supported on this platform.  Not adding dependency");
-            return;
-        }
-        File cefZip = getJar("com.codenameone", "codenameone-cef", platform);
-        if (cefZip == null || !cefZip.exists()) {
-            getLog().warn("codenameone-cef not found in dependencies.  Not adding CEF dependency");
-            return;
-        }
-        File extractedDir = new File(cefZip.getParentFile(), cefZip.getName()+"-extracted");
-        if (!extractedDir.exists() || extractedDir.lastModified() < cefZip.lastModified()) {
-            if (extractedDir.exists()) {
-                delTree(extractedDir);
-            }
-            Expand expand = (Expand)antProject.createTask("unzip");
-            expand.setDest(extractedDir);
-            expand.setSrc(cefZip);
-            expand.execute();
-        }
-        
-        project.getProperties().setProperty("cef.dir", extractedDir.getAbsolutePath());
-        System.setProperty("cef.dir", extractedDir.getAbsolutePath());
-        
-    }
-    
-    private static String OS = System.getProperty("os.name").toLowerCase();
-    private static boolean isWindows = (OS.indexOf("win") >= 0);
-    
-
-    private static boolean isMac =  (OS.indexOf("mac") >= 0);
-    private static final String ARCH = System.getProperty("os.arch");
-
-    private static boolean isUnix = (OS.indexOf("nux") >= 0);
-    private static final boolean is64Bit = is64Bit();
-    private static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
     
 }

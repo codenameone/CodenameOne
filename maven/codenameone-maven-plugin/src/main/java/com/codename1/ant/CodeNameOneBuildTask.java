@@ -226,9 +226,6 @@ public class CodeNameOneBuildTask extends Task {
         try {        
             BuildProcess b = new BuildProcess();
             String u = CodeNameOneBuildClient.SERVER_URL;
-            if(CodeNameOneBuildClient.USE_NEW_SERVER) {
-                u = CodeNameOneBuildClient.NEW_SERVER_URL;
-            }
             if(!b.login(u, userName, password, 
                     rootDir, buildArgs != null && 
                     buildArgs.contains("codename1.arg.build.version"))) {

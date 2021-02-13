@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0-SNAPSHOT</version>
+        <version>7.0.1-test4</version>
     </parent>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-maven-plugin</artifactId>
-    <version>7.0-SNAPSHOT</version>
+    <version>7.0.1-test4</version>
     <packaging>maven-plugin</packaging>
     <name>codenameone-maven-plugin</name>
   
@@ -28,7 +28,12 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-designer</artifactId>
+            <classifier>jar-with-dependencies</classifier>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
@@ -69,6 +74,9 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
+            <version>${cn1.version}}</version>
+            <scope>system</scope>
+            <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
         
         <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
@@ -87,10 +95,15 @@
         </dependency>            
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-io -->
         <dependency>
-            <groupId>org.apache.commons</groupId>
+            <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
     
         </dependency>
+        <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                
+            </dependency>
         <dependency>
             <groupId>com.guardsquare</groupId>
             <artifactId>proguard-core</artifactId>
@@ -105,6 +118,89 @@
             <version>84.4.1</version>
             <type>pom</type>
         </dependency>
+
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.4.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.4.2</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-vfs2 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-vfs2</artifactId>
+
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-util -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-util</artifactId>
+
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-commons</artifactId>
+
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/javassist/javassist -->
+        <dependency>
+            <groupId>javassist</groupId>
+            <artifactId>javassist</artifactId>
+
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-builder-resources-common</artifactId>
+            <scope>runtime</scope>
+
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-builder-resources-android</artifactId>
+
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-ios</artifactId>
+            <version>${cn1.version}</version>
+            <classifier>bundle</classifier>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${cn1.version}</version>
+            <classifier>bundle</classifier>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -162,5 +258,17 @@
                                         
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.1</version>
+            </plugin>
+            <plugin>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>codenameone-designer-maven-plugin</artifactId>
+                <version>${project.version}</version>
+            </plugin>
+        </plugins>
     </build>
 </project>

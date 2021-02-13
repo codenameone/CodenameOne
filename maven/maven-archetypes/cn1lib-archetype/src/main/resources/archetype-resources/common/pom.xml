@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <parent>
+        <groupId>${groupId}</groupId>
+        <artifactId>${rootArtifactId}</artifactId>
+        <version>${version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>jar</packaging>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+
+    </properties>
+    
+    
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <executions>
+                    
+                    <execution>
+                        <id>cn1-compliance-check</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>compliance-check</goal>
+                        </goals>
+                    </execution>
+                   
+                </executions>
+            </plugin>
+        </plugins>
+
+        
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+    <profiles>
+        <!-- 
+            == Kotlin Support 
+            
+            Enable kotlin support by adding an empty file into the project directory named
+            codenameone_kotlin.properties
+            
+            Kotlin sources go in src/main/kotlin
+            Kotlin test sources go in src/test/kotlin
+        -->
+        <profile>
+            <id>kotlin</id>
+            <activation>
+                <file>
+                    <!-- To enable Kotlin, add the following file to the project base dir -->
+                    <exists>${basedir}/src/main/kotlin</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-stdlib</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.jetbrains</groupId>
+                    <artifactId>annotations</artifactId>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        
+        <profile>
+            <id>appended-properties</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/codenameone_library_appended.properties</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                <plugin>
+
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-antrun-plugin</artifactId>
+
+                                
+                            <executions>
+                                <execution>
+                                    <id>copy-library-appended-properties</id>
+                                    <phase>process-resources</phase>
+                                    <configuration>
+                                        <target>
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}" />
+                                            <copy file="${basedir}/codenameone_library_appended.properties" todir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}/" />
+                                        </target>
+                                    </configuration>
+                                    <goals>
+                                        <goal>run</goal>
+                                    </goals>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>required-properties</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/codenameone_library_required.properties</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                <plugin>
+
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-antrun-plugin</artifactId>
+
+                                
+                            <executions>
+                                <execution>
+                                    <id>copy-library-required-properties</id>
+                                    <phase>process-resources</phase>
+                                    <configuration>
+                                        <target>
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}" />
+                                            <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}" />
+                                            <copy file="${basedir}/codenameone_library_required.properties" todir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}/" />
+                                        </target>
+                                    </configuration>
+                                    <goals>
+                                        <goal>run</goal>
+                                    </goals>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>copy-css</id>
+            <activation>
+                <file>
+                    <!-- To enable Kotlin, add the following file to the project base dir -->
+                    <exists>${basedir}/src/main/css</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                <plugin>
+
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-antrun-plugin</artifactId>
+
+                                
+                            <executions>
+                                <execution>
+                                    <id>copy-css</id>
+                                    <phase>process-resources</phase>
+                                    <configuration>
+                                        <target>
+                                            <mkdir dir="${basedir}/src/main/css" />
+                                            <touch file="${basedir}/src/main/css/index.txt" />
+                                            <mkdir dir="${project.build.directory}/cn1css/META-INF/codenameone/${project.groupId}/${project.artifactId}/css" />
+                                            <copy todir="${project.build.directory}/cn1css/META-INF/codenameone/${project.groupId}/${project.artifactId}/css" >
+                                                <fileset dir="${basedir}/src/main/css" />
+                                            </copy>
+                                            <zip destfile="${project.build.directory}/${project.build.finalName}-cn1css.zip" compress="true">
+                                                <fileset dir="${project.build.directory}/cn1css" />
+                                            </zip>
+                                            
+                                        </target>
+                                    </configuration>
+                                    <goals>
+                                        <goal>run</goal>
+                                    </goals>
+                                </execution>
+                            </executions>
+                        </plugin>
+                        <plugin>
+                                <groupId>org.codehaus.mojo</groupId>
+                                <artifactId>build-helper-maven-plugin</artifactId>
+
+                                <executions>
+                                  <execution>
+                                    <id>attach-css</id>
+                                    <phase>package</phase>
+                                    <goals>
+                                      <goal>attach-artifact</goal>
+                                    </goals>
+                                    <configuration>
+                                      <artifacts>
+                                        <artifact>
+                                          <file>${project.build.directory}/${project.build.finalName}-cn1css.zip</file>
+                                          <type>zip</type>
+                                          <classifier>cn1css</classifier>
+                                        </artifact>
+                                      
+                                      </artifacts>
+                                    </configuration>
+                                  </execution>
+                                </executions>
+                              </plugin>
+                    </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

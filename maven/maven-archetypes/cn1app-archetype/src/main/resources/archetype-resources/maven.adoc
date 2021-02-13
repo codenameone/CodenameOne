@@ -1,0 +1,233 @@
+= Maven Usage Instructions
+
+== Project Structure
+
+This module is a multi-module Maven project with the following modules:
+
+common::
+A Codename One application.  All of your cross-platform application code goes in this module.
+
+android::
+Module containing native Android code such as native interface implementations.
+
+ios::
+Module containing native iOS code, such as native interface implementations.
+
+javase::
+Module containing native JavaSE code, such as native interface implementations.
+
+javascript::
+Module containing native javascript code for the Javascript port.
+
+win::
+Module containing native Windows UWP code for the UWP windows port.
+
+cn1libs::
+Module where legacy cn1libs will be installed the `cn1:install-cn1lib` goal.
+
+== Running The Project
+
+.Running project in the Codename One simulator
+[source,bash]
+----
+mvn verify -Psimulator -Dcodename1.platform=javase -DskipTests
+----
+
+.Running project as JavaSE desktop app
+[source,bash]
+----
+mvn verify -Prun-desktop -Dcodename1.platform=javase -DskipTests
+----
+
+== Building the Project
+
+Excutable Jar::
+Build app as executable Jar file locally.  *Does not use build server*
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=jar -DskipTests
+----
++
+*Output location:* `javase/target`
+
+Xcode Project::
+Generate an Xcode project that can be opened and built in Xcode.  *Does not use build server.  Requires Mac with Xcode installed*
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -DskipTests
+----
++
+*Output location:* `ios/target/generated-sources`
+
+Android Gradle Project::
+Generate a native Android gradle project that can be opened in Android Studio.  *Does not use build server. Requires `ANDROID_HOME` environment variable pointing at Android SDK.  Also requires Gradle installed and in path, or `GRADLE_HOME` environment variable pointing at gradle installation directory.*
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -DskipTests
+----
++
+*Output location:* `android/target/generated-sources`
+
+iOS Debug Build::
+Build an iOS app using the Codename One build server. **Requires Codename One account**
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `ios/target`.  You can download the result in the Codename One build app.
+
+iOS Release Buld::
+Build an iOS app release build to submit to the Apple app store, using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device-release -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `ios/target`.  You can download the result in the Codename One build app.
+
+Android App::
+Build an android app using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `android/target`.  You can download the result in the Codename One build app.
+
+Javascript App::
+Build a web/javascript app using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `javascript/target`.  You can download the result in the Codename One build app.
+
+Mac Desktop App::
+Build a Mac desktop app using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `javase/target`.  You can download the result in the Codename One build app.
+
+Windows Desktop App::
+Build a Windows desktop app using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=windows-desktop -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `javase/target`.  You can download the result in the Codename One build app.
+
+Windows (UWP) App::
+Build a Windows UWP app using the Codename One build server.
++
+[source,bash]
+----
+mvn package -Dcodename1.platform=win -Dcodename1.buildTarget=windows-device -DskipTests
+----
++
+*Output location:* If you add the `-Dautomated` flag, then it will output the file to `win/target`.  You can download the result in the Codename One build app.
+
+== Other Goals
+
+Install cn1lib::
+Installs a legacy cn1lib file as a dependency in your project.
++
+[source,bash]
+----
+mvn cn1:install-cn1lib -Dfile=/path/to/mylib.cn1lib
+----
++
+This will create a module inside the cn1libs module.
++
+====
+**Optional Parameters**
+
+groupId::
+Optional group ID for the maven module that is created for this cn1lib.  Default value will be `${project.groupId}.cn1libs`.
+
+artifactId::
+Optional artifact ID for the maven module that is created for this cn1lib.  Default value is `${project.artifactId}-${libname}`
+
+version::
+Optional version for the maven module that is created for this cn1lib.  Default value is `${project.version}`.
+
+updatePom::
+Optional boolean (true/false) indicating whether the cn1libs module pom file should be updated automatically.  Default value is `true`.
+
+overwrite::
+Optional boolean (true/false) indicating whether it should overwrite an existing cn1lib with the same name.  Default value is `false`.
+
+====
+
+Create GUI Form::
+Create a GUI Builder Form.
++
+[source,bash]
+----
+mvn cn1:create-gui-form -DclassName=com.example.MyForm
+----
++
+This will generate a class in `common/src/main/java` named `com.example.MyForm`, and an accompanying `.guibuilder` XML file in `common/src/main/guibuilder`.
++
+====
+**Parameters**
+
+className::
+(Required) The class name of the form that you wish to generate.  E.g `com.example.MyForm`.
+
+guiType::
+The type of GUI component to generate.  Supports "Form", "Dialog", and "Container".  Default value is "Form"
+
+autoLayout::
+Whether to use autolayout.  This is boolean (true/false), and the default value is `true`.
+
+====
++
+[TIP]
+====
+Open this form in the GUI Builder using the `cn1:guibuilder` goal.
+
+[source,bash]
+----
+mvn cn1:guibuilder -DclassName=com.example.MyForm
+----
+====
+
+Open Codename One Settings::
+Open the Codename One settings app which allows to to configure your app, and monitor build progress on the build server.
++
+[source,bash]
+----
+mvn cn1:settings
+----
+
+Generate Native Interfaces::
+Generate native stubs for all https://www.codenameone.com/how_di_i/how-do-i-access-native-device-functionality-invoke-native-interfaces.html[native interfaces] in the app.
++
+[source,bash]
+----
+mvn cn1:generate-native-interfaces
+----
+
+
+
+
+
+
+
+
+

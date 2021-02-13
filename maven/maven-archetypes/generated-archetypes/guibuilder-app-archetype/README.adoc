@@ -1,0 +1,101 @@
+= Codename One Application Archetype
+
+This project is a Maven archetype for a basic Codename One application project.  This project is the basis for all other Codename One application archetypes.
+
+IMPORTANT: If you make any changes to this archetype, you should run the link:../archetype-generator[archetype-generator] project to regenerate all of the derived archetypes which are defined in the link:../templates[../templates directory], and generated to the link:../generated-archetypes/[../generated-archetypes directory].
+
+== Project Structure
+
+This builds a multi-module maven project with the following sub-modules:
+
+common::
+The cross-platform Codename One project.  Most of your application source will go in here.
++
+[TIP]
+====
+The "common" module is the nearest thing to the legacy Codename One ANT project.  It is where the codenameone_settings.properties file is found, and all of the source that used to be found in your Codename One project's "src" directory will be found inside the src/main/java directory of the common project.
+====
+
+javase::
+JavaSE-specific source files.  This is where you would place native interface implementations for the javase platform (i.e. the CN1 simulator and desktop builds).  If you're familiar with the legacy Codename One ANT project format, then the source files that you used to place in the native/javase directory will now be found in the "src/main/java" directory of the javase module.
+
+ios::
+IOS-specific source files.  Your native interface implementations for the iOS platform will be found in the src/main/objectivec directory of this module.
+
+android::
+Android-specific source files.  Your native interface implementations for the Android platform should be placed inside the src/main/java directory of this module.
+
+javascript::
+Your native interface implementations for the javascript platform should be placed inside the src/main/javascript directory of this module.
+
+win::
+Your native interface implementations for the Windows (UWP) platform should be placed inside the src/main/csharp directory of this module.
+
+== CSS Files
+
+This archetype uses CSS for its theme.  CSS files should be placed inside the "src/main/css/theme.css" file of the "common" module.
+
+== GUIBuilder Files
+
+GUIBuilder files should be placed inside the "src/main/guibuilder" directory of the "common" module.
+
+**Creating GUI Forms**
+
+Use the `cn1:create-gui-form` goal to create a new GUI Builder form.
+
+[source,bash]
+----
+mvn cn1:create-gui-form -DclassName=com.example.MyForm
+----
+
+TIP: See link:../../codenameone-maven-plugin/src/main/asciidoc/mojos/create-gui-form.adoc[create-gui-form] for usage instructions of the `create-gui-form` goal.
+
+The above example will generate a GUIBuilder form with the provided class name.  It effectively generates two files:
+
+. `common/src/main/guibuilder/com/example/MyForm.gui`
+. `common/src/main/java/com/example/MyForm.java`
+
+You can then open the guibuilder to edit this form using the `cn1:guibuilder` goal.
+
+[source,bash]
+----
+mvn cn1:guibuilder -DclassName=com.example.MyForm
+----
+
+== Running the Project In Simulator
+
+To run the project in the Codename One simulator use the `verify` goal with additional command-line parameters `-P simulator -Dcodename1.platform=javase`.
+
+I.e.
+
+[source,bash]
+----
+mvn verify -P simulator -Dcodename1.platform=javase`
+----
+
+The `-P simulator` parameter activates the simulator, and the `-Dcodename1.platform=javase` property ensures that dependencies for the "javase" platform are included.
+
+NOTE: We are still working on refining this goal to remove the need for parameters.  The instructions for running in simulator will likely change.
+
+== Dependencies
+
+Dependencies should be added in the common/pom.xml file.  JavaSE-specific dependencies (i.e. for use only in JavaSE native interfaces) may be added to the javase/pom.xml file.
+
+
+[WARNING]
+====
+The "common" module should include only code that uses APIs that is supported by Codename One.  Codename One supports a subset of JavaSE 8 currently.  For a full list of supported APIs, see https://www.codenameone.com/javadoc/[Codename One's javadocs].
+
+If you add a dependency to a library that uses unsupported APIs, you may receive a build error when you go to build your project.  If the library uses unsupported APIs, but the code that you use in your project doesn't "trigger" any of that code, then you still may be fine, as Codename One uses proguard (and similar libraries) to strip out unused code.
+
+====
+
+[TIP]
+====
+There is a large selection of Codename One libraries (i.e. cn1libs) that you can use in your projects that are guaranteed to support the Codename One API.  It is recommended that you use to these libraries rather than "any old java library" you find on Maven central because they have been specially designed to work well on mobile.
+====
+
+
+
+
+

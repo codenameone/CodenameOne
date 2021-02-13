@@ -15,10 +15,7 @@ import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.apache.maven.artifact.Artifact;
@@ -27,11 +24,13 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.shared.invoker.*;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Path;
 
 /**
- *
+ * This mojo runs tests in the Codename One Test Runner.  This goal should be used in place of
+ * the surefire plugin.
  * @author shannah
  */
 @Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
@@ -41,24 +40,46 @@ public class RunTestsMojo extends AbstractCN1Mojo {
     private File getMetaDataFile() {
         return new File(project.getBuild().getTestOutputDirectory()+ File.separator + "tests.dat");
     }
-    
+
+    private boolean isJavaSEProject() {
+        return project.getArtifactId().endsWith("-javase");
+    }
+
+    private boolean isCommonProject() {
+        return project.getArtifactId().endsWith("-common");
+    }
+
+    private File getCommonProjectBaseDir() {
+        if (isJavaSEProject()) {
+            return new File(project.getParent().getBasedir(), "common");
+        }
+        if (isCommonProject()) {
+            return project.getBasedir();
+        }
+        throw new IllegalStateException("Cannot get common project in this context");
+    }
+
     private boolean prepareTests() throws MojoExecutionException {
+
+
+        // At this point, we are running inside the common project.
         try {
             List<File> paths = new ArrayList<File>();
+            File cn1ProjectDir = getCN1ProjectDir();
+            
             paths.add(new File(project.getBuild().getTestOutputDirectory()));
             paths.add(new File(project.getBuild().getOutputDirectory()));
             
             for (Artifact artifact : project.getArtifacts()) {
-                //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
                 paths.add(getJar(artifact));
-                //}
             }
-            getLog().info("Looking for test cases in "+paths);
             Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
                 return false;
             }
-            DataOutputStream fo = new DataOutputStream(new FileOutputStream(getMetaDataFile()));
+            File metadataFile = getMetaDataFile();
+            metadataFile.getParentFile().mkdir();
+            DataOutputStream fo = new DataOutputStream(new FileOutputStream(metadataFile));
             
             Arrays.sort(testCases, new Comparator<Class>() {
                 @Override
@@ -82,7 +103,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         }
     }
     
-     private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
+    private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for(int iter = 0 ; iter < urls.length ; iter++) {
             urls[iter] = classesDirectories[iter].toURI().toURL();
@@ -94,6 +115,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         
         List<Class> classList = new ArrayList<Class>();
         findTestCasesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
+
         Class[] arr = new Class[classList.size()];
         classList.toArray(arr);
         return arr;
@@ -107,6 +129,9 @@ public class RunTestsMojo extends AbstractCN1Mojo {
                         || file.getName().endsWith(".jar");
             }
         });
+        if (files == null) {
+            return;
+        }
         for(File f : files) {
             if(f.isDirectory()) {
                 findTestCasesInDir(baseDir, f, cl, classList);

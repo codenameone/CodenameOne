@@ -52,11 +52,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.math.BigInteger;
 import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.file.CopyOption;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,6 +72,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -87,6 +90,7 @@ import javax.swing.JPanel;
  * @author shannah
  */
 public class CN1CSSCLI {
+    public static String version = "7.0";
     static Object lock = new Object();
     static BrowserComponent web;
     
@@ -122,11 +126,50 @@ public class CN1CSSCLI {
         startImpl();
     }
     
+    
+    // It's getting to be a bit of a gong show in here with the CSS compiler trying to 
+    // work nicely with the project files - e.g. automatically saving the theme.res in the
+    // src directory.
+    // Stateless mode is an attempt to make it simpler.  
+    // Stateless mode can be invoked by adding "-stateless" to the parameters.
+    public static boolean statelessMode;
     public static boolean mergeMode;
     public static boolean watchmode;
     private static Thread watchThread;
     
+    
+    
+    private static String getArgByName(String[] args, String... names) {
+        int len = args.length;
+        List<String> namesList = Arrays.asList(names);
+        for (int i=0; i<len; i++) {
+            String arg = args[i];
+            if (arg.length() > 0 && arg.charAt(0) == '-' && namesList.contains(arg.substring(1))) {
+                if (i + 1 < len) {
+                    String nextArg = args[i+1];
+                    if (nextArg.length() > 0 && nextArg.charAt(0) == '-') {
+                        // If the next arg is another flag, then just return value "true"
+                        // to confirm that the flag exists.
+                        return "true";
+                    } else {
+                        return nextArg;
+                    }
+                } else {
+                    // If this is the last arg, then just return "true" to verify that the
+                    // flag exists.
+                    return "true";
+                }
+            }
+        }
+        return null;
+    }
+
+    
     private static String getInputFile(String[] args) {
+        if (statelessMode) {
+            return getArgByName(args, "i", "input");
+            
+        }
         if (args.length > 0) {
             return args[0];
         } else {
@@ -141,6 +184,15 @@ public class CN1CSSCLI {
             out.load(fis);
         };
         return out;
+    }
+    
+    private static boolean isStatelessMode(String[] args) {
+        for (String arg : args) {
+            if ("-stateless".equals(arg)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     private static boolean isMergeMode(String[] args) {
@@ -220,9 +272,185 @@ public class CN1CSSCLI {
         return sb.toString();
     }
     
+    private static void delTree(File dir) {
+        for(File f : dir.listFiles()) {
+            if(f.isDirectory()) {
+                delTree(f);
+            } else {
+                f.delete();
+            }
+        }
+    }
+    private static void syncDirectories(File srcDir, File destDir) throws IOException {
+        File canonicalSrc = srcDir.getCanonicalFile();
+        File canonicalDest = destDir.getCanonicalFile();
+        
+        if (canonicalSrc.equals(canonicalDest)) {
+            return;
+        }
+        
+        if (!destDir.exists()) {
+            destDir.mkdir();
+        }
+        
+        if (contains(srcDir, destDir) || contains(destDir, srcDir)) {
+            throw new IllegalArgumentException("Cannot sync dir "+srcDir+" to "+destDir+" because one contains the other");
+        }
+        HashSet<String> destChildren = new HashSet<String>();
+        String[] children = destDir.list();
+        if (children != null) {
+            for (String child : children) {
+                destChildren.add(child);
+            }
+        }
+        for (File child : srcDir.listFiles()) {
+            
+            String childName = child.getName();
+            File destChild = new File(destDir, childName);
+            if (destChildren.contains(childName)) {
+                
+                if (child.isDirectory()) {
+                    if (destChild.isDirectory()) {
+                        syncDirectories(child, destChild);
+                    } else {
+                        destChild.delete();
+                        destChild.mkdir();
+                        syncDirectories(child, destChild);
+                    }
+                } else {
+                    if (destChild.isDirectory()) {
+                        delTree(destChild);
+                        Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    }  else {
+                        long destMtime = destChild.lastModified();
+                        long srcMTime = child.lastModified();
+                        if (destMtime < srcMTime) {
+                            Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                }
+            } else {
+                
+                if (child.isDirectory()) {
+                    destChild.mkdir();
+                } else {
+                    Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+        
+        
+    }
     
+    private static String getMd5(String input) 
+    { 
+        try { 
+  
+            // Static getInstance method is called with hashing MD5 
+            MessageDigest md = MessageDigest.getInstance("MD5"); 
+  
+            // digest() method is called to calculate message digest 
+            //  of an input digest() return array of byte 
+            byte[] messageDigest = md.digest(input.getBytes()); 
+  
+            // Convert byte array into signum representation 
+            BigInteger no = new BigInteger(1, messageDigest); 
+  
+            // Convert message digest into hex value 
+            String hashtext = no.toString(16); 
+            while (hashtext.length() < 32) { 
+                hashtext = "0" + hashtext; 
+            } 
+            return hashtext; 
+        }  
+  
+        // For specifying wrong message digest algorithms 
+        catch (NoSuchAlgorithmException e) { 
+            throw new RuntimeException(e); 
+        } 
+    } 
     
-    private static void updateMergeFile(File inputFile, File mergedFile) throws IOException {
+    /**
+     * Checks if directory 1 contains directory 2
+     * @param directory1
+     * @param directory2
+     * @return true if directory 1 contains directory 2
+     */
+    private static boolean contains(File directory1, File directory2) throws IOException {
+        File canonical1 = directory1.getCanonicalFile();
+        File canonical2 = directory2.getCanonicalFile();
+        File parent2 = canonical2.getParentFile();
+        if (parent2 == null) {
+            return false;
+        }
+        if (canonical1.equals(parent2)) {
+            return true;
+        }
+        return contains(directory2, parent2);
+    }
+    
+    /**
+     * Updates the given merged CSS file with the contents of the given input files.  This is only used when
+     * running in stateless mode.
+     * @param inputFiles List of input CSS files
+     * @param mergedFile Output CSS file
+     * @throws IOException If there is a problem writing the merged file.
+     */
+    private static void updateMergeFileStateless(File[] inputFiles, File mergedFile) throws IOException {
+        boolean changed = false;
+        
+        long mergedFileLastModified = mergedFile.exists() ? mergedFile.lastModified() : 0l;
+        for (File inputFile : inputFiles) {
+            if (mergedFileLastModified < inputFile.lastModified()) {
+                changed = true;
+                break;
+            }
+        }
+        
+        if (!changed) {
+            return;
+        }
+        
+        File mergeRoot = mergedFile.getParentFile();
+        File incDir = new File(mergeRoot, "cn1-merged-files");
+        incDir.mkdir();
+        
+        
+        StringBuilder buf = new StringBuilder();
+        
+        //File libCSSDir = getLibCSSDirectory(inputFile);
+        //String relativePathToLibCSSDir = getRelativePath(libCSSDir, mergedFile);
+        
+        for (File f : inputFiles) {
+            File canonicalFile = f.getCanonicalFile();
+            String md5 = getMd5(canonicalFile.getAbsolutePath());
+            File destDir = new File(incDir, md5);
+            syncDirectories(canonicalFile.getParentFile(), destDir);
+            
+            String contents;
+            try (FileInputStream fis = new FileInputStream(f)) {
+                byte[] buffer = new byte[(int)f.length()];
+                fis.read(buffer);
+                contents = new String(buffer, "UTF-8");
+            }
+            
+            contents = prefixUrls(contents, "cn1-merged-files/"+md5+"/");
+            buf.append("\n/* "+f.getAbsolutePath()+" */\n").append(contents).append("\n/* end "+f.getAbsolutePath()+"*/\n");
+        }
+       
+        try (FileOutputStream fos = new FileOutputStream(mergedFile)) {
+            fos.write(buf.toString().getBytes("UTF-8"));
+        }
+        
+        
+    }
+    
+    private static void updateMergeFile(File[] inputFiles, File mergedFile) throws IOException {
+        if (statelessMode) {
+            updateMergeFileStateless(inputFiles, mergedFile);
+            return;
+        } 
+        File inputFile = inputFiles[0];
         List<File> libCSSFiles = findLibCSSFiles(inputFile);
         boolean changed = false;
         if (!mergedFile.exists() || mergedFile.lastModified() < inputFile.lastModified()) {
@@ -349,44 +577,110 @@ public class CN1CSSCLI {
         return false;
     }
     
+    private static File[] getInputFiles(String inputPath) {
+        List<File> out = new ArrayList<File>();
+        if (inputPath.contains(",")) {
+            String[] paths = inputPath.split(",");
+            for (String path : paths) {
+                if (path.trim().isEmpty()) {
+                    continue;
+                }
+                File f = new File(path);
+                out.add(f);
+            }
+        } else {
+            if (!inputPath.trim().isEmpty()) {
+                out.add(new File(inputPath));
+            }
+        }
+        return out.toArray(new File[out.size()]);
+    }
+            
+    
+    
     public static void main(String[] args) throws Exception {
-        // We don't want media queries while editing CSS because we need to be 
-        // editing the rules raw.
-        if (checkWatchMode(args) && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
-            // In watch mode we require 
-            throw new MissingNativeBrowserException();
+        if (getArgByName(args, "help") != null) {
+            System.out.println("Codename One CSS Compiler\nversion "+version);
+            System.out.println("Usage Instructions:\n");
+            System.out.println(" java -jar designer.jar -Dcli=true -css -input [inputfile.css] -output [outputfile.res] OPTIONS...\n");
+            System.out.println("Options:");
+            System.out.println(" -i, -input         Input CSS file path.  Multiple files separated by commas.");
+            System.out.println(" -o, -output        Output res file path.");
+            System.out.println(" -m, -merge         Path to merge file, used in  case there are multipl input files.");
+            System.out.println(" -w, -watch         Run in watch mode.");
+            System.out.println("                    Watches input files for changes and automatically recompiles.");
+            System.out.println("\nSystem Properties:");
+            System.out.println(" cef.dir            The path to the CEF directory.");
+            System.out.println("                    Required for generation of image borders.");
+            System.out.println(" parent.port        The port number to connect to the parent process for watch mode so that it knows ");
+            System.out.println("                    to exit if the parent process ends.");
+            return;
+            
+            
         }
-        Resources.setEnableMediaQueries(false);
-        mergeMode = isMergeMode(args);
-        String inputPath = getInputFile(args);
-        
-        String mergedFile = mergeMode ? getMergedFile(inputPath) : inputPath;
-        if (mergeMode) {
-            updateMergeFile(new File(inputPath), new File(mergedFile));
-        }
-        
-        String outputPath = inputPath+".res";
-        
-        if (args.length > 1) {
-            if ("-watch".equals(args[1])) {
-                watchmode = true;
+        statelessMode = getArgByName(args, "i", "input") != null;
+        String inputPath;
+        String outputPath;
+        String mergedFile;
+        if (statelessMode) {
+            System.out.println("Using stateless mode");
+            inputPath = getArgByName(args, "i", "input");
+            outputPath = getArgByName(args, "o", "output");
+            if (outputPath == null) {
+                throw new IllegalArgumentException("Output path is required.  Use -o [filepath] or -output [filepath]");
+            }
+            watchmode = "true".equals(getArgByName(args, "watch"));
+            if (watchmode && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
+                // In watch mode we require CEF to be loaded
+                throw new MissingNativeBrowserException();
+            }
+            mergedFile = getArgByName(args, "m", "merge");
+            
+            mergeMode = inputPath.contains(",") || mergedFile != null;
+            if (mergeMode && mergedFile == null) {
+                throw new IllegalArgumentException("When compiling multiple files, you must specify a merge path.  Use -m [filepath] or -merge [filepath]");
+            }
+           
+            
+        } else {
+            System.out.println("Using stateful mode. Use -help flag to see options for new stateless mode.");
+            // We don't want media queries while editing CSS because we need to be 
+            // editing the rules raw.
+            if (checkWatchMode(args) && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
+                // In watch mode we require 
+                throw new MissingNativeBrowserException();
+            }
+            Resources.setEnableMediaQueries(false);
+            mergeMode = isMergeMode(args);
+            inputPath = getInputFile(args);
+
+            mergedFile = mergeMode ? getMergedFile(inputPath) : inputPath;
+            
+
+            outputPath = inputPath+".res";
+
+            if (args.length > 1) {
+                if ("-watch".equals(args[1])) {
+                    watchmode = true;
+                    File tmpF = new File(inputPath).getParentFile().getParentFile();
+                    tmpF = new File(tmpF, "src");
+                    tmpF = new File(tmpF, new File(inputPath).getName()+".res");
+                    outputPath = tmpF.getAbsolutePath();
+                } else {
+                    outputPath = args[1];
+                }
+            } else {
                 File tmpF = new File(inputPath).getParentFile().getParentFile();
                 tmpF = new File(tmpF, "src");
                 tmpF = new File(tmpF, new File(inputPath).getName()+".res");
                 outputPath = tmpF.getAbsolutePath();
-            } else {
-                outputPath = args[1];
+
             }
-        } else {
-            File tmpF = new File(inputPath).getParentFile().getParentFile();
-            tmpF = new File(tmpF, "src");
-            tmpF = new File(tmpF, new File(inputPath).getName()+".res");
-            outputPath = tmpF.getAbsolutePath();
-            
+            if (args.length > 2 && "-watch".equals(args[2])) {
+                watchmode = true;
+            }
         }
-        if (args.length > 2 && "-watch".equals(args[2])) {
-            watchmode = true;
-        }
+        
         
         if (!Display.isInitialized()) {
             JavaSEPort.setShowEDTViolationStacks(false);
@@ -404,10 +698,15 @@ public class CN1CSSCLI {
             
         }
         
-        File inputFile = new File(inputPath);
+        File[] inputFiles = getInputFiles(inputPath);
+        if (mergeMode) {
+            System.out.println("Updating merge file "+mergedFile);
+            updateMergeFile(inputFiles, new File(mergedFile));
+        }
+
         File outputFile = new File(outputPath);
         if (watchmode && watchThread == null) {
-            
+            System.out.println("Starting watch thread to watch "+Arrays.toString(inputFiles));
             watchThread = new Thread(new Runnable() {
 
                 @Override
@@ -444,22 +743,22 @@ public class CN1CSSCLI {
                     }
                     
                     
-                    PollingFileWatcher watcher = new PollingFileWatcher(inputFile, 1000);
+                    PollingFileWatcher watcher = new PollingFileWatcher(inputFiles, 1000);
                     while (true) {
                         try {
                             watcher.poll();
                             try {
-                                System.out.println("Changed detected in "+inputFile+".  Recompiling");
+                                System.out.println("Changed detected in "+Arrays.toString(inputFiles)+".  Recompiling");
                                 if (mergeMode) {
-                                    updateMergeFile(new File(inputPath), new File(mergedFile));
+                                    updateMergeFile(inputFiles, new File(mergedFile));
                                     compile(new File(mergedFile), outputFile);
                                 } else {
-                                    compile(inputFile, outputFile);
+                                    compile(inputFiles[0], outputFile);
                                 }
 
                                 System.out.println("::refresh::"); // Signal to CSSWatcher in Simulator that it should refresh
                             } catch (Throwable t) {
-                                System.err.println("Compile of "+inputFile+" failed");
+                                System.err.println("Compile of "+Arrays.toString(inputFiles)+" failed");
                                 t.printStackTrace();    
                             }
                         } catch (InterruptedException ex) {
@@ -477,9 +776,10 @@ public class CN1CSSCLI {
         }
         try {
             if (mergeMode) {
+                System.out.println("Compiling "+mergedFile+" to "+outputFile);
                 compile(new File(mergedFile), outputFile);
             } else {
-                compile(inputFile, outputFile);
+                compile(inputFiles[0], outputFile);
             }
             System.out.println("CSS file successfully compiled.  "+outputFile);
             

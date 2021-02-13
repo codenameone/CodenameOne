@@ -25,7 +25,7 @@ import org.apache.tools.ant.types.FileSet;
  *
  * @author shannah
  */
-@Mojo(name="build", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, 
+@Mojo(name="build-old", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME, 
         defaultPhase = LifecyclePhase.COMPILE)
 @Execute(phase = LifecyclePhase.PACKAGE)

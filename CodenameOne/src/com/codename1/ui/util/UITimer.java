@@ -105,7 +105,9 @@ public class UITimer {
      * Stops executing the timer
      */
     public void cancel() {
-        bound.deregisterAnimated(i);
+        if(bound != null) {
+            bound.deregisterAnimated(i);
+        }
     }
     
 

@@ -21,6 +21,9 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         updateCodenameOne(false, getGuiBuilderJar());
         Java java = createJava();
         java.setFork(true);

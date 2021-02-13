@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>pom</packaging>
+
+    <name>${artifactId}</name>
+    <description>${artifactId}</description>
+    <url>https://www.codenameone.com</url>
+
+    <licenses>
+        <license>
+            <name>GPL v2 With Classpath Exception</name>
+            <url>https://openjdk.java.net/legal/gplv2+ce.html</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <modules>
+        <module>common</module>
+    </modules>
+    <!--
+  <distributionManagement>
+      <snapshotRepository>
+        <id>sonatype-nexus-snapshots</id>
+        <name>Sonatype Nexus Snapshots</name>
+        <url>${sonatypeOssDistMgmtSnapshotsUrl}</url>
+      </snapshotRepository>
+      <repository>
+        <id>sonatype-nexus-staging</id>
+        <name>Nexus Release Repository</name>
+        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      </repository>
+    </distributionManagement>-->
+	  
+    <properties>
+        <cn1.version>7.0-SNAPSHOT</cn1.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	      
+        <java.version>1.8</java.version>
+        <java-tests.version>11</java-tests.version>
+        <rhino.version>1.7.11</rhino.version>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <cn1app.name>${artifactId}</cn1app.name>
+        
+        
+        
+    </properties>
+		  
+		  
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-buildclient</artifactId>
+                <version>${cn1.version}</version>
+                <scope>system</scope>
+                <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+            </dependency>
+            
+
+        </dependencies>
+    </dependencyManagement>
+    
+			
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-maven-plugin</artifactId>
+                    <version>${cn1.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+    
+			
+    <repositories>
+        
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-guardsquare-proguard</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/guardsquare/proguard</url>
+        </repository>
+        
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-codenameone-codenameone</id>
+            <name>bintray-plugins</name>
+            <url>https://dl.bintray.com/codenameone/codenameone</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <profiles>
+        <profile>
+            <id>javascript</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javascript</value>
+                </property>
+            </activation>
+            <modules>
+                <module>javascript</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>javase</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
+            </activation>
+            <modules>
+                <module>javase</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>cn1libs</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/cn1libs/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>cn1libs</module>
+            </modules>
+        </profile>
+    </profiles>
+
+</project>
