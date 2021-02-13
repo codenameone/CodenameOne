@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.8-b1</version>
+        <version>7.0.8-b2</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-javase</artifactId>
-    <version>7.0.8-b1</version>
+    <version>7.0.8-b2</version>
     <packaging>jar</packaging>
 
     <dependencies>
@@ -40,6 +40,7 @@
             <version>8</version>
             <scope>system</scope>
             <systemPath>${cn1.binaries}/jfxrt.jar</systemPath>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
@@ -47,6 +48,7 @@
             <version>6.0.0</version>
             <scope>system</scope>
             <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
+            <optional>true</optional>
         </dependency>
     </dependencies>
     <properties>

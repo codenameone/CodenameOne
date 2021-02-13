@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.8-b1</version>
+        <version>7.0.8-b2</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-designer</artifactId>
-    <version>7.0.8-b1</version>
+    <version>7.0.8-b2</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -141,6 +141,7 @@
                     <version>3.3.0</version>
                     <executions>
                         <execution>
+                            <id>build-executable-jar</id>
                             <phase>package</phase>
                             <goals>
                                 <goal>single</goal>
@@ -166,6 +167,7 @@
 
                         <executions>
                           <execution>
+                              <id>add-designer-jar-with-dependencies</id>
                             <phase>package</phase>
                             <configuration>
                               <target>

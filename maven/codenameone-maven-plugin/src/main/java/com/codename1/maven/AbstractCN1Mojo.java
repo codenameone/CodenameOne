@@ -398,7 +398,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     protected File getJar(Artifact artifact) {
         File[] out = new File[1];
-        
+        out[0] = artifact.getFile();
+        if (out[0] != null) {
+            return out[0];
+        }
         
         ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
                 

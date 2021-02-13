@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0.8-b1</version>
+    <version>7.0.8-b2</version>
 
     <packaging>pom</packaging>
 
@@ -393,6 +393,14 @@
                             </goals>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <configuration>
+                        <additionalOptions>--allow-script-in-comments</additionalOptions>
+                    </configuration>
                 </plugin>
             </plugins>
 
