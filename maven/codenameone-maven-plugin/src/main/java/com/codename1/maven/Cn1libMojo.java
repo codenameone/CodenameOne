@@ -236,20 +236,23 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         File zipFile = new File(getBuildDir(), basename + ".zip");
         Zip zip = (Zip)antProject.createTask("zip");
         zip.setDestFile(zipFile);
-        //boolean empty = true;
+        boolean empty = true;
         for (File dir : paths) {
             FileSet fs = new FileSet();
             fs.setProject(antProject);
             fs.setDir(dir);
             fs.setIncludes("**");
-            //if (dir.exists() && !isDirectoryEmpty(dir)) {
-            //    empty = false;
-            //}
+            if (dir.exists() && !isDirectoryEmpty(dir)) {
+                empty = false;
+            } else {
+                continue;
+            }
             zip.addFileset(fs);
         }
-        //if (empty) {
-        //    getLog().debug("No directories found for "+basename+" zip file.  Skipping");
-        //}
+        if (empty) {
+            getLog().debug("No directories found for "+basename+" zip file.  Skipping");
+            return;
+        }
         zip.execute();
     }
 
