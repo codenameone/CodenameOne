@@ -25,7 +25,9 @@ import org.apache.tools.ant.taskdefs.Zip;
 import static com.codename1.maven.PathUtil.path;
 
 /**
- * A goal that installs a legacy cn1lib as a dependency.
+ * A goal that installs a legacy cn1lib as a dependency.  This will generate a Maven project for the cn1lib inside
+ * the "cn1libs" directory of the root project (assuming the project structure follows that of the cn1app-archetype.
+ *
  * @author shannah
  */
 @Mojo(name = "install-cn1lib")
@@ -33,27 +35,49 @@ public class InstallLegacyCn1libMojo extends AbstractCN1Mojo {
 
     private File cn1libsDirectory;
 
+    /**
+     * The path to the .cn1lib file to install.
+     */
     @Parameter(property="file", required=true)
     private File file;
 
+    /**
+     * The groupID to use for the generated project.  If omitted, it will use the same groupId as the project.
+     */
     @Parameter(property="groupId", required = false)
     private String groupId;
 
+    /**
+     * The artifactId to use for the generated project.  If omitted, it will use ${project.artifactId}-${libName}, where ${libName}
+     * is the name of the cn1lib file with out the .cn1lib extension.
+     * module
+     */
     @Parameter(property="artifactId", required = false)
     private String artifactId;
 
+    /**
+     * The version for the generated project.  If omitted, it will use the ${project.version}.
+     */
     @Parameter(property="version", required = false)
     private String version;
 
+    /**
+     * A boolean flag indicating whether it should automatically update the pom.xml file with the dependency.
+     * Default true.
+     */
     @Parameter(property="updatePom", required=false, defaultValue = "true")
     private boolean updatePom;
 
+    /**
+     * A boolean flag indicating whether it should overwrite an existing project of the same name.  Default false.
+     */
     @Parameter(property="overwrite", required=false, defaultValue = "false")
     private boolean overwrite;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (!isCN1ProjectDir()) {
+            // To make things sane, this mojo should only be executed for the common module.
             return;
         }
         File canonicalFile;
@@ -133,15 +157,15 @@ public class InstallLegacyCn1libMojo extends AbstractCN1Mojo {
         
         String groupId = this.groupId;
         if (groupId == null) {
-            groupId = project.getGroupId() + ".cn1libs";
+            groupId = project.getParent().getGroupId();
         }
         String artifactId = this.artifactId;
         if (artifactId == null) {
-            artifactId = project.getArtifactId() + "-" +libName;
+            artifactId = project.getParent().getArtifactId() + "-" +libName;
         }
         String version = this.version;
         if (version == null) {
-            version = project.getVersion();
+            version = project.getParent().getVersion();
         }
         
         File seJar = new File(libOutputJars, "nativese.zip");

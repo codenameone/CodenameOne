@@ -10,7 +10,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 
 /**
- *
+ * A mojo that updates Codename One.
  * @author shannah
  */
 @Mojo(name = "update")
@@ -19,6 +19,9 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
     
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         updateCodenameOne(true);
  
     }

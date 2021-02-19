@@ -178,7 +178,8 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         // point for proguard to crawl through the code and find out what is used.
         // For application projects, the starting point is just the main class.
         // For library projects, we keep all classes in the immediate project.
-        if (properties != null && properties.getProperty("codename1.mainName") != null) {
+
+        if (properties != null && properties.getProperty("codename1.mainName") != null && !properties.getProperty("codename1.mainName").isEmpty()) {
 
             String keep = "class "+properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName")+" {\n" +
                 "            *;\n" +

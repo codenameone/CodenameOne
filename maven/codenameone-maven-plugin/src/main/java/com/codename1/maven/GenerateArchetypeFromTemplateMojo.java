@@ -67,7 +67,11 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
         if (tplFile.isFile() && tplFile.getName().endsWith(".java")) {
 
             processJavaFile(tplFile);
+        } else if (tplFile.isFile() && tplFile.getName().endsWith(".kt")) {
+
+            processKotlinFile(tplFile);
         }
+
     }
 
     /**
@@ -102,9 +106,9 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
 
     /**
      * Extracts a section from a template string.
-     * @param haystack
-     * @param sectionName
-     * @return
+     * @param haystack The text within which to search for the given section.
+     * @param sectionName  The section name to search for.  E.g. Looking for [sectionName]\n--- .... --- in the haystack.
+     * @return The section content, or an empty string if the section was not found.
      * @throws TemplateParseException
      */
     private String extractSectionFrom(String haystack, String sectionName) throws TemplateParseException {
@@ -141,8 +145,8 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
      * content here
      * ----
      *
-     * @param str
-     * @return
+     * @param str The text to search for dependencies in.
+     * @return The content the dependencies section.  Or an empty string.
      * @throws TemplateParseException
      */
     private String extractDependencies(String str) throws TemplateParseException {
@@ -475,6 +479,31 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
             sb.append(part);
         }
         return sb.toString();
+    }
+
+    /**
+     * Processes a Kotlin file that have embedded template commands in it.
+     * @param tplFile The java template file.
+     * @throws MojoExecutionException
+     */
+    private void processKotlinFile(File tplFile) throws MojoExecutionException{
+        try {
+            String kotlinContents = FileUtils.readFileToString(tplFile, "UTF-8");
+            File destProject = generateBaseArchetype(kotlinContents, tplFile);
+
+            processString(kotlinContents, destProject);
+            File archetypeResourcesDir = new File(destProject, path("src", "main", "resources", "archetype-resources"));
+            File commonDir = new File(archetypeResourcesDir, "common");
+            File mainClassFile = new File(commonDir, path("src", "main", "kotlin", "__mainName__.kt"));
+
+
+            getLog().info("Writing Kotlin Source file at " + mainClassFile);
+            FileUtils.writeStringToFile(mainClassFile, kotlinContents, "UTF-8");
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to load java template file from "+tplFile, ex);
+        } catch (TemplateParseException ex) {
+            throw new MojoExecutionException("Failed to parse template from file "+tplFile, ex);
+        }
     }
 
     /**

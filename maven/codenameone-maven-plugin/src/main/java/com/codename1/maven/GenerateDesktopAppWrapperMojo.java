@@ -14,6 +14,10 @@ import java.io.IOException;
 
 import static com.codename1.maven.PathUtil.path;
 
+/**
+ * Generates The SEWrapper, or the main class for a JavaSE desktop app.  This is used by the javase module
+ * of the cn1app-archetype.
+ */
 @Mojo(name="generate-desktop-app-wrapper")
 public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     @Override

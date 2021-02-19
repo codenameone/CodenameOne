@@ -8,18 +8,13 @@ package com.codename1.maven;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
+
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
-import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.tools.ant.taskdefs.Copy;
@@ -31,83 +26,43 @@ import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.selectors.FilenameSelector;
 import org.codehaus.plexus.util.FileUtils;
 
+import static com.codename1.maven.PathUtil.path;
+
 /**
- * This was an early attempt at building a cn1lib format that was based on the legacy cn1lib format.  Ultimately
- * I decided to change to a completely different strategy for building cn1libs using the cn1lib-archetype
- * which is a pom project.
- *
- *
- * @deprecated To be removed.
+ * Generates a legacy .cn1lib file.
  * @author shannah
  */
 @Mojo(name = "cn1lib", defaultPhase = LifecyclePhase.PACKAGE)
 public final class Cn1libMojo extends AbstractCN1Mojo {
-    
-    public static final String CN1LIB_VERSION = "1.0";
 
-    
-    private static final String STUBBER_ARTIFACT_ID = "stubber";
 
-    private static final String[] NATIVE_TYPES = new String[]{"rim", "j2me", "javase", "javascript", "ios", "android", "win"};
-   
+    private File getNativeDir() {
+        return new File(getCN1LibProjectDir(), "native");
+    }
+
+    private File getBuildDir() {
+        return new File(path(project.getBuild().getDirectory(), "codenameone", "cn1lib"));
+    }
+
+    private File getFinalCn1lib() {
+        return new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + ".cn1lib"));
+    }
+
+
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
         
-        
-        
-        File artifact = new File(this.outputDirectory +"/"+ this.finalName + ".jar");
-        
-        
-        nativeDir = new File(getCN1LibProjectDir(), "native");
-        buildDir = new File(this.project.getBuild().getDirectory(), "tmp");
-        //File stubsDir = new File(buildDir, "stubs");
-        File lib = new File(buildDir, "lib");
-        File metaInf = new File(lib, "META-INF");
-        File metaCn1lib = new File(metaInf, "cn1lib");
-        metaCn1lib.mkdirs();
-        buildMain(lib);
-        for (String file : new String[]{"manifest.properties", "codenameone_library_appended.properties", "codenameone_library_required.properties"}) {
-            Copy copy = new Copy();
-            copy.setFile(new File(getCN1LibProjectDir(), file));
-            copy.setTodir(metaCn1lib);
-            copy.execute();
+        if (!isCN1ProjectDir()) {
+            return;
         }
-        
-        
-        
-        
-        
-        buildNatives(metaCn1lib);
-        nativeDir = getCN1LibProjectDir();
-        buildCSS(metaCn1lib);
-        
-        
-        stubber();
-        
-        
-        Manifest manifest = new Manifest();
-        Attributes cn1Attributes = manifest.getAttributes("cn1lib");
-        if (cn1Attributes == null) {
-            cn1Attributes = new Attributes();
-            manifest.getEntries().put("cn1lib", cn1Attributes);
-        }
-        cn1Attributes.putValue("Version", CN1LIB_VERSION);
-        
-        File manifestFile = new File(metaInf, "MANIFEST.MF");
-        try (FileOutputStream fos = new FileOutputStream(manifestFile)) {
-            manifest.write(fos);
+
+        try {
+            buildCn1lib();
         } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to create manifest file", ex);
+            throw new MojoExecutionException("Failed to create CN1lib", ex);
         }
-        
-        Zip zip = (Zip)antProject.createTask("zip");
-        
-        zip.setBasedir(lib);
-        zip.setCompress(true);
-        zip.setDestFile(artifact);
-        zip.execute();
-        //this.project.getArtifact().setFile(artifact);
-        projectHelper.attachArtifact(project, "jar", "cn1lib", artifact);
+
+        projectHelper.attachArtifact(project, "cn1lib", getFinalCn1lib());
         
     }
     
@@ -146,12 +101,13 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         return findPluginDependency(GROUP_ID, STUBBER_ARTIFACT_ID);
     }
     */
-    
-    
 
-    
+
+    /**
+     * Finds the Stubber jar.
+     * @return
+     */
     private File findStubberJar() {
-
         File mavenPluginJar = getJar("com.codenameone", "codenameone-maven-plugin");
         if (mavenPluginJar == null || !mavenPluginJar.exists()) {
             throw new RuntimeException("Cannot find codenameone-maven-plugin jar");
@@ -169,72 +125,39 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         return stubberJar;
     }
     
-   private Path prepareStubberClassPath() {
-        Log log = getLog();
-        log.info("Preparing classpath for Stubber");
-        List<String> paths = new ArrayList<>();
-        //StringBuilder classpath = new StringBuilder();
-        Path classpath = new Path(antProject);
-        
-        for (Artifact artifact : project.getArtifacts()) {
-            log.debug("Checking artifact "+artifact);
-            if (!filterByScope(artifact)) {
-                continue;
-            }
-            File file = artifact.getFile();
-            //if (classpath.length() > 0) {
-            //    classpath.append(':');
-            //}
-            classpath.add(new Path(antProject, file.getAbsolutePath()));
-            //classpath.append(file.getPath());
-            //paths.add(file.getAbsolutePath());
-        }
-        //if (classpath.length() > 0) {
-        //    classpath.append(':');
-        //}
-        //classpath.append(classFiles.getPath());
-        //paths.add(classFiles.getAbsolutePath());
-        log.debug("Using the following classpath for Stubber: " + classpath);
-        return classpath;
-    }
-   private boolean filterByScope(Artifact artifact) {
-        return isSupportedScope(artifact.getScope());
-                
+
+    private File getStubsBuildDir() {
+        return new File(getBuildDir(), "stubs");
     }
 
-    protected boolean isSupportedScope(String scope) {
-        switch (scope) {
-            case Artifact.SCOPE_COMPILE:
-            case Artifact.SCOPE_PROVIDED:
-            case Artifact.SCOPE_SYSTEM:
-                return true;
-            default:
-                return false;
-        }
+    private File getStubsZip() {
+        return new File(getBuildDir(), "stubs.zip");
     }
-    
-    private void stubber() {
+
+
+
+    private void buildStubs() throws IOException {
         getLog().debug("Found stubber "+findStubberJar());
-        
-        File srcDir = new File(project.getCompileSourceRoots().get(0));
-        File antBuildDir = new File(srcDir.getParentFile(), "build");
-        boolean antBuildDirExists = antBuildDir.exists();
-        File stubDir = new File(antBuildDir, "stubs");
+        getStubsBuildDir().mkdirs();
+        File javaSourcesDir = new File(project.getBasedir(), path("src", "main", "java"));
+        if (getStubsZip().exists() && getStubsZip().lastModified() >= lastModifiedRecursive(javaSourcesDir)) {
+            getLog().debug("Stubs have not changed.  Skipping stubber");
+            return;
+        }
+
+        FileUtils.deleteDirectory(getStubsBuildDir());
+        getStubsBuildDir().mkdir();
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", getBuildDir().getAbsolutePath());
         try {
-            //File stubDir = new File(new File(project.getCmo), "stubs");
-            //stubDir.mkdirs();
-            Delete delete = (Delete)antProject.createTask("delete");
-            delete.setDir(stubDir);
-            delete.execute();
-
-
-            Javadoc javadoc = (Javadoc)antProject.createTask("javadoc");
-            
-            Path sourcePath = new Path(antProject, srcDir.getAbsolutePath());
-            
-            
+            Javadoc javadoc = (Javadoc) antProject.createTask("javadoc");
+            Path sourcePath = new Path(antProject, javaSourcesDir.getAbsolutePath());
             javadoc.setSourcepath(sourcePath);
-            javadoc.setClasspath(prepareStubberClassPath());
+            Path classPath = new Path(antProject);
+            for (Artifact artifact : project.getArtifacts()) {
+                classPath.add(new Path(antProject, artifact.getFile().getAbsolutePath()));
+            }
+            javadoc.setClasspath(classPath);
             javadoc.setDocletPath(new Path(antProject, findStubberJar().getAbsolutePath()));
             javadoc.setDoclet("com.codename1.build.client.StubGenerator");
 
@@ -242,142 +165,185 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
             fileset.setProject(antProject);
 
             //getLog().info("dir="+project.getCompileSourceRoots().get(0));
-            fileset.setDir(new File(project.getCompileSourceRoots().get(0)));
-            getLog().debug("includes="+stubberIncludes+"; excludes="+stubberExcludes);
+            fileset.setDir(javaSourcesDir);
 
-            fileset.setExcludes("*.java,"+str(stubberExcludes));
+            getLog().debug("includes=" + stubberIncludes + "; excludes=" + stubberExcludes);
+
+            fileset.setExcludes("*.java," + str(stubberExcludes));
             fileset.setIncludes(str(stubberIncludes));
 
             FilenameSelector javaFiles = new FilenameSelector();
             javaFiles.setName("**/*.java");
 
             fileset.addFilename(javaFiles);
-            //javadoc.addFileset(fileset);
+            javadoc.addFileset(fileset);
 
             javadoc.execute();
-
-            //<zip basedir="build/stubs" compress="false" destfile="build/lib/stubs.zip" />
-            Zip zip = (Zip)antProject.createTask("zip");
-
-            zip.setBasedir(stubDir);
-            zip.setCompress(false);
-
-            File libDir = new File(buildDir, "lib");
-            libDir.mkdirs();
-            //File stubsZip = new File(new File(project.getBuild().getOutputDirectory()), ""
-            File stubsZip = new File(this.outputDirectory +"/"+ this.finalName + "-sources.jar");
-
-            zip.setDestFile(stubsZip);
-            zip.execute();
-
-            projectHelper.attachArtifact(project, "java-source", "sources", stubsZip);
-
-
-    //        <delete dir="build/stubs"/>
-    //        <javadoc sourcepath="src"
-    //            classpath="lib/CodenameOne.jar:lib/CLDC11.jar"
-    //            docletpath="Stubber.jar"
-    //            doclet="com.codename1.build.client.StubGenerator"> 
-    //            <fileset dir="${src.dir}" excludes="*.java,${excludes}" includes="${includes}">
-    //                <filename name="**/*.java"/>
-    //            </fileset>
-    //         </javadoc>
-    //            
         } finally {
-            if (!antBuildDirExists && antBuildDir.exists()) {
-                Delete delete = (Delete)antProject.createTask("delete");
-                delete.setDir(antBuildDir);
-                delete.execute();
-            }
-            if (stubDir.exists()) {
-                Delete delete = (Delete)antProject.createTask("delete");
-                delete.setDir(stubDir);
-                delete.execute();
-            }
+
+            System.setProperty("user.dir", userDir);
         }
+
+        Zip zip = (Zip)antProject.createTask("zip");
+        zip.setDestFile(getStubsZip());
+        FileSet files = new FileSet();
+        files.setProject(antProject);
+        files.setDir(getStubsBuildDir());
+        files.setIncludes("**");
+        zip.addFileset(files);
+        zip.execute();
+
+        FileUtils.deleteDirectory(getStubsBuildDir());
+
                         
     }
     
-    private void buildMain(File libJarRoot) {
-        
-        //Zip zip = (Zip)antProject.createTask("zip");
-        
-        //zip.setCompress(false);
-        getLog().debug("Zipping baseDir "+new File(this.project.getBuild().getOutputDirectory()));
-        //zip.setBasedir(new File(this.project.getBuild().getOutputDirectory()));
-        //File destFile = new File(new File(buildDir, "lib"), "main.zip");
-        //getLog().debug("Into zip file "+destFile);
-        //destFile.getParentFile().mkdirs();
-        //zip.setDestFile(destFile);
-        //zip.execute();
-        libJarRoot.mkdirs();
-        Copy copy = (Copy)antProject.createTask("copy");
-        copy.setTodir(libJarRoot);
-        FileSet files = new FileSet();
-        files.setProject(antProject);
-        files.setDir(new File(this.project.getBuild().getOutputDirectory()));
-        files.setIncludes("**");
-        copy.addFileset(files);
-        copy.execute();
-        
-        
-    }
-    
-    private File nativeDir;
-    private File buildDir;
-    
-    private void buildNative(File libRoot, String type, String prefix) {
-        File dir = new File(nativeDir, type);
-        dir.mkdirs();
-        Zip zip = (Zip)antProject.createTask("zip");
-        zip.setBasedir(dir);
-        zip.setCompress(false);
-        
-        libRoot.mkdirs();
-        
-        File destFile = new File(libRoot, prefix+type+".zip");
-        zip.setDestFile(destFile);
-        zip.execute();
-        
-        
-    }
-    
-    private File findCSSDir() {
-        for (String path : project.getCompileSourceRoots()) {
-            File file = new File(path);
-            File css = new File(file.getParentFile(), "css");
-            if (css.exists()) {
-                return css;
+    private void buildMainZip() {
+        getBuildDir().mkdirs();
+        {
+            Zip zip = (Zip)antProject.createTask("zip");
+            File mainZip = new File(getBuildDir(), "main.zip");
+            zip.setDestFile(mainZip);
+            {
+                FileSet files = new FileSet();
+                files.setProject(antProject);
+                files.setDir(new File(this.project.getBuild().getOutputDirectory()));
+                files.setIncludes("**");
+                zip.addFileset(files);
             }
+            zip.execute();
         }
-        return new File("src" + File.separator + "main" + File.separator + "css");
+        
     }
-    
-    private void buildCSS(File libRoot) {
-        File cssDir = findCSSDir();
-        if (!cssDir.exists()) {
-            return;
-        }
+
+    private File getModuleProject(String name) {
+        return new File(project.getParent().getBasedir(), name);
+    }
+
+    private File[] getIOSPaths() {
+        return new File[]{
+                new File(getModuleProject("ios"), path("src", "main", "objectivec")),
+                new File(getModuleProject("ios"), path("src", "main", "resources"))
+        };
+    }
+
+    private static boolean isDirectoryEmpty(File directory) {
+        String[] files = directory.list();
+        return files.length == 0;
+    }
+
+    private void buildZip(String basename, File[] paths) {
+        File zipFile = new File(getBuildDir(), basename + ".zip");
         Zip zip = (Zip)antProject.createTask("zip");
-        zip.setBasedir(cssDir);
-        zip.setCompress(false);
-        
-        libRoot.mkdirs();
-        
-        File destFile = new File(libRoot, "css.zip");
-        zip.setDestFile(destFile);
-        zip.execute();
-        
-        
-    }
-    
-    private void buildNatives(File libRoot) {
-        
-        for (String type : NATIVE_TYPES) {
-            buildNative(libRoot, type, "native");
+        zip.setDestFile(zipFile);
+        //boolean empty = true;
+        for (File dir : paths) {
+            FileSet fs = new FileSet();
+            fs.setProject(antProject);
+            fs.setDir(dir);
+            fs.setIncludes("**");
+            //if (dir.exists() && !isDirectoryEmpty(dir)) {
+            //    empty = false;
+            //}
+            zip.addFileset(fs);
         }
+        //if (empty) {
+        //    getLog().debug("No directories found for "+basename+" zip file.  Skipping");
+        //}
+        zip.execute();
+    }
+
+    private void buildIOS() {
+        buildZip("nativeios", getIOSPaths());
+    }
+
+    private File[] getAndroidPaths() {
+        return new File[]{
+                new File(getModuleProject("android"), path("src", "main", "java")),
+                new File(getModuleProject("android"), path("src", "main", "resources"))
+        };
+    }
+
+    private void buildAndroid() {
+        buildZip("nativeand", getAndroidPaths());
+    }
+
+    private File[] getJavascriptPaths() {
+        return new File[]{
+                new File(getModuleProject("javascript"), path("src", "main", "javascript")),
+                new File(getModuleProject("javascript"), path("src", "main", "resources"))
+        };
+    }
+
+    private void buildJavascript() {
+        buildZip("nativejavascript", getJavascriptPaths());
+    }
+
+    private File[] getJavasePaths() {
+        return new File[]{
+                new File(getModuleProject("javase"), path("src", "main", "java")),
+                new File(getModuleProject("javase"), path("src", "main", "resources"))
+        };
+    }
+
+    private void buildJavase() {
+        buildZip("nativese", getJavasePaths());
+    }
+
+    private File[] getWinPaths() {
+        return new File[]{
+                new File(getModuleProject("win"), path("src", "main", "csharp")),
+                new File(getModuleProject("win"), path("src", "main", "resources"))
+        };
+    }
+
+    private void buildWin() {
+        buildZip("nativewin", getWinPaths());
+    }
+
+
+    private File[] getCSSPaths() {
+        return new File[]{
+                new File(project.getBasedir(), path("src", "main", "css"))
+        };
+    }
+
+    private void buildCSS() {
+        buildZip("css", getCSSPaths());
+    }
+
+
+
+    private void buildCn1lib() throws IOException {
+        buildMainZip();
+        buildCSS();
+        buildAndroid();
+        buildIOS();
+        buildJavascript();
+        buildJavase();
+        buildStubs();
+        buildWin();
+
+        Zip zip = (Zip)antProject.createTask("zip");
+        zip.setDestFile(getFinalCn1lib());
+        {
+            FileSet files = new FileSet();
+            files.setProject(antProject);
+            files.setDir(getBuildDir());
+            files.setIncludes("**");
+            zip.addFileset(files);
+        }
+        {
+            FileSet files = new FileSet();
+            files.setProject(antProject);
+            files.setDir(project.getBasedir());
+            files.setIncludes("*.properties");
+            zip.addFileset(files);
+        }
+        zip.execute();
     }
     
+
     
     
     

@@ -24,6 +24,12 @@ import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
 
+/**
+ * Mojo that uses the CodenameOneBuildClient to send builds to the CodenameOne build server.
+ *
+ * It also supports a few local build targets, such as "ios-source", which generates an Xcode project,
+ * and "android-source", which generates an Android gradle project.
+ */
 @Mojo(name="build", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PACKAGE)
@@ -45,12 +51,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     @Parameter(property = "codename1.buildTarget", required = true, defaultValue = "${codename1.defaultBuildTarget}")
     private String buildTarget;
 
-    @Parameter(property = "automated", defaultValue = "true")
+    /**
+     * Flag to indicate whether to use an automated build or not.
+     */
+    @Parameter(property = "automated", defaultValue = "false")
     private boolean automated;
-
-    @Parameter(property = "useBuildServer", defaultValue = "false")
-    private boolean useBuildServer;
-
 
     /**
      * Flag of whether to open the xcode/android studio project.

@@ -36,7 +36,7 @@ import static com.codename1.maven.PathUtil.path;
  * Simple tool to generate platform implementation stubs matching a
  * Native interface instance
  *
- * @author Shai Almog
+ * This is used by the {@link GenerateNativeInterfaces} mojo.
  */
 public class StubGenerator {
     private Class nativeInterface;
