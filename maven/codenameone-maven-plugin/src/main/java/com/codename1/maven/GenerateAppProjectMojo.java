@@ -1,6 +1,7 @@
 package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.maven.MavenExecutionException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -21,13 +22,13 @@ import java.util.Properties;
 import static com.codename1.maven.PathUtil.path;
 
 /**
- * Generates a Maven cn1lib project (using the cn1lib-archetype) using a provided ANT cn1lib project as a template.
+ * Generates a Maven project (using the cn1app-archetype) using a provided ANT Codename One application project as a template.
  * This is to assist in migrating Ant projects to Maven projects.
  *
  *
  */
-@Mojo(name="generate-cn1lib-project", requiresProject = false)
-public class GenerateCn1libProjectMojo extends AbstractMojo {
+@Mojo(name="generate-app-project", requiresProject = false)
+public class GenerateAppProjectMojo extends AbstractMojo {
 
     @Parameter(property = "sourceProject")
     private File sourceProject;
@@ -48,12 +49,13 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
         String[] propsArr = {
                 "interactiveMode=false",
-            "archetypeArtifactId=cn1lib-archetype",
+            "archetypeArtifactId=cn1app-archetype",
             "archetypeGroupId=com.codenameone",
             "archetypeVersion=LATEST",
             "artifactId="+artifactId,
                 "groupId="+groupId,
-                "version="+version
+                "version="+version,
+                "mainName=MyApp"
         };
         Properties props = new Properties();
         for (String prop : propsArr) {
@@ -72,7 +74,7 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
         try {
             InvocationResult result = invoker.execute( request );
             if (result.getExitCode() != 0) {
-                throw new MojoExecutionException("Failed to generate project using cn1lib-archetype.  Exit code "+result.getExitCode());
+                throw new MojoExecutionException("Failed to generate project using cn1app-archetype.  Exit code "+result.getExitCode());
             }
         } catch (MavenInvocationException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex);
@@ -291,6 +293,10 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
         }
     }
 
+    private File sourceLibDir() {
+        return new File(sourceProject, "lib");
+    }
+
     private File sourceCSSDir() {
         return new File(sourceProject, "css");
     }
@@ -428,6 +434,7 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
             copyWinFiles();
             copyJavaseFiles();
             copyCSSFiles();
+            copyCn1libs();
 
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to copy files", ex);
@@ -451,6 +458,35 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
             antProject.init();
         }
         return antProject;
+
+    }
+
+
+
+    private void copyCn1libs() throws MojoExecutionException, MojoFailureException{
+        for (File cn1lib : sourceLibDir().listFiles()) {
+            if (cn1lib.getName().startsWith("kotlin-runtime")) {
+                getLog().debug("Skipping "+cn1lib+" because kotlin no longer requires a cn1lib.");
+                continue;
+            }
+            if (cn1lib.getName().endsWith(".cn1lib")) {
+                installLegacyCn1lib(cn1lib);
+            }
+        }
+    }
+
+    private static String getBaseName(File file) {
+        return file.getName().substring(0, file.getName().indexOf("."));
+    }
+
+    private void installLegacyCn1lib(File cn1lib) throws MojoExecutionException, MojoFailureException {
+        getLog().info("Installing cn1lib "+cn1lib);
+        Cn1libInstaller installer = new Cn1libInstaller(new File(targetProjectDir(), "common"), groupId, artifactId, version, getLog());
+        installer.setFile(cn1lib);
+        installer.setOverwrite(false);
+        installer.setUpdatePom(true);
+
+        installer.executeImpl();
 
     }
 
