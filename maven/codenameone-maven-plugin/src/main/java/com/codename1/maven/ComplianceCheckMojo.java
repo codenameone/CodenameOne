@@ -152,6 +152,11 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             // code and place the result into a complianceCheck jar file.  This jar file
             // will be checked for consistency on the second pass.
             Path inJars = new Path(antProject, project.getBuild().getOutputDirectory());
+            //File kotlinIc = new File(project.getBuild().getDirectory(), path("kotlin-ic", "compile", "classes"));
+            //if (kotlinIc.exists()) {
+            //
+            //    inJars.add(new Path(antProject, kotlinIc.getAbsolutePath()));
+            //}
 
             project.getArtifacts().forEach(artifact -> {
                 getLog().info("artifact "+artifact);
@@ -166,6 +171,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             getLog().info("injars = "+inJars);
             java.createArg().setValue("-injars");
             java.createArg().setPath(inJars);
+
             java.createArg().setValue("-outjars");
             java.createArg().setPath(new Path(antProject, complianceCheckJar.getAbsolutePath()));
         } else if (passNum == 1) {
@@ -187,6 +193,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             //getLog().info("Addin -keep directive "+keep);
             java.createArg().setValue("-keep");
             java.createArg().setValue(keep);
+            getLog().info("Keeping "+keep);
         } else {
 
             List<String> keeps = new ArrayList<String>();

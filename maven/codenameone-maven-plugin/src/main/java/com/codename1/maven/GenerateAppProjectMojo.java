@@ -1,5 +1,6 @@
 package com.codename1.maven;
 
+import com.codename1.util.RichPropertiesReader;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.MavenExecutionException;
 import org.apache.maven.plugin.AbstractMojo;
@@ -15,9 +16,9 @@ import org.apache.tools.ant.taskdefs.Copy;
 import org.apache.tools.ant.types.FileSet;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Properties;
+import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -422,19 +423,163 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
     }
 
+    private Properties generateAppProjectProperties;
+    private Properties generateAppProjectProperties() throws IOException, RichPropertiesReader.ConfigSyntaxException {
+        if (generateAppProjectProperties == null) {
+            generateAppProjectProperties = new Properties();
+            if (generateAppProjectConfigFile().exists()) {
+
+                new RichPropertiesReader().load(generateAppProjectConfigFile(), generateAppProjectProperties);
+
+            }
+        }
+        return generateAppProjectProperties;
+    }
+
+    private String packageName() {
+        if (System.getProperty("packageName") != null) {
+            return System.getProperty("packageName");
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(groupId).append(".");
+        int len = artifactId.length();
+        boolean firstChar = true;
+        boolean capNext = false;
+        for (int i=0; i<len; i++) {
+            char ch = artifactId.charAt(i);
+            if (firstChar) {
+                if (Character.isLetter(ch)) {
+                    sb.append(Character.toLowerCase(ch));
+                    firstChar = false;
+                }
+                continue;
+            }
+            if (Character.isLetterOrDigit(ch)) {
+                if (capNext) {
+                    sb.append(Character.toUpperCase(ch));
+                    capNext = false;
+                } else {
+                    sb.append(ch);
+                }
+            } else {
+                capNext = true;
+            }
+        }
+
+
+
+        return sb.toString();
+    }
+
+    private String mainName() {
+        if (System.getProperty("mainName") != null) {
+            return System.getProperty("mainName");
+        }
+        StringBuilder sb = new StringBuilder();
+        int len = artifactId.length();
+        boolean firstChar = true;
+        boolean capNext = false;
+        for (int i=0; i<len; i++) {
+            char ch = artifactId.charAt(i);
+            if (firstChar) {
+                if (Character.isLetter(ch)) {
+                    sb.append(Character.toUpperCase(ch));
+                    firstChar = false;
+                }
+                continue;
+            }
+            if (Character.isLetterOrDigit(ch)) {
+                if (capNext) {
+                    sb.append(Character.toUpperCase(ch));
+                    capNext = false;
+                } else {
+                    sb.append(ch);
+                }
+            } else {
+                capNext = true;
+            }
+        }
+
+
+
+        return sb.toString();
+    }
+
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
             generateProject();
-            copyPropertiesFiles();
-            copySourceFiles();
-            copyAndroidFiles();
-            copyIosFiles();
-            copyJavascriptFiles();
-            copyWinFiles();
-            copyJavaseFiles();
-            copyCSSFiles();
-            copyCn1libs();
+            Properties props;
+            try {
+                props = generateAppProjectProperties();
+            } catch (Exception ex) {
+                throw new MojoExecutionException("Failed to load "+generateAppProjectConfigFile(), ex);
+            }
+
+            String templateType = props.getProperty("template.type");
+
+            if (templateType != null) {
+                // This is a project template
+                // Make a copy of it so that we can turn it into a concrete proejct
+                File dest = new File(targetProjectDir(), path("target", "codenameone", "tmpProject"));
+                dest.getParentFile().mkdirs();
+                FileUtils.copyDirectory(sourceProject, dest);
+                File origSource = sourceProject;
+                sourceProject = dest;
+
+                Properties renderProperties = new Properties();
+                renderProperties.put("packageName", packageName());
+                renderProperties.put("mainName", mainName());
+                renderProperties.putAll(System.getProperties());
+
+
+                ProjectTemplate tpl = new ProjectTemplate(sourceProject, renderProperties);
+
+                if (props.getProperty("template.mainName") != null && props.getProperty("template.packageName") != null) {
+                    tpl.convertToTemplate(props.getProperty("template.packageName"), props.getProperty("template.mainName"));
+                }
+
+                tpl.processFiles();
+
+                // The project should now be a concrete project
+
+
+
+                //
+
+            }
+
+            if (templateType == null || "ant".equalsIgnoreCase(templateType)) {
+                // The source project was an ANT project
+                copyPropertiesFiles();
+                copySourceFiles();
+                copyAndroidFiles();
+                copyIosFiles();
+                copyJavascriptFiles();
+                copyWinFiles();
+                copyJavaseFiles();
+                copyCSSFiles();
+                copyCn1libs();
+                injectDependencies();
+            } else if ("maven".equalsIgnoreCase(templateType)) {
+                //The source project was a Maven project
+                File src = new File(sourceProject, path("common", "src"));
+                File destSrc = new File(targetProjectDir(), path("common", "src"));
+                if (src.exists()) {
+                    FileUtils.deleteDirectory(destSrc);
+                    FileUtils.copyDirectory(src, destSrc);
+                }
+
+                File cn1Settings = new File(sourceProject, path("common", "codenameone_settings.properties"));
+                File destCn1Settings = new File(targetProjectDir(), path("common", "codenameone_settings.properties"));
+                if (cn1Settings.exists()) {
+                    FileUtils.copyFile(cn1Settings, destCn1Settings);
+                }
+                injectDependencies();
+            }
+
+
 
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to copy files", ex);
@@ -488,6 +633,44 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
         installer.executeImpl();
 
+    }
+
+    private File generateAppProjectConfigFile() {
+        return new File(sourceProject, "generate-app-project.rpf");
+    }
+
+    private File targetCommonPomXml() {
+        return new File(targetCommonDir(), "pom.xml");
+    }
+
+    private void injectDependencies() throws MojoExecutionException {
+        if (!generateAppProjectConfigFile().exists()) {
+            return;
+        }
+        try {
+            Properties props = new Properties();
+            new RichPropertiesReader().load(generateAppProjectConfigFile(), props);
+            String dependencies = props.getProperty("dependencies");
+            if (targetCommonPomXml().exists()) {
+                String contents = FileUtils.readFileToString(targetCommonPomXml(), "UTF-8");
+                if (dependencies != null) {
+                    String marker = "<!-- INJECT DEPENDENCIES -->";
+                    if (!contents.contains(marker)) {
+                        throw new MojoExecutionException("Failed to inject dependencies into "+targetCommonPomXml()+" because the expected marker '"+marker+"' could not be found.  Please place this marker inside the '<dependencies>' section.");
+                    }
+                    contents = contents.replace(marker, dependencies + System.lineSeparator() + marker);
+                    FileUtils.writeStringToFile(targetCommonPomXml(), contents, "UTF-8");
+                }
+
+
+            }
+
+
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to process configuration for generateAppProjectConfigFile "+generateAppProjectConfigFile(), ex);
+        } catch (RichPropertiesReader.ConfigSyntaxException ex) {
+            throw new MojoExecutionException("Failed to process configuration for generateAppProjectConfigFile "+generateAppProjectConfigFile(), ex);
+        }
     }
 
 }
