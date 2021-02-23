@@ -434,7 +434,7 @@ public class Tabs extends Container {
      * Cover method for <code>insertTab</code>.
      *
      * @param title the title to be displayed in this tab
-     * @param icon one of the material design icon constants from {@link com.codename1.ui.FontImage}
+     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
      * @param iconSize icon size in millimeters 
      * @param component the component to be displayed when this tab is clicked
      * @return this so these calls can be chained
