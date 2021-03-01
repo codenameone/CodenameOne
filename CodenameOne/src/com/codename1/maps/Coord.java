@@ -24,7 +24,7 @@ import com.codename1.ui.geom.Dimension;
 /**
  * This class declares a coordinate point on a map.
  * 
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
+ * @author Roman Kamyk roman.kamyk@itiner.pl
  */
 public class Coord {
 
@@ -36,8 +36,8 @@ public class Coord {
 
     /**
      * Creates a isProjected Coord
-     * @param getLatitude the getLatitude of this Coordinate
-     * @param getLongitude the getLongitude of this Coordinate
+     * @param latitude the getLatitude of this Coordinate
+     * @param longitude the getLongitude of this Coordinate
      */
     public Coord(double latitude, double longitude) {
         this(latitude, longitude, false);
@@ -46,9 +46,9 @@ public class Coord {
     
     /**
      * a Constructor with getLatitude, getLongitude
-     * @param getLatitude the Coordinate getLatitude
-     * @param getLongitude the Coordinate getLongitude
-     * @param isProjected declares if this is a isProjected Coordinate
+     * @param latitude the Coordinate getLatitude
+     * @param longitude the Coordinate getLongitude
+     * @param projected declares if this is a isProjected Coordinate
      */
     public Coord(double latitude, double longitude, boolean projected) {
         this.latitude = latitude;

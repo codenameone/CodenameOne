@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -571,7 +572,7 @@ public class SignatureComponent extends Container implements ActionSource {
            }
            calcSignatureRect(signatureRect);
 
-           Image img = Image.createImage(signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
+           Image img = ImageFactory.createImage(this, signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
            Graphics g = img.getGraphics();
            g.translate(-signatureRect.getX(), -signatureRect.getY());
            paintSignature(g);

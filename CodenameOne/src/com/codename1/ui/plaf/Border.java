@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.geom.Rectangle;
@@ -1308,7 +1309,7 @@ public class Border {
                         g.drawImage(i, x, y);
                     } else {
                         // we need to draw a background image!
-                        i = Image.createImage(width, height);
+                        i = ImageFactory.createImage(c, width, height, 0);
                         Graphics imageG = i.getGraphics();
                         imageG.setColor(0);
                         imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
@@ -1318,7 +1319,7 @@ public class Border {
                         if(s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {
                             imageRGB = s.getBgImage().scaled(width, height).getRGBCached();
                         } else {
-                            Image bgPaint = Image.createImage(width, height);
+                            Image bgPaint = ImageFactory.createImage(c, width, height, 0);
                             Painter p = s.getBgPainter();
 
                             // might occur during temporary conditions in the theme switching
@@ -1355,7 +1356,7 @@ public class Border {
                             // if its transparent we don't need to do anything, if its
                             // translucent... well....
                             if(s.getBgTransparency() != 0) {
-                                Image i = Image.createImage(width, height);
+                                Image i = ImageFactory.createImage(c, width, height, 0);
                                 int[] imageRgb;
                                 if(g.getColor() != 0xffffff) {
                                     Graphics imageG = i.getGraphics();

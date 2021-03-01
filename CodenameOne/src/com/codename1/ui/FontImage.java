@@ -8816,7 +8816,7 @@ public class FontImage extends Image {
      */
     public Image toImage() {
         if (Image.isAlphaMutableImageSupported()) {
-            Image img = Image.createImage(width, height, 0);
+            Image img = ImageFactory.createImage(null, width, height, 0);
             Graphics g = img.getGraphics();
             g.drawImage(this, 0, 0);
             return img;

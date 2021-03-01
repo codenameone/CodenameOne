@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.DataChangedListener;
@@ -220,7 +221,7 @@ public class ImageViewer extends Component {
         super.initComponent();
         if(image == null) {
             // gui builder?
-            image = Image.createImage(50, 50, 0);
+            image = ImageFactory.createImage(this, 50, 50, 0);
         } else {
             image.lock();
         }
@@ -556,7 +557,7 @@ public class ImageViewer extends Component {
             height = (int)Math.round(width * getHeight() / (double)getWidth());
         }
         
-        Image out = Image.createImage(width, height, backgroundColor);
+        Image out = ImageFactory.createImage(this, width, height, backgroundColor);
         Graphics g = out.getGraphics();
         g.setColor(backgroundColor);
         g.fillRect(0, 0, width, height);

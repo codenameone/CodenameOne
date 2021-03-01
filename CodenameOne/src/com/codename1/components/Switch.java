@@ -30,6 +30,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.ReleasableComponent;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
@@ -196,21 +197,21 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     
     private Image getThumbOnImage() {
         if (thumbOnImage == null) {
-            thumbOnImage = createPlatformThumbImage((int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());
+            thumbOnImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());
         }
         return thumbOnImage;
     }
     
     private Image getThumbOffImage() {
         if (thumbOffImage == null) {
-            thumbOffImage = createPlatformThumbImage((int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);
+            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);
         }
         return thumbOffImage;
     }
     
     private Image getThumbDisabledImage() {
         if (thumbDisabledImage == null) {
-            thumbDisabledImage = createPlatformThumbImage((int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);
+            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);
         }
         return thumbDisabledImage;
     }
@@ -274,14 +275,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     
     private Image getTrackOnImage() {
         if (trackOnImage == null) {
-            trackOnImage = createPlatformTrackImage((int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getSelectedStyle().getBgColor(), 255, 2, getTrackOnOutlineColor(), getTrackOnOutlineWidth());
+            trackOnImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getSelectedStyle().getBgColor(), 255, 2, getTrackOnOutlineColor(), getTrackOnOutlineWidth());
         }
         return trackOnImage;
     }
     
     private Image getTrackDisabledImage() {
         if (trackDisabledImage == null) {
-            trackDisabledImage = createPlatformTrackImage((int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
+            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
         }
         return trackDisabledImage;
     }
@@ -296,7 +297,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     
     private Image getTrackOffImage() {
         if (trackOffImage == null) {
-            trackOffImage = createPlatformTrackImage((int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getUnselectedStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
+            trackOffImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getUnselectedStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
         }
         return trackOffImage;
     }
@@ -382,8 +383,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
     }
 
-    private static Image createRoundThumbImage(int pxDim, int color, int shadowSpread, int thumbInset) {
-        Image img = Image.createImage(pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
+    private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
 
@@ -422,12 +423,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return img;
     }
     
-    private static Image createPlatformThumbImage(int pxDim, int color, int shadowSpread, int thumbInset) {
-        return createRoundThumbImage(pxDim, color, shadowSpread, thumbInset);
+    private static Image createPlatformThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+        return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
     }
 
-    private static Image createRoundRectTrackImage(int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
-        Image img = Image.createImage(width + 2 * thumbPadding, height, 0x0);
+    private static Image createRoundRectTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+        Image img = ImageFactory.createImage(context, width + 2 * thumbPadding, height, 0x0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
         g.setAlpha(alpha);
@@ -449,8 +450,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return img;
     }
     
-    private static Image createPlatformTrackImage(int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
-        return createRoundRectTrackImage(width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
+    private static Image createPlatformTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+        return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
     }
 
     /**
