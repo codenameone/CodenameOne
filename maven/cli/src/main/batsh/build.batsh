@@ -60,7 +60,7 @@ function ios_release() {
 
 function jar() {
     global MVNW;
-    case(MVNW, "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests");
+    call(MVNW, "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests");
 }
 
 function help() {
