@@ -15,12 +15,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.8-b5-SNAPSHOT</version>
+        <version>7.0.8-b5</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-ios</artifactId>
-    <version>7.0.8-b5-SNAPSHOT</version>
+    <version>7.0.8-b5</version>
     <packaging>jar</packaging>
 
     <name>Codename One iOS Port</name>
