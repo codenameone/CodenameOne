@@ -45,7 +45,8 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
     }
 
     private File getFinalCn1lib() {
-        return new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + ".cn1lib"));
+        String finalName = project.getBuild().getFinalName().replace("-common-", "-");
+        return new File(path(project.getBuild().getDirectory(), finalName + ".cn1lib"));
     }
 
 
@@ -62,7 +63,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed to create CN1lib", ex);
         }
 
-        projectHelper.attachArtifact(project, "cn1lib", getFinalCn1lib());
+        projectHelper.attachArtifact(project, "cn1lib", "cn1lib", getFinalCn1lib());
         
     }
     
