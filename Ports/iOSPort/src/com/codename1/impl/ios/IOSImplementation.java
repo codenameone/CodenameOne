@@ -673,7 +673,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void afterComponentPaint(Component c, Graphics g) {
         super.afterComponentPaint(c, g);
-        if (isEditingText(c) && nativeInstance.isAsyncEditMode()) {
+        if (isEditingText(c)) {
             updateNativeTextEditorFrame(false);
         }
     }
