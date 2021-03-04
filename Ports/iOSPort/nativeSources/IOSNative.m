@@ -267,15 +267,57 @@ extern int isIOS7();
 extern int isIOS8();
 extern int isIOS8_2();
 
+NSString* cn1_getDocumentsDir() {
+    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    return [writablePaths lastObject];  
+}
+NSString* cn1_getContainerRoot() {
+    NSString* appRoot = cn1_getDocumentsDir();
+    if ([appRoot hasSuffix:@"/"]) {
+        appRoot = [appRoot substringWithRange:NSMakeRange(0, [appRoot length]-1)];
+    }
+    return [appRoot substringWithRange:NSMakeRange(0, [appRoot rangeOfString:@"/" options:NSBackwardsSearch].location +1)];
+
+}
+NSString* cn1_fixAppRoot(NSString* path) {
+    NSString* base = @"/var/mobile/Containers/Data/Application/";
+    NSString* containerRoot = cn1_getContainerRoot();
+    if ([path hasPrefix:base] && ![path hasPrefix:containerRoot]) {
+        NSUInteger start = [base length];
+        NSUInteger end = [path length];
+
+        NSString* theRest = [path substringWithRange:NSMakeRange(start, end - start)];
+        NSUInteger slashPos = [theRest rangeOfString:@"/"].location;
+        if (slashPos <= 0) {
+            return path;
+        }
+        start = slashPos+1;
+        end = [theRest length];
+        return [containerRoot stringByAppendingString: [theRest substringWithRange:NSMakeRange(start, end - start)]];
+    }
+    return path;
+}
 NSString* fixFilePath(NSString* ns) {
+    //NSLog(@"Fixing %@", ns);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
         while([ns hasPrefix:@"//"]) {
             ns = [ns substringFromIndex:1];
         }
     }
-    return ns;
+    
+    NSString* out = cn1_fixAppRoot(ns);
+    //NSLog(@"Fixed to %@", out);
+    return out;
 }
+
+
+
+
+
+
+
+
 
 bool galleryPopover = NO;
 
@@ -5194,7 +5236,7 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
                     if (error != nil) {
                         msg = [error localizedDescription];
                     }
-                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
+                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG msg);
                     com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jmsg);
                 }   
             }];
