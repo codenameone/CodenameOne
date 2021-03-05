@@ -3204,7 +3204,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
-        return true;
+        return false;
     }
 
     /**

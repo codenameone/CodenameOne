@@ -3476,6 +3476,7 @@ public final class Display extends CN1Constants {
      *
      * @param soundIdentifier the sound identifier which can match one of the
      * common constants in this class or be a user/implementation defined sound
+     * @deprecated this isn't supported on most platforms
      */
     public void playBuiltinSound(String soundIdentifier) {
         impl.playBuiltinSound(soundIdentifier);
@@ -3511,6 +3512,7 @@ public final class Display extends CN1Constants {
      *
      * @param soundIdentifier the sound string passed to playBuiltinSound
      * @return true if a sound of this given type is avilable
+     * @deprecated this isn't supported on most platforms
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
         return impl.isBuiltinSoundAvailable(soundIdentifier);
