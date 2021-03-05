@@ -541,8 +541,7 @@ public class Cn1libInstaller {
         //installFile(pomFile, groupId, artifactId, project.getVersion(), null, "pom");
         
 
-        String dependencyString = "<!-- cn1lib imported from " + file + " -->\n" +
-                "<dependency>\n" +
+        String dependencyString = "<dependency>\n" +
                 "  <artifactId>"+artifactId+"</artifactId>\n" +
                 "  <groupId>"+groupId+"</groupId>\n" +
                 "  <version>"+version+"</version>\n" +
