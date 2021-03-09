@@ -30,7 +30,10 @@
         <sourceDirectory>${src.dir}</sourceDirectory>
 		<resources>
 		      <resource>
-		        <directory>${src.dir}</directory>
+                  <directory>${src.dir}</directory>
+                  <excludes>
+                      <exclude>**/*.java</exclude>
+                  </excludes>
 		      </resource>
 		    </resources>
 
