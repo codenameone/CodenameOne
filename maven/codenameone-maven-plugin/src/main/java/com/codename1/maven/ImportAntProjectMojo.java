@@ -40,6 +40,7 @@ import org.apache.tools.ant.types.FileSet;
  * As a safety feature, this goal will fail if the maven project has an existing src directory.  Before running 
  * this goal, you need to delete or move the src directory.
  * @author shannah
+ * @deprecated
  */
 @Mojo(name = "import-ant-project")
 public class ImportAntProjectMojo extends AbstractCN1Mojo {
