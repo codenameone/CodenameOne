@@ -327,7 +327,6 @@ public class ImageViewer extends Component {
 
     @Override
     protected void dragFinished(int x, int y) {
-        System.out.println("ImageViewer dragFinished");
         super.dragFinished(x, y);
     }
 
@@ -358,7 +357,6 @@ public class ImageViewer extends Component {
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         isPinchZooming = false;
-        System.out.println("PanPositionX = "+panPositionX);
         if(panPositionX > 1) {
             if(panPositionX >= 1 + swipeThreshold && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
@@ -524,12 +522,12 @@ public class ImageViewer extends Component {
         imageX = (int)(s.getPaddingLeftNoRTL()+ imageDrawWidth * (0.5-panPositionX));
         if (imageDrawWidth < getInnerWidth()) {
 
-            //imageX += (getInnerWidth() - imageDrawWidth)/2;
+            imageX += (getInnerWidth() - imageDrawWidth)/2;
         }
         imageY = (int)(s.getPaddingTop() + imageDrawHeight * (0.5 - panPositionY));
         if (imageDrawHeight < getInnerHeight()) {
 
-            //imageY += (getInnerHeight() - imageDrawHeight)/2;
+            imageY += (getInnerHeight() - imageDrawHeight)/2;
         }
         cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
     }
