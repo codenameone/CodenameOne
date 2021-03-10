@@ -1702,7 +1702,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             if (e.isMetaDown() && e.getKeyChar() == 'a') {
-                System.out.println("Select all");
                 Form f = CN.getCurrentForm();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
@@ -1765,8 +1764,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             return (int)(coordinate * retinaScale);
         }
         Integer triggeredKeyCode;
-
+        private boolean mouseDown;
         public void mousePressed(MouseEvent e) {
+            this.mouseDown = true;
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
                 int x = scaleCoordinateX(e.getX());
@@ -1830,6 +1830,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseReleased(MouseEvent e) {
+            boolean mouseDown = this.mouseDown;
+            this.mouseDown = false;
             cn1GrabbedDrag = false;
             e.consume();
             if (!isEnabled()) {
@@ -1839,8 +1841,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
                     if (touchDevice) {
+                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
+                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
                         if (testRecorder != null) {
                             testRecorder.eventPointerReleased(x, y);
                         }
@@ -1874,23 +1878,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
                     if (touchDevice) {
+                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
+                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
                         if (testRecorder != null && hasDragStarted(x, y)) {
                             testRecorder.eventPointerDragged(x, y);
                         }
                         JavaSEPort.this.pointerDragged(x, y);
                     }
-                } else {
-                    x = Math.min(x, getDisplayWidthImpl());
-                    x = Math.max(x, 0);
-                    y = Math.min(y, getDisplayHeightImpl());
-                    y = Math.max(y, 0);
-                    if (testRecorder != null) {
-                        testRecorder.eventPointerReleased(x, y);
-                    }
-                    JavaSEPort.this.pointerReleased(x, y);
-                    releaseLock = true;
                 }
                 return;
             }
@@ -1899,9 +1895,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
                     if (touchDevice) {
-                        JavaSEPort.this.pointerDragged(new int[]{x, 0}, new int[]{y, 0});
+                        JavaSEPort.this.pointerDragged(new int[]{Math.min(getDisplayWidthImpl(), Math.max(0,x)), 0}, new int[]{Math.min(getDisplayHeightImpl(), Math.max(0, y)), 0});
                     }
                 } 
                 return;
@@ -10512,7 +10508,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     CN.invokeAndBlock(new Runnable() {
                         public void run() {
                             try {
-                                System.out.println("Encoding to mp3");
+
                                 FileEncoder.getEncoder("audio/wav", "audio/mp3").encode(wavFile, outFile, getAudioFormat());
                                 wavFile.delete();
                             } catch (Throwable ex) {
