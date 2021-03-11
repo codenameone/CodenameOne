@@ -99,6 +99,8 @@ public abstract class Executor {
     static boolean IS_MAC;
 
 
+
+
     protected File codenameOneJar;
 
     public void setCodenameOneJar(File codenameOneJar) {
@@ -236,7 +238,11 @@ public abstract class Executor {
 
         HashMap<String, String> env = new HashMap<String, String>();
 
-        String retrolambda = getResourceAsFile("/com/codename1/builder/retrolambda.jar", ".jar").getAbsolutePath();
+
+        String retrolambda = System.getProperty("retrolambdaJarPath", null);
+        if (retrolambda == null) {
+            getResourceAsFile("/com/codename1/builder/retrolambda.jar", ".jar").getAbsolutePath();
+        }
 
 
         if (codenameOneJar == null) {

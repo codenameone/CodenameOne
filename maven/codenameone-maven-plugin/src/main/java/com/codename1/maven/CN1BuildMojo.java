@@ -66,6 +66,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
 
+        File retrolambdaJar = getJar("net.orfjackal.retrolambda", "retrolambda");
+        if (retrolambdaJar != null && retrolambdaJar.exists()) {
+            System.setProperty("retrolambdaJarPath", retrolambdaJar.getAbsolutePath());
+        } else {
+            getLog().warn("Could not find retrolambda Jar from dependencies.  Falling back to default version 2.5.1 that may have issues building Android.");
+        }
+
         String projectPlatform = project.getProperties().getProperty("codename1.projectPlatform");
         if (projectPlatform == null) {
             getLog().debug("Skipping build because codename1.projectPlatform property is not defined");
