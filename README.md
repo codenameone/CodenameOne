@@ -1,7 +1,7 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 
 
-## Write Once Run Anywhere Native Mobile Apps for Java and Kotlin Developers
+## Codename One - Cross Platform Native Apps with Java or Kotlin
 
 [Codename One](https://www.codenameone.com/) is a mobile first cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
 It's a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder/css), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
