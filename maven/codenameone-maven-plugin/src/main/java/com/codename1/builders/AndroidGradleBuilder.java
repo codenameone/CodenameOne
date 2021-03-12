@@ -25,6 +25,11 @@ package com.codename1.builders;
 import static com.codename1.builders.Executor.delTree;
 import static com.codename1.builders.Executor.is_windows;
 import static com.codename1.builders.Executor.zipDir;
+import static com.codename1.maven.PathUtil.path;
+
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.ZipFile;
+
 import com.codename1.builders.util.JSONParser;
 
 import java.awt.Color;
@@ -59,6 +64,8 @@ import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -71,6 +78,10 @@ import org.xeustechnologies.jtar.TarOutputStream;
  * @author Shai Almog
  */
 public class AndroidGradleBuilder extends Executor {
+    private static final float MIN_GRADLE_VERSION=6;
+    private static final String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
+    public static final boolean PREFER_MANAGED_GRADLE=true;
+
     private File gradleProjectDirectory;
 
     public File getGradleProjectDirectory() {
@@ -331,9 +342,17 @@ public class AndroidGradleBuilder extends Executor {
 
     private int parseVersionStringAsInt(String versionString) {
         if (versionString.indexOf(".") > 0) {
-            return Integer.parseInt(versionString.substring(0, versionString.indexOf(".")).trim());
+            try {
+                return Integer.parseInt(versionString.substring(0, versionString.indexOf(".")).trim());
+            } catch (Exception ex) {
+                return 0;
+            }
         } else {
-            return Integer.parseInt(versionString);
+            try {
+                return Integer.parseInt(versionString);
+            } catch (Exception ex) {
+                return 0;
+            }
         }
     }
 
@@ -357,6 +376,92 @@ public class AndroidGradleBuilder extends Executor {
         }
         log("-------------------");
 
+        String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
+                : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
+                : path(System.getProperty("user.home"), "Android", "sdk"); // linux
+
+        String androidHome = System.getenv("ANDROID_HOME");
+        if (androidHome == null) {
+            androidHome = defaultAndroidHome;
+        }
+
+
+        File androidSDKDir;
+        String bat = "";
+        if (is_windows) {
+
+            bat = ".bat";
+        }
+
+
+        androidSDKDir = new File(androidHome);
+        if (!androidSDKDir.exists()) {
+            throw new BuildException("Cannot find Android SDK at "+androidHome+".  Please install Android studio, or set the ANDROID_HOME environment variable to point to your android sdk directory.");
+        }
+
+        File sdkmanager = new File(androidSDKDir, path("tools", "bin", "sdkmanager"+bat));
+
+
+
+        String sdkListStr;
+        try {
+            sdkListStr = execString(tmpDir, sdkmanager.getAbsolutePath(), "--list");
+        } catch (Exception ex) {
+            log("Failed to get SDK list using "+sdkmanager+".  "+ex.getMessage());
+            throw new BuildException("Failed to get SDK list using "+sdkmanager, ex);
+        }
+        Scanner sdkScanner = new Scanner(sdkListStr);
+        List<String> installedPlatforms = new ArrayList<>();
+        List<String> installedBuildToolsVersions = new ArrayList<>();
+        while (sdkScanner.hasNextLine()) {
+            String line = sdkScanner.nextLine().trim();
+            if (line.startsWith("build-tools;")) {
+                String[] columns = line.split("\\|");
+                if (columns.length >= 4) {
+                    // If there are only 3 columns, then this is not referring to an installed build-tools
+                    // but an available one.
+                    String[] col1Parts = columns[0].split(";");
+                    if (col1Parts.length > 1) {
+                        installedBuildToolsVersions.add(col1Parts[1].trim());
+                    }
+                }
+            } else if (line.startsWith("platforms;")) {
+                String[] columns = line.split("\\|");
+                if (columns.length > 1) {
+                    String[] col1Parts = columns[0].split(";");
+                    String platform = col1Parts[1].trim();
+                    if (platform.contains("-")) {
+                        platform = platform.substring(platform.indexOf("-")+1);
+                    }
+
+                    installedPlatforms.add(platform);
+                }
+            }
+        }
+
+        System.out.println("Installed platforms: "+installedPlatforms);
+
+        int maxBuildToolsVersionInt = 0;
+        String maxBuildToolsVersion = "0";
+        for (String ver : installedBuildToolsVersions) {
+            int verInt = parseVersionStringAsInt(ver);
+            if (verInt > maxBuildToolsVersionInt) {
+                maxBuildToolsVersion = ver;
+                maxBuildToolsVersionInt = verInt;
+            }
+        }
+
+        int maxPlatformVersionInt = 0;
+        String maxPlatformVersion = "0";
+        for (String ver : installedPlatforms) {
+            int verInt = parseVersionStringAsInt(ver);
+            if (verInt > maxPlatformVersionInt) {
+                maxPlatformVersionInt = verInt;
+                maxPlatformVersion = ver;
+            }
+        }
+
+
         String buildVer = request.getArg("build.version", "");
 
         float buildVersion = -1;
@@ -370,8 +475,8 @@ public class AndroidGradleBuilder extends Executor {
         useAndroidX = request.getArg("android.useAndroidX", "false").equals("true");
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
-        buildToolsVersionInt = 29;
-        this.buildToolsVersion = request.getArg("android.buildToolsVersion", ""+buildToolsVersionInt);
+        buildToolsVersionInt = maxBuildToolsVersionInt;
+        this.buildToolsVersion = request.getArg("android.buildToolsVersion", ""+maxBuildToolsVersion);
         String buildToolsVersionIntStr = this.buildToolsVersion;
         if (buildToolsVersionIntStr.indexOf(".") > 1) {
             buildToolsVersionIntStr = buildToolsVersionIntStr.substring(0, buildToolsVersionIntStr.indexOf("."));
@@ -380,6 +485,9 @@ public class AndroidGradleBuilder extends Executor {
         if (useAndroidX && buildToolsVersionInt < 29) {
             buildToolsVersionInt = 29;
             this.buildToolsVersion = "29";
+        } else if (buildToolsVersionInt > 28 && !useAndroidX) {
+            useAndroidX = true;
+            migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
         }
         log("Effective build tools version = "+this.buildToolsVersion);
 
@@ -419,32 +527,20 @@ public class AndroidGradleBuilder extends Executor {
         }
         tmpFile.mkdirs();
 
-        File androidSDKDir;
-        String bat = "";
-        if (is_windows) {
-
-            bat = ".bat";
-        }
-
-        String androidHome = System.getenv("ANDROID_HOME");
-        if (androidHome == null) {
-            throw new BuildException("ANDROID_HOME environment variable not set");
-        }
-        androidSDKDir = new File(androidHome);
-        if (!androidSDKDir.exists()) {
-            throw new BuildException("Android SDK directory not found at "+androidSDKDir+". Check that your ANDROID_HOME environment variable points to your android SDK");
-        }
-
 
         boolean useNewBuildTools = false;
+        File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle"));
+
         String gradleHome = System.getenv("GRADLE_HOME");
+        if (gradleHome == null && managedGradleHome.exists()) {
+            gradleHome = managedGradleHome.getAbsolutePath();
+        }
         String gradleExe = System.getenv("GRADLE_PATH");
-        //String gradleVersion;
+
 
         if(buildToolsVersionInt >= 27) {
             useNewBuildTools = true;
         }
-        //String gradleVersion = request.getArg("android.gradleVersion", "2.8");
 
         if (gradleExe == null) {
             if (gradleHome != null) {
@@ -455,15 +551,98 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        if (PREFER_MANAGED_GRADLE) {
+            log("PREFER_MANAGED_GRADLE flag is set.  Ignoring GRADLE_HOME and GRADLE_PATH environment variables.  Using managed gradle at "+managedGradleHome+" instead");
+            gradleHome = managedGradleHome.getAbsolutePath();
+            gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
+
+        }
+
+        String gradleVersion;
+        try {
+            gradleVersion = getGradleVersion(gradleExe);
+        } catch (Exception ex) {
+            gradleVersion = "0";
+        }
+        log("FOUND gradleVersion "+gradleVersion);
+        int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
+        log("Found gradleVersionInt="+gradleVersionInt);
+        if (gradleVersionInt <  MIN_GRADLE_VERSION) {
+            // The minimum version is too low.
+            if (managedGradleHome.exists()) {
+                gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
+                try {
+                    gradleVersion = getGradleVersion(gradleExe);
+                } catch (Exception ex) {
+                    gradleVersion = "0";
+                }
+                gradleVersionInt = parseVersionStringAsInt(gradleVersion);
+
+            }
+            if (gradleVersionInt < MIN_GRADLE_VERSION) {
+                if (managedGradleHome.exists()) {
+                    delTree(managedGradleHome);
+                }
+                File gradleZip = new File(managedGradleHome+".zip");
+                if (gradleZip.exists()) {
+                    gradleZip.delete();
+                }
+                try {
+                    log("Downloading gradle distribution from "+gradleDistributionUrl);
+                    FileUtils.copyURLToFile(new URL(gradleDistributionUrl), gradleZip);
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to download gradle distribution from URL "+gradleDistributionUrl, ex);
+                }
+                try {
+                    ZipFile gradleZipFile = new ZipFile(gradleZip);
+                    File extracted = new File(path(gradleZip.getAbsolutePath()+"-extracted"));
+                    extracted.mkdir();
+                    gradleZipFile.extractAll(extracted.getAbsolutePath());
+                    gradleZip.delete();
+
+                    for (File extractedChild : extracted.listFiles()) {
+                        if (extractedChild.getName().startsWith("gradle") && extractedChild.isDirectory()) {
+                            extractedChild.renameTo(managedGradleHome);
+                            break;
+                        }
+                    }
+
+                } catch (ZipException zex) {
+                    throw new BuildException("Failed to unzip gradle distribution after downloading it", zex);
+                }
+
+                if (!managedGradleHome.exists()) {
+                    throw new BuildException("There was a problem extracting the gradle distribution. Expected it to be extracted at "+managedGradleHome+", but was not found");
+                }
+
+                File managedGradleExe = new File(managedGradleHome, path("bin", "gradle"+bat));
+                if (!managedGradleExe.exists()) {
+                    throw new BuildException("Expected to find gradle executable at "+managedGradleExe+" after download and extraction, but it wasn't there.  Something about the gradle install must have failed.  Try again.");
+                }
+
+                gradleExe = managedGradleExe.getAbsolutePath();
+                try {
+                    gradleVersion = getGradleVersion(gradleExe);
+
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to get gradle version even after downloading it from "+gradleDistributionUrl+".  Something must have gone wrong with the gradle installation.");
+                }
+                gradleVersionInt = parseVersionStringAsInt(gradleVersion);
+                if (gradleVersionInt < MIN_GRADLE_VERSION) {
+                    throw new BuildException("Required gradle version is "+MIN_GRADLE_VERSION+" but found version "+gradleVersion);
+                }
+            }
+        }
+
         File androidToolsDir = new File(androidSDKDir, "tools");
         File androidCommand = new File(androidToolsDir, "android" + bat);
         File projectDir = new File(tmpFile, request.getMainClass());
-        projectDir.mkdirs();
+        //projectDir.mkdirs();
         gradleProjectDirectory = projectDir;
 
         //String androidVersion = "android-21";
         String androidVersion = "android-14";
-        String defaultVersion = "29";
+        String defaultVersion = maxPlatformVersion;
         String usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
         if (buildVersion > 0) {
 
@@ -505,15 +684,9 @@ public class AndroidGradleBuilder extends Executor {
         }
         targetSDKVersion = " android:targetSdkVersion=\"" + targetSDKVersion + "\" ";
 
-        String gradleVersion;
-        try {
-            gradleVersion = getGradleVersion(gradleExe);
-        } catch (Exception ex) {
-            throw new BuildException("Failed to get gradle version", ex);
-        }
-        log("FOUND gradleVersion "+gradleVersion);
-        int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
-        log("Found gradleVersionInt="+gradleVersionInt);
+
+
+
 
         String gradlePluginVersion = "1.3.1";
         if(gradleVersionInt < 3){
@@ -533,28 +706,24 @@ public class AndroidGradleBuilder extends Executor {
         boolean androidAppBundle = request.getArg("android.appBundle", gradleVersionInt >= 5 ? "true" : "false").equals("true");
 
         log("gradlePluginVersion="+gradlePluginVersion);
+        projectDir = new File(projectDir, "app");
+        File studioProjectDir = projectDir.getParentFile();
+
 
         if (isUnitTestMode()) {
-            try {
-                if (!exec(tmpFile, androidCommand.getAbsolutePath(), "create", "project", "--target", androidVersion, "--name", "CodenameOneUnitTestExecutor",
-                        "--path", projectDir.getAbsolutePath(), "--activity", "CodenameOneUnitTestExecutorStub", "--package", request.getPackageName(), "--gradle", "--gradle-version", gradlePluginVersion)) {
-                    return false;
-                }
-            } catch (Exception ex) {
-                throw new BuildException("Failed to create project in unit test mode", ex);
-            }
-            try {
-                generateUnitTestFiles(request, new File(projectDir, "src" + File.separator + "main" + File.separator + "java"));
-            } catch (IOException ex) {
-                throw new BuildException("Failed to generate Unit test files for project", ex);
-            }
+
+            throw new BuildException("Unit Test mode not currently supported for local android builds.");
+
         } else {
             try {
-                if (!exec(tmpFile, androidCommand.getAbsolutePath(), "create", "project", "--target", androidVersion, "--name", request.getMainClass(),
-                        "--path", projectDir.getAbsolutePath(), "--activity", request.getMainClass() + "Stub", "--package", request.getPackageName(), "--gradle", "--gradle-version", gradlePluginVersion)) {
-                    return false;
+                log("Creating AndroidStudioProject from template");
+                if (studioProjectDir.exists()) {
+                    delTree(studioProjectDir);
                 }
+                createAndroidStudioProject(studioProjectDir);
+
             } catch (Exception ex) {
+                log("Failed to create AndroidStudioProject: "+ex.getMessage());
                 throw new BuildException("Failed to create android project", ex);
             }
         }
@@ -3112,8 +3281,8 @@ public class AndroidGradleBuilder extends Executor {
 
         String supportV4Default = "    compile 'com.android.support:support-v4:23.+'";
         if(useNewBuildTools) {
-            compileSdkVersion = "27";
-            String supportLibVersion = "27";
+            compileSdkVersion = maxPlatformVersion;
+            String supportLibVersion = maxPlatformVersion;
             if (buildToolsVersion.startsWith("28")) {
                 compileSdkVersion = "28";
                 supportLibVersion = "28";
@@ -3146,6 +3315,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
+
         String gradleProps = "apply plugin: 'com.android.application'\n"
                 + request.getArg("android.gradlePlugin", "")
                 + "\n"
@@ -3162,7 +3332,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "android {\n"
                 + request.getArg("android.gradle.androidx", "") + "\n"
                 + "    compileSdkVersion " + compileSdkVersion + "\n"
-                + ((buildToolsVersionInt < 29)?("    buildToolsVersion " + quotedBuildToolsVersion + "\n"):"")
+                + "    buildToolsVersion " + quotedBuildToolsVersion + "\n"
                 + useLegacyApache
                 + "\n"
                 + "    dexOptions {\n"
@@ -3245,12 +3415,19 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to write gradle properties to "+gradleFile, ex);
         }
 
+        File settingsGradle = new File(studioProjectDir, "settings.gradle");
+        try {
+            replaceInFile(settingsGradle, "My Application2", request.getDisplayName());
+        } catch (Exception ex) {
+            throw new BuildException("Failed to update settingsGradle with display name", ex);
+        }
+
         gradlePropertiesObject.setProperty("org.gradle.daemon", "true");
         if(request.getArg("android.forceJava8Builder", "false").equals("true")) {
             gradlePropertiesObject.setProperty("org.gradle.java.home", System.getProperty("java.home"));
         }
         gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
-        if (request.getArg("android.useAndroidX", "false").equals("true")) {
+        if (useAndroidX) {
             gradlePropertiesObject.setProperty("android.useAndroidX", "true");
             gradlePropertiesObject.setProperty("android.enableJetifier", "true");
         }
@@ -3926,7 +4103,7 @@ public class AndroidGradleBuilder extends Executor {
     private Map<String,String> androidXClassMapping;
     private Map<String,String> loadAndroidXClassMapping() throws IOException {
         if (androidXClassMapping == null) {
-            androidXClassMapping = loadCSVMapping(androidXClassMapping,"/androidx-class-mapping.csv");
+            androidXClassMapping = loadCSVMapping(androidXClassMapping,"androidx-class-mapping.csv");
             Map<String,String> packages = new LinkedHashMap<String,String>();
             for (String supportClass : androidXClassMapping.keySet()) {
                 String xClass = androidXClassMapping.get(supportClass);
@@ -3964,6 +4141,34 @@ public class AndroidGradleBuilder extends Executor {
             out.put(line.substring(0, pos).trim(), line.substring(pos+1).trim());
         }
         return out;
+
+    }
+
+    private void createAndroidStudioProject(File dest) throws IOException {
+        if (dest.exists()) {
+            throw new IOException("Cannot create AndroidStudio project at "+dest+" because it already exists");
+        }
+        File destZip = new File(dest.getAbsolutePath()+".zip");
+        if (destZip.exists()) {
+            throw new IOException("Cannot extract AndroidStudioTemplate at "+destZip+" because it already exists");
+        }
+        FileUtils.copyInputStreamToFile(getClass().getResourceAsStream("AndroidStudioProjectTemplate.zip"), destZip);
+        ZipFile zipFile = new ZipFile(destZip);
+        File destZipExtracted = new File(destZip.getAbsolutePath()+"-extracted");
+        destZipExtracted.mkdir();
+        zipFile.extractAll(destZipExtracted.getAbsolutePath());
+
+        for (File child : destZipExtracted.listFiles()) {
+            if (child.isDirectory() && "AndroidStudioProjectTemplate".equals(child.getName())) {
+                child.renameTo(dest);
+                break;
+            }
+        }
+        delTree(destZipExtracted);
+        delete(destZip);
+        if (!dest.exists()) {
+            throw new IOException("Failed to create Android Studio Project at "+dest+".  Not sure what went wrong.  Did all the steps, but just wasn't there when we were done");
+        }
 
     }
 }

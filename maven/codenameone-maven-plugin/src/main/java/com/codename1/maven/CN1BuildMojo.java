@@ -398,7 +398,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     private File getGeneratedProjectSourceDirectory() {
-        return new File(project.getBuild().getDirectory(), path("generated-sources", "codenameone", buildTarget, project.getBuild().getFinalName()));
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-android-source");
     }
 
     private File[] doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
@@ -542,6 +542,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             return results;
 
         } catch (BuildException ex) {
+            getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
             throw new MojoExecutionException("Failed to build android app", ex);
         } finally {
 

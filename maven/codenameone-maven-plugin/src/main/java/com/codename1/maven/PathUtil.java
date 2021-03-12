@@ -5,7 +5,7 @@ import java.io.File;
 /**
  * Utility for creatings file paths.
  */
-class PathUtil {
+public class PathUtil {
     public static String path(String... parts) {
         StringBuilder sb = new StringBuilder();
         for (String part : parts) {
