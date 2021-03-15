@@ -119,10 +119,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         task.setDestFile(dest);
         task.setUpdate(true);
         for (File srcFile : src) {
-            ZipFileSet fileset = new ZipFileSet();
-            fileset.setProject(antProject);
-            fileset.setSrc(srcFile);
-            task.addZipfileset(fileset);
+
+            if (srcFile.isDirectory()) {
+                FileSet fs = new FileSet();
+                fs.setProject(this.antProject);
+                fs.setDir(srcFile);
+                task.addFileset(fs);
+            } else {
+                ZipFileSet fileset = new ZipFileSet();
+                fileset.setProject(antProject);
+                fileset.setSrc(srcFile);
+                task.addZipfileset(fileset);
+            }
         }
         task.execute();
     }
@@ -178,34 +186,38 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-            for (Artifact artifact : project.getArtifacts()) {
-                if (!contains(artifact.getScope(), BUNDLE_ARTIFACT_SCOPES)) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because it has scope " + artifact.getScope() + " and only scopes " + Arrays.toString(BUNDLE_ARTIFACT_SCOPES) + " are to be included in builds.");
-                    continue;
-                }
+            List<String> cpElements;
+            try {
+                //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
+                cpElements = project.getCompileClasspathElements();
+            } catch (Exception ex) {
+                throw new MojoExecutionException("Failed to get classpath elements", ex);
 
+            }
+            List<String> blackListJars = new ArrayList<String>();
+            for (Artifact artifact : project.getArtifacts()) {
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because it is on the artifact blacklist. I.e. the server doesn't need this.  It will be provided on the server side");
+                    File jar = getJar(artifact);
+                    if (jar != null) {
+                        blackListJars.add(jar.getAbsolutePath());
+                    }
+                }
+            }
+            for (String element : cpElements) {
+
+
+
+                if (blackListJars.contains(element)) {
                     continue;
                 }
-                File jar = getJar(artifact);
-                if (jar == null || !jar.exists()) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because jar couldn't be found.");
+                if (!new File(element).exists()) {
                     continue;
                 }
-                getLog().debug("Adding artifact " + artifact + " to " + jarWithDependencies);
-                mergeJars(jarWithDependencies, getJar(artifact));
+                getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
+                mergeJars(jarWithDependencies, new File(element));
             }
 
-            Zip task = (Zip)this.antProject.createTask("zip");
-            task.setDestFile(jarWithDependencies);
-            task.setUpdate(true);
-            FileSet fs = new FileSet();
-            fs.setProject(this.antProject);
-            fs.setDir(new File(project.getBuild().getOutputDirectory()));
-            task.addFileset(fs);
-            getLog().debug("Adding files from "+project.getBuild().getOutputDirectory());
-            task.execute();
+
 
 
 
@@ -240,7 +252,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         FileSystemManager fsManager = VFS.getManager();
         FileObject jarFile = fsManager.resolveFile( "jar:"+jarWithDependencies.getAbsolutePath() + "!/META-INF/codenameone" );
         if (jarFile != null) {
-            FileObject[] appendedPropsFiles = jarFile.findFiles(new PatternFileSelector(".\\*\\/codenameone_library_appended.properties"));
+            FileObject[] appendedPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_appended.properties"));
             if (appendedPropsFiles != null) {
                 for (FileObject appendedPropsFile : appendedPropsFiles) {
                     SortedProperties appendedProps = new SortedProperties();
@@ -261,7 +273,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     }
                 }
             }
-            FileObject[] requiredPropsFiles = jarFile.findFiles(new PatternFileSelector(".\\*\\/codenameone_library_required.properties"));
+            FileObject[] requiredPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_required.properties"));
             if (requiredPropsFiles != null) {
                 for (FileObject requiredPropsFile : requiredPropsFiles) {
                     SortedProperties requiredProps = new SortedProperties();
