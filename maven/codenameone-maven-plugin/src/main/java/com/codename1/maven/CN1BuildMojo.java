@@ -12,7 +12,6 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
-import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.ZipFileSet;
@@ -60,7 +59,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     /**
      * Flag of whether to open the xcode/android studio project.
      */
-    @Parameter(property = "open", defaultValue = "false")
+    @Parameter(property = "open", defaultValue = "true")
     private boolean open;
 
     @Override
@@ -397,14 +396,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    private File getGeneratedProjectSourceDirectory() {
+    private File getGeneratedAndroidProjectSourceDirectory() {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-android-source");
+    }
+
+    private File getGeneratedIOSProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
     }
 
     private File[] doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
 
-            File generatedProject = getGeneratedProjectSourceDirectory();
+            File generatedProject = getGeneratedAndroidProjectSourceDirectory();
             getLog().info("Generating android gradle Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -528,7 +531,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget) && e.getGradleProjectDirectory() != null) {
                 File gradleProject = e.getGradleProjectDirectory();
-                File output = getGeneratedProjectSourceDirectory();
+                File output = getGeneratedAndroidProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Gradle Project to "+output);
@@ -571,7 +574,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
 
-            File generatedProject = getGeneratedProjectSourceDirectory();
+            File generatedProject = getGeneratedIOSProjectSourceDirectory();
             getLog().info("Generating Xcode Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -682,7 +685,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
-                File output = getGeneratedProjectSourceDirectory();
+                File output = getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Xcode Project to "+output);
