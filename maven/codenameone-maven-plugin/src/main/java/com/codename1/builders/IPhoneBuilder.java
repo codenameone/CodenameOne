@@ -35,6 +35,7 @@ import java.io.*;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.NoSuchAlgorithmException;
@@ -1028,7 +1029,7 @@ public class IPhoneBuilder extends Executor {
                     + "    }\n\n"
                     + "    public static void main(String[] argv) {\n"
                     + "        if(!(argv != null && argv.length > 0 && argv[0].equals(\"ignoreNative\"))) {\n"
-                    + registerNativeImplementationsAndCreateStubs(stubSource, classesDir)
+                    + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), stubSource, classesDir)
                     + "        }\n"
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"

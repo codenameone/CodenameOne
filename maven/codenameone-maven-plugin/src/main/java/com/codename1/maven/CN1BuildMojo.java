@@ -14,6 +14,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
 import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
+import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
 
 import javax.imageio.ImageIO;
@@ -196,6 +197,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 mergeJars(jarWithDependencies, getJar(artifact));
             }
 
+            Zip task = (Zip)this.antProject.createTask("zip");
+            task.setDestFile(jarWithDependencies);
+            task.setUpdate(true);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(new File(project.getBuild().getOutputDirectory()));
+            task.addFileset(fs);
+            getLog().debug("Adding files from "+project.getBuild().getOutputDirectory());
+            task.execute();
+
+
+
         }
 
 
@@ -207,7 +220,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             throw new IOException("Failed to update Codename One", ex);
         }
         File antDistDir = new File(antProject, "dist");
-        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + ".jar");
+        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + "-jar-with-dependencies.jar");
         antDistDir.mkdirs();
         FileUtils.copyFile(jarWithDependencies, antDistJar);
         Properties p = new Properties();
@@ -415,8 +428,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
                         getLog().info("Sources have not changed.  Skipping android gradle project generation");
                         if (open) {
-                            getLog().info("Opening workspace project "+getWorkspace(props, generatedProject));
-                            openWorkspace(getWorkspace(props, generatedProject));
+                            openAndroidStudioProject(generatedProject);
                         }
                         return new File[]{generatedProject};
 
@@ -502,9 +514,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         try {
+            getLog().info("Starting android project builder...");
             boolean result = e.build(distJar, request);
+            getLog().info("Android project builder completed with result "+result);
             if (!result) {
-                throw new MojoExecutionException("Android build failed");
+                getLog().error("Received false return value from build()");
+                throw new MojoExecutionException("Android build failed.  Received false return value for build");
             }
             // send the response to the server
             File[] results = e.getResults();
@@ -541,10 +556,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
 
             }
-
+            if (open) {
+                openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
+            }
             return results;
 
         } catch (BuildException ex) {
+
             getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
             throw new MojoExecutionException("Failed to build android app", ex);
         } finally {
@@ -553,6 +571,35 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
     }
+
+    private void openAndroidStudioProject(File generatedProject) {
+        if (isMac) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("open", "-a", "/Applications/Android Studio.app", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else if (isWindows) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("start", "", "C:\\Program Files\\Android\\Android Studio\\bin\\studio64.exe", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else {
+            getLog().warn("Opening automatically in Android studio not supported on this platform.");
+            getLog().warn("Please open the project in Android studio manually.");
+            getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+        }
+    }
+
     private File getWorkspace(Properties props, File xcprojectRoot) {
         return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcworkspace");
     }

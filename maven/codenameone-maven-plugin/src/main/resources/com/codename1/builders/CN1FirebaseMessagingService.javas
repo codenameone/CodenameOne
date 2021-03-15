@@ -1,0 +1,240 @@
+package com.codename1.impl.android;
+
+import com.google.firebase.messaging.RemoteMessage;
+import com.codename1.ui.Display;
+import com.codename1.push.PushCallback;
+import android.app.NotificationManager;
+import android.app.Activity;
+import android.content.Intent;
+import android.app.PendingIntent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.support.v4.app.NotificationCompat.Builder;
+import android.support.v4.app.NotificationCompat;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.content.Context;
+import java.io.IOException;
+
+import java.io.InputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+/**
+ This class is injected into android builds if FCM is enabled in order to support push notifications.
+*/
+
+public class CN1FirebaseMessagingService extends com.google.firebase.messaging.FirebaseMessagingService {
+
+    // This value will be changed by the AndroidGradleBuilder
+    private static boolean allowBackgroundPush = false;
+
+    protected boolean appIsRunning() { return StubUtil.appIsRunning();}
+    protected Class getAppStubClass() { return StubUtil.getAppStubClass();}
+    protected Object getMain(){ return StubUtil.getMain();}
+
+    
+    private Drawable getDrawable(String name, Context context) {
+        android.content.res.Resources resources = context.getResources();
+        final int resourceId = resources.getIdentifier(name, "drawable", 
+                context.getPackageName());
+        return resources.getDrawable(resourceId);
+    }
+    
+    private int getDrawableResourceId(String name, Context context) {
+        android.content.res.Resources resources = context.getResources();
+        final int resourceId = resources.getIdentifier(name, "drawable", 
+                context.getPackageName());
+        return resourceId;
+        
+    }
+    
+    @Override
+    public void onMessageReceived(RemoteMessage remoteMessage) {
+        super.onMessageReceived(remoteMessage);
+        final Context context = this;
+        System.out.println("Message received " + remoteMessage.getData());
+
+        final String messageType = (String)remoteMessage.getData().get("messageType");
+        final String message = (String)remoteMessage.getData().get("message");
+        final String image = (String)remoteMessage.getData().get("image");
+        final String category = (String)remoteMessage.getData().get("category");
+        System.out.println("Push message received: " + message);
+        System.out.println("Push type: " + messageType);
+        System.out.println("Is running: " + appIsRunning());
+
+        if (appIsRunning() || (allowBackgroundPush && Display.isInitialized())) {
+
+            final Object main = getMain();
+            if (main instanceof com.codename1.push.PushCallback) {
+                Display.getInstance().setProperty("pushType", messageType);
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        com.codename1.impl.android.AndroidImplementation.initPushContent(message, image, messageType, category, context);
+                        if (messageType != null && (Integer.parseInt(messageType) == 3 || Integer.parseInt(messageType) == 6)) {
+                            String[] a = message.split(";");
+                            ((PushCallback) main).push(a[0]);
+                            ((PushCallback) main).push(a[1]);
+                            return;
+                        } else if ("101".equals(messageType)) {
+                            ((PushCallback) main).push(message.substring(message.indexOf(" ")+1));
+                            return;
+                        }
+                        ((PushCallback) main).push(message);
+                    }
+                });
+            }
+        } 
+        if (!appIsRunning()) {
+            int badgeNumber = -1;
+            if ("101".equals(messageType)) {
+                badgeNumber = Integer.parseInt(message.substring(0, message.indexOf(" ")));
+            }
+            com.codename1.impl.android.AndroidImplementation.appendNotification(messageType, message, image, category, context);
+            if (messageType == null || messageType.length() == 0 || Integer.parseInt(messageType) < 2 || messageType.equals("3") || messageType.equals("4") || messageType.equals("5") || messageType.equals("6") || messageType.equals("101")) {
+                String actualMessage = message;
+                if ("101".equals(messageType)) {
+                    actualMessage = message.substring(message.indexOf(" ")+1);
+                }
+                String title = "{{DISPLAY_NAME}}";
+                if (messageType != null && (Integer.parseInt(messageType) == 3 || Integer.parseInt(messageType) == 6)) {
+                    String[] a = message.split(";");
+                    actualMessage = a[0];
+                }
+                if (messageType != null && Integer.parseInt(messageType) == 4) {
+                    String[] a = message.split(";");
+                    title = a[0];
+                    actualMessage = a[1];
+                }
+                NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
+                Intent newIntent = new Intent(context, getAppStubClass());
+                PendingIntent contentIntent = PendingIntent.getActivity(context, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+                Drawable myIcon = getDrawable("icon", context);
+                Bitmap icon = ((BitmapDrawable) myIcon).getBitmap();
+                int notifyID = 1;
+                Builder mNotifyBuilder = new NotificationCompat.Builder(context)
+                        .setContentTitle(title)
+                        .setSmallIcon(getDrawableResourceId("ic_stat_notify", context))
+                        .setLargeIcon(icon)
+                        .setContentIntent(contentIntent)
+                        .setAutoCancel(true)
+                        .setWhen(System.currentTimeMillis())
+                        .setTicker(actualMessage);
+                if (messageType == null || (Integer.parseInt(messageType) != 5 && Integer.parseInt(messageType) != 6)) {
+                    Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                    mNotifyBuilder.setSound(alarmSound);
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 21) {
+                    mNotifyBuilder.setCategory("Notification");
+                }
+
+                com.codename1.impl.android.AndroidImplementation.setNotificationChannel(nm, mNotifyBuilder, context);
+                String[] messages = com.codename1.impl.android.AndroidImplementation.getPendingPush(messageType, context);
+                int numMessages = messages.length;
+                if (numMessages == 1) {
+                    mNotifyBuilder.setContentText(messages[0]);
+                } else {
+                    NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle();
+                    for (int i = 0; i < messages.length; i++) {
+                        inboxStyle.addLine(messages[i]);
+                    }
+                    mNotifyBuilder.setStyle(inboxStyle);
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 22) {
+                    if (badgeNumber >= 0) {
+                        mNotifyBuilder.setNumber(badgeNumber);
+                    } else {
+                        mNotifyBuilder.setNumber(numMessages);
+                    }
+                }
+                if (category != null && numMessages == 1) {
+                    try {
+                        AndroidImplementation.addActionsToNotification(null, category, mNotifyBuilder, newIntent, context);
+                    } catch (IOException ex) {
+                        Logger.getLogger(CN1FirebaseMessagingService.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                if (image != null && numMessages == 1) {
+                    final Builder fNotifyBuilder = mNotifyBuilder;
+                    final int fNotifyID = notifyID;
+                    final NotificationManager fnm = nm;
+                    fNotifyBuilder.setStyle(new NotificationCompat.BigPictureStyle()
+                            .bigPicture(getBitmapfromUrl(image)));/*Notification with Image*/
+
+                    fnm.notify(fNotifyID, fNotifyBuilder.build());
+
+                } else {
+                    nm.notify(notifyID, mNotifyBuilder.build());
+                }
+            }
+        }
+
+
+    }
+
+    private android.graphics.Bitmap getBitmapfromUrl(String imageUrl) {
+        try {
+            java.net.URL url = new java.net.URL(imageUrl);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap bitmap = android.graphics.BitmapFactory.decodeStream(input);
+            return bitmap;
+
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+
+        }
+    }
+
+    /**
+    * Called if InstanceID token is updated. This may occur if the security of
+    * the previous token had been compromised. Note that this is called when the InstanceID token
+    * is initially generated so this is where you would retrieve the token.
+    *  NOTE:  THis method is not supported with the version of play services that
+    * we currently build with... it will be used only if play services are increased to something more recent (e.g. 17)
+    * That is why Override annotation is commented out.
+    */
+   //@Override
+   public void onNewToken(String token) {
+        final Object i = getMain();
+        try {
+                if (token != null) {
+
+                    com.codename1.io.Preferences.set("push_key", "cn1-fcm-" + token);
+                    
+                    if (i instanceof PushCallback) {
+
+                        ((PushCallback) i).registeredForPush("cn1-fcm-" + token);
+
+                    }
+
+                } else {
+
+                    if (i instanceof PushCallback) {
+
+ ((PushCallback) i).pushRegistrationError("Failed to get FCM token.  Null token returned", 1); 
+
+                    }
+
+                }
+
+            } catch (Exception ex) {
+
+                if (i instanceof PushCallback) {
+
+                    ((PushCallback) i).pushRegistrationError("Failed to register push: " + ex.getMessage(), 0);
+
+                }
+
+                System.out.println("Failed to get fcm token.");
+
+                ex.printStackTrace();
+
+            }
+   }
+
+}
