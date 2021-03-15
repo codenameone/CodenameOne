@@ -118,10 +118,12 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         File cssFile = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
         File resFile = new File(getCN1ProjectDir(), "target" + File.separator + "classes" + File.separator + "theme.res");
         File mergeFile = new File(getCN1ProjectDir(), "target" + File.separator + "css" + File.separator + "theme.css");
-        
-        project.getModel().addProperty("codename1.css.compiler.args.input", cssFile.getAbsolutePath());
-        project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
-        project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
+
+        if (cssFile.exists()) {
+            project.getModel().addProperty("codename1.css.compiler.args.input", cssFile.getAbsolutePath());
+            project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
+            project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
+        }
         if ("true".equals(project.getProperties().getProperty("cn1.class.path.required"))) {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
         }

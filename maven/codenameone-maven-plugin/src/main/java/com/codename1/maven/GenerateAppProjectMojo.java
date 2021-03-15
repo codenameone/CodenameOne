@@ -302,9 +302,10 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         return new File(sourceProject, "css");
     }
 
-    private void copyCSSFiles() {
+    private void copyCSSFiles() throws IOException {
+        File srcDir = targetSrcDir("css");
         if (sourceCSSDir().exists()) {
-            File srcDir = targetSrcDir("css");
+
 
             {
                 Copy copy = (Copy) antProject().createTask("copy");
@@ -317,6 +318,12 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 copy.addFileset(files);
 
                 copy.execute();
+            }
+        } else {
+            if (srcDir.exists()) {
+                // This project doesn't have a css directory
+                // so the target project won't have a css directory either.
+                FileUtils.deleteDirectory(srcDir);
             }
         }
     }
