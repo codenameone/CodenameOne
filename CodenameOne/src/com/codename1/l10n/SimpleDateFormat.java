@@ -285,9 +285,6 @@ public class SimpleDateFormat extends DateFormat {
     
     @Override
     String format(Date source, StringBuilder toAppendTo) {
-        if(source == null) {
-            source = new Date();
-        }
         if (pattern == null) {
             return super.format(source, toAppendTo);
         }

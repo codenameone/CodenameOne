@@ -71,7 +71,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
             paths.add(new File(project.getBuild().getOutputDirectory()));
             
             for (Artifact artifact : project.getArtifacts()) {
-                paths.add(getJar(artifact));
+                File jar = getJar(artifact);
+                if (jar != null) {
+                    paths.add(jar);
+                } else {
+                    getLog().warn("Failed to resolve artifact "+artifact);
+                }
             }
             Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
@@ -106,7 +111,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
     private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for(int iter = 0 ; iter < urls.length ; iter++) {
-            urls[iter] = classesDirectories[iter].toURI().toURL();
+            try {
+                urls[iter] = classesDirectories[iter].toURI().toURL();
+            } catch (RuntimeException ex) {
+                getLog().error("Failed to add class directory "+iter+" in directory list: "+Arrays.toString(urls));
+                throw ex;
+            }
         }
         URLClassLoader cl = new URLClassLoader(urls);
         
@@ -208,8 +218,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
                 continue;
             }
             //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
-                cp.add(new Path(antProject, getJar(artifact).getAbsolutePath()));
-            //}
+            File jar = getJar(artifact);
+            if (jar != null) {
+                cp.add(new Path(antProject, jar.getAbsolutePath()));
+            } else {
+                getLog().warn("Failed to resolve artifact: "+artifact);
+            }
         }
         cp.add(new Path(antProject, getProjectInternalTmpJar().getAbsolutePath()));
         java.createJvmarg().setValue("-Dcef.dir="+System.getProperty("cef.dir", System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef"));

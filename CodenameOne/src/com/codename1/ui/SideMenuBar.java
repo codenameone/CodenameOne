@@ -1494,7 +1494,7 @@ public class SideMenuBar extends MenuBar {
         }
         boolean v = c.isVisible();
         c.setVisible(true);
-        Image buffer = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        Image buffer = ImageFactory.createImage(this, Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight(), 0);
         Graphics g = buffer.getGraphics();
         c.paintComponent(g);
         rightPanel.getStyle().setBgImage(buffer);

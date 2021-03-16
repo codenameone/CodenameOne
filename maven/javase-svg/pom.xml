@@ -4,24 +4,24 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.11-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-javase-svg</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.11-SNAPSHOT</version>
     <packaging>jar</packaging>
     
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.xmlgraphics/batik-transcoder -->
         <dependency>

@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.1-test4</version>
+        <version>7.0.11-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-core</artifactId>
-    <version>7.0.1-test4</version>
+    <version>7.0.11-SNAPSHOT</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -20,9 +20,10 @@
         </dependency>
     </dependencies>
     <properties>
+        <java.version>1.5</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>6</maven.compiler.source>
-        <maven.compiler.target>6</maven.compiler.target>
+        <maven.compiler.source>1.5</maven.compiler.source>
+        <maven.compiler.target>1.5</maven.compiler.target>
         <src.dir>../../CodenameOne/src</src.dir>
        
     </properties>
@@ -30,9 +31,23 @@
         <sourceDirectory>${src.dir}</sourceDirectory>
 		<resources>
 		      <resource>
-		        <directory>${src.dir}</directory>
+                  <directory>${src.dir}</directory>
+                  <excludes>
+                      <exclude>**/*.java</exclude>
+                  </excludes>
 		      </resource>
 		    </resources>
+
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                </configuration>
+            </plugin>
+        </plugins>
 
     </build>
 

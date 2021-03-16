@@ -13,7 +13,7 @@ import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Commandline.Argument;
 
 /**
- *
+ * Opens Codename One Settings.
  * @author shannah
  */
 @Mojo(name = "settings")

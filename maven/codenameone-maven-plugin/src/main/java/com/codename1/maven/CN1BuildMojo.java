@@ -12,9 +12,9 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
-import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
+import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
 
 import javax.imageio.ImageIO;
@@ -24,6 +24,12 @@ import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
 
+/**
+ * Mojo that uses the CodenameOneBuildClient to send builds to the CodenameOne build server.
+ *
+ * It also supports a few local build targets, such as "ios-source", which generates an Xcode project,
+ * and "android-source", which generates an Android gradle project.
+ */
 @Mojo(name="build", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PACKAGE)
@@ -45,21 +51,27 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     @Parameter(property = "codename1.buildTarget", required = true, defaultValue = "${codename1.defaultBuildTarget}")
     private String buildTarget;
 
-    @Parameter(property = "automated", defaultValue = "true")
+    /**
+     * Flag to indicate whether to use an automated build or not.
+     */
+    @Parameter(property = "automated", defaultValue = "false")
     private boolean automated;
-
-    @Parameter(property = "useBuildServer", defaultValue = "false")
-    private boolean useBuildServer;
-
 
     /**
      * Flag of whether to open the xcode/android studio project.
      */
-    @Parameter(property = "open", defaultValue = "false")
+    @Parameter(property = "open", defaultValue = "true")
     private boolean open;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+
+        File retrolambdaJar = getJar("net.orfjackal.retrolambda", "retrolambda");
+        if (retrolambdaJar != null && retrolambdaJar.exists()) {
+            System.setProperty("retrolambdaJarPath", retrolambdaJar.getAbsolutePath());
+        } else {
+            getLog().warn("Could not find retrolambda Jar from dependencies.  Falling back to default version 2.5.1 that may have issues building Android.");
+        }
 
         String projectPlatform = project.getProperties().getProperty("codename1.projectPlatform");
         if (projectPlatform == null) {
@@ -107,10 +119,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         task.setDestFile(dest);
         task.setUpdate(true);
         for (File srcFile : src) {
-            ZipFileSet fileset = new ZipFileSet();
-            fileset.setProject(antProject);
-            fileset.setSrc(srcFile);
-            task.addZipfileset(fileset);
+
+            if (srcFile.isDirectory()) {
+                FileSet fs = new FileSet();
+                fs.setProject(this.antProject);
+                fs.setDir(srcFile);
+                task.addFileset(fs);
+            } else {
+                ZipFileSet fileset = new ZipFileSet();
+                fileset.setProject(antProject);
+                fileset.setSrc(srcFile);
+                task.addZipfileset(fileset);
+            }
         }
         task.execute();
     }
@@ -166,24 +186,40 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-            for (Artifact artifact : project.getArtifacts()) {
-                if (!contains(artifact.getScope(), BUNDLE_ARTIFACT_SCOPES)) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because it has scope " + artifact.getScope() + " and only scopes " + Arrays.toString(BUNDLE_ARTIFACT_SCOPES) + " are to be included in builds.");
-                    continue;
-                }
+            List<String> cpElements;
+            try {
+                //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
+                cpElements = project.getCompileClasspathElements();
+            } catch (Exception ex) {
+                throw new MojoExecutionException("Failed to get classpath elements", ex);
 
-                if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because it is on the artifact blacklist. I.e. the server doesn't need this.  It will be provided on the server side");
-                    continue;
-                }
-                File jar = getJar(artifact);
-                if (jar == null || !jar.exists()) {
-                    getLog().debug("Not including jar for artifact " + artifact + " because jar couldn't be found.");
-                    continue;
-                }
-                getLog().debug("Adding artifact " + artifact + " to " + jarWithDependencies);
-                mergeJars(jarWithDependencies, getJar(artifact));
             }
+            List<String> blackListJars = new ArrayList<String>();
+            for (Artifact artifact : project.getArtifacts()) {
+                if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+                    File jar = getJar(artifact);
+                    if (jar != null) {
+                        blackListJars.add(jar.getAbsolutePath());
+                    }
+                }
+            }
+            for (String element : cpElements) {
+
+
+
+                if (blackListJars.contains(element)) {
+                    continue;
+                }
+                if (!new File(element).exists()) {
+                    continue;
+                }
+                getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
+                mergeJars(jarWithDependencies, new File(element));
+            }
+
+
+
+
 
         }
 
@@ -196,7 +232,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             throw new IOException("Failed to update Codename One", ex);
         }
         File antDistDir = new File(antProject, "dist");
-        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + ".jar");
+        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + "-jar-with-dependencies.jar");
         antDistDir.mkdirs();
         FileUtils.copyFile(jarWithDependencies, antDistJar);
         Properties p = new Properties();
@@ -216,7 +252,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         FileSystemManager fsManager = VFS.getManager();
         FileObject jarFile = fsManager.resolveFile( "jar:"+jarWithDependencies.getAbsolutePath() + "!/META-INF/codenameone" );
         if (jarFile != null) {
-            FileObject[] appendedPropsFiles = jarFile.findFiles(new PatternFileSelector(".\\*\\/codenameone_library_appended.properties"));
+            FileObject[] appendedPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_appended.properties"));
             if (appendedPropsFiles != null) {
                 for (FileObject appendedPropsFile : appendedPropsFiles) {
                     SortedProperties appendedProps = new SortedProperties();
@@ -237,7 +273,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     }
                 }
             }
-            FileObject[] requiredPropsFiles = jarFile.findFiles(new PatternFileSelector(".\\*\\/codenameone_library_required.properties"));
+            FileObject[] requiredPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_required.properties"));
             if (requiredPropsFiles != null) {
                 for (FileObject requiredPropsFile : requiredPropsFiles) {
                     SortedProperties requiredProps = new SortedProperties();
@@ -385,14 +421,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    private File getGeneratedProjectSourceDirectory() {
-        return new File(project.getBuild().getDirectory(), path("generated-sources", "codenameone", buildTarget, project.getBuild().getFinalName()));
+    private File getGeneratedAndroidProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-android-source");
+    }
+
+    private File getGeneratedIOSProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
     }
 
     private File[] doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
 
-            File generatedProject = getGeneratedProjectSourceDirectory();
+            File generatedProject = getGeneratedAndroidProjectSourceDirectory();
             getLog().info("Generating android gradle Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -400,8 +440,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
                         getLog().info("Sources have not changed.  Skipping android gradle project generation");
                         if (open) {
-                            getLog().info("Opening workspace project "+getWorkspace(props, generatedProject));
-                            openWorkspace(getWorkspace(props, generatedProject));
+                            openAndroidStudioProject(generatedProject);
                         }
                         return new File[]{generatedProject};
 
@@ -487,9 +526,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         try {
+            getLog().info("Starting android project builder...");
             boolean result = e.build(distJar, request);
+            getLog().info("Android project builder completed with result "+result);
             if (!result) {
-                throw new MojoExecutionException("Android build failed");
+                getLog().error("Received false return value from build()");
+                throw new MojoExecutionException("Android build failed.  Received false return value for build");
             }
             // send the response to the server
             File[] results = e.getResults();
@@ -516,7 +558,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget) && e.getGradleProjectDirectory() != null) {
                 File gradleProject = e.getGradleProjectDirectory();
-                File output = getGeneratedProjectSourceDirectory();
+                File output = getGeneratedAndroidProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Gradle Project to "+output);
@@ -526,10 +568,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
 
             }
-
+            if (open) {
+                openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
+            }
             return results;
 
         } catch (BuildException ex) {
+
+            getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
             throw new MojoExecutionException("Failed to build android app", ex);
         } finally {
 
@@ -537,6 +583,35 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
     }
+
+    private void openAndroidStudioProject(File generatedProject) {
+        if (isMac) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("open", "-a", "/Applications/Android Studio.app", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else if (isWindows) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("start", "", "C:\\Program Files\\Android\\Android Studio\\bin\\studio64.exe", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else {
+            getLog().warn("Opening automatically in Android studio not supported on this platform.");
+            getLog().warn("Please open the project in Android studio manually.");
+            getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+        }
+    }
+
     private File getWorkspace(Properties props, File xcprojectRoot) {
         return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcworkspace");
     }
@@ -558,7 +633,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
 
-            File generatedProject = getGeneratedProjectSourceDirectory();
+            File generatedProject = getGeneratedIOSProjectSourceDirectory();
             getLog().info("Generating Xcode Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -669,7 +744,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
-                File output = getGeneratedProjectSourceDirectory();
+                File output = getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Xcode Project to "+output);

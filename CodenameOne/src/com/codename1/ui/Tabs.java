@@ -452,6 +452,27 @@ public class Tabs extends Container {
         return this;
     }
     
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon an icon from the font
+     * @param font the font for the icon
+     * @param iconSize icon size in millimeters 
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     *
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char icon, Font font, float iconSize, Component component) {
+        int index = tabsContainer.getComponentCount();
+        insertTab(title, icon, font, iconSize, component, index);
+        return this;
+    }
 
     /**
      * Adds a <code>component</code>
@@ -485,14 +506,7 @@ public class Tabs extends Container {
         insertTab(tab, component, tabsContainer.getComponentCount());
     }
 
-    /**
-     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
-     * @param title the title of the tab
-     * @param icon the icon of the tab
-     * @return component instance
-     */
-    protected Component createTab(String title, Image icon) {
-        RadioButton b = new RadioButton(title != null ? title : "", icon);
+    private Component createTabImpl(RadioButton b) {
         radioGroup.add(b);
         b.setToggle(true);
         b.setTextPosition(BOTTOM);
@@ -516,6 +530,31 @@ public class Tabs extends Container {
         }
         return b;
     }
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     * @param title the title of the tab
+     * @param icon an icon from the font
+     * @param font the font for the icon
+     * @return component instance
+     */
+    protected Component createTab(String title, Font font, char icon, float size) {
+        RadioButton b = new RadioButton(title != null ? title : "");
+        FontImage.setIcon(b,font, icon, size);
+        createTabImpl(b);
+        return b;
+    }
+    
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     * @param title the title of the tab
+     * @param icon the icon of the tab
+     * @return component instance
+     */
+    protected Component createTab(String title, Image icon) {
+        RadioButton b = new RadioButton(title != null ? title : "", icon);
+         createTabImpl(b);
+        return b;
+    }
     
     /**
      * Inserts a <code>component</code>, at <code>index</code>,
@@ -535,6 +574,28 @@ public class Tabs extends Container {
     public void insertTab(String title, Image icon, Component component,
             int index) {
         Component b = createTab(title != null ? title : "", icon);
+        insertTab(b, component, index);
+    }
+
+ /**
+     * Inserts a <code>component</code>, at <code>index</code>,
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which may be <code>null</code>.
+     * Uses java.util.Vector internally, see <code>insertElementAt</code>
+     * for details of insertion conventions.
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon an icon from the font
+     * @param font the font for the icon
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index the position to insert this new tab
+     *
+     * @see #addTab
+     * @see #removeTabAt
+     */
+    public void insertTab(String title, char icon, Font font, float iconSize, Component component,
+            int index) {
+        Component b = createTab(title != null ? title : "", font, icon, iconSize);
         insertTab(b, component, index);
     }
 

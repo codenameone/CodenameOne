@@ -2209,7 +2209,7 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 Image i = (Image)d.extractHardRef(paintLockImage);
                 if(i == null) {
-                    i = Image.createImage(getWidth(), getHeight());
+                    i = ImageFactory.createImage(this, getWidth(), getHeight(), 0);
                     int x = getX();
                     int y = getY();
                     setX(0);
@@ -2555,7 +2555,7 @@ public class Component implements Animation, StyleListener, Editable {
             int absX = getAbsoluteX() + getScrollX();
             int absY = getAbsoluteY() + getScrollY();
             if(i == null || i.getWidth() != getWidth() || i.getHeight() != getHeight()) {
-                i = Image.createImage(getWidth(), getHeight());
+                i = ImageFactory.createImage(this, getWidth(), getHeight(), 0);
                 Graphics tg = i.getGraphics();
                 //tg.translate(g.getTranslateX(), g.getTranslateY());
                 drawPaintersImpl(tg, par, c, x, y, w, h);
@@ -4147,7 +4147,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return an image
      */
     protected Image getDragImage() {
-        Image draggedImage = Image.createImage(getWidth(), getHeight(),0x00ff7777);
+        Image draggedImage = ImageFactory.createImage(this, getWidth(), getHeight(),0x00ff7777);
         Graphics g = draggedImage.getGraphics();
 
         g.translate(-getX(), -getY());
@@ -4171,7 +4171,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (getWidth() <= 0 || getHeight() <= 0) {
             return null;
         }
-        Image image = Image.createImage(getWidth(), getHeight(),0x0);
+        Image image = ImageFactory.createImage(this, getWidth(), getHeight(),0x0);
         Graphics g = image.getGraphics();
 
         g.translate(-getX(), -getY());
@@ -6582,7 +6582,7 @@ public class Component implements Animation, StyleListener, Editable {
             return null;
         }
         if(paintLockImage == null) {
-            paintLockImage = Image.createImage(getWidth(), getHeight());
+            paintLockImage = ImageFactory.createImage(this, getWidth(), getHeight(), 0);
             int x = getX();
             int y = getY();
             setX(0);

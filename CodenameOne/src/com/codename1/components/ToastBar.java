@@ -120,6 +120,8 @@ public class ToastBar {
     
     private static ToastBar instance;
     
+    private boolean useFormLayeredPane;
+    
     /**
      * Gets reference to the singleton StatusBar instance
      * @return 
@@ -168,6 +170,32 @@ public class ToastBar {
      */
     public String getDefaultMessageUIID() {
         return defaultMessageUIID;
+    }
+    
+    /**
+     * By default the ToastBar uses the LayeredPane.  However, it may be better in many
+     * cases to use the FormLayerd pane.  This allows you to toggle whether to use
+     * the FormLayeredPane.
+     * 
+     * <p>Key use-case is for displaying the ToastBar over a Sheet, which is on the FormLayeredPane.
+     * If you don't set this to true, then the ToastBar will be displayed behind the Sheet.</p>
+     * 
+     * @param useFormLayeredPane True to use the form layered pane to display the toastbar.
+     * @return Self for chaining.
+     * @since 8.0
+     */
+    public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
+        if (useFormLayeredPane != this.useFormLayeredPane) {
+            ToastBarComponent c = getToastBarComponent(false);
+            if (c != null) {
+                c.remove();
+                getLayeredPane().remove();
+            }
+            
+            this.useFormLayeredPane = useFormLayeredPane;
+            
+        }
+        return this;
     }
 
     /**
@@ -500,6 +528,7 @@ public class ToastBar {
      */
     private void updateStatus() {
         final ToastBarComponent c = getToastBarComponent();
+        moveLayerToFront();
         if (c != null) {
             
             try {
@@ -755,15 +784,55 @@ public class ToastBar {
         updateStatus();
     }
     
+    private Container getLayeredPane() {
+        Form f = Display.getInstance().getCurrent();
+        if (f == null) {
+            throw new IllegalStateException("Cannot get layered pane when form is null");
+        }
+        if (useFormLayeredPane) {
+            return f.getFormLayeredPane(this.getClass(), true);
+        } else {
+            return f.getLayeredPane(this.getClass(), true);
+        }
+    }
+    
+    private void moveLayerToFront() {
+        Form f = Display.getInstance().getCurrent();
+        if (f == null) return;
+        final Container layered = getLayeredPane();
+        final Container parent = layered.getParent();
+        if (parent == null) {
+            return;
+        }
+        if (parent.getComponentIndex(layered) != parent.getComponentCount() -1) {
+            f.getAnimationManager().flushAnimation(new Runnable() {
+                public void run() {
+                    parent.removeComponent(layered);
+                    parent.addComponent(layered);
+                    parent.revalidate();
+                }
+            });
+            
+            
+        }
+    }
+    
+    
     private ToastBarComponent getToastBarComponent() {
+        return getToastBarComponent(true);
+    }
+    private ToastBarComponent getToastBarComponent(boolean create) {
         Form f = Display.getInstance().getCurrent();
         if (f != null && !(f instanceof Dialog)) {
             ToastBarComponent c = (ToastBarComponent)f.getClientProperty("ToastBarComponent");
+            if (c == null && !create) {
+                return null;
+            }
             if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
-                Container layered = f.getLayeredPane(this.getClass(), true);
+                Container layered = getLayeredPane();
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();

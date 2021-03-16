@@ -189,15 +189,18 @@ public class SwipeableContainer extends Container {
         if (!open) {
             return;
         }
-        if (openedToRight) {
-            int topX = topWrapper.getX();
-            openCloseMotion = Motion.createSplineMotion(topX, 0, 300);
-        } else {
-            int topX = topWrapper.getX();
-            openCloseMotion = Motion.createSplineMotion(-topX, 0, 300);
+        Form f = getComponentForm();
+        if(f != null) {
+            if (openedToRight) {
+                int topX = topWrapper.getX();
+                openCloseMotion = Motion.createSplineMotion(topX, 0, 300);
+            } else {
+                int topX = topWrapper.getX();
+                openCloseMotion = Motion.createSplineMotion(-topX, 0, 300);
+            }
+            f.registerAnimated(this);
+            openCloseMotion.start();
         }
-        getComponentForm().registerAnimated(this);
-        openCloseMotion.start();
         open = false;
     }
 

@@ -1985,7 +1985,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        ((AndroidGraphics) graphics).getFont().setAntiAlias(a);
+        android.graphics.Paint p  = ((AndroidGraphics) graphics).getFont();
+        if(p != null) {
+            p.setAntiAlias(a);
+        }
     }
 
     @Override
@@ -3201,7 +3204,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
-        return true;
+        return false;
     }
 
     /**

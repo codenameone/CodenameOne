@@ -194,6 +194,71 @@ public class Util {
     public static String readToString(InputStream i) throws IOException {
         return readToString(i, "UTF-8");
     }
+    
+    /**
+     * Reads the contents of a file to a string.
+     * @param file The file to read.
+     * @param charset The Charset to use to write the file.
+     * @return The string read from the file.
+     * 
+     * @throws IOException If the file does not exist, or cannot be read for some reason.
+     * 
+     * @since 8.0
+     */
+    public static String readToString(File file, String charset) throws IOException {
+        if (charset == null) charset = "UTF-8";
+        if (!file.exists()) {
+            throw new IOException("Failed to read file "+file+" because it does not exist.");
+        }
+        return Util.readToString(FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath()), charset);
+    }
+    
+    /**
+     * Reads the contents of a file to a string.  Uses UTF-8 encoding.
+     * @param file The file to read.
+     * @return The string read from the file.
+     * 
+     * @throws IOException If the file does not exist, or cannot be read for some reason.
+     * 
+     * @since 8.0
+     */
+    public static String readToString(File file) throws IOException {
+        return readToString(file, "UTF-8");
+    }
+    
+    /**
+     * Writes a string to a file using UTF-8 encoding.
+     * @param file The file to write to.
+     * @param contents The contents to write to the file.
+     * @throws IOException If it cannot write to the file for some reason.
+     * @since 8.0
+     */
+    public static void writeStringToFile(File file, String contents) throws IOException {
+        writeStringToFile(file, contents, "UTF-8");
+    }
+    
+    /**
+     * Writes a string to a file.
+     * @param file The file to write to.
+     * @param contents The contents to write to the file.
+     * @param charset The charset to use.  If null, it defaults to UTF-8
+     * @throws IOException If it cannot write to the file for some reason.
+     * @since 8.0
+     */
+    public static void writeStringToFile(File file, String contents, String charset) throws IOException {
+        if (charset == null) charset= "UTF-8";
+        OutputStream output = null;
+        try {
+            output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());
+            output.write(contents.getBytes(charset));
+        } finally {
+            if (output != null) {
+                try {
+                    output.close();
+                } catch (Exception ex){}
+            }
+        }
+    }
 
     /**
      * Reads an input stream to a string

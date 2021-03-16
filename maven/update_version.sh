@@ -5,7 +5,7 @@ if [ -z "$1" ]; then
 	exit 1
 fi
 currdir=$(pwd)
-for d in android build-client codenameone-maven-plugin core designer factory ios java-runtime javase javase-svg maven-archetypes parparvm tests
+for d in android codenameone-maven-plugin core designer factory ios java-runtime javase javase-svg maven-archetypes parparvm tests
 do
     cd "$d"
     mvn versions:set -DnewVersion=$1

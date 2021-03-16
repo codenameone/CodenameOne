@@ -24,7 +24,7 @@ import java.util.Vector;
 /**
  * This class declares a bounding box of coordinates on the map.
  * 
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
+ * @author Roman Kamyk roman.kamyk@itiner.pl
  */
 public class BoundingBox {
 
@@ -45,8 +45,8 @@ public class BoundingBox {
     /**
      * Constructor with 2 coordinates for south west and north east
      * 
-     * @param getSouthWest coordinate
-     * @param getNorthEast coordinate
+     * @param southWest coordinate
+     * @param northEast coordinate
      */
     public BoundingBox(Coord southWest, Coord northEast) {
         _southWest = southWest;

@@ -35,6 +35,7 @@ import java.io.*;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.NoSuchAlgorithmException;
@@ -59,7 +60,8 @@ public class IPhoneBuilder extends Executor {
     private static final String GOOGLE_SIGNIN_TUTORIAL_URL = "http://www.codenameone.com/...";
     private boolean buildForSimulator;
     private File resultDir;
-
+    private File pushCertificate, notificationServiceProvisioningProfileTemp;
+    private boolean includePush;
     private File tmpFile;
     private File ipaFile;
     private File icon57;
@@ -347,6 +349,9 @@ public class IPhoneBuilder extends Executor {
         String iosSDK = request.getArg("ios.sdk", "13.2");
         xcodebuild = "xcodebuild";
         xcodeVersion = getXcodeVersion(xcodebuild);
+        if (xcodeVersion <= 0) {
+            xcodeVersion = 10;
+        }
 
         codesignAllocate = xcodebuild.replace(
                 "/Contents/Developer/usr/bin/xcodebuild", 
@@ -414,8 +419,10 @@ public class IPhoneBuilder extends Executor {
         resDir.mkdirs();
         File buildinRes = new File(tmpFile, "btres");
         buildinRes.mkdirs();
-        File seVersionDir = new File(tmpFile, "seVer");
-        seVersionDir.mkdirs();
+        //File seVersionDir = new File(tmpFile, "seVer");
+        //seVersionDir.mkdirs();
+
+        pushCertificate = new File(tmpFile, "PushCertificate.p12");
 
         // fill classes dir from JAR and proper ports
         try {
@@ -486,7 +493,7 @@ public class IPhoneBuilder extends Executor {
         File podSpecs = new File(tmpFile, "podspecs");
         podSpecs.mkdirs();
         try {
-            for (File dir : new File[]{classesDir, resDir, buildinRes, seVersionDir}) {
+            for (File dir : new File[]{classesDir, resDir, buildinRes}) {
                 for (File child : dir.listFiles()) {
                     if (child.getName().endsWith(".podspec")) {
                         Files.move(child.toPath(), new File(podSpecs, child.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -1022,7 +1029,7 @@ public class IPhoneBuilder extends Executor {
                     + "    }\n\n"
                     + "    public static void main(String[] argv) {\n"
                     + "        if(!(argv != null && argv.length > 0 && argv[0].equals(\"ignoreNative\"))) {\n"
-                    + registerNativeImplementationsAndCreateStubs(stubSource, classesDir)
+                    + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), stubSource, classesDir)
                     + "        }\n"
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
@@ -1219,10 +1226,13 @@ public class IPhoneBuilder extends Executor {
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
 
-        ProcessBuilder p;
 
-        
-        if (usesLocalNotifications) {
+
+
+        includePush = request.getArg("ios.includePush", "false").equalsIgnoreCase("true");
+        boolean includePushEnt= includePush;
+
+        if ((request.getPushCertificate() != null || includePush) || usesLocalNotifications) {
             try {
                 File appDelH = new File(buildinRes, "CodenameOne_GLAppDelegate.h");
                 DataInputStream dis = new DataInputStream(new FileInputStream(appDelH));
@@ -1245,34 +1255,57 @@ public class IPhoneBuilder extends Executor {
                 str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
                 fios.write(str);
                 fios.close();
-            } catch (Exception ex) {
-                throw new BuildException("Failed to generate local notifications", ex);
+            } catch (IOException ex) {
+                log("Failed to Update Objective-C source files to activate notifications flag");
+                throw new BuildException("Failed to update Objective-C source files to activate notifications flag", ex);
             }
         }
+
+        if(!(request.getPushCertificate() != null || includePush)) {
+            try {
+                // special workaround for issue Apple is having with push notification missing from
+                // the entitlements
+                DataInputStream dis = new DataInputStream(new FileInputStream(glAppDelegate));
+                byte[] data = new byte[(int) glAppDelegate.length()];
+                dis.readFully(data);
+                dis.close();
+                FileWriter fios = new FileWriter(glAppDelegate);
+                String str = new String(data);
+                str = str.replace("#define INCLUDE_CN1_PUSH", "");
+                fios.write(str);
+                fios.close();
+
+                File iosNative = new File(buildinRes, "IOSNative.m");
+                dis = new DataInputStream(new FileInputStream(iosNative));
+                data = new byte[(int) iosNative.length()];
+                dis.readFully(data);
+                dis.close();
+                fios = new FileWriter(iosNative);
+                str = new String(data);
+                str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
+                fios.write(str);
+                fios.close();
+            } catch (IOException ex) {
+                throw new BuildException("Failed to update Objective-C source files to activate push notification flag", ex);
+            }
+
+        } else {
+            if(request.getArg("ios.enableBadgeClear", "true").equals("false")) {
+                try {
+                    replaceInFile(glAppDelegate, "[UIApplication sharedApplication].applicationIconBadgeNumber = 0;", "//[UIApplication sharedApplication].applicationIconBadgeNumber = 0;");
+                    replaceInFile(glAppDelegate, "[[UIApplication sharedApplication] cancelAllLocalNotifications];", "//[[UIApplication sharedApplication] cancelAllLocalNotifications];");
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to remove badge notifications from objective-c soruce files", ex);
+                }
+            }
+        }
+
+
+
         String releaseString = buildForSimulator ? "Debug" : "Release";
         try {
-            // special workaround for issue Apple is having with push notification missing from
-            // the entitlements
-            DataInputStream dis = new DataInputStream(new FileInputStream(glAppDelegate));
-            byte[] data = new byte[(int) glAppDelegate.length()];
-            dis.readFully(data);
-            dis.close();
-            FileWriter fios = new FileWriter(glAppDelegate);
-            String str = new String(data);
-            str = str.replace("#define INCLUDE_CN1_PUSH", "");
-            fios.write(str);
-            fios.close();
-
             File iosNative = new File(buildinRes, "IOSNative.m");
-            dis = new DataInputStream(new FileInputStream(iosNative));
-            data = new byte[(int) iosNative.length()];
-            dis.readFully(data);
-            dis.close();
-            fios = new FileWriter(iosNative);
-            str = new String(data);
-            str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
-            fios.write(str);
-            fios.close();
+
 
 
             String glAppDelegeateHeader = request.getArg("ios.glAppDelegateHeader", null);
@@ -1416,6 +1449,7 @@ public class IPhoneBuilder extends Executor {
                     addLibs = addLibs.substring(1);
                 }
             }
+
             try {
                 if (!runPods && googleAdUnitId != null && googleAdUnitId.length() > 0) {
                     unzip(getResourceAsStream("/google-play-services_lib-ios.zip"), classesDir, buildinRes, buildinRes);
@@ -1433,7 +1467,7 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
-                if (usesLocalNotifications && xcodeVersion >= 9) {
+                if ((includePush || usesLocalNotifications) && xcodeVersion >= 9) {
                     if (addLibs == null) {
                         addLibs = "UserNotifications.framework";
                     } else {
@@ -1628,6 +1662,258 @@ public class IPhoneBuilder extends Executor {
                         podSpecFileList.add(targetF);
                         //}
                     }
+
+                    // Generate the NotificationServiceExtension
+                    String notificationServiceExtensionStr = "";
+                    if (xcodeVersion >= 9 &&
+                            "true".equals(request.getArg("ios.useNotificationServiceExtension", "false"))) {
+
+                        String notificationServiceExtensionName = request.getMainClass() + "NotificationServiceExtension";
+                        // Make the notificationServiceExtensionFiles
+                        File nseFolder = new File(tmpFile, "dist/"+notificationServiceExtensionName);
+                        nseFolder.mkdir();
+                        File nseInfoPlist = new File(nseFolder, "Info.plist");
+                        PrintWriter writer = new PrintWriter(nseInfoPlist, "UTF-8");
+                        writer.println(
+                                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                                        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n" +
+                                        "<plist version=\"1.0\">\n" +
+                                        "<dict>\n" +
+                                        "	<key>CFBundleDevelopmentRegion</key>\n" +
+                                        "	<string>$(DEVELOPMENT_LANGUAGE)</string>\n" +
+                                        "	<key>CFBundleDisplayName</key>\n" +
+                                        "	<string>"+notificationServiceExtensionName+"</string>\n" +
+                                        "	<key>CFBundleExecutable</key>\n" +
+                                        "	<string>$(EXECUTABLE_NAME)</string>\n" +
+                                        "	<key>CFBundleIdentifier</key>\n" +
+                                        "	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n" +
+                                        "	<key>CFBundleInfoDictionaryVersion</key>\n" +
+                                        "	<string>6.0</string>\n" +
+                                        "	<key>CFBundleName</key>\n" +
+                                        "	<string>$(PRODUCT_NAME)</string>\n" +
+                                        "	<key>CFBundlePackageType</key>\n" +
+                                        "	<string>XPC!</string>\n" +
+                                        "	<key>CFBundleShortVersionString</key>\n" +
+                                        "	<string>1.0</string>\n" +
+                                        "	<key>CFBundleVersion</key>\n" +
+                                        "	<string>1</string>\n" +
+                                        "	<key>NSExtension</key>\n" +
+                                        "	<dict>\n" +
+                                        "		<key>NSExtensionPointIdentifier</key>\n" +
+                                        "		<string>com.apple.usernotifications.service</string>\n" +
+                                        "		<key>NSExtensionPrincipalClass</key>\n" +
+                                        "		<string>NotificationService</string>\n" +
+                                        "	</dict>\n" +
+                                        "</dict>\n" +
+                                        "</plist>");
+                        writer.close();
+
+                        File notificationServiceH = new File(nseFolder, "NotificationService.h");
+                        writer = new PrintWriter(notificationServiceH, "UTF-8");
+                        writer.println(
+                                "#import <UserNotifications/UserNotifications.h>\n" +
+                                        "\n" +
+                                        "@interface NotificationService : UNNotificationServiceExtension\n" +
+                                        "\n" +
+                                        "@end"
+                        );
+
+                        writer.close();
+
+                        File notificationServiceM = new File(nseFolder, "NotificationService.m");
+                        writer = new PrintWriter(notificationServiceM, "UTF-8");
+                        writer.println(
+                                "//\n" +
+                                        "//  NotificationService.m\n" +
+                                        "//  NotificationExt2\n" +
+                                        "//\n" +
+                                        "//  Created by Steve Hannah on 2018-06-19.\n" +
+                                        "//  Copyright (c) 2018 CodenameOne. All rights reserved.\n" +
+                                        "//\n" +
+                                        "\n" +
+                                        "#import \"NotificationService.h\"\n" +
+                                        "\n" +
+                                        "@interface NotificationService ()\n" +
+                                        "\n" +
+                                        "@property (nonatomic, strong) void (^contentHandler)(UNNotificationContent *contentToDeliver);\n" +
+                                        "@property (nonatomic, strong) UNMutableNotificationContent *bestAttemptContent;\n" +
+                                        "@property (nonatomic, strong) NSURLSession *session;\n" +
+                                        "\n" +
+                                        "@end\n" +
+                                        "\n" +
+                                        "@implementation NotificationService\n" +
+                                        "\n" +
+                                        "- (void)didReceiveNotificationRequest:(UNNotificationRequest *)request withContentHandler:(void (^)(UNNotificationContent * _Nonnull))contentHandler {\n" +
+                                        "    self.contentHandler = contentHandler;\n" +
+                                        "    self.bestAttemptContent = [request.content mutableCopy];\n" +
+                                        "    \n" +
+                                        "    NSDictionary *userInfo = request.content.userInfo;\n" +
+                                        "    if (userInfo == nil)\n" +
+                                        "    {\n" +
+                                        "        [self contentComplete];\n" +
+                                        "        return;\n" +
+                                        "    }\n" +
+                                        "    NSString *mediaUrl = [userInfo objectForKey:@\"media-url\"];\n" +
+                                        "    \n" +
+                                        "    if (mediaUrl == nil) {\n" +
+                                        "        [self contentComplete];\n" +
+                                        "        return;\n" +
+                                        "    }\n" +
+                                        "    [self loadAttachmentForUrlString:mediaUrl\n" +
+                                        "                   completionHandler:^(UNNotificationAttachment *attachment) {\n" +
+                                        "                       if (attachment) {\n" +
+                                        "                           self.bestAttemptContent.attachments = [NSArray arrayWithObject:attachment];\n" +
+                                        "                       }\n" +
+                                        "                       [self contentComplete];\n" +
+                                        "                   }];\n" +
+                                        "\n" +
+                                        "}\n" +
+                                        "\n" +
+                                        "- (void)contentComplete\n" +
+                                        "{\n" +
+                                        "    [self.session invalidateAndCancel];\n" +
+                                        "    self.contentHandler(self.bestAttemptContent);\n" +
+                                        "}\n" +
+                                        "\n" +
+                                        "- (void)loadAttachmentForUrlString:(NSString *)urlString\n" +
+                                        "                 completionHandler:(void (^)(UNNotificationAttachment *))completionHandler\n" +
+                                        "{\n" +
+                                        "    __block UNNotificationAttachment *attachment = nil;\n" +
+                                        "    __block NSURL *attachmentURL = [NSURL URLWithString:urlString];\n" +
+                                        "    \n" +
+                                        "    NSString *fileExt = [@\".\" stringByAppendingString:[urlString pathExtension]];\n" +
+                                        "    \n" +
+                                        "    \n" +
+                                        "    NSURLSession *session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];\n" +
+                                        "    \n" +
+                                        "    NSURLSessionDownloadTask *task = [session downloadTaskWithURL:attachmentURL\n" +
+                                        "                                                completionHandler: ^(NSURL *temporaryFileLocation, NSURLResponse *response, NSError *error) {\n" +
+                                        "                                                    if (error != nil)\n" +
+                                        "                                                    {\n" +
+                                        "                                                        NSLog(@\"%@\", error.localizedDescription);\n" +
+                                        "                                                    }\n" +
+                                        "                                                    else\n" +
+                                        "                                                    {\n" +
+                                        "                                                        NSFileManager *fileManager = [NSFileManager defaultManager];\n" +
+                                        "                                                        NSURL *localURL = [NSURL fileURLWithPath:[temporaryFileLocation.path\n" +
+                                        "                                                                                                  stringByAppendingString:fileExt]];\n" +
+                                        "                                                        [fileManager moveItemAtURL:temporaryFileLocation\n" +
+                                        "                                                                             toURL:localURL\n" +
+                                        "                                                                             error:&error];\n" +
+                                        "                                                        \n" +
+                                        "                                                        NSError *attachmentError = nil;\n" +
+                                        "                                                        attachment = [UNNotificationAttachment attachmentWithIdentifier:[attachmentURL lastPathComponent]\n" +
+                                        "                                                                                                                    URL:localURL\n" +
+                                        "                                                                                                                options:nil\n" +
+                                        "                                                                                                                  error:&attachmentError];\n" +
+                                        "                                                        if (attachmentError)\n" +
+                                        "                                                        {\n" +
+                                        "                                                            NSLog(@\"%@\", attachmentError.localizedDescription);\n" +
+                                        "                                                        }\n" +
+                                        "                                                    }\n" +
+                                        "                                                    completionHandler(attachment);\n" +
+                                        "                                                }];\n" +
+                                        "    \n" +
+                                        "    [task resume];\n" +
+                                        "}\n" +
+                                        "\n" +
+                                        "- (void)serviceExtensionTimeWillExpire {\n" +
+                                        "    // Called just before the extension will be terminated by the system.\n" +
+                                        "    // Use this as an opportunity to deliver your \"best attempt\" at modified content, otherwise the original push payload will be used.\n" +
+                                        "    [self contentComplete];\n" +
+                                        "}\n" +
+                                        "\n" +
+                                        "@end"
+                        );
+                        writer.close();
+
+
+                        String buildSettingsStr = "CLANG_ANALYZER_NONNULL = YES;\n" +
+                                "				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;\n" +
+                                "				CLANG_CXX_LANGUAGE_STANDARD = \"gnu++14\";\n" +
+                                "				CLANG_ENABLE_MODULES = YES;\n" +
+                                "				CLANG_ENABLE_OBJC_ARC = YES;\n" +
+                                "				CLANG_ENABLE_OBJC_WEAK = YES;\n" +
+                                "				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;\n" +
+                                "				CLANG_WARN_COMMA = YES;\n" +
+                                "				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;\n" +
+                                "				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;\n" +
+                                "				CLANG_WARN_EMPTY_BODY = YES;\n" +
+                                "				CLANG_WARN_ENUM_CONVERSION = YES;\n" +
+                                "				CLANG_WARN_INFINITE_RECURSION = YES;\n" +
+                                "				CLANG_WARN_INT_CONVERSION = YES;\n" +
+                                "				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;\n" +
+                                "				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;\n" +
+                                "				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;\n" +
+                                "				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;\n" +
+                                "				CLANG_WARN_STRICT_PROTOTYPES = YES;\n" +
+                                "				CLANG_WARN_SUSPICIOUS_MOVE = YES;\n" +
+                                "				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;\n" +
+                                "				CLANG_WARN_UNREACHABLE_CODE = YES;\n" +
+                                "				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;";
+
+                        Map<String,String> buildSettingsMap = new HashMap<String,String>();
+                        String[] lines = buildSettingsStr.split("\n");
+                        for (String line : lines) {
+                            if (line.trim().isEmpty()) {
+                                continue;
+                            }
+                            String key = line.substring(0, line.indexOf("=")).trim();
+                            String val = line.substring(line.indexOf("=")+1).trim();
+                            if (val.endsWith(";")) {
+                                val = val.substring(val.length()-1);
+                            }
+                            buildSettingsMap.put(key, val);
+
+                        }
+                        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName()+".NotificationServiceExtension");
+                        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+                        buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
+                        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", "$(NS_CODE_SIGN_ENTITLEMENTS)");
+                        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+                        buildSettingsMap.put("INFOPLIST_FILE", notificationServiceExtensionName+"/Info.plist");
+
+                        // We are using the notification service extension so that we can support rich push notifications
+
+                        notificationServiceExtensionStr = "\nservice_target = xcproj.new_target(:app_extension, '"+notificationServiceExtensionName+"', :ios, '10.0')\n"
+                                + "xcproj.targets.find{|e|e.name=='"+request.getMainClass()+"'}.build_configurations.each{|e| \n"
+                                + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
+                                + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
+                                + "}\n"
+                                + "service_target.frameworks_build_phase.add_file_reference(xcproj.files.find{|e|e.path.include? 'UserNotifications.framework'})\n"
+                                + "service_group = xcproj.new_group('"+notificationServiceExtensionName+"')\n"
+                                + "infoPlist = '"+nseInfoPlist.getAbsolutePath()+"'\n"
+                                + "notificationServiceH = '"+notificationServiceH.getAbsolutePath()+"'\n"
+                                + "notificationServiceM = '"+notificationServiceM.getAbsolutePath()+"'\n"
+                                + "service_group.new_file(infoPlist)\n"
+                                + "service_group.new_file(notificationServiceH)\n"
+                                + "fileref = service_group.new_file(notificationServiceM)\n"
+                                + "service_target.add_file_references([fileref])\n"
+                                + "xcproj.targets.find{|e|e.name==main_class_name}.add_dependency(service_target)\n"
+                                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"+notificationServiceExtensionName+".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                                + "embed_phase=xcproj.targets.find{|e| e.name=='"+request.getMainClass()+"'}.new_copy_files_build_phase('Embed App Extensions')\n"
+                                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                                + "embed_phase.add_file_reference(fileref)\n"
+                                + "service_target.build_configurations.each{|e| \n";
+                        for (String buildSettingKey : buildSettingsMap.keySet()) {
+                            notificationServiceExtensionStr += "  e.build_settings['"+buildSettingKey+"'] = \"" + buildSettingsMap.get(buildSettingKey)+"\"\n";
+                        }
+
+                        notificationServiceExtensionStr +=
+                                "}\n"
+                                        + "xcproj.save(project_file)\n";
+
+
+                        log("Adding NotificationServiceExtension: "+notificationServiceExtensionStr);
+
+                    } else {
+
+                        log("Not adding NotificationServiceExtension");
+                    }
+
+
                     String deploymentTargetStr = "";
 
 
@@ -1672,7 +1958,8 @@ public class IPhoneBuilder extends Executor {
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
                             + "  puts 'An error occurred recreating schemes, but the build still might work...'\n"
                             + "end\n"
-                            + deploymentTargetStr;
+                            + deploymentTargetStr
+                            + notificationServiceExtensionStr;
                     //  "xcproj.save";
                     File hooksDir = new File(tmpFile, "hooks");
                     hooksDir.mkdir();
@@ -1682,11 +1969,12 @@ public class IPhoneBuilder extends Executor {
                     exec(hooksDir, "chmod", "0755", fixSchemesFile.getAbsolutePath());
                     exec(hooksDir, "echo", fixSchemesFile.getAbsolutePath());
                     if (!exec(hooksDir, fixSchemesFile.getAbsolutePath())) {
-                        log("Failed to fix xcode project schemes");
+                        log("Failed to fix xcode project schemes.  Make sure you have Cocoapods installed. ");
                         return false;
                     }
 
                     if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "init")) {
+                        log("Failed to run "+pod+" init.  Make sure you have Cocoapods installed.");
                         return false;
                     }
                     //System.out.println("Stopping here: "+tmpDir.getAbsolutePath()+"/dist/");
@@ -2351,6 +2639,16 @@ public class IPhoneBuilder extends Executor {
             }
         }
         String backgroundModesStr = request.getArg("ios.background_modes", null);
+        if (includePush) {
+            if (backgroundModesStr == null || !backgroundModesStr.contains("remote-notification")) {
+                if (backgroundModesStr == null) {
+                    backgroundModesStr = "";
+                } else {
+                    backgroundModesStr += ",";
+                }
+                backgroundModesStr += "remote-notification";
+            }
+        }
 
         if (backgroundModesStr != null) {
             String[] backgroundModes = backgroundModesStr.split(",");
@@ -2892,6 +3190,145 @@ public class IPhoneBuilder extends Executor {
         }
         return out.toString();
     }
+
+
+/**
+ * Helper class for finding and downloading the NotificationServiceExtension provisioning
+ * profile from S3, which would have been generated and uploaded by the certificate wizard.
+ *
+ * <p>IMPORTANT: The hashing functions used for generating the S3 keys and URLs for where
+ * the certificates are stored match those in the certificate wizard.  If you make changes to
+ * the hash functions or naming conventions in the Certificate wizard, you must make corresponding
+ * changes here.  See the PushCertificateService class in the AppleCertServiceRestCLI project.</p>
+ */
+private static class NotificationServiceExtensionProvisioningProfileHelper {
+    private final IPhoneBuilder context;
+    private final BuildRequest request;
+    private final static String S3_BUCKET_NAME = "codename-one-push-certificates";
+    private final static String NOTIFICATION_SERVICE_EXTENSION_MTIME_HASH_SALT = "1234567890-QWERTYUIO";
+    private final byte[] appProvisioningProfileData;
+    private final String appBundleId;
+    private byte[] notificationServiceExtensionProvisioningProfileData;
+
+    private String overrideUrl;
+
+    public NotificationServiceExtensionProvisioningProfileHelper(IPhoneBuilder context, BuildRequest request, String appBundleId, byte[] appProvisioningProfileData) {
+        this.context = context;
+        this.request = request;
+        this.appProvisioningProfileData = appProvisioningProfileData;
+        this.appBundleId = appBundleId;
+    }
+
+    /**
+     * Override the URL where the provisioning profile is stored with this explicit URL.  This
+     * will allow developers to generate their own provisioning profile if they want, without
+     * using the certificate wizard.  They would upload it themselves to their own server,
+     * and provide the URL here.
+     * @param url
+     */
+    public void setOverrideUrl(String url) {
+        this.overrideUrl = url;
+    }
+
+    public String getUrl() throws IOException {
+        if (overrideUrl != null) {
+            return overrideUrl;
+        }
+        return "https://" + S3_BUCKET_NAME + ".s3.amazonaws.com/" + java.net.URLEncoder.encode(getKey(), "UTF-8");
+    }
+
+    public String getMtimeUrl() throws IOException {
+        return "https://" + S3_BUCKET_NAME + ".s3.amazonaws.com/" + java.net.URLEncoder.encode(getMtimeKey(), "UTF-8");
+    }
+
+    public String getKey() throws IOException {
+        return getKeyPrefix() + getProvisioningProfileHash();
+    }
+
+    public String getMtimeKey() throws IOException {
+        String typePrefix = "mtime-dev-";
+        if (request.isProduction()) {
+            typePrefix = "mtime-prod-";
+        }
+        return typePrefix + getKeyPrefix()+sha1(appBundleId+NOTIFICATION_SERVICE_EXTENSION_MTIME_HASH_SALT);
+    }
+    private String getKeyPrefix() {
+        String prefix = appBundleId + "NotificationServiceExtension-";
+        return prefix;
+    }
+
+    private static String sha1(String str) throws IOException {
+        return sha1(str.getBytes("UTF-8"));
+    }
+
+    private static String sha1(byte[] bytes) throws IOException {
+        java.security.MessageDigest digest = null;
+        try {
+            digest = java.security.MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(IPhoneBuilder.class.getName()).log(Level.SEVERE, null, ex);
+            throw new IOException(ex);
+        }
+        digest.reset();
+        digest.update(bytes);
+        byte[] result = digest.digest();
+
+        return java.util.Base64.getEncoder().encodeToString(result);
+    }
+
+    public String getProvisioningProfileHash()  throws IOException {
+        return sha1(appProvisioningProfileData);
+
+    }
+
+
+    public boolean tryDownloadProvisioningProfile(File dest) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection)new URL(getUrl()).openConnection();
+        conn.setInstanceFollowRedirects(true);
+        if (conn.getResponseCode() != 200) {
+            context.log("Failed to dowload NotificationServiceExtension provisioning profile from "+getUrl()+" but it was not found.  Response code "+conn.getResponseCode()+" : "+conn.getResponseMessage());
+            return false;
+        }
+        System.out.println("Trying to download provisioning profile from "+getUrl());
+        FileOutputStream baos = new FileOutputStream(dest);
+        InputStream input = null;
+        try {
+            input = conn.getInputStream();
+            copy(input, baos);
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (Throwable t){}
+            }
+            if (baos != null) {
+                try {
+                    baos.close();
+                } catch (Throwable t) {}
+            }
+        }
+        return true;
+
+    }
+
+
+    private byte[] readFile(File f) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(f);
+            copy(fis, baos);
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (Throwable t){}
+            }
+        }
+        return baos.toByteArray();
+    }
+
+}
 
             
 }

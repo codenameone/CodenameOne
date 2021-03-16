@@ -2,7 +2,10 @@ package com.codename1.maven;
 
 import java.io.File;
 
-class PathUtil {
+/**
+ * Utility for creatings file paths.
+ */
+public class PathUtil {
     public static String path(String... parts) {
         StringBuilder sb = new StringBuilder();
         for (String part : parts) {

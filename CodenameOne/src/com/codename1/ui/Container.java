@@ -1245,7 +1245,10 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public boolean isEnabled() {
-        if(leadComponent != null) {
+        // Normally a container shouldn't be a lead component but this happens
+        // in the GUI builder and this block can cause an infinite recursion
+        // without the second condition
+        if(leadComponent != null && leadComponent != this) {
             return leadComponent.isEnabled();
         }
         return super.isEnabled();

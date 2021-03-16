@@ -3863,12 +3863,9 @@ public class Form extends Container {
             if (dragged == null) {
                 //if the pointer was released on the menu invoke the appropriate
                 //soft button.
-                if (origPressedCmp != null && inOrigPressedCmpBounds) {
-                    // This is a special case that occurs when the pointer press
-                    // causes a drastic change in the layout (e.g. hiding the keyboard)
-                    // This causes buttons to fail to fire their action events because
-                    // the button is no longer under the pointer release event.
-                    // We solve this by tracking the original location of the pressed component.
+                if (origPressedCmp != null) {
+                    // The original pressed component should receive a pointer released event even if it falls
+                    // outside of the bounds because it may need to know that a drag is complete.
                     if (origPressedCmp.isEnabled()) {
                         LeadUtil.pointerReleased(origPressedCmp, x, y);
                     }

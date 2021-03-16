@@ -99,6 +99,8 @@ public abstract class Executor {
     static boolean IS_MAC;
 
 
+
+
     protected File codenameOneJar;
 
     public void setCodenameOneJar(File codenameOneJar) {
@@ -236,7 +238,11 @@ public abstract class Executor {
 
         HashMap<String, String> env = new HashMap<String, String>();
 
-        String retrolambda = getResourceAsFile("/com/codename1/builder/retrolambda.jar", ".jar").getAbsolutePath();
+
+        String retrolambda = System.getProperty("retrolambdaJarPath", null);
+        if (retrolambda == null) {
+            getResourceAsFile("/com/codename1/builder/retrolambda.jar", ".jar").getAbsolutePath();
+        }
 
 
         if (codenameOneJar == null) {
@@ -671,8 +677,8 @@ public abstract class Executor {
         return "Impl";
     }
 
-    protected String registerNativeImplementationsAndCreateStubs(File stubDir, File... classesDirectory) throws MalformedURLException, IOException {
-        nativeInterfaces = findNativeInterfaces(classesDirectory);
+    protected String registerNativeImplementationsAndCreateStubs(ClassLoader parentClassLoader, File stubDir, File... classesDirectory) throws MalformedURLException, IOException {
+        nativeInterfaces = findNativeInterfaces(parentClassLoader, classesDirectory);
         String registerNativeFunctions = "";
         if (nativeInterfaces != null && nativeInterfaces.length > 0) {
             for (Class n : nativeInterfaces) {
@@ -755,18 +761,21 @@ public abstract class Executor {
         return exec(dir, args);
     }
 
-    protected Class[] findNativeInterfaces(File... classesDirectories) throws MalformedURLException, IOException {
+    protected Class[] findNativeInterfaces(ClassLoader parentClassLoader, File... classesDirectories) throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for (int iter = 0; iter < urls.length; iter++) {
             urls[iter] = classesDirectories[iter].toURI().toURL();
         }
-        URLClassLoader cl = new URLClassLoader(urls);
+        URLClassLoader cl = new URLClassLoader(urls, parentClassLoader);
 
         // first directory is assumed to be the user classes directory
-        File userClassesDirectory = classesDirectories[0];
-
         List<Class> classList = new ArrayList<Class>();
-        findNativeClassesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
+        for (File userClassesDirectory : classesDirectories) {
+
+
+            findNativeClassesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
+
+        }
         Class[] arr = new Class[classList.size()];
         classList.toArray(arr);
         return arr;
@@ -790,7 +799,7 @@ public abstract class Executor {
                     ZipInputStream zip = new ZipInputStream(zipFile);
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
-                        //System.out.println("Extracting: " +entry);
+
                         if (entry.isDirectory()) {
                             continue;
                         }
@@ -818,14 +827,14 @@ public abstract class Executor {
             if (cls.isInterface()) {
                 for (Class current : cls.getInterfaces()) {
                     if (current.getName().equals("com.codename1.system.NativeInterface")) {
-                        System.out.println(className + " is a native interface");
+                        debug(className + " is a native interface");
                         classList.add(cls);
                         break;
                     }
                 }
             }
         } catch (Throwable t) {
-            System.out.println("Evaluated " + className + " it is not a native interface " + t);
+            warn("Evaluated " + className + " it is not a native interface " + t, t);
         }
     }
 
@@ -915,7 +924,7 @@ public abstract class Executor {
                         err.printStackTrace();
                         if (err.getCause() != null) {
                             err.getCause().printStackTrace();
-                            System.out.println(err.getCause().toString());
+                            debug(err.getCause().toString());
                             message.append(getCustomStackTrace(err.getCause()));
                         }
                         message.append(getCustomStackTrace(err));
@@ -1245,7 +1254,7 @@ public abstract class Executor {
                     entryName = entryName.substring(5);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
-                    System.out.println("Packaging entry " + entryName + " size: " + entry.getSize());
+                    debug("Packaging entry " + entryName + " size: " + entry.getSize());
                     tos.putNextEntry(tEntry);
                     int count;
                     byte[] data = new byte[8192];
@@ -1265,7 +1274,7 @@ public abstract class Executor {
                     entryName = entryName.substring(podSpecsPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
-                    System.out.println("Packaging entry " + entryName + " size: " + entry.getSize());
+                    debug("Packaging entry " + entryName + " size: " + entry.getSize());
                     podspecTos.putNextEntry(tEntry);
                     int count;
                     byte[] data = entry.getSize() >=819200 ? new byte[819200] : new byte[8192];
@@ -1287,7 +1296,7 @@ public abstract class Executor {
                     entryName = entryName.substring(libPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
-                    System.out.println("Packaging entry " + entryName + " size: " + entry.getSize());
+                    debug("Packaging entry " + entryName + " size: " + entry.getSize());
                     libTos.putNextEntry(tEntry);
                     int count;
                     byte[] data = entry.getSize() >=819200 ? new byte[819200] : new byte[8192];
@@ -1370,7 +1379,7 @@ public abstract class Executor {
             String currentDir = null;
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
-                System.out.println("Extracting "+entryName);
+                debug("Extracting "+entryName);
 
                 if (entry.isDirectory()) {
                     currentDir = entryName;
@@ -1434,10 +1443,8 @@ public abstract class Executor {
     }
 
     public String execStringWithThrow(boolean withThrow, File dir, String... varArgs) throws Exception {
-        System.out.print("Executing: ");
         message.append("Executing: ");
         for (String s : varArgs) {
-            System.out.print(s + " ");
             message.append(s);
             message.append(" ");
         }
@@ -1478,6 +1485,34 @@ public abstract class Executor {
 
     protected synchronized void log(String s) {
         log(s, true);
+    }
+
+    protected synchronized void debug(String s) {
+        if (logger != null) {
+            logger.debug(s);
+            return;
+        }
+    }
+
+    protected synchronized void warn(String s) {
+        if (logger != null) {
+            logger.warn(s);
+            return;
+        }
+    }
+
+    protected synchronized void warn(String s, Throwable ex) {
+        if (logger != null) {
+            logger.warn(s, ex);
+            return;
+        }
+    }
+
+    protected synchronized void error(String s, Throwable ex) {
+        if (logger != null) {
+            logger.error(s, ex);
+            return;
+        }
     }
 
     protected synchronized void log(String s, boolean ln) {
@@ -1681,7 +1716,7 @@ public abstract class Executor {
     public static void zipDir(String zipFileName, String dir) throws Exception {
         File dirObj = new File(dir);
         ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipFileName));
-        //System.out.println("Creating : " + zipFileName);
+
         addDir(dirObj, dirObj, out);
         out.close();
     }
@@ -1689,7 +1724,7 @@ public abstract class Executor {
     public static void zipDir(String zipFileName, String dir, String... exclude) throws Exception {
         File dirObj = new File(dir);
         ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipFileName));
-        //System.out.println("Creating : " + zipFileName);
+
         addDir(dirObj, dirObj, out, exclude);
         out.close();
     }
@@ -1735,7 +1770,7 @@ public abstract class Executor {
                 continue;
             }
             FileInputStream in = new FileInputStream(files[i].getAbsolutePath());
-            //System.out.println(" Adding: " + files[i].getAbsolutePath());
+
             out.putNextEntry(new ZipEntry(files[i].getAbsolutePath().substring(baseDir.getAbsolutePath().length() + 1).replace('\\', '/')));
             int len;
             while ((len = in.read(tmpBuf)) >= 0) {
@@ -1867,7 +1902,7 @@ public abstract class Executor {
                 CtClass cls = pool.makeClass(fi);//pool.get(name);
                 fi.close();
                 CtClass runtimeException = pool.get("java.lang.RuntimeException");
-                //System.out.println("Processing: " + name);
+
                 methodNames.add(name);
                 CtMethod[] mtds = cls.getDeclaredMethods();
                 for (CtMethod mtd : mtds) {
@@ -1996,7 +2031,7 @@ public abstract class Executor {
 
     public String decodeFunction() {
 
-        System.out.println("Using xorDecode function");
+        debug("Using xorDecode function");
         return "    public String d(String s) {\n"
                 + "        return com.codename1.io.Util.xorDecode(s);\n"
                 + "    }\n\n";
@@ -2019,5 +2054,16 @@ public abstract class Executor {
             return null;
         }
     }
+
+
+
+
+    private ClassLoader getCodenameOneJarClassLoader() throws IOException {
+        if (codenameOneJar == null) {
+            throw new IllegalStateException("Must set codenameOneJar in Executor");
+        }
+        return new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()});
+    }
+
 
 }

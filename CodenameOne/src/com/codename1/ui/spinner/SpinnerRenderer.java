@@ -26,6 +26,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.List;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.Style;
@@ -125,7 +126,7 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T>{
             Font f = getStyle().getFont();
             int w = f.charWidth(c);
             int h = f.getHeight();
-            i = Image.createImage(w, h, 0);
+            i = ImageFactory.createImage(this, w, h, 0);
             g = i.getGraphics();
             UIManager.getInstance().getLookAndFeel().setFG(g, this);
             g.drawChar(c, 0, 0);
