@@ -376,7 +376,7 @@ public class AndroidGradleBuilder extends Executor {
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
                 : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
-                : path(System.getProperty("user.home"), "Android", "sdk"); // linux
+                : path(System.getProperty("user.home"), "Android", "Sdk"); // linux
 
         String androidHome = System.getenv("ANDROID_HOME");
         if (androidHome == null) {
