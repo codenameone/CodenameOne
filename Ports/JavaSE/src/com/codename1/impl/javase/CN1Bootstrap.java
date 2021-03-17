@@ -130,7 +130,7 @@ public class CN1Bootstrap {
             if (dir.exists()) {
                 
                 for (File jar : dir.listFiles()) {
-                    if (jar.getName().endsWith(".jar")) {
+                    if (jar.getName().endsWith(".jar") || jar.getName().endsWith(".zip")) {
                         if (!files.contains(jar)) {
                             files.add(jar);
                             System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());

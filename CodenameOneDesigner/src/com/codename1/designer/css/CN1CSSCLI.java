@@ -333,6 +333,7 @@ public class CN1CSSCLI {
                 
                 if (child.isDirectory()) {
                     destChild.mkdir();
+                    syncDirectories(child, destChild);
                 } else {
                     Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -422,6 +423,7 @@ public class CN1CSSCLI {
         //String relativePathToLibCSSDir = getRelativePath(libCSSDir, mergedFile);
         
         for (File f : inputFiles) {
+
             File canonicalFile = f.getCanonicalFile();
             String md5 = getMd5(canonicalFile.getAbsolutePath());
             File destDir = new File(incDir, md5);
@@ -699,6 +701,9 @@ public class CN1CSSCLI {
         }
         
         File[] inputFiles = getInputFiles(inputPath);
+        if (inputFiles.length == 0) {
+            throw new IllegalArgumentException("CSS Compiler requires at least one input file");
+        }
         if (mergeMode) {
             System.out.println("Updating merge file "+mergedFile);
             updateMergeFile(inputFiles, new File(mergedFile));
@@ -774,6 +779,7 @@ public class CN1CSSCLI {
             });
             
         }
+
         try {
             if (mergeMode) {
                 System.out.println("Compiling "+mergedFile+" to "+outputFile);

@@ -122,5 +122,24 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>cef-dependency</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-cef</artifactId>
+                    <version>84.4.1-M2</version>
+                    <type>pom</type>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>

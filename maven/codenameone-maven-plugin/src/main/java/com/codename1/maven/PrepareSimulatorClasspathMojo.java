@@ -47,6 +47,22 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
     }
 
     private String prepareClasspath() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            for (String el : project.getRuntimeClasspathElements()) {
+                if (sb.length() > 0) {
+                    sb.append(File.pathSeparator);
+                }
+                sb.append(el);
+            }
+        } catch (Exception ex) {
+            getLog().error("Failed to get runtime classpath elementes", ex);
+        }
+        return sb.toString();
+    }
+
+    private String prepareClasspathOld() {
+
         Log log = getLog();
         log.debug("Preparing classpath for Simulator");
         List<String> paths = new ArrayList<>();

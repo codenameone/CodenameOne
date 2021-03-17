@@ -853,13 +853,15 @@ public abstract class Executor {
         if (!force && disableDelete) {
             return;
         }
-        for (String current : f.list()) {
-            File ff = new File(f, current);
-            if (ff.isDirectory()) {
-                delTree(ff, force);
+        if (f != null && f.isDirectory()) {
+            for (String current : f.list()) {
+                File ff = new File(f, current);
+                if (ff.isDirectory()) {
+                    delTree(ff, force);
+                }
+                ff.setWritable(true);
+                ff.delete();
             }
-            ff.setWritable(true);
-            ff.delete();
         }
     }
 

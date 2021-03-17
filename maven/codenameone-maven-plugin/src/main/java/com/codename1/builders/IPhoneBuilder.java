@@ -279,7 +279,8 @@ public class IPhoneBuilder extends Executor {
         try {
             log("Pods version: " + execString(new File("."), pod, "--version"));
         } catch (Exception ex) {
-            throw new BuildException("Failed to find pods version.  Ensure that cocoapods is installed");
+            error("Please install Cocoapods in order to generate Xcode projects.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/", ex);
+            throw new BuildException("Please install Cocoapods in order to generate Xcode projects.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/");
         }
         log("Request Args: ");
         log("-----------------");

@@ -16,6 +16,7 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
+import org.apache.tools.ant.types.resources.Sort;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -420,6 +421,65 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             return true;
         }
     }
+    private String generateCertificate(String password, String alias, String fullName, String orgName, String company, String city, String state, String twoLetterCountryCode, boolean sha512) throws Exception {
+        File keyTool = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "keytool");
+        if (!keyTool.exists()) {
+            keyTool = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "keytool.exe");
+        }
+        File keyfileLocation = new File(System.getProperty("user.home") + File.separator + "Keychain.ks");
+        int counter = 1;
+        while (keyfileLocation.exists()) {
+            keyfileLocation = new File(System.getProperty("user.home") + File.separator + "Keychain_" + counter + ".ks");
+            counter++;
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(keyTool.getAbsolutePath(),
+                "-genkey", "-keystore", keyfileLocation.getAbsolutePath(), "-storetype", "jks", "-alias", alias,
+                "-keyalg", "RSA", "-keysize", "2048", "-validity", "15000", "-dname", "CN=" + fullName.replace(",", "\\,")
+                + ", OU=" + orgName.replace(",", "\\,")
+                + ", O=" + company.replace(",", "\\,")
+                + ", L=" + city.replace(",", "\\,")
+                + ", S=" + state.replace(",", "\\,")
+                + ", C=" + twoLetterCountryCode, "-storepass", password, "-keypass", password, "-v");
+
+        if(sha512) {
+            pb.command().add("-sigalg");
+            pb.command().add("SHA512withRSA");
+        }
+
+        Process p = pb.start();
+        int res = p.waitFor();
+        //error occured
+        if(res > 0){
+            StringBuilder msg = new StringBuilder();
+            final InputStream input = p.getInputStream();
+            final InputStream stream = p.getErrorStream();
+
+            byte[] buffer = new byte[8192];
+            int i = input.read(buffer);
+            while (i > -1) {
+                String str = new String(buffer, 0, i);
+                System.out.print(str);
+                msg.append(str);
+                i = stream.read(buffer);
+            }
+            i = stream.read(buffer);
+            while (i > -1) {
+                String str = new String(buffer, 0, i);
+                System.out.print(str);
+                msg.append(str);
+                i = stream.read(buffer);
+            }
+
+
+            return null;
+        }
+
+
+
+        return keyfileLocation.getAbsolutePath();
+    }
+
 
     private File getGeneratedAndroidProjectSourceDirectory() {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-android-source");
@@ -486,19 +546,63 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
         r.setType("android");
-        r.setKeystoreAlias(props.getProperty("codename1.android.keystoreAlias"));
+
+        r.setKeystoreAlias(props.getProperty("codenamekeystore1.android.keystoreAlias"));
         String keystorePath = props.getProperty("codename1.android.keystore");
         if (keystorePath != null) {
             File keystoreFile = new File(keystorePath);
             if (!keystoreFile.isAbsolute()) {
                 keystoreFile = new File(getCN1ProjectDir(), keystorePath);
             }
-            if (keystoreFile.exists()) {
+            if (keystoreFile.exists() && keystoreFile.isFile()) {
                 try {
                     r.setCertificate(keystoreFile.getAbsolutePath());
                 } catch (IOException ex) {
                     throw new MojoExecutionException("Failed to load keystore file. ", ex);
                 }
+            } else {
+
+                File androidCerts = new File(getCN1ProjectDir(), "androidCerts");
+                androidCerts.mkdirs();
+                keystoreFile = new File(androidCerts, "KeyChain.ks");
+                if (!keystoreFile.exists()) {
+                    try {
+                        String alias = r.getKeystoreAlias();
+                        if (alias == null || alias.isEmpty()) {
+                            alias = "androidKey";
+                            r.setKeystoreAlias(alias);
+                            props.setProperty("codename1.android.keystoreAlias", alias);
+                        }
+                        String password = props.getProperty("codename1.android.keystorePassword");
+                        if (password == null || password.isEmpty()) {
+                            password = "password";
+                            props.setProperty("codename1.android.keystorePassword", password);
+
+
+                        }
+                        getLog().info("No Keystore found.  Generating one now");
+                        String keyPath = generateCertificate(password, alias, r.getVendor(), "", r.getVendor(), "Vancouver", "BC", "CA", false);
+                        FileUtils.copyFile(new File(keyPath), keystoreFile);
+                        r.setCertificate(keystoreFile.getAbsolutePath());
+                        getLog().info("Generated keystore with password 'password' at "+keystoreFile+". alias=androidKey");
+                        new File(keyPath).delete();
+                        SortedProperties sp = new SortedProperties();
+                        try (FileInputStream fis = new FileInputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties"))) {
+                            sp.load(fis);
+                        }
+                        sp.setProperty("codename1.android.keystore", keystoreFile.getAbsolutePath());
+                        sp.setProperty("codename1.android.keystorePassword", password);
+                        sp.setProperty("codename1.android.keystoreAlias", alias);
+                        try (FileOutputStream fos = new FileOutputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties"))) {
+                            sp.store(fos, "Updated keystore");
+                        }
+                    } catch (Exception ex) {
+                        getLog().error("Failed to generate keystore", ex);
+                        throw new MojoExecutionException("Failed to generate keystore", ex);
+                    }
+                }
+
+
             }
         }
         r.setCertificatePassword(props.getProperty("codename1.android.keystorePassword"));
