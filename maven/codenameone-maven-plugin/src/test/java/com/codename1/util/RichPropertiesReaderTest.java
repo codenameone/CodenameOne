@@ -38,6 +38,7 @@ public class RichPropertiesReaderTest {
     public void testReadRichProperties() throws Exception {
         RichPropertiesReader reader = new RichPropertiesReader();
         {
+            String s = System.getProperty("line.separator");
             String dependencyString =  "<dependency>\n" +
                     "            <groupId>com.codenameone</groupId>\n" +
                     "            <artifactId>cn1-builder-resources-android</artifactId>\n" +
@@ -48,10 +49,12 @@ public class RichPropertiesReaderTest {
                     "            <artifactId>codenameone-android</artifactId>\n" +
                     "            <scope>runtime</scope>\n" +
                     "        </dependency>";
+
             String string = "foo=bar\nfizz=bazz\nback=ward\n"
                     + "[dependencies]\n====\n"
                     + dependencyString + "\n"
                     + "====\npass=word\nkey=val\n\n\nfool=barl";
+
             Properties props = new Properties();
             reader.load(toStream(string), props);
             assertEquals(7, props.size());

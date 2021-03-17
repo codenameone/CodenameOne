@@ -1,5 +1,6 @@
 package com.codename1.maven;
 
+import org.apache.commons.exec.ExecuteException;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.InvocationRequest;
@@ -46,7 +47,27 @@ public class ProjectTemplateTest {
     @AfterEach
     private void tearDown() throws Exception {
         if (project.exists()) {
-            FileUtils.deleteDirectory(project);
+            boolean success = false;
+            Exception lastException = null;
+            for (int i=0; i < 100; i++) {
+                try {
+                    FileUtils.deleteDirectory(project);
+                    success = true;
+                    break;
+                } catch (Exception ex) {
+                    lastException = ex;
+                    if (i == 0) {
+                        System.out.println("Failed to delete project directory " + project + " with error " + ex.getMessage());
+                        System.out.println("Sometimes this happens on Windows because Windows is a stickler about deleting files that are in use.");
+                    }
+                    System.out.println("Waiting 500ms and retrying...");
+                    Thread.sleep(500);
+                }
+            }
+            if (!success) {
+                throw lastException;
+            }
+
         }
     }
 
@@ -106,7 +127,10 @@ public class ProjectTemplateTest {
 
         File cn1SettingsFile = new File(project, "codenameone_settings.properties");
         Properties cn1Settings = new Properties();
-        cn1Settings.load(new FileInputStream(cn1SettingsFile));
+        try (FileInputStream fis = new FileInputStream(cn1SettingsFile)) {
+            cn1Settings.load(fis);
+        }
+
         assertEquals("com.example", cn1Settings.getProperty("codename1.packageName"));
         assertEquals("MyExample", cn1Settings.getProperty("codename1.mainName"));
 
@@ -131,7 +155,9 @@ public class ProjectTemplateTest {
 
         File cn1SettingsFile = new File(project, "codenameone_settings.properties");
         Properties cn1Settings = new Properties();
-        cn1Settings.load(new FileInputStream(cn1SettingsFile));
+        try (FileInputStream fis = new FileInputStream(cn1SettingsFile)) {
+            cn1Settings.load(fis);
+        }
         assertEquals("${packageName}", cn1Settings.getProperty("codename1.packageName"));
         assertEquals("${mainName}", cn1Settings.getProperty("codename1.mainName"));
 
