@@ -169,13 +169,29 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         // Build a jar with all dependencies that we will send to the build server.
         File jarWithDependencies = new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-jar-with-dependencies.jar"));
+        List<String> cpElements;
+        try {
+            //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
+            cpElements = project.getCompileClasspathElements();
+        } catch (Exception ex) {
+            throw new MojoExecutionException("Failed to get classpath elements", ex);
+
+        }
+        getLog().debug("Classpath Elements: "+cpElements);
         if (jarWithDependencies.exists()) {
             getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
             // Evidently pom.xml file has already built the jar file - we will use that one.  This allows
             // developers to override what is included in the jar file that is sent to the server.
-            for (Artifact artifact : project.getAttachedArtifacts()) {
-                File jar = artifact.getFile();
-                if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
+
+            for (String artifact : cpElements) {
+                File jar = new File(artifact);
+                if (jar.isDirectory()) {
+                    if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+                        getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                        jarWithDependencies.delete();
+                        break;
+                    }
+                } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
                     // One of the dependency jar files is newer... so we delete the dependencies jar file
                     // and will generate a new one.
                     getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
@@ -187,28 +203,37 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-            List<String> cpElements;
-            try {
-                //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
-                cpElements = project.getCompileClasspathElements();
-            } catch (Exception ex) {
-                throw new MojoExecutionException("Failed to get classpath elements", ex);
 
-            }
             List<String> blackListJars = new ArrayList<String>();
             for (Artifact artifact : project.getArtifacts()) {
+                boolean addToBlacklist = false;
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+                    addToBlacklist = true;
+                }
+                if (!"compile".equals(artifact.getScope())) {
+                    addToBlacklist = true;
+                }
+                if (addToBlacklist) {
                     File jar = getJar(artifact);
                     if (jar != null) {
                         blackListJars.add(jar.getAbsolutePath());
+                        blackListJars.add(jar.getPath());
+                        try {
+                            blackListJars.add(jar.getCanonicalPath());
+                        } catch (Exception ex){}
                     }
                 }
+
             }
+            getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
             for (String element : cpElements) {
 
+                String canonicalEl = element;
+                try {
+                    canonicalEl = new File(canonicalEl).getCanonicalPath();
+                } catch (Exception ex){}
 
-
-                if (blackListJars.contains(element)) {
+                if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
                     continue;
                 }
                 if (!new File(element).exists()) {
