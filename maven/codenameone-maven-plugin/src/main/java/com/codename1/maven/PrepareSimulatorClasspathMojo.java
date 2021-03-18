@@ -61,52 +61,6 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         return sb.toString();
     }
 
-    private String prepareClasspathOld() {
-
-        Log log = getLog();
-        log.debug("Preparing classpath for Simulator");
-        List<String> paths = new ArrayList<>();
-        //StringBuilder classpath = new StringBuilder();
-        List<String> classpath = new ArrayList<>();
-
-        copyKotlinIncrementalCompileOutputToOutputDir();
-        for (Artifact artifact : project.getArtifacts()) {
-
-            log.debug("Checking artifact "+artifact);
-            //if (!filterByScope(artifact)) {
-            //    continue;
-            //}
-            if ("provided".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
-                continue;
-            }
-            if (!filterByName(artifact)) {
-                continue;
-            }
-            File file = getJar(artifact);
-            //if (classpath.length() > 0) {
-            //    classpath.append(':');
-            //}
-            classpath.add(file.getAbsolutePath());
-
-            //classpath.append(file.getPath());
-            //paths.add(file.getAbsolutePath());
-        }
-        //if (classpath.length() > 0) {
-        //    classpath.append(':');
-        //}
-        //classpath.append(classFiles.getPath());
-        //paths.add(classFiles.getAbsolutePath());
-        classpath.add(project.getBuild().getOutputDirectory());
-        log.debug("Using the following classpath for Stubber: " + classpath);
-        StringBuilder sb = new StringBuilder();
-        for (String path : classpath) {
-            if (sb.length() > 0) {
-                sb.append(File.pathSeparator);
-            }
-            sb.append(path);
-        }
-        return sb.toString();
-    }
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -143,9 +97,7 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         if ("true".equals(project.getProperties().getProperty("cn1.class.path.required"))) {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
         }
-        
-        
-        
+
         
     }
     
