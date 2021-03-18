@@ -460,16 +460,9 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        String buildVer = request.getArg("build.version", "");
 
-        float buildVersion = -1;
-        if (buildVer.length() > 0) {
-            buildVersion = Float.parseFloat(buildVer);
-        }
 
-        if (buildVersion > 0 && buildVersion < 2) {
-            throw new BuildException("versioned builds older then 2.0 are not supported anymore, update your code to a newer version");
-        }
+
         useAndroidX = request.getArg("android.useAndroidX", "false").equals("true");
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
@@ -642,26 +635,7 @@ public class AndroidGradleBuilder extends Executor {
         String androidVersion = "android-14";
         String defaultVersion = maxPlatformVersion;
         String usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
-        if (buildVersion > 0) {
 
-            if (buildVersion <= 7) {
-                defaultVersion = "29";
-                usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
-            }
-            if(buildVersion <= 6) {
-                usesLibrary = "";
-                defaultVersion = "27";
-            }
-            if(buildVersion <= 4) {
-                usesLibrary = "";
-                defaultVersion = "23";
-            }
-            if(buildVersion <= 3.5) {
-                usesLibrary = "";
-                defaultVersion = "21";
-            }
-
-        }
         String targetNumber = request.getArg("android.targetSDKVersion", defaultVersion);
 
         if(!targetNumber.equals(defaultVersion)) {
@@ -1114,28 +1088,25 @@ public class AndroidGradleBuilder extends Executor {
 
 
         boolean legacyGplayServicesMode = false;
-        if(buildVersion == 3.3f ) {
-            legacyGplayServicesMode = true;
-            playFlag = "false";
-        } else {
-            if(playServicesValue != null) {
-                if(playServicesValue.equals("true")){
-                    // compatibility mode...
-                    legacyGplayServicesMode = true;
-                    if(playFlag.equals("false")) {
-                        // legacy gplay can't be mixed with explicit gplay fail the build right now!
-                        if (googleServicesJson.exists()) {
-                            debug("The android.playService.auth flag was automatically enabled because the project includes the google-services.json file");
-                        }
-                        error("Error: you can't use the build hint android.includeGPlayServices together with android.playService.* build hints. They are exclusive of one another. Please remove the old android.includeGPlayServices hint from your code or from the cn1lib that might have injected it", new RuntimeException());
-                        return false;
+
+        if(playServicesValue != null) {
+            if(playServicesValue.equals("true")){
+                // compatibility mode...
+                legacyGplayServicesMode = true;
+                if(playFlag.equals("false")) {
+                    // legacy gplay can't be mixed with explicit gplay fail the build right now!
+                    if (googleServicesJson.exists()) {
+                        debug("The android.playService.auth flag was automatically enabled because the project includes the google-services.json file");
                     }
-                    playFlag = "true";
-                } else {
-                    playFlag = "false";
+                    error("Error: you can't use the build hint android.includeGPlayServices together with android.playService.* build hints. They are exclusive of one another. Please remove the old android.includeGPlayServices hint from your code or from the cn1lib that might have injected it", new RuntimeException());
+                    return false;
                 }
+                playFlag = "true";
+            } else {
+                playFlag = "false";
             }
         }
+
 
         playServicesPlus = request.getArg("android.playService.plus", "false" ).equals("true");
         playServicesAuth = request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("true");
@@ -1367,46 +1338,26 @@ public class AndroidGradleBuilder extends Executor {
 
         final String zoozAppId = request.getArg("zooz.andappId", null);
         final String zoozSandBox = request.getArg("zooz.sandbox", null);
-        if (buildVersion > 0 && buildVersion <= 3.8) {
-            if (zoozAppId != null && zoozSandBox != null) {
+
+        if (zoozAppId != null && zoozSandBox != null) {
+            try {
                 integrateZooz = true;
-            } else {
-                try {
-                    File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
-                    DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
-                    byte[] data = new byte[(int) zoozCode.length()];
-                    dis.readFully(data);
-                    dis.close();
-                    FileWriter fios = new FileWriter(zoozCode);
-                    String str = new String(data);
-                    str = str.replaceAll("// ZOOZMARKER_START", "/*");
-                    str = str.replaceAll("// ZOOZMARKER_END", "*/");
-                    fios.write(str);
-                    fios.close();
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to inject ZOOZ code into the ZoozPurchase class", ex);
-                }
-            }
-        } else {
-            if (zoozAppId != null && zoozSandBox != null) {
-                try {
-                    integrateZooz = true;
-                    File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
-                    DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
-                    byte[] data = new byte[(int) zoozCode.length()];
-                    dis.readFully(data);
-                    dis.close();
-                    FileWriter fios = new FileWriter(zoozCode);
-                    String str = new String(data);
-                    str = str.replaceAll("/* ZOOZMARKER_START", "");
-                    str = str.replaceAll("ZOOZMARKER_END */", "");
-                    fios.write(str);
-                    fios.close();
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to inject ZOOZ ode into the ZoozPurchase class", ex);
-                }
+                File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
+                DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
+                byte[] data = new byte[(int) zoozCode.length()];
+                dis.readFully(data);
+                dis.close();
+                FileWriter fios = new FileWriter(zoozCode);
+                String str = new String(data);
+                str = str.replaceAll("/* ZOOZMARKER_START", "");
+                str = str.replaceAll("ZOOZMARKER_END */", "");
+                fios.write(str);
+                fios.close();
+            } catch (IOException ex) {
+                throw new BuildException("Failed to inject ZOOZ ode into the ZoozPurchase class", ex);
             }
         }
+
         if (request.getArg("android.textureView", "false").equals("true")) {
             File impl = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidImplementation.java");
             try {
@@ -2202,42 +2153,34 @@ public class AndroidGradleBuilder extends Executor {
 
 
         String localNotificationCode = "";
-        if (buildVersion < 0 || buildVersion > 3.1) {
-            localNotificationCode = ""
-                    + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
-                    + "            Intent intent = getIntent();\n"
-                    + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
-                    + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
-                    + "                intent.removeExtra(\"LocalNotificationID\");\n"
-                    + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
-                    + "            }\n"
-                    + "        }\n";
-        }
+
+        localNotificationCode = ""
+                + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
+                + "            Intent intent = getIntent();\n"
+                + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
+                + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
+                + "                intent.removeExtra(\"LocalNotificationID\");\n"
+                + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
+                + "            }\n"
+                + "        }\n";
+
 
         String reinitCode0 = "Display.init(this);\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
-            // We need to explicitly call initImpl() to setup the activity in case the 
-            // last used context is a service, since Display.init() won't actually do 
-            // a reinitialize in this case. 
-            // We don't want to actually call deinitialize here because this is too heavy-handed,
-            // (if the service is running, this will create a new implementation and edt thread
-            // which will cause problems for existing background procresses.  
-            // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
-            // but other things will be set up properly.
-            reinitCode0 = "AndroidImplementation.startContext(this);\n";
-        }
+
+        reinitCode0 = "AndroidImplementation.startContext(this);\n";
+
         String reinitCode = "Display.init(this);\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
-            // We need to explicitly call initImpl() to setup the activity in case the 
-            // last used context is a service, since Display.init() won't actually do 
-            // a reinitialize in this case. 
-            // We don't want to actually call deinitialize here because this is too heavy-handed,
-            // (if the service is running, this will create a new implementation and edt thread
-            // which will cause problems for existing background procresses.  
-            // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
-            // but other things will be set up properly.
-            reinitCode = "AndroidImplementation.startContext(this);\n";
-        }
+
+        // We need to explicitly call initImpl() to setup the activity in case the
+        // last used context is a service, since Display.init() won't actually do
+        // a reinitialize in this case.
+        // We don't want to actually call deinitialize here because this is too heavy-handed,
+        // (if the service is running, this will create a new implementation and edt thread
+        // which will cause problems for existing background procresses.
+        // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
+        // but other things will be set up properly.
+        reinitCode = "AndroidImplementation.startContext(this);\n";
+
         String waitingForPermissionsRequestOnStop = "        if (isWaitingForPermissionResult()) {\n" +
                         "            return;\n" +
                         "        }\n";
@@ -2254,7 +2197,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "        Display.getInstance().callSerially(new Runnable() { public void run() {i.stop();} });\n"
                 + "        running = false;\n"
                 + "    }\n\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
 
             // Added a bit of blocking to onStop() to prevent onDestroy() from being
             // run before stop() is completed.  This probably only shows up if the 
@@ -2262,9 +2205,9 @@ public class AndroidGradleBuilder extends Executor {
             // to developer options... but it is still better to finish onStop()
             // before onDestroy() is run.
             onStopCode = "protected void onStop() {\n";
-            if (buildVersion < 0 || buildVersion >= 5) {
+
                 onStopCode += "        com.codename1.impl.android.AndroidImplementation.writeServiceProperties(this);\n";
-            }
+
             onStopCode +=
                     "        super.onStop();\n" +
                             "        if(isWaitingForResult()){\n" +
@@ -2296,24 +2239,24 @@ public class AndroidGradleBuilder extends Executor {
                             "        }\n" +
                             "        running = false;\n" +
                             "    }\n\n";
-        }
+
 
         String onDestroyCode = "    protected void onDestroy() {\n"
-                + createOnDestroyCode(request, buildVersion)
+                + createOnDestroyCode(request)
                 + "        super.onDestroy();\n"
                 + "        Display.getInstance().callSerially(new Runnable() { public void run() {i.destroy(); Display.deinitialize();} });\n"
                 + "        running = false;\n"
                 + "    }\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
             onDestroyCode = "protected void onDestroy() {\n" +
-                    createOnDestroyCode(request, buildVersion) +
+                    createOnDestroyCode(request) +
                     "        super.onDestroy();\n" +
                     "\n" +
                     "        Display.getInstance().callSerially(new Runnable() { public void run() {i.destroy();} });\n" +
                     "        AndroidImplementation.stopContext(this);\n" +
                     "        running = false;\n" +
                     "    }";
-        }
+
 
         File stubFileSourceFile = new File(stubFileSourceDir, request.getMainClass() + "Stub.java");
         String consumableCode;
@@ -2325,9 +2268,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "}\n";
 
         String firstTimeStatic = "";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
             firstTimeStatic = " static";
-        }
+
 
         String notificationChannelId = request.getArg("android.NotificationChannel.id", "cn1-channel");
         String notificationChannelName = request.getArg("android.NotificationChannel.name", "Notifications");
@@ -2418,7 +2361,7 @@ public class AndroidGradleBuilder extends Executor {
                     + streamMode
                     + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), srcDir, dummyClassesDir)
                     + oncreate + "\n"
-                    + createOnCreateCode(request, buildVersion)
+                    + createOnCreateCode(request)
                     + "    }\n"
                     + "    protected void onResume() {\n"
                     + "        running = true;\n"
@@ -3232,10 +3175,10 @@ public class AndroidGradleBuilder extends Executor {
 
         String compileSdkVersion = "'android-21'";
         String quotedBuildToolsVersion = "'23.0.1'";
-        if (buildVersion < 0 || buildVersion > 3.4) {
+
             compileSdkVersion = "'android-" + request.getArg("android.sdkVersion", "23") + "'";
             quotedBuildToolsVersion = "'" +buildToolsVersion + "'";
-        }
+
 
 
 
@@ -3542,7 +3485,7 @@ public class AndroidGradleBuilder extends Executor {
         return "(android.view.View)" + param + ".getNativePeer()";
     }
 
-    private String createOnDestroyCode(BuildRequest request, float version) {
+    private String createOnDestroyCode(BuildRequest request) {
         String retVal = "";
         if (integrateMoPub) {
             retVal += "moPubView.destroy();\n";
@@ -3551,9 +3494,9 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "    com.codename1.impl.android.AndroidNativeUtil.removeLifecycleListener(com.codename1.location.AndroidLocationPlayServiceManager.getInstance());\n";
         }
         if(shouldIncludeGoogleImpl){
-            if (version < 0 || version > 3) {
+
                 retVal += "    com.codename1.impl.android.AndroidNativeUtil.removeLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
-            }
+
         }
         return retVal;
     }
@@ -3563,7 +3506,7 @@ public class AndroidGradleBuilder extends Executor {
         return retVal;
     }
 
-    private String createOnCreateCode(BuildRequest request, float version) {
+    private String createOnCreateCode(BuildRequest request) {
         String retVal = "";
 
         if (request.getArg("android.includeGPlayServices", "true").equals("true") || playServicesLocation) {
@@ -3573,10 +3516,10 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener(com.codename1.location.AndroidLocationPlayServiceManager.getInstance());\n";
         }
         if(shouldIncludeGoogleImpl){
-            if (version < 0 || version > 3) {
+
                 retVal += "com.codename1.social.GoogleImpl.init();\n";
                 retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
-            }
+            
         }
 
         if (request.getArg("android.web_loading_hidden", "false").equalsIgnoreCase("true")) {

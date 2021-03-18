@@ -1,11 +1,8 @@
 #!/bin/bash
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
-cd $SCRIPTPATH
-if [ ! -d build ]; then
-  mkdir build
-fi
-cd build
+source $SCRIPTPATH/inc/env.sh
+cd $SCRIPTPATH/build
 if [ -d myapp2 ]; then
   rm -rf myapp2
 fi

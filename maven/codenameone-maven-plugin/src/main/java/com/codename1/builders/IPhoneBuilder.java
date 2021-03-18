@@ -48,6 +48,7 @@ import java.util.regex.Pattern;
 /**
  *
  * @author Shai Almog
+ * @author Steve Hannah
  */
 public class IPhoneBuilder extends Executor {
     private boolean useMetal;
@@ -70,7 +71,7 @@ public class IPhoneBuilder extends Executor {
     private String provisioningProfileName, developmentTeam;
 
     private File dsym;
-    //public static boolean maveriks;
+
     private boolean runPods=false;
     private String certificateName;
     private boolean photoLibraryUsage;
@@ -87,7 +88,6 @@ public class IPhoneBuilder extends Executor {
     final static String osVersion;
     static {
         osVersion = System.getProperty("os.version");
-        //maveriks = !ver.startsWith("10.8");
         StringTokenizer versionTok = new StringTokenizer(osVersion, ".");
         majorOSVersion = Integer.parseInt(versionTok.nextToken());
         minorOSVersion = Integer.parseInt(versionTok.nextToken());
