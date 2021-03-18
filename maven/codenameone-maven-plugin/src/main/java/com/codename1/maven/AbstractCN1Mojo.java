@@ -828,7 +828,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     protected File getCefDir() {
         String path = System.getProperty("cef.dir", null);
-        if (path == null) return null;
+
+        if (path == null || path.isEmpty()) return null;
         return new File(path);
     }
 

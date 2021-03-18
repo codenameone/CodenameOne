@@ -74,8 +74,12 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         project.getModel().addProperty("codename1.mainClass", properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
         // Setup CEF directory
         if (!isCefSetup()) {
+            getLog().debug("CEF Not set up yet.  Setting it up now");
             setupCef();
+        } else {
+            getLog().debug("CEF is already set up. cef.dir="+System.getProperty("cef.dir"));
         }
+        project.getProperties().setProperty("cef.dir", System.getProperty("cef.dir"));
         
         File designerJar = getDesignerJar();
         
