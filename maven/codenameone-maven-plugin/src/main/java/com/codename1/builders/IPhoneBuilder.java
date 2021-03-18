@@ -375,7 +375,6 @@ public class IPhoneBuilder extends Executor {
         boolean usePodsForFacebook = !request.getArg("ios.facebook.usePods", "true").equals("false") && facebookAppId != null && facebookAppId.length() > 0;
         if (usePodsForFacebook) {
             String fbPodsVersion = request.getArg("ios.facebook.version", "~>5.6.0");
-            //iosPodsMinPlatformVersion = 10;
             addMinDeploymentTarget("10.0");
             iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
         }
@@ -387,15 +386,12 @@ public class IPhoneBuilder extends Executor {
         boolean usePodsForGoogleAds = runPods && googleAdUnitId != null && googleAdUnitId.length() > 0;
         if (usePodsForGoogleAds) {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Core,Firebase/AdMob");
-            //iosPodsMinPlatformVersion = Math.max(iosPodsMinPlatformVersion, 7);
             addMinDeploymentTarget("7.0");
         }
         if (enableGalleryMultiselect && photoLibraryUsage) {
-            //iosPodsMinPlatformVersion = Math.max(iosPodsMinPlatformVersion, 8);
             addMinDeploymentTarget("8.0");
         }
         if (enableWKWebView) {
-            //iosPodsMinPlatformVersion = Math.max(iosPodsMinPlatformVersion, 8);
             addMinDeploymentTarget("8.0");
         }
         
@@ -420,9 +416,6 @@ public class IPhoneBuilder extends Executor {
         resDir.mkdirs();
         File buildinRes = new File(tmpFile, "btres");
         buildinRes.mkdirs();
-        //File seVersionDir = new File(tmpFile, "seVer");
-        //seVersionDir.mkdirs();
-
         pushCertificate = new File(tmpFile, "PushCertificate.p12");
 
         // fill classes dir from JAR and proper ports
@@ -885,24 +878,7 @@ public class IPhoneBuilder extends Executor {
             }
         }
         
-        String zoozAppId = request.getArg("zooz.iosappId", null);
-        String zoozSandBox = request.getArg("zooz.sandbox", null);
-        String integrateZooz = "";
 
-        if(zoozAppId != null) {
-            try {
-                unzip(getResourceAsStream("/zoozIosSources.jar"), classesDir, buildinRes, buildinRes);
-                integrateZooz = "        Display.getInstance().setProperty(\"ZoozAppKey\", \"" + zoozAppId + "\");\n";
-                if (zoozSandBox != null) {
-                    integrateZooz += "        Display.getInstance().setProperty(\"ZoozSandBox\", \"" + zoozSandBox + "\");\n";
-                }
-                File CodenameOne_GLViewController = new File(buildinRes, "CodenameOne_GLViewController.h");
-                replaceInFile(CodenameOne_GLViewController, "//#define INCLUDE_ZOOZ", "#define INCLUDE_ZOOZ");
-            } catch (IOException ex) {
-                throw new BuildException("Failed to add Zooz support", ex);
-
-            }
-        }
 
         try {
             if (request.getArg("ios.lowMemCamera", "false").equals("true")) {
@@ -955,7 +931,6 @@ public class IPhoneBuilder extends Executor {
                 + "        Display.getInstance().callSerially(new Runnable() { \n"
                 + "            public void run(){ \n"
                 + "                i.stop();\n"
-                //+ "                stopped = true;\n"
                 + "                com.codename1.impl.ios.IOSImplementation.endBackgroundTask(bgTask);"
                 + "            }\n"
                 + "        });\n";
@@ -980,23 +955,16 @@ public class IPhoneBuilder extends Executor {
 
                 stubSourceCode += decodeFunction();
                 stubSourceCode += "    public void run() {\n"
-                    //+ "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
-                    //+ "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"
                     + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                     + newStorage
-                    //+ corporateServer
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
-                    + integrateZooz
-                    //+ integrateBackgroundLocationListener
+
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
-                    //+ "            i = new " + request.getMainClass() + "();\n"
-                    //+ "            com.codename1.impl.ios.IOSImplementation.setMainClass(i);\n"
-                    //+ "            com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
                     + "            i.init(this);\n"
                     + createStartInvocation(request, "i")
                     + "        } else {\n"
@@ -1369,7 +1337,6 @@ public class IPhoneBuilder extends Executor {
             }
 
             if (request.getArg("ios.background_modes", "").contains("location")) {
-                //#define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
                 replaceInFile(CodenameOne_GLViewController_h, "#define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization", "#define CN1_REQUEST_LOCATION_AUTH requestAlwaysAuthorization");
 
@@ -1460,13 +1427,6 @@ public class IPhoneBuilder extends Executor {
                         addLibs = addLibs + ";AdSupport.framework;SystemConfiguration.framework;StoreKit.framework;CoreTelephony.framework";
                     }
                 }
-                if (zoozAppId != null) {
-                    if (addLibs == null || addLibs.length() == 0) {
-                        addLibs = "libZooZSDK.a";
-                    } else {
-                        addLibs = addLibs + ";libZooZSDK.a";
-                    }
-                }
 
                 if ((includePush || usesLocalNotifications) && xcodeVersion >= 9) {
                     if (addLibs == null) {
@@ -1535,23 +1495,18 @@ public class IPhoneBuilder extends Executor {
             if(request.getArg("ios.superfastBuild", "false").equals("true")) {
                 env.put("concatenateFiles", "true");
             }
-            // bytecode translator timeout = 6 minutes
-            // fieldNullChecks flag will include null checks on all direct property/field accesses.
-            //  Default to false
+
             String fieldNullChecks = Boolean.valueOf(request.getArg("ios.fieldNullChecks", "false")) ? "true":"false";
 
             // includeNullChecks enables null checks on everything else (methods, arrays, etc..)
             String includeNullChecks = Boolean.valueOf(request.getArg("ios.includeNullChecks", "true")) ? "true":"false";
             String bundleVersionNumber = request.getArg("ios.bundleVersion", buildVersion);
 
-            //int iosDeploymentTargetMajorVersionInt = getMajorVersionInt(request.getArg("ios.deployment_target", "6.0"), 6);
-            
+
             if (enableGalleryMultiselect && photoLibraryUsage) {
-                //iosDeploymentTargetMajorVersionInt = 8;
                 addMinDeploymentTarget("8.0");
             }
             if (enableWKWebView) {
-                //iosDeploymentTargetMajorVersionInt = 8;
                 addMinDeploymentTarget("8.0");
             }
 
@@ -1657,11 +1612,10 @@ public class IPhoneBuilder extends Executor {
                             continue;
                         }
                         File distDir = new File(tmpFile, "dist");
-                        //if (podSpec.getName().endsWith(".podspec")) {
                         File targetF = new File(distDir, podSpec.getName());
                         Files.move(podSpec.toPath(), targetF.toPath(), StandardCopyOption.REPLACE_EXISTING);
                         podSpecFileList.add(targetF);
-                        //}
+
                     }
 
                     // Generate the NotificationServiceExtension
@@ -1941,10 +1895,6 @@ public class IPhoneBuilder extends Executor {
                             + "end\n";
 
 
-                    // We need to add schems i
-
-                    // NOTE:  Build server must have xcodeproj gem installed
-                    // sudo gem install xcodeproj
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
                             "main_class_name = \"" + request.getMainClass() + "\"\n" +
@@ -1961,7 +1911,6 @@ public class IPhoneBuilder extends Executor {
                             + "end\n"
                             + deploymentTargetStr
                             + notificationServiceExtensionStr;
-                    //  "xcproj.save";
                     File hooksDir = new File(tmpFile, "hooks");
                     hooksDir.mkdir();
                     File fixSchemesFile = new File(hooksDir, "fix_xcode_schemes.rb");
@@ -1978,8 +1927,6 @@ public class IPhoneBuilder extends Executor {
                         log("Failed to run "+pod+" init.  Make sure you have Cocoapods installed.");
                         return false;
                     }
-                    //System.out.println("Stopping here: "+tmpDir.getAbsolutePath()+"/dist/");
-                    //System.exit(1);
                     File podFile = new File(new File(tmpFile, "dist"), "Podfile");
                     if (!podFile.exists()) {
                         log("Failed to create the PodFile at " + podFile);
@@ -2138,10 +2085,7 @@ public class IPhoneBuilder extends Executor {
             
             String buildSubdir = runPods ? "/dist/build/Build/Products/" : "/dist/build/";
 
-            
-            // effectively commented out this mode as it doesn't work at the moment
-            //if(xcode7) {
-            // This all assumes that runPods was true so that the workspace has been generated
+
             String projectFlag = "-workspace" ;
             String projectFlagValue = request.getMainClass() + ".xcworkspace";
             String targetFlag = "-scheme";
@@ -2196,8 +2140,8 @@ public class IPhoneBuilder extends Executor {
             String releaseString,
             String certificateName,
             String iosSDK) throws Exception {
-        log("Starting xcode7BuildMode");
-        System.out.println("Starting xcode7BuildMode");
+        debug("Starting xcode7BuildMode");
+        debug("Starting xcode7BuildMode");
         if(projectFlagValue.endsWith("/")) {
             projectFlagValue = projectFlagValue.substring(0, projectFlagValue.length() - 1);
         }
@@ -2247,7 +2191,6 @@ public class IPhoneBuilder extends Executor {
             if (xcodeVersion >= 9) {
                 String icloudContainerType = request.getArg("ios.buildType", "debug").equals("debug") ? 
                         "Development" : "Production";
-                //iCloudKeys += "\n        <key>com.apple.developer.icloud-container-environment</key>\n" +
                 iCloudKeys += "\n        <key>iCloudContainerEnvironment</key>\n" +
                         "        <string>"+icloudContainerType+"</string>\n";
                         
@@ -2261,7 +2204,6 @@ public class IPhoneBuilder extends Executor {
                 provisioningProfilesDict +
                 teamId +
                 iCloudKeys +
-                //"<key>teamID</key><string>" + teamId + "</string>" +
                 "        <key>compileBitcode</key>\n" +
                 "        <" + request.getArg("ios.bitcode", "false") + "/>\n" +
                 "        <key>uploadBitcode</key>\n" +
@@ -2274,7 +2216,7 @@ public class IPhoneBuilder extends Executor {
                 "</plist>";
         File ep = createTempFile("export", ".plist");
         System.out.println("Export Options: "+exportOptionsPlist);
-        log("Export Options: "+exportOptionsPlist);
+        debug("Export Options: "+exportOptionsPlist);
         createFile(ep, exportOptionsPlist.getBytes("UTF-8"));
         
         
@@ -2296,13 +2238,11 @@ public class IPhoneBuilder extends Executor {
         
         if (buildForSimulator) {
             
-            // killall -9 com.apple.CoreSimulator.CoreSimulatorService
-            
             Process killProc = new ProcessBuilder("launchctl", "remove", "com.apple.CoreSimulator.CoreSimulatorService").inheritIO().start();
             int killCode = killProc.waitFor();
             killProc = new ProcessBuilder("killall", "-9", "com.apple.CoreSimulator.CoreSimulatorService").inheritIO().start();
             killCode = killProc.waitFor();
-            System.out.println("Kill code was "+killCode);
+            debug("Kill code was "+killCode);
             File xcrun = new File(getXcodeAppDir(xcodebuild), "Contents/Developer/usr/bin/xcrun");
             
             Process bootProc = new ProcessBuilder(xcrun.getAbsolutePath(), "simctl", "boot", "119955A8-55F5-4CC7-9FB7-5971F307CF38").inheritIO().start();
@@ -2670,17 +2610,7 @@ public class IPhoneBuilder extends Executor {
                 
             }
         }
-        
-        
-        
-        // Not enabling NSLocationAlwaysUsageDescription yet... Needs to be accompanied
-        // by appropriate authorization call.
-        // See http://nevan.net/2014/09/core-location-manager-changes-in-ios-8/
-        // for new iOS requirements on location in 8.1
-        //if(inject.indexOf("NSLocationAlwaysUsageDescription") < 0) {
-        //    inject += "\n<key>NSLocationAlwaysUsageDescription</key> 	<string>Location is required to find out where you are</string>";
-        //}
-        
+
         BufferedReader infoReader = new BufferedReader(new FileReader(infoPlist));
         StringBuilder b = new StringBuilder();
         String line = infoReader.readLine();
@@ -2719,9 +2649,6 @@ public class IPhoneBuilder extends Executor {
                         b.append(facebook);
                         b.append("</string>");
                     }
-                    ///if (google != null) {
-                    //    b.append("<string>")
-                    //}
                     b.append(request.getArg("ios.urlSchemes", request.getArg("ios.urlScheme", "")));
                     b.append("</array>\n");
                     b.append("</dict>");
@@ -3142,7 +3069,6 @@ public class IPhoneBuilder extends Executor {
     private boolean generateLaunchScreen(BuildRequest request) throws Exception {
         File buildinRes = getBuildinRes();
         File resDir = getResDir();
-        //File screenshotDirectory = getScreenshotDir(request);
         File iconDirectory = getIconDirectory(request);
         
         

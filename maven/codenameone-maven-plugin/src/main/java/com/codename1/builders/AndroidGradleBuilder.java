@@ -622,10 +622,8 @@ public class AndroidGradleBuilder extends Executor {
         File androidToolsDir = new File(androidSDKDir, "tools");
         File androidCommand = new File(androidToolsDir, "android" + bat);
         File projectDir = new File(tmpFile, request.getMainClass());
-        //projectDir.mkdirs();
         gradleProjectDirectory = projectDir;
 
-        //String androidVersion = "android-21";
         String androidVersion = "android-14";
         String defaultVersion = maxPlatformVersion;
         String usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
@@ -1119,7 +1117,6 @@ public class AndroidGradleBuilder extends Executor {
 
         if (googleAdUnitId == null && playServicesAds) {
             minSDK = maxInt("9", minSDK);
-            //targetSDKVersion = "      android:targetSdkVersion=\"14\" ";
             googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
         }
         if (playServicesLocation) {
@@ -1157,16 +1154,6 @@ public class AndroidGradleBuilder extends Executor {
                     + "}\n\n";
         }
 
-//        if (dep.exists() && dep.listFiles().length > 0) {
-//            Properties p = new Properties();
-//            p.load(new FileInputStream(new File(projectDir, "project.properties")));
-//            File[] deps = dep.listFiles();
-//            for (int i = 0; i < deps.length; i++) {
-//                File lib = deps[i];
-//                p.put("android.library.reference." + (i + 1), "/dependency/" + lib.getName() + "/");
-//            }
-//            p.store(new FileOutputStream(new File(projectDir, "project.properties")), "");
-//        }
         File stubFileSourceDir = new File(srcDir, request.getPackageName().replace('.', File.separatorChar));
         stubFileSourceDir.mkdirs();
 
@@ -2396,10 +2383,6 @@ public class AndroidGradleBuilder extends Executor {
         }
         boolean backgroundPushHandling = "true".equals(request.getArg("android.background_push_handling", "false"));
         if (!useFCM) {
-            //File fcmMessagingServiceFile = new File(androidImplDir, "CN1FirebaseMessagingService.java");
-            //fcmMessagingServiceFile.delete();
-
-
             File pushServiceFileSourceFile = new File(stubFileSourceDir, "PushNotificationService.java");
 
             String pushServiceOnCreate = "";
