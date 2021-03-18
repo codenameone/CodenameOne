@@ -914,21 +914,7 @@ public class AndroidGradleBuilder extends Executor {
                             playFlag = "false";
                         }
                     }
-                
-                /*if (cls.indexOf("com/codename1/components/ShareButton") > -1) {
-                    //contactsReadPermission = true;
-                    phonePermission = true;
-                }*/
-                /*
-                // Disabling this as I can't see any reason why the media package 
-                // requires phone permission.
-                // REF: https://github.com/codenameone/CodenameOne/issues/1945
-                
-                if (cls.indexOf("com/codename1/media") > -1) {
-                    //contactsReadPermission = true;
-                    phonePermission = true;
-                }
-                */
+
                     if (cls.indexOf("com/codename1/social") > -1) {
                         credentialsPermission = true;
                         getAccountsPermission = true;
@@ -2040,9 +2026,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "                <action android:name=\"com.google.android.c2dm.intent.REGISTRATION\" />\n"
                 + "                <category android:name=\"" + request.getPackageName() + "\" />\n"
                 + "            </intent-filter>\n"
-                /*+ "            <intent-filter>\n"
-                + "                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />\n"
-                + "            </intent-filter>\n"*/
+
                 + "        </receiver>\n";
         if (!pushPermission) {
             pushManifestEntries = "";
@@ -3519,7 +3503,7 @@ public class AndroidGradleBuilder extends Executor {
 
                 retVal += "com.codename1.social.GoogleImpl.init();\n";
                 retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
-            
+
         }
 
         if (request.getArg("android.web_loading_hidden", "false").equalsIgnoreCase("true")) {
