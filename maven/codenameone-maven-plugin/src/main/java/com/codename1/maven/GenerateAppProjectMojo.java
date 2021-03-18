@@ -3,6 +3,8 @@ package com.codename1.maven;
 import com.codename1.util.RichPropertiesReader;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.MavenExecutionException;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -43,7 +45,32 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Parameter(property="version", defaultValue = "1.0-SNAPSHOT")
     private String version;
 
+
+    private Properties loadSourceProjectProperties() throws IOException {
+        Properties props = new Properties();
+        if (sourceProject.isDirectory()) {
+            File propsFile = new File(sourceProject, "codenameone_settings.properties");
+            if (propsFile.exists()) {
+                try (FileInputStream fis = new FileInputStream(propsFile)) {
+                    props.load(fis);
+                }
+            }
+
+        }
+        return props;
+    }
+
     private void generateProject() throws MojoExecutionException{
+
+
+        String archetypeVersion = "LATEST";
+        try {
+            MavenXpp3Reader reader = new MavenXpp3Reader();
+            Model model = reader.read(getClass().getResourceAsStream("/META-INF/maven/com.codenameone/codenameone-maven-plugin/pom.xml"));
+            archetypeVersion = model.getVersion();
+        } catch (Exception ex) {
+            getLog().warn("Attempted to read archetype version from embedded pom.xml file but failed", ex);
+        }
         InvocationRequest request = new DefaultInvocationRequest();
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
 
@@ -52,11 +79,12 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 "interactiveMode=false",
             "archetypeArtifactId=cn1app-archetype",
             "archetypeGroupId=com.codenameone",
-            "archetypeVersion=LATEST",
+            "archetypeVersion="+archetypeVersion,
             "artifactId="+artifactId,
                 "groupId="+groupId,
                 "version="+version,
-                "mainName=MyApp"
+                "mainName="+mainName(),
+                "package="+packageName()
         };
         Properties props = new Properties();
         for (String prop : propsArr) {
@@ -167,7 +195,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("ios"));
@@ -180,7 +208,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(resDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("ios"));
@@ -201,7 +229,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("android"));
@@ -214,7 +242,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(resDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("android"));
@@ -235,7 +263,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javascript"));
@@ -248,7 +276,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(resDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javascript"));
@@ -268,7 +296,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
@@ -281,7 +309,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(resDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
@@ -310,7 +338,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceCSSDir());
@@ -335,7 +363,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(srcDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javase"));
@@ -348,7 +376,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             {
                 Copy copy = (Copy) antProject().createTask("copy");
                 copy.setTodir(resDir);
-
+                copy.setOverwrite(true);
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javase"));
@@ -377,7 +405,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         {
             Copy copy = (Copy) antProject().createTask("copy");
             copy.setTodir(targetSrcDir("java"));
-
+            copy.setOverwrite(true);
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
@@ -390,7 +418,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         {
             Copy copy = (Copy) antProject().createTask("copy");
             copy.setTodir(targetSrcDir("resources"));
-
+            copy.setOverwrite(true);
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
@@ -405,7 +433,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             targetSrcDir("kotlin").mkdirs();
             Copy copy = (Copy) antProject().createTask("copy");
             copy.setTodir(targetSrcDir("kotlin"));
-
+            copy.setOverwrite(true);
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
@@ -418,7 +446,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             targetSrcDir("mirah").mkdirs();
             Copy copy = (Copy) antProject().createTask("copy");
             copy.setTodir(targetSrcDir("mirah"));
-
+            copy.setOverwrite(true);
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
@@ -447,35 +475,11 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         if (System.getProperty("packageName") != null) {
             return System.getProperty("packageName");
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append(groupId).append(".");
-        int len = artifactId.length();
-        boolean firstChar = true;
-        boolean capNext = false;
-        for (int i=0; i<len; i++) {
-            char ch = artifactId.charAt(i);
-            if (firstChar) {
-                if (Character.isLetter(ch)) {
-                    sb.append(Character.toLowerCase(ch));
-                    firstChar = false;
-                }
-                continue;
-            }
-            if (Character.isLetterOrDigit(ch)) {
-                if (capNext) {
-                    sb.append(Character.toUpperCase(ch));
-                    capNext = false;
-                } else {
-                    sb.append(ch);
-                }
-            } else {
-                capNext = true;
-            }
+        if (System.getProperty("package") != null) {
+            return System.getProperty("package");
         }
+        return groupId;
 
-
-
-        return sb.toString();
     }
 
     private String mainName() {
@@ -516,15 +520,33 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
-            generateProject();
+
             Properties props;
             try {
                 props = generateAppProjectProperties();
             } catch (Exception ex) {
                 throw new MojoExecutionException("Failed to load "+generateAppProjectConfigFile(), ex);
             }
-
             String templateType = props.getProperty("template.type");
+
+            if (templateType == null) {
+                // templateType == null is a proxy to test whether this is just a request to migrate
+                // an existing ANT project.  If it is, then we will want to retain the main name and
+                // package name of the original project.
+                // We set the system properties here so that the call to generateProject() after this
+                // will use the correct coordinates.
+                Properties sourceAntProjectCn1Properties = loadSourceProjectProperties();
+                if (sourceAntProjectCn1Properties.getProperty("codename1.mainName") != null) {
+                    System.setProperty("mainName", sourceAntProjectCn1Properties.getProperty("codename1.mainName"));
+                }
+                if (sourceAntProjectCn1Properties.getProperty("codename1.packageName") != null) {
+                    System.setProperty("packageName", sourceAntProjectCn1Properties.getProperty("codename1.packageName"));
+                }
+            }
+
+            generateProject();
+
+
 
             if (templateType != null) {
                 // This is a project template

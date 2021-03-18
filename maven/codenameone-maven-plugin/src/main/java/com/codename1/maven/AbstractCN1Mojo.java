@@ -16,10 +16,10 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.util.*;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
@@ -831,9 +831,50 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (path == null) return false;
         return new File(path).exists();
     }
-     
+
+    private void fixCefPermissions(File cefDir) {
+        Set<String> patterns = new HashSet<String>();
+        patterns.add("*.dylib");
+        patterns.add("*.framework");
+        patterns.add("jcef Helper*");
+        patterns.add("Chromium Embedded Framework");
+        setExecutableRecursive(cefDir, patterns);
+    }
+
+
+    private boolean match(File file, Collection<String> patterns) {
+        for (String pattern : patterns) {
+            if (pattern.contains("*")) {
+                PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:"+pattern);
+                if (matcher.matches(file.toPath().getFileName())) {
+                    return true;
+                }
+            } else {
+                if (pattern.equals(file.getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void setExecutableRecursive(File root, Collection<String> patterns) {
+        if (match(root, patterns)) {
+            if (root.exists()) {
+                root.setExecutable(true, false);
+            }
+        }
+        if (root.isDirectory()) {
+            for (File child : root.listFiles()) {
+                setExecutableRecursive(child, patterns);
+            }
+        }
+
+    }
+
     protected void setupCef() {
         if (isCefSetup()) {
+
             return;
         }
         String platform = getCefPlatform();
@@ -856,9 +897,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             expand.setSrc(cefZip);
             expand.execute();
         }
-        
+        if (new File(extractedDir, "cef").exists()) {
+            extractedDir = new File(extractedDir, "cef");
+        }
         project.getProperties().setProperty("cef.dir", extractedDir.getAbsolutePath());
         System.setProperty("cef.dir", extractedDir.getAbsolutePath());
+        fixCefPermissions(extractedDir);
         
     }
 

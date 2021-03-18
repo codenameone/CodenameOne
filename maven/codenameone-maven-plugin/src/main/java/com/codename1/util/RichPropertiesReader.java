@@ -68,7 +68,7 @@ public class RichPropertiesReader {
             }
 
             if (sectionName != null) {
-                sb.append(line).append(System.lineSeparator());
+                sb.append(line).append("\n");
                 continue;
             }
 
@@ -103,7 +103,7 @@ public class RichPropertiesReader {
                         }
                     } else {
                         separator = "";
-                        sb.append(nextLine).append(System.lineSeparator());
+                        sb.append(nextLine).append("\n");
                     }
                 }
             }
