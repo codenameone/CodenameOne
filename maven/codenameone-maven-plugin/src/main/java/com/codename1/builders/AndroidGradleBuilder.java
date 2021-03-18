@@ -806,7 +806,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "-dontnote android.support.**\n"
                     + "-dontnote androidx.**";
 
-            //facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"" + request.getArg("facebook.appId", "706695982682332") + "\"/>\n";
+
             facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"@string/facebook_app_id\"/>\n";
             facebookActivity = " <activity android:name=\"com.facebook.FacebookActivity\"/>\n";
             additionalKeyVals += "<string name=\"facebook_app_id\">" + request.getArg("facebook.appId", "706695982682332") + "</string>";
@@ -2892,7 +2892,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "    public "+xclass("android.support.v4.app.NotificationCompat")+"$Builder setChannelId(java.lang.String);\n"
                 + "}\n\n"
                 + facebookProguard
-                //+ goodProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 + googlePlayObfuscation
                 + "-keep class com.google.mygson.**{\n"
