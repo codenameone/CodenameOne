@@ -267,7 +267,6 @@ public class AndroidGradleBuilder extends Executor {
     private boolean launcherPermissions;
 
     private boolean integrateMoPub = false;
-    private boolean integrateZooz = false;
 
     private static final boolean isMac;
 
@@ -1322,27 +1321,7 @@ public class AndroidGradleBuilder extends Executor {
             integrateMoPub = true;
         }
 
-        final String zoozAppId = request.getArg("zooz.andappId", null);
-        final String zoozSandBox = request.getArg("zooz.sandbox", null);
 
-        if (zoozAppId != null && zoozSandBox != null) {
-            try {
-                integrateZooz = true;
-                File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
-                DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
-                byte[] data = new byte[(int) zoozCode.length()];
-                dis.readFully(data);
-                dis.close();
-                FileWriter fios = new FileWriter(zoozCode);
-                String str = new String(data);
-                str = str.replaceAll("/* ZOOZMARKER_START", "");
-                str = str.replaceAll("ZOOZMARKER_END */", "");
-                fios.write(str);
-                fios.close();
-            } catch (IOException ex) {
-                throw new BuildException("Failed to inject ZOOZ ode into the ZoozPurchase class", ex);
-            }
-        }
 
         if (request.getArg("android.textureView", "false").equals("true")) {
             File impl = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidImplementation.java");
@@ -1457,30 +1436,9 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        String zoozActivities = "";
 
-        //if(purchasePermissions) {
-        if (integrateZooz) {
-            try {
-                createFile(new File(libsDir, "zooz_iap.jar"), getResourceAsStream("zooz_iap.jar"));
-            } catch (IOException ex) {
-                throw new BuildException("Failed to add the zooz_iap.jar", ex);
-            }
-            debug("Adding phone permission because of Zooz integration");
-            phonePermission = true;
-            accessNetworkStatePermission = true;
-            accessWifiStatePermissions = true;
-            vibratePermission = true;
-            getAccountsPermission = true;
-            zoozActivities = "<!-- ZooZ Activity -->"
-                    + "<activity android:name=\"com.zooz.android.lib.CheckoutActivity\""
-                    + " android:theme=\"@android:style/Theme.Translucent\""
-                    + " android:configChanges=\"keyboardHidden|orientation\"/>"
-                    + "<!-- Pay Pal -->"
-                    + "<activity android:name=\"com.paypal.android.MEP.PayPalActivity\""
-                    + " android:theme=\"@android:style/Theme.Translucent.NoTitleBar\""
-                    + " android:configChanges=\"keyboardHidden|orientation\"/>";
-        }
+
+
 
         File stringsFile = new File(valsDir, "strings.xml");
 
@@ -1932,9 +1890,6 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        if (integrateZooz) {
-            minSDK = maxInt("8", minSDK);
-        }
 
         String sharedUserId = request.getArg("android.sharedUserId", "");
         if (sharedUserId.length() > 0) {
@@ -2079,7 +2034,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "        </activity>\n"
                 + facebookActivityMetaData
                 + facebookActivity
-                + zoozActivities
                 + googlePlayAdsActivity
                 + pushManifestEntries
                 + billingServiceData
@@ -2951,7 +2905,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontoptimize\n"
                 + dontObfuscate
                 + "\n"
-                + "-keepclassmembers class com.zooz.android.lib.** {\n"
                 + "public *;\n"
                 + "}\n\n"
                 + "-dontwarn com.google.android.gms.**\n"
@@ -3522,13 +3475,6 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
 
-        if (integrateZooz) {
-            String zoozAppId = request.getArg("zooz.andappId", null);
-            String zoozSandBox = request.getArg("zooz.sandbox", null);
-
-            retVal += "Display.getInstance().setProperty(\"ZoozAppKey\", \"" + zoozAppId + "\");\n"
-                    + "Display.getInstance().setProperty(\"ZoozSandBox\", \"" + zoozSandBox + "\");\n";
-        }
 
         return retVal;
     }
