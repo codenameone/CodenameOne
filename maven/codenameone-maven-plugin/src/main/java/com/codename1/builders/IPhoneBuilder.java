@@ -59,7 +59,6 @@ public class IPhoneBuilder extends Executor {
     private int xcodeVersion;
     private String codesignAllocate;
     private static final String GOOGLE_SIGNIN_TUTORIAL_URL = "http://www.codenameone.com/...";
-    private boolean buildForSimulator;
     private File resultDir;
     private File pushCertificate, notificationServiceProvisioningProfileTemp;
     private boolean includePush;
@@ -288,9 +287,7 @@ public class IPhoneBuilder extends Executor {
             log(arg+"="+request.getArg(arg, null));
         }
         log("-------------------");
-        if ("true".equals(request.getArg("ios.buildForSimulator", "false"))) {
-            buildForSimulator = true;
-        }
+
         origMainClass = request.getMainClass();
 
         buildVersion = request.getVersion();
@@ -1271,7 +1268,7 @@ public class IPhoneBuilder extends Executor {
 
 
 
-        String releaseString = buildForSimulator ? "Debug" : "Release";
+        String releaseString = "Release";
         try {
             File iosNative = new File(buildinRes, "IOSNative.m");
 
@@ -1510,9 +1507,9 @@ public class IPhoneBuilder extends Executor {
                 addMinDeploymentTarget("8.0");
             }
 
-            System.out.println("iosDeploymentTargetMajorVersionInt="+getDeploymentTargetInt(request));
+            debug("iosDeploymentTargetMajorVersionInt="+getDeploymentTargetInt(request));
 
-            System.out.println("Building using addLibs="+addLibs);
+            debug("Building using addLibs="+addLibs);
             try {
                 if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
                         "-jar", parparVMCompilerJar, "ios",
@@ -2116,9 +2113,8 @@ public class IPhoneBuilder extends Executor {
             return true;
         }
 
-        if (!buildForSimulator) {
-            ipaFile = new File(resultDir.getAbsolutePath() + "/" + request.getMainClass() + ".ipa");
-        }
+        ipaFile = new File(resultDir.getAbsolutePath() + "/" + request.getMainClass() + ".ipa");
+
 
 
         return true;
@@ -2177,7 +2173,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         String provisioningProfilesDict = "";
-        if (xcodeVersion >= 9 && !buildForSimulator) {
+        if (xcodeVersion >= 9) {
             provisioningProfilesDict = "<key>provisioningProfiles</key>\n" +
                 "    <dict>\n" +
                 "        <key>"+request.getPackageName()+"</key>\n" +
@@ -2215,7 +2211,6 @@ public class IPhoneBuilder extends Executor {
                 "</dict>\n" +
                 "</plist>";
         File ep = createTempFile("export", ".plist");
-        System.out.println("Export Options: "+exportOptionsPlist);
         debug("Export Options: "+exportOptionsPlist);
         createFile(ep, exportOptionsPlist.getBytes("UTF-8"));
         
@@ -2236,48 +2231,7 @@ public class IPhoneBuilder extends Executor {
             debugArchs = "ARCHS=armv7";
         }
         
-        if (buildForSimulator) {
-            
-            Process killProc = new ProcessBuilder("launchctl", "remove", "com.apple.CoreSimulator.CoreSimulatorService").inheritIO().start();
-            int killCode = killProc.waitFor();
-            killProc = new ProcessBuilder("killall", "-9", "com.apple.CoreSimulator.CoreSimulatorService").inheritIO().start();
-            killCode = killProc.waitFor();
-            debug("Kill code was "+killCode);
-            File xcrun = new File(getXcodeAppDir(xcodebuild), "Contents/Developer/usr/bin/xcrun");
-            
-            Process bootProc = new ProcessBuilder(xcrun.getAbsolutePath(), "simctl", "boot", "119955A8-55F5-4CC7-9FB7-5971F307CF38").inheritIO().start();
-            bootProc.waitFor();
-            
-            debugArchs = "ARCHS=x86_64";
-            if(!exec(distDir, 25 * 60 * 1000, nonNull(xcodebuild,  
-                    projectFlag, projectFile, 
-                    targetFlag, targetFlagValue,
-                    "-configuration", releaseString,
-                    "-sdk", "iphonesimulator" + iosSDK, 
-                    debugArchs,
-                    "VALID_ARCHS=x86_64",
-                    "ONLY_ACTIVE_ARCH=YES",
-                    "CODE_SIGN_IDENTITY=\"\"", 
-                    "CODE_SIGNING_REQUIRED=NO",
-                    derivedDataPathFlag, derivedDataPathValue))) {
-                if (mp != null && mp.exists()) mp.delete();
-                log("Failed xcodebuild step");
-                System.out.println("Failed xcodebuild step");
-                return false;
-            } 
-            
-            File derivedDataDir = new File(distDir, derivedDataPathValue);
-            String appFileName = request.getMainClass()+".app";
-            ipaFile = new File(derivedDataDir, "Build/Products/"+releaseString+"-iphonesimulator/"+appFileName);
-            if (!ipaFile.exists()) {
-                log(".app not found after build.  There must be a problem with xcodebuild step");
-                return false;
-            }
-            String zipFile = new File(ipaFile.getParentFile(), ipaFile.getName()+".ipa").getAbsolutePath();
-            zipDir(zipFile, ipaFile.getAbsolutePath());
-            ipaFile = new File(zipFile);
-            return true;
-        }
+
         
         
         File entitlementsFile = generateEntitlements(request, method);
