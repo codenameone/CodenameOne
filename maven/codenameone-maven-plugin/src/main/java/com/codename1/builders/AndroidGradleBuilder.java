@@ -518,7 +518,7 @@ public class AndroidGradleBuilder extends Executor {
         tmpFile.mkdirs();
 
 
-        boolean useNewBuildTools = false;
+
         File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle"));
 
         String gradleHome = System.getenv("GRADLE_HOME");
@@ -526,11 +526,6 @@ public class AndroidGradleBuilder extends Executor {
             gradleHome = managedGradleHome.getAbsolutePath();
         }
         String gradleExe = System.getenv("GRADLE_PATH");
-
-
-        if(buildToolsVersionInt >= 27) {
-            useNewBuildTools = true;
-        }
 
         if (gradleExe == null) {
             if (gradleHome != null) {
@@ -1499,10 +1494,7 @@ public class AndroidGradleBuilder extends Executor {
         String themeName = "android:Theme.Black";
         String itemName = androidAppBundle ? "cn1Style" : "attr/cn1Style";
 
-        String stylesFileContent;
-
-        if(useNewBuildTools) {
-            stylesFileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        String stylesFileContent  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                     + "<resources>\n" +
                     "    <style name=\"CustomTheme\" parent=\"" + themeName + "\">\n" +
                     "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1513,19 +1505,7 @@ public class AndroidGradleBuilder extends Executor {
                     "    </style>\n" +
                     request.getArg("android.style", "") +
                     "</resources>";
-        } else {
-            stylesFileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                    + "<resources>\n"
-                    + "    <style name=\"CustomTheme\" parent=\"" + themeName + "\">\n"
-                    + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>\n"
-                    + "    </style>\n"
-                    + "    <attr name=\"cn1Style\" format=\"reference\" />\n"
-                    + "    <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">\n"
-                    + "        <item name=\"android:textCursorDrawable\">@null</item>\n"
-                    + "    </style>\n"
-                    + request.getArg("android.style", "")
-                    + "</resources>";
-        }
+
         try {
             OutputStream stylesSourceStream = new FileOutputStream(stylesFile);
             stylesSourceStream.write(stylesFileContent.getBytes());
@@ -1539,10 +1519,7 @@ public class AndroidGradleBuilder extends Executor {
             }
 
             File styles11File = new File(vals11Dir, "styles.xml");
-            String styles11FileContent;
-
-            if (useNewBuildTools) {
-                styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            String styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                         "<resources>\n" +
                         "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Holo" + theme + "\">\n" +
                         "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1553,29 +1530,14 @@ public class AndroidGradleBuilder extends Executor {
                         "        <item name=\"android:textCursorDrawable\">@null</item>\n" +
                         "    </style>\n" +
                         "</resources>\n";
-            } else {
-                styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Holo" + theme + "\">"
-                        + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>"
-                        + "        <item name=\"android:windowActionBar\">false</item>"
-                        + "       <item name=\"android:windowTitleSize\">0dp</item>"
-                        + "   </style>"
-                        + "   <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">"
-                        + "       <item name=\"android:textCursorDrawable\">@null</item>"
-                        + "   </style>"
-                        + "</resources>";
-            }
+
 
             OutputStream styles11SourceStream = new FileOutputStream(styles11File);
             styles11SourceStream.write(styles11FileContent.getBytes());
             styles11SourceStream.close();
 
             File styles21File = new File(vals21Dir, "styles.xml");
-            String styles21FileContent;
-
-            if (useNewBuildTools) {
-                styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            String styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                         "<resources>\n" +
                         "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Material" + theme + "\">\n" +
                         "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1587,20 +1549,7 @@ public class AndroidGradleBuilder extends Executor {
                         "        <item name=\"android:textCursorDrawable\">@null</item>\n" +
                         "    </style>\n" +
                         "</resources>\n";
-            } else {
-                styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Material" + theme + "\">"
-                        + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>"
-                        + "        <item name=\"android:windowActionBar\">false</item>"
-                        + "       <item name=\"android:windowTitleSize\">0dp</item>"
-                        + colorsStr
-                        + "   </style>"
-                        + "   <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">"
-                        + "       <item name=\"android:textCursorDrawable\">@null</item>"
-                        + "   </style>"
-                        + "</resources>";
-            }
+
 
             OutputStream styles21SourceStream = new FileOutputStream(styles21File);
             styles21SourceStream.write(styles21FileContent.getBytes());
@@ -3156,35 +3105,35 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String supportV4Default = "    compile 'com.android.support:support-v4:23.+'";
-        if(useNewBuildTools) {
-            compileSdkVersion = maxPlatformVersion;
-            String supportLibVersion = maxPlatformVersion;
-            if (buildToolsVersion.startsWith("28")) {
-                compileSdkVersion = "28";
-                supportLibVersion = "28";
-            }
-            if (buildToolsVersion.startsWith("29")) {
-                compileSdkVersion = "29";
-                supportLibVersion = "28";
-            }
-            jcenter =
-                    "      google()\n" +
-                            "     jcenter()\n" +
-                            "     mavenLocal()\n" +
-                            "      mavenCentral()\n";
 
-            injectRepo += "      google()\n" +
-                    "     mavenLocal()\n" +
-                    "      mavenCentral()\n";
-            if(!androidAppBundle){
-                gradlePropertiesObject.put("android.enableAapt2", "false");
-            }
-            if (!useAndroidX) {
-                supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
-            } else {
-                supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
-            }
+        compileSdkVersion = maxPlatformVersion;
+        String supportLibVersion = maxPlatformVersion;
+        if (buildToolsVersion.startsWith("28")) {
+            compileSdkVersion = "28";
+            supportLibVersion = "28";
         }
+        if (buildToolsVersion.startsWith("29")) {
+            compileSdkVersion = "29";
+            supportLibVersion = "28";
+        }
+        jcenter =
+                "      google()\n" +
+                        "     jcenter()\n" +
+                        "     mavenLocal()\n" +
+                        "      mavenCentral()\n";
+
+        injectRepo += "      google()\n" +
+                "     mavenLocal()\n" +
+                "      mavenCentral()\n";
+        if(!androidAppBundle){
+            gradlePropertiesObject.put("android.enableAapt2", "false");
+        }
+        if (!useAndroidX) {
+            supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
+        } else {
+            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
+        }
+
         String compile = "compile";
         if (useAndroidX) {
             compile = "implementation";
