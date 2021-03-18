@@ -395,7 +395,7 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.sdk", null) == null && System.getProperty("ios.sdk", null) != null) {
             iosSDK = System.getProperty("ios.sdk", iosSDK);
         }
-        System.out.println("Xcode version is "+xcodeVersion);
+        debug("Xcode version is "+xcodeVersion);
         String iosMode = request.getArg("ios.themeMode", "auto");
         
         tmpFile = getBuildDirectory();
@@ -537,8 +537,8 @@ public class IPhoneBuilder extends Executor {
                         if (nextEl != null && "string".equals(nextEl.getTagName())) {
                             String bid = nextEl.getTextContent().trim();
                             if (bid == null || !bid.equals(request.getPackageName())) {
-                                System.out.println("Bundle ID="+request.getPackageName()+"; GoogleService BUNDLE_ID="+bid);
-                                System.out.println("GoogleService-Info.plist file bundle ID does not match the App ID.  See "+GOOGLE_SIGNIN_TUTORIAL_URL+" for instructions on setting up GoogleSignIn");
+                                debug("Bundle ID="+request.getPackageName()+"; GoogleService BUNDLE_ID="+bid);
+                                debug("GoogleService-Info.plist file bundle ID does not match the App ID.  See "+GOOGLE_SIGNIN_TUTORIAL_URL+" for instructions on setting up GoogleSignIn");
                                 log("GoogleService-Info.plist file bundle ID does not match the App ID.  See "+GOOGLE_SIGNIN_TUTORIAL_URL+" for instructions on setting up GoogleSignIn");
                                 
                                 return false;
@@ -567,7 +567,7 @@ public class IPhoneBuilder extends Executor {
         
         if (googleClientId == null && useGoogleSignIn) {
             log("GoogleService-Info.plist file specifies that GoogleSignIn should be used but it doesn't provide a client ID.  Likely the GoogleService-Info.plist file is not valid.  See "+GOOGLE_SIGNIN_TUTORIAL_URL+" for instructions on setting up GoogleSignIn");
-            System.out.println("Fail 2");
+            error("Fail 2", new RuntimeException("Need to provide GoogleService-Info.plist file"));
             return false;
         }
         if (googleClientId == null) {
@@ -610,8 +610,8 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan project classes for permissions.");
         }
         
-        System.out.println("Local Notifications "+(usesLocalNotifications?"enabled":"disabled"));
-        log("Local Notifications "+(usesLocalNotifications?"enabled":"disabled"));
+
+        debug("Local Notifications "+(usesLocalNotifications?"enabled":"disabled"));
         try {
             unzip(getResourceAsStream("/iOSPort.jar"), classesDir, buildinRes, buildinRes);
         } catch (IOException ex) {
@@ -2821,8 +2821,8 @@ public class IPhoneBuilder extends Executor {
     private int getXcodeVersion(String xcodeBuild) {
         try {
             String result = execString(tmpFile, xcodeBuild, "-version");
-            log("Result is "+result);
-            System.out.println("Result is "+result);
+            debug("Result is "+result);
+
             Scanner scanner = new Scanner(result);
             scanner.useDelimiter("\n");
             while (scanner.hasNext()) {
