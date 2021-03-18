@@ -361,16 +361,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
 
         });
-        File[] results = null;
+
 
         try {
 
             if (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 automated = false;
                 if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                    results = doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                    doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
-                    results = doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
@@ -514,7 +514,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
     }
 
-    private File[] doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+    private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
 
             File generatedProject = getGeneratedAndroidProjectSourceDirectory();
@@ -527,7 +527,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         if (open) {
                             openAndroidStudioProject(generatedProject);
                         }
-                        return new File[]{generatedProject};
+                        return;
 
                     }
                 }
@@ -644,11 +644,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         BuildRequest request = r;
-        String incSources = request.getArg("build.incSources", null);
         request.setIncludeSource(true);
-
-
-
         String testBuild = request.getArg("build.unitTest", null);
         if(testBuild != null && testBuild.equals("1")) {
             e.setUnitTestMode(true);
@@ -661,28 +657,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!result) {
                 getLog().error("Received false return value from build()");
                 throw new MojoExecutionException("Android build failed.  Received false return value for build");
-            }
-            // send the response to the server
-            File[] results = e.getResults();
-
-            for (File child : results) {
-                if (child == null) continue;
-                String name = child.getName();
-                int dotpos = name.lastIndexOf(".");
-                if (dotpos < 0) {
-                    continue;
-                }
-                String extension = name.substring(dotpos);
-                String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
-                try {
-                    FileUtils.copyFile(child, copyTo);
-                } catch (IOException ex) {
-                    throw new MojoExecutionException("Failed to copy APK to output directory", ex);
-                }
-                if (".apk".equals(extension)) {
-                    projectHelper.attachArtifact(project, "apk", "android-app", copyTo);
-                }
             }
 
             if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget) && e.getGradleProjectDirectory() != null) {
@@ -700,7 +674,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (open) {
                 openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
             }
-            return results;
+
 
         } catch (BuildException ex) {
 
@@ -758,7 +732,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    private File[] doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+    private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
 
         if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
 
@@ -773,7 +747,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                             getLog().info("Opening workspace project "+getWorkspace(props, generatedProject));
                             openWorkspace(getWorkspace(props, generatedProject));
                         }
-                        return new File[]{generatedProject};
+                        return;
 
                     }
                 }
@@ -848,28 +822,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!result) {
                 throw new MojoExecutionException("iOS build failed");
             }
-            // send the response to the server
-            File[] results = e.getResults();
-
-            for (File child : results) {
-                if (child == null) continue;
-                String name = child.getName();
-                int dotpos = name.lastIndexOf(".");
-                if (dotpos < 0) {
-                    continue;
-                }
-                String extension = name.substring(dotpos);
-                String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
-                try {
-                    FileUtils.copyFile(child, copyTo);
-                } catch (IOException ex) {
-                    throw new MojoExecutionException("Failed to copy APK to output directory", ex);
-                }
-                if (".ipa".equals(extension)) {
-                    projectHelper.attachArtifact(project, "ipa", "ios-app", copyTo);
-                }
-            }
 
             if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
@@ -889,7 +841,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
 
-            return results;
 
         } catch (BuildException ex) {
             throw new MojoExecutionException("Failed to build ios app", ex);

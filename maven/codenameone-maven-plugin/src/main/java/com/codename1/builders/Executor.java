@@ -1080,7 +1080,6 @@ public abstract class Executor {
         return "application/unknown";
     }
 
-    public abstract File[] getResults();
 
     private void copyDir(File dir, File classesDir, File resDir, File sourceDir, File libsDir) throws IOException {
         for (File currentFile : dir.listFiles()) {

@@ -232,12 +232,7 @@ public class AndroidGradleBuilder extends Executor {
     private File androidPortSrcJar;
 
     private String playFlag;
-    private File apk;
-    private File debugApk;
-    private File aab;
-    private File debugAab;
-    private File mapping;
-    private File sourceReturnValue;
+
     private boolean capturePermission;
     private boolean vibratePermission;
     private boolean smsPermission;
@@ -3289,59 +3284,6 @@ public class AndroidGradleBuilder extends Executor {
         return s;
     }
 
-    @Override
-    public File[] getResults() {
-        if(aab != null){
-            if (sourceReturnValue != null) {
-                if (debugAab != null && debugAab != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, aab, debugAab, mapping, sourceReturnValue};
-                    }
-                    return new File[]{apk, aab, debugAab, sourceReturnValue};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, aab, mapping, sourceReturnValue};
-                }
-                return new File[]{apk, aab, sourceReturnValue};
-            } else {
-                if (debugAab != null && debugAab != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, aab, debugAab, mapping};
-                    }
-                    return new File[]{apk, aab, debugApk};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, aab, mapping};
-                }
-                return new File[]{apk, aab};
-            }
-        }
-        else{
-            if (sourceReturnValue != null) {
-                if (debugApk != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, debugApk, mapping, sourceReturnValue};
-                    }
-                    return new File[]{apk, debugApk, sourceReturnValue};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, mapping, sourceReturnValue};
-                }
-                return new File[]{apk, sourceReturnValue};
-            } else {
-                if (debugApk != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, debugApk, mapping};
-                    }
-                    return new File[]{apk, debugApk};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, mapping};
-                }
-                return new File[]{apk};
-            }
-        }
-    }
 
     @Override
     protected String generatePeerComponentCreationCode(String methodCallString) {

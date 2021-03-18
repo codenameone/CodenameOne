@@ -33,17 +33,13 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.lang.reflect.Method;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  *
@@ -57,25 +53,16 @@ public class IPhoneBuilder extends Executor {
     private String pod = "/usr/local/bin/pod";
     private int podTimeout = 300000; // 5 minutes
     private int xcodeVersion;
-    private String codesignAllocate;
     private static final String GOOGLE_SIGNIN_TUTORIAL_URL = "http://www.codenameone.com/...";
     private File resultDir;
-    private File pushCertificate;
     private boolean includePush;
     private File tmpFile;
-    private File ipaFile;
     private File icon57;
     private File icon512;
 
-    private String provisioningProfileName, developmentTeam;
-
-    private File dsym;
-
     private boolean runPods=false;
-    private String certificateName;
     private boolean photoLibraryUsage;
     private String buildVersion;
-    private String origMainClass; // generate unit tests will change the request.getMainClass() to the unit test executor
     private boolean usesLocalNotifications;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
@@ -161,65 +148,9 @@ public class IPhoneBuilder extends Executor {
         }
         return false;
     }
-    
-    private double versionToDouble(String version) {
-        StringBuilder majorVersion = new StringBuilder();
-        StringBuilder minorVersion = new StringBuilder();
-        boolean majorComplete = false;
-        for (char c : version.toCharArray()) {
-            if (!Character.isDigit(c)) {
-                majorComplete = true;
-                continue;
-            }
-            if (majorComplete) {
-                minorVersion.append(c);
-            } else {
-                majorVersion.append(c);
-            }
-        }
-        if (majorVersion.length() == 0) {
-            majorVersion.append("0");
-        }
-        if (minorVersion.length() == 0) {
-            minorVersion.append("0");
-        }
-        return Double.parseDouble(majorVersion + "." + minorVersion);
-    }
-    
-    /**
-     * Strips non-null values from an array of strings.
-     * @param params
-     * @return 
-     */
-    private String[] nonNull(String... params) {
-        ArrayList<String> out = new ArrayList<String>();
-        for (String p : params) {
-            if (p != null) {
-                out.add(p);
-            }
-        }
-        return out.toArray(new String[out.size()]);
-    }
-    
-    /**
-     * Gets the Xcode.app file corresponding to a given xcodebuildPath
-     * @param xcodebuildPath
-     * @return 
-     */
-    private File getXcodeAppDir(String xcodebuildPath) {
-        File f = new File(xcodebuildPath);
-        while (f != null) {
-            if ("Contents".equals(f.getName())) {
-                f = f.getParentFile();
-                if (f != null) {
-                    return f;
-                }
-                throw new IllegalArgumentException("Provided xcodeBuildPath "+xcodebuildPath+" not in Xcode.app bundle");
-            }
-            f = f.getParentFile();
-        }
-        throw new IllegalArgumentException("Provided xcodeBUildPath "+xcodebuildPath+" not in Xcode.app bundle");
-    }
+
+
+
     
     private File getResDir() {
         return new File(tmpFile, "res");
@@ -286,7 +217,6 @@ public class IPhoneBuilder extends Executor {
         }
         log("-------------------");
 
-        origMainClass = request.getMainClass();
 
         buildVersion = request.getVersion();
         if(request.getArg("ios.twoDigitVersion", "false").equals("true")) {
@@ -316,8 +246,7 @@ public class IPhoneBuilder extends Executor {
                 privacyUsageDescriptions.put(arg.substring(arg.lastIndexOf(".")+1), request.getArg(arg, null));
             }
         }
-        
-        String homeDir = System.getProperty("user.home");
+
         String xcodebuild;
         String iosPods = request.getArg("ios.pods", "");
         enableGalleryMultiselect = "true".equals(request.getArg("ios.enableGalleryMultiselect", "false"));
@@ -337,25 +266,11 @@ public class IPhoneBuilder extends Executor {
         disableUIWebView = enableWKWebView && "true".equals(request.getArg("ios.noUIWebView", "true"));
 
         boolean bicodeHandle = true;
-        String xcodePath = System.getenv("XCODE_PATH");
-        if (xcodePath == null) {
-            xcodePath = "/Applications/Xcode.app";
-        }
-        xcodebuild = "xcodebuild";
-        String iosSDK = request.getArg("ios.sdk", "13.2");
         xcodebuild = "xcodebuild";
         xcodeVersion = getXcodeVersion(xcodebuild);
         if (xcodeVersion <= 0) {
             xcodeVersion = 10;
         }
-
-        codesignAllocate = xcodebuild.replace(
-                "/Contents/Developer/usr/bin/xcodebuild", 
-                "/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/codesign_allocate"
-        );
-        
-        
-        
 
         String facebookAppId = request.getArg("facebook.appId", null);
         if(!new File(pod).exists()) {
@@ -389,10 +304,7 @@ public class IPhoneBuilder extends Executor {
         if (enableWKWebView) {
             addMinDeploymentTarget("8.0");
         }
-        
-        if (request.getArg("ios.sdk", null) == null && System.getProperty("ios.sdk", null) != null) {
-            iosSDK = System.getProperty("ios.sdk", iosSDK);
-        }
+
         debug("Xcode version is "+xcodeVersion);
         String iosMode = request.getArg("ios.themeMode", "auto");
         
@@ -411,7 +323,6 @@ public class IPhoneBuilder extends Executor {
         resDir.mkdirs();
         File buildinRes = new File(tmpFile, "btres");
         buildinRes.mkdirs();
-        pushCertificate = new File(tmpFile, "PushCertificate.p12");
 
         // fill classes dir from JAR and proper ports
         try {
@@ -939,9 +850,7 @@ public class IPhoneBuilder extends Executor {
                     + "import com.codename1.push.PushCallback;\n\n"
                     + "import com.codename1.system.*;\n\n"
                     + "public class " + request.getMainClass() + "Stub extends com.codename1.impl.ios.Lifecycle implements Runnable {\n"
-                    //+ "    public static final String BUILD_KEY = \"" + xorEncode(getBuildKey()) + "\";\n"
                     + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
-                    //+ "    public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\";\n"
                     + "    public static final String APPLICATION_VERSION = \"" + buildVersion + "\";\n"
                     + "    public static final String APPLICATION_NAME = \"" + request.getDisplayName()+ "\";\n"
                     + "    private " + request.getMainClass() + " i = new "+request.getMainClass()+"();\n"
@@ -1194,7 +1103,6 @@ public class IPhoneBuilder extends Executor {
 
 
         includePush = request.getArg("ios.includePush", "false").equalsIgnoreCase("true");
-        boolean includePushEnt= includePush;
 
         if ((request.getPushCertificate() != null || includePush) || usesLocalNotifications) {
             try {
@@ -1264,14 +1172,8 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
-
-
-        String releaseString = "Release";
         try {
             File iosNative = new File(buildinRes, "IOSNative.m");
-
-
-
             String glAppDelegeateHeader = request.getArg("ios.glAppDelegateHeader", null);
             if (glAppDelegeateHeader != null && glAppDelegeateHeader.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_INCLUDE", glAppDelegeateHeader);
@@ -1403,8 +1305,7 @@ public class IPhoneBuilder extends Executor {
         }
         
          {
-            
-            //if(isNewVM) {
+
             String addLibs = request.getArg("ios.add_libs", null);
             if(addLibs != null) {
                 addLibs = addLibs.replace(',', ';').replace(':', ';');
@@ -1613,12 +1514,7 @@ public class IPhoneBuilder extends Executor {
 
                     }
 
-
-
-
                     String deploymentTargetStr = "";
-
-
                     String targetStr = request.getArg("ios.deployment_target", xcodeVersion >= 9 ? "7.0" : "6.0");
 
                     if (enableGalleryMultiselect && photoLibraryUsage && getMajorVersionInt(targetStr, 6) < 8) {
@@ -1795,8 +1691,6 @@ public class IPhoneBuilder extends Executor {
                     replaceAllInFile(pbx, "COPY_PHASE_STRIP = YES;", "COPY_PHASE_STRIP = NO;");
                     replaceAllInFile(pbx, "STRIP_STYLE = all;", "STRIP_STYLE = debugging;");
                     replaceAllInFile(pbx, "SEPARATE_STRIP = YES;", "SEPARATE_STRIP = NO;");
-
-                    releaseString = "Debug";
                 }
                 if ("YES".equals(request.getArg("ios.pods.build.CLANG_ENABLE_MODULES", null))) {
                     // Needed this for WebRTC.  For some reason cocoapods was not updating these build settings.
@@ -1828,32 +1722,8 @@ public class IPhoneBuilder extends Executor {
                 throw new BuildException("Failed to inject into plist");
             }
 
-            
-            String buildSubdir = runPods ? "/dist/build/Build/Products/" : "/dist/build/";
 
 
-            String projectFlag = "-workspace" ;
-            String projectFlagValue = request.getMainClass() + ".xcworkspace";
-            String targetFlag = "-scheme";
-            String targetFlagValue = request.getMainClass() ;
-            String derivedDataPathFlag = "-derivedDataPath";
-            String derivedDataPathValue = "build" ;
-            buildSubdir = "/dist/build/Build/Products/";
-            try {
-                if (!xcode7BuildMode(request, xcodebuild, projectFlag,
-                        projectFlagValue,
-                        targetFlag,
-                        targetFlagValue,
-                        derivedDataPathFlag,
-                        derivedDataPathValue,
-                        releaseString,
-                        certificateName,
-                        iosSDK)) {
-                    return false;
-                }
-            } catch (Exception ex) {
-                throw new BuildException("Failed during Xcode build", ex);
-            }
             
         }
 
@@ -1861,10 +1731,6 @@ public class IPhoneBuilder extends Executor {
             xcodeProjectDir = new File(tmpFile, "dist");
             return true;
         }
-
-        ipaFile = new File(resultDir.getAbsolutePath() + "/" + request.getMainClass() + ".ipa");
-
-
 
         return true;
     }
@@ -1874,118 +1740,6 @@ public class IPhoneBuilder extends Executor {
     public File getXcodeProjectDir() {
         return xcodeProjectDir;
     }
-
-    private boolean xcode7BuildMode(BuildRequest request, String xcodebuild, 
-            String projectFlag,
-            String projectFlagValue,
-            String targetFlag,
-            String targetFlagValue,
-            String derivedDataPathFlag,
-            String derivedDataPathValue, 
-            String releaseString,
-            String certificateName,
-            String iosSDK) throws Exception {
-        debug("Starting xcode7BuildMode");
-        debug("Starting xcode7BuildMode");
-        if(projectFlagValue.endsWith("/")) {
-            projectFlagValue = projectFlagValue.substring(0, projectFlagValue.length() - 1);
-        }
-        
-        String homeDir = System.getProperty("user.home");
-        
-        File mp = null;
-        File nsmp = null;
-        String ppUID = null;
-        String nsppUID = null;
-
-        
-        String teamId = request.getArg("ios.teamId", "");
-        if (request.getArg("ios.buildType", "debug").equals("debug")) {
-            teamId = request.getArg("ios.debug.teamId", teamId);
-        } else {
-            teamId = request.getArg("ios.release.teamId", teamId);
-        }
-        if(teamId.length() > 0) {
-            teamId = "<key>teamID</key><string>" + teamId + "</string>";
-        }
-        
-        String method = "development";
-        if(!request.getArg("ios.buildType", "debug").equals("debug")) {
-            method = "app-store";
-        } 
-        // can be one of: app-store, enterprise, ad-hoc, development
-        method = request.getArg("ios.distributionMethod", method);
-        if (request.getArg("ios.buildType", "debug").equals("debug")) {
-            method = request.getArg("ios.debug.distributionMethod", method);
-        } else {
-            method = request.getArg("ios.release.distributionMethod", method);
-        }
-        
-        String provisioningProfilesDict = "";
-        if (xcodeVersion >= 9) {
-            provisioningProfilesDict = "<key>provisioningProfiles</key>\n" +
-                "    <dict>\n" +
-                "        <key>"+request.getPackageName()+"</key>\n" +
-                "        <string>"+provisioningProfileName+"</string>\n" +
-                "    </dict>";
-        }
-        
-        
-        String iCloudKeys = "";
-        if ("true".equals(request.getArg("ios.icloud.CloudDocuments", "false"))) {
-            if (xcodeVersion >= 9) {
-                String icloudContainerType = request.getArg("ios.buildType", "debug").equals("debug") ? 
-                        "Development" : "Production";
-                iCloudKeys += "\n        <key>iCloudContainerEnvironment</key>\n" +
-                        "        <string>"+icloudContainerType+"</string>\n";
-                        
-            }
-        }
-        
-        String exportOptionsPlist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n" +
-                "<plist version=\"1.0\">\n" +
-                "<dict>\n" +
-                provisioningProfilesDict +
-                teamId +
-                iCloudKeys +
-                "        <key>compileBitcode</key>\n" +
-                "        <" + request.getArg("ios.bitcode", "false") + "/>\n" +
-                "        <key>uploadBitcode</key>\n" +
-                "        <" + request.getArg("ios.bitcode", "false") + "/>\n" +
-                "        <key>method</key>\n" +
-                "        <string>" + method + "</string>\n" +
-                "        <key>uploadSymbols</key>\n" +
-                "        <false/>\n" +
-                "</dict>\n" +
-                "</plist>";
-        File ep = createTempFile("export", ".plist");
-        debug("Export Options: "+exportOptionsPlist);
-        createFile(ep, exportOptionsPlist.getBytes("UTF-8"));
-        
-        
-        
-        ep.deleteOnExit();
-        File distDir = new File(tmpFile, "dist");
-        String projectFile = projectFlagValue;
-        if(!new File(distDir, projectFlagValue).exists()) {
-            projectFile = request.getMainClass() + ".xcodeproj/project.xcworkspace";
-        }
-        
-        // Allow users to force debug builds target arm64 if they want a 64 bit build
-        String debugArchs = request.getArg("ios.buildType", "debug").equals("debug") ? "ARCHS=arm64":null;
-        String onlyActiveArchs = request.getArg("ios.buildType", "debug").equals("debug") ? "ONLY_ACTIVE_ARCH=NO" : null;
-        
-        if (debugArchs != null && "armv7".equals(request.getArg("ios.debug.archs", null))) {
-            debugArchs = "ARCHS=armv7";
-        }
-
-        return true;
-
-    } 
-    
-    
-
 
     
     private String convertToJavaMethod(Class type) {
@@ -2094,17 +1848,6 @@ public class IPhoneBuilder extends Executor {
         }
         // array/string
         return "JAVA_OBJECT";
-    }
-    
-
-
-    @Override
-    public File[] getResults() {
-        if(dsym != null) {
-            return new File[] {ipaFile, icon57, icon512, dsym, xcodeProjectDir};
-        } else {
-            return new File[] {ipaFile, icon57, icon512, xcodeProjectDir};
-        }
     }
     
     protected String generatePeerComponentCreationCode(String methodCallString) {
@@ -2221,14 +1964,7 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
-        
-        //if(request.getArg("ios.background_modes", "").contains("music")) {
-        //    inject += "<key>UIBackgroundModes</key><array><string>audio</string> </array>";
-        //}
-        
-        /*if((fontFiles == null || fontFiles.length == 0) && inject == null && statusBarWhite == null && facebook == null) {
-            return;
-        }*/
+
         if(request.getArg("ios.fileSharingEnabled", "false").equals("true")) {
             inject += "\n	<key>UIFileSharingEnabled</key>\n	<true/>\n";
         }
@@ -2430,95 +2166,6 @@ public class IPhoneBuilder extends Executor {
         fo.close();
     }
 
-    
-    
-    private String entitlementsString;
-    private File generateEntitlements(BuildRequest request,  String method) throws IOException {
-        File entitlementsFile = createTempFile("Entitlements", ".plist");
-        entitlementsFile.deleteOnExit();
-
-
-        String iCloudKeys = "";
-        if ("true".equals(request.getArg("ios.icloud.CloudDocuments", "false"))) {
-            iCloudKeys = "	<key>com.apple.developer.icloud-services</key>\n" +
-                "	<array>\n" +
-                "		<string>CloudDocuments</string>\n" +
-                "	</array>\n";
-        }
-        
-        String keychainAccessGroups = "";
-        if (request.getArg("ios.keychainAccessGroup", null) != null) {
-            String[] accessGroups = request.getArg("ios.keychainAccessGroup", "").split(" ");
-            StringBuilder sb = new StringBuilder();
-            for (String grp : accessGroups) {
-                sb.append("<string>").append(grp.trim()).append("</string>\n");
-            }
-            keychainAccessGroups = sb.toString();
-        }
-        
-        String associatedDomains = "";
-        if (request.getArg("ios.associatedDomains", null) != null) {
-            String[] domains = request.getArg("ios.associatedDomains", null).split(",");
-            String domainsStr = "";
-            for (String domain : domains) {
-                domain = domain.trim();
-                if (domain.isEmpty()) continue;
-                domainsStr += "<string>"+domain+"</string>\n";
-            }
-            associatedDomains = "<key>com.apple.developer.associated-domains</key>\n" +
-                "	<array>\n" + domainsStr +
-                "	</array>";
-        }
-
-        String getTaskAllow = request.getArg("ios.buildType", "debug").equals("debug") ? "<key>get-task-allow</key><true/>\n" : "";
-        
-        String accessWifi = "";
-        if(request.getArg("ios.accessWifi", "false").equals("true")) {
-            accessWifi = "<key>com.apple.developer.networking.wifi-info</key><true/>\n";
-        }
-        String appleSignin = "true".equals(request.getArg("ios.entitlements.applesignin", "false")) ?
-                ("<key>com.apple.developer.applesignin</key>\n" +
-"	<array>\n" +
-"		<string>Default</string>\n" +
-"	</array>") : "";
-        
-        
-        FileOutputStream entitlementsOutput = new FileOutputStream(entitlementsFile);
-        String appId = request.getAppid();
-        if (appId == null) {
-            throw new IllegalStateException("The appID is not set.  Please set app ID via the codename1.ios.appid of the codenameone_settings.properties file");
-        }
-        String ent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-                + "<plist version=\"1.0\">\n"
-                + "   <dict>\n"
-                + "       <key>application-identifier</key>\n"
-                + "       <string>" + request.getAppid().trim() + "</string>\n"
-                + "       <key>keychain-access-groups</key>\n"
-                + "       <array>\n"
-                + "           <string>" + request.getAppid().trim() + "</string>\n"
-                + keychainAccessGroups
-                + "       </array>\n"
-                + appleSignin
-                + iCloudKeys
-                + getTaskAllow
-                + associatedDomains
-                + accessWifi
-                + "   </dict>\n"
-                + "</plist>\n";
-        log("Entitlements: "+ent);
-
-        entitlementsOutput.write(ent.getBytes());
-        entitlementsOutput.close();
-        entitlementsString = ent;
-        return entitlementsFile;
-    }
-    
-
-    
-    
-
-    
     /**
      * 
      * @param xcodeBuild path to xcodebuild executable
@@ -2674,58 +2321,7 @@ public class IPhoneBuilder extends Executor {
         
         return true;
     }
-    
-    private boolean generateIconsPre5(BuildRequest request) throws Exception {
-        File iconDirectory = getIconDirectory(request);
-        File resDir = getResDir();
-        
-        BufferedImage iconImage = ImageIO.read(new ByteArrayInputStream(request.getIcon()));
-        icon512 = new File(iconDirectory, "iTunesArtwork");
-        createFile(icon512, request.getIcon());
-        icon57 = new File(iconDirectory, "Icon.png");
-        createIconFile(icon57, iconImage, 57, 57);
-        createIconFile(new File(iconDirectory, "Icon7.png"), iconImage, 60, 60);
-        createIconFile(new File(iconDirectory, "Icon@2x.png"), iconImage, 114, 114);
-        createIconFile(new File(iconDirectory, "Icon7@2x.png"), iconImage, 120, 120);
-        createIconFile(new File(iconDirectory, "Icon-72.png"), iconImage, 72, 72);
-        createIconFile(new File(iconDirectory, "Icon-76.png"), iconImage, 76, 76);
-        createIconFile(new File(iconDirectory, "Icon-152.png"), iconImage, 152, 152);
-        createIconFile(new File(iconDirectory, "Icon-Small-50.png"), iconImage, 50, 50);
-        createIconFile(new File(iconDirectory, "Icon-Small.png"), iconImage, 29, 29);
-        createIconFile(new File(iconDirectory, "Icon-Small@2x.png"), iconImage, 58, 58);
-        createIconFile(new File(iconDirectory, "Icon@3x.png"), iconImage, 87, 87);
-        createIconFile(new File(iconDirectory, "Icon7@3x.png"), iconImage, 180, 180);
-        createIconFile(new File(iconDirectory, "Icon-167.png"), iconImage, 167, 167);
-        createIconFile(new File(iconDirectory, "Icon-1024.png"), iconImage, 1024, 1024);
-        
 
-        copy(icon512, new File(resDir, icon512.getName()));
-        copy(icon57, new File(resDir, icon57.getName()));
-        copy(new File(iconDirectory, "Icon7.png"), new File(resDir, "Icon7.png"));
-        copy(new File(iconDirectory, "Icon@2x.png"), new File(resDir, "Icon@2x.png"));
-        copy(new File(iconDirectory, "Icon7@2x.png"), new File(resDir, "Icon7@2x.png"));
-        copy(new File(iconDirectory, "Icon-72.png"), new File(resDir, "Icon-72.png"));
-        copy(new File(iconDirectory, "Icon-76.png"), new File(resDir, "Icon-76.png"));
-        copy(new File(iconDirectory, "Icon-152.png"), new File(resDir, "Icon-152.png"));
-        copy(new File(iconDirectory, "Icon-Small-50.png"), new File(resDir, "Icon-Small-50.png"));
-        copy(new File(iconDirectory, "Icon-Small.png"), new File(resDir, "Icon-Small.png"));
-        copy(new File(iconDirectory, "Icon-Small@2x.png"), new File(resDir, "Icon-Small@2x.png"));
-        copy(new File(iconDirectory, "Icon@3x.png"), new File(resDir, "Icon@3x.png"));
-        copy(new File(iconDirectory, "Icon7@3x.png"), new File(resDir, "Icon7@3x.png"));
-        copy(new File(iconDirectory, "Icon-167.png"), new File(resDir, "Icon-167.png"));
-        
-        return true;
-    }
-    
-    private File getScreenshotDir(BuildRequest request) {
-
-        File screenshotDirectory = new File(tmpFile, "dist/" + request.getMainClass() + "-src/Images.xcassets/LaunchImage.launchimage");
-        if (!screenshotDirectory.exists()) {
-            screenshotDirectory.mkdirs();
-        }
-        return screenshotDirectory;
-
-    }
     
     private boolean generateLaunchScreen(BuildRequest request) throws Exception {
         File buildinRes = getBuildinRes();
