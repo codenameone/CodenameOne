@@ -22,7 +22,7 @@ jobs:
     - name: Build with Maven
       run: |
         cd maven
-        mvn install
+        xvfb-run -a mvn install
       
 
     - name: Fetch archetype projects
@@ -34,9 +34,9 @@ jobs:
       run: |
         unzip cn1-maven-archetypes.zip
         cd cn1-maven-archetypes-master
-        mvn install
+        xvfb-run -a mvn install
     - name: Run Maven Unit Tests
-      run: bash maven/tests/all.sh
+      run: xvfb-run -a bash maven/tests/all.sh
     - name: Fetch JavaDoc Source Embed
       uses: carlosperate/download-file-action@v1.0.3
       with:
