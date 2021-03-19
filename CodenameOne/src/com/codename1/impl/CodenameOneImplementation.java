@@ -4552,6 +4552,16 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only Android and iOS ports support this.
+     * @return True if platform supports native cookie sharing.
+     * @since 8.0
+     */
+    public boolean isNativeCookieSharingSupported() {
+        return false;
+    }
+
+    /**
      * Adds/replaces a cookie to be sent to the given domain
      * 
      * @param c cookie to add

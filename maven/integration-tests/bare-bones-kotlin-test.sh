@@ -10,7 +10,7 @@ curl -L https://github.com/shannah/cn1app-archetype-kotlin-template/archive/mast
 unzip master.zip
 rm master.zip
 mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \
-  -DarchetypeGroupId=com.codename1 \
+  -DarchetypeGroupId=com.codenameone \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeVersion=${CN1_VERSION} \
   -DartifactId=myapp2 \

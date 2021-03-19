@@ -97,6 +97,10 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getModel().addProperty("codename1.css.compiler.args.input", cssFile.getAbsolutePath());
             project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
             project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
+        } else {
+            project.getModel().addProperty("codename1.css.compiler.args.input", "");
+            project.getModel().addProperty("codename1.css.compiler.args.output", "");
+            project.getModel().addProperty("codename1.css.compiler.args.merge", "");
         }
         if ("true".equals(project.getProperties().getProperty("cn1.class.path.required"))) {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());

@@ -89,7 +89,7 @@ public class ProjectUtil {
 
         req.setGoals(Collections.singletonList("archetype:generate"));
         Properties props = new Properties();
-        props.setProperty("archetypeGroupId", "com.codenameone.archetypes");
+        props.setProperty("archetypeGroupId", "com.codenameone");
         props.setProperty("archetypeArtifactId", "cn1app-archetype");
         String version = System.getProperty("codename1.version");
         if (version == null) {

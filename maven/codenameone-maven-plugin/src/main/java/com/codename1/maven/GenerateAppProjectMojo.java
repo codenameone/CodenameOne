@@ -149,8 +149,18 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         return new File(targetSrcDir(), path("main", type));
     }
 
+
+
+    private File targetTestSrcDir(String type) {
+        return new File(targetSrcDir(), path("test", type));
+    }
+
     private File sourceSrcDir() {
         return new File(sourceProject, "src");
+    }
+
+    private File sourceTestsDir() {
+        return new File(sourceProject, "test");
     }
 
     private File sourceNativeDir() {
@@ -401,6 +411,63 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         }
     }
 
+    private void copyTestSourceFiles() {
+        {
+            Copy copy = (Copy) antProject().createTask("copy");
+            copy.setTodir(targetTestSrcDir("java"));
+            copy.setOverwrite(true);
+            FileSet files = new FileSet();
+            files.setProject(antProject());
+            files.setDir(sourceTestsDir());
+            files.setIncludes("**/*.java");
+            copy.addFileset(files);
+
+            copy.execute();
+        }
+
+        {
+            Copy copy = (Copy) antProject().createTask("copy");
+            copy.setTodir(targetTestSrcDir("resources"));
+            copy.setOverwrite(true);
+            FileSet files = new FileSet();
+            files.setProject(antProject());
+            files.setDir(sourceTestsDir());
+            files.setExcludes("**/*.kt, **/*.java, **/*.mirah");
+            copy.addFileset(files);
+
+            copy.execute();
+        }
+
+
+        if (hasFilesWithSuffix(sourceSrcDir(), ".kt")){
+            targetSrcDir("kotlin").mkdirs();
+            Copy copy = (Copy) antProject().createTask("copy");
+            copy.setTodir(targetTestSrcDir("kotlin"));
+            copy.setOverwrite(true);
+            FileSet files = new FileSet();
+            files.setProject(antProject());
+            files.setDir(sourceTestsDir());
+            files.setIncludes("**/*.kt");
+            copy.addFileset(files);
+
+            copy.execute();
+        }
+        if (hasFilesWithSuffix(sourceSrcDir(), ".mirah")){
+            targetSrcDir("mirah").mkdirs();
+            Copy copy = (Copy) antProject().createTask("copy");
+            copy.setTodir(targetTestSrcDir("mirah"));
+            copy.setOverwrite(true);
+            FileSet files = new FileSet();
+            files.setProject(antProject());
+            files.setDir(sourceTestsDir());
+            files.setIncludes("**/*.mirah");
+            copy.addFileset(files);
+
+            copy.execute();
+        }
+
+    }
+
     private void copySourceFiles() {
         {
             Copy copy = (Copy) antProject().createTask("copy");
@@ -583,6 +650,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 // The source project was an ANT project
                 copyPropertiesFiles();
                 copySourceFiles();
+                copyTestSourceFiles();
                 copyAndroidFiles();
                 copyIosFiles();
                 copyJavascriptFiles();

@@ -280,6 +280,22 @@ public abstract class AbstractTest implements UnitTest {
     }
 
     /**
+     * @see TestUtils#assertRange(double, double, double)
+     * @since 8.0
+     */
+    public void assertRange(double expected, double actual, double maxAbsoluteError) {
+        TestUtils.assertRange(expected, actual, maxAbsoluteError);
+    }
+
+    /**
+     * @see TestUtils#assertRange(double, double, double, String)
+     * @since 8.0
+     */
+    public void assertRange(double expected, double actual, double maxAbsoluteError, String errorMessage) {
+        TestUtils.assertRange(expected, actual, maxAbsoluteError, errorMessage);
+    }
+
+    /**
      * This method just invokes the test utils method, it is here for convenience
      * @see TestUtils
      */
