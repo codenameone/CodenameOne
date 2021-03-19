@@ -124,6 +124,13 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                 inputs.append(",");
             }
             inputs.append(cssTheme.getAbsolutePath());
+        } else {
+            if (inputs.length() > 0) {
+                throw new MojoFailureException("Cannot compile CSS for this project.  The project does not include a theme.css file in "+cssTheme+", but it includes dependencies that require CSS.  Please add a CSS file at "+cssTheme);
+
+            }
+            getLog().info("Skipping CSS compilation because "+cssTheme+" does not exist");
+            return;
         }
 
 

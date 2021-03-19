@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0.10-SNAPSHOT</version>
+    <version>7.0.13-SNAPSHOT</version>
 
     <packaging>pom</packaging>
 
@@ -80,6 +80,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
+                <version>3.3.9</version>
+            </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase-svg</artifactId>

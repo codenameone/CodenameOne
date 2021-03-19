@@ -47,50 +47,20 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
     }
 
     private String prepareClasspath() {
-        Log log = getLog();
-        log.debug("Preparing classpath for Simulator");
-        List<String> paths = new ArrayList<>();
-        //StringBuilder classpath = new StringBuilder();
-        List<String> classpath = new ArrayList<>();
-
-        copyKotlinIncrementalCompileOutputToOutputDir();
-        for (Artifact artifact : project.getArtifacts()) {
-
-            log.debug("Checking artifact "+artifact);
-            //if (!filterByScope(artifact)) {
-            //    continue;
-            //}
-            if ("provided".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
-                continue;
-            }
-            if (!filterByName(artifact)) {
-                continue;
-            }
-            File file = getJar(artifact);
-            //if (classpath.length() > 0) {
-            //    classpath.append(':');
-            //}
-            classpath.add(file.getAbsolutePath());
-
-            //classpath.append(file.getPath());
-            //paths.add(file.getAbsolutePath());
-        }
-        //if (classpath.length() > 0) {
-        //    classpath.append(':');
-        //}
-        //classpath.append(classFiles.getPath());
-        //paths.add(classFiles.getAbsolutePath());
-        classpath.add(project.getBuild().getOutputDirectory());
-        log.debug("Using the following classpath for Stubber: " + classpath);
         StringBuilder sb = new StringBuilder();
-        for (String path : classpath) {
-            if (sb.length() > 0) {
-                sb.append(File.pathSeparator);
+        try {
+            for (String el : project.getRuntimeClasspathElements()) {
+                if (sb.length() > 0) {
+                    sb.append(File.pathSeparator);
+                }
+                sb.append(el);
             }
-            sb.append(path);
+        } catch (Exception ex) {
+            getLog().error("Failed to get runtime classpath elementes", ex);
         }
         return sb.toString();
     }
+
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -104,8 +74,12 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         project.getModel().addProperty("codename1.mainClass", properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
         // Setup CEF directory
         if (!isCefSetup()) {
+            getLog().debug("CEF Not set up yet.  Setting it up now");
             setupCef();
+        } else {
+            getLog().debug("CEF is already set up. cef.dir="+System.getProperty("cef.dir"));
         }
+        project.getProperties().setProperty("cef.dir", System.getProperty("cef.dir"));
         
         File designerJar = getDesignerJar();
         
@@ -118,16 +92,16 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         File cssFile = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
         File resFile = new File(getCN1ProjectDir(), "target" + File.separator + "classes" + File.separator + "theme.res");
         File mergeFile = new File(getCN1ProjectDir(), "target" + File.separator + "css" + File.separator + "theme.css");
-        
-        project.getModel().addProperty("codename1.css.compiler.args.input", cssFile.getAbsolutePath());
-        project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
-        project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
+
+        if (cssFile.exists()) {
+            project.getModel().addProperty("codename1.css.compiler.args.input", cssFile.getAbsolutePath());
+            project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
+            project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
+        }
         if ("true".equals(project.getProperties().getProperty("cn1.class.path.required"))) {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
         }
-        
-        
-        
+
         
     }
     

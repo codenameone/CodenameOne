@@ -22,9 +22,8 @@
  */
 package com.codename1.builders;
 
-import static com.codename1.builders.Executor.delTree;
-import static com.codename1.builders.Executor.is_windows;
-import static com.codename1.builders.Executor.zipDir;
+
+
 import static com.codename1.maven.PathUtil.path;
 
 import net.lingala.zip4j.exception.ZipException;
@@ -42,14 +41,13 @@ import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
 import java.io.*;
-import java.math.BigInteger;
-import java.net.HttpURLConnection;
+
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.channels.FileChannel;
-import java.security.MessageDigest;
-import java.text.SimpleDateFormat;
+
 import java.util.ArrayList;
-import java.util.Calendar;
+
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,8 +55,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.StringTokenizer;
-import java.util.TimeZone;
-import java.util.prefs.Preferences;
+
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
@@ -76,6 +73,7 @@ import org.xeustechnologies.jtar.TarOutputStream;
 /**
  *
  * @author Shai Almog
+ * @author Steve Hannah
  */
 public class AndroidGradleBuilder extends Executor {
     private static final float MIN_GRADLE_VERSION=6;
@@ -234,12 +232,7 @@ public class AndroidGradleBuilder extends Executor {
     private File androidPortSrcJar;
 
     private String playFlag;
-    private File apk;
-    private File debugApk;
-    private File aab;
-    private File debugAab;
-    private File mapping;
-    private File sourceReturnValue;
+
     private boolean capturePermission;
     private boolean vibratePermission;
     private boolean smsPermission;
@@ -269,7 +262,6 @@ public class AndroidGradleBuilder extends Executor {
     private boolean launcherPermissions;
 
     private boolean integrateMoPub = false;
-    private boolean integrateZooz = false;
 
     private static final boolean isMac;
 
@@ -369,16 +361,16 @@ public class AndroidGradleBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
-        log("Request Args: ");
-        log("-----------------");
+        debug("Request Args: ");
+        debug("-----------------");
         for (String arg : request.getArgs()) {
-            log(arg+"="+request.getArg(arg, null));
+            debug(arg+"="+request.getArg(arg, null));
         }
-        log("-------------------");
+        debug("-------------------");
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
                 : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
-                : path(System.getProperty("user.home"), "Android", "sdk"); // linux
+                : path(System.getProperty("user.home"), "Android", "Sdk"); // linux
 
         String androidHome = System.getenv("ANDROID_HOME");
         if (androidHome == null) {
@@ -407,7 +399,7 @@ public class AndroidGradleBuilder extends Executor {
         try {
             sdkListStr = execString(tmpDir, sdkmanager.getAbsolutePath(), "--list");
         } catch (Exception ex) {
-            log("Failed to get SDK list using "+sdkmanager+".  "+ex.getMessage());
+            error("Failed to get SDK list using "+sdkmanager+".  "+ex.getMessage(), ex);
             throw new BuildException("Failed to get SDK list using "+sdkmanager, ex);
         }
         Scanner sdkScanner = new Scanner(sdkListStr);
@@ -439,7 +431,7 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        System.out.println("Installed platforms: "+installedPlatforms);
+        debug("Installed platforms: "+installedPlatforms);
 
         int maxBuildToolsVersionInt = 0;
         String maxBuildToolsVersion = "0";
@@ -462,16 +454,9 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        String buildVer = request.getArg("build.version", "");
 
-        float buildVersion = -1;
-        if (buildVer.length() > 0) {
-            buildVersion = Float.parseFloat(buildVer);
-        }
 
-        if (buildVersion > 0 && buildVersion < 2) {
-            throw new BuildException("versioned builds older then 2.0 are not supported anymore, update your code to a newer version");
-        }
+
         useAndroidX = request.getArg("android.useAndroidX", "false").equals("true");
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
@@ -489,17 +474,17 @@ public class AndroidGradleBuilder extends Executor {
             useAndroidX = true;
             migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
         }
-        log("Effective build tools version = "+this.buildToolsVersion);
+        debug("Effective build tools version = "+this.buildToolsVersion);
 
 
         // Augment the xpermissions request arg with explicit android.permissions.XXX build hints
         xPermissions = request.getArg("android.xpermissions", "");
-        System.out.println("Adding android permissions...");
+        debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
             String permName = xPerm.substring(xPerm.lastIndexOf(".")+1);
 
             if (request.getArg("android.permission."+permName, "false").equals("true")) {
-                System.out.println("Found permission "+permName);
+                debug("Found permission "+permName);
                 String maxSdk = request.getArg("android.permission."+permName+".maxSdkVersion", "");
                 String required = request.getArg("android.permission."+permName+".required", "");
                 String addString =  "    <uses-permission android:name=\""+xPerm+"\" ";
@@ -528,7 +513,7 @@ public class AndroidGradleBuilder extends Executor {
         tmpFile.mkdirs();
 
 
-        boolean useNewBuildTools = false;
+
         File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle"));
 
         String gradleHome = System.getenv("GRADLE_HOME");
@@ -536,11 +521,6 @@ public class AndroidGradleBuilder extends Executor {
             gradleHome = managedGradleHome.getAbsolutePath();
         }
         String gradleExe = System.getenv("GRADLE_PATH");
-
-
-        if(buildToolsVersionInt >= 27) {
-            useNewBuildTools = true;
-        }
 
         if (gradleExe == null) {
             if (gradleHome != null) {
@@ -552,7 +532,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         if (PREFER_MANAGED_GRADLE) {
-            log("PREFER_MANAGED_GRADLE flag is set.  Ignoring GRADLE_HOME and GRADLE_PATH environment variables.  Using managed gradle at "+managedGradleHome+" instead");
+            debug("PREFER_MANAGED_GRADLE flag is set.  Ignoring GRADLE_HOME and GRADLE_PATH environment variables.  Using managed gradle at "+managedGradleHome+" instead");
             gradleHome = managedGradleHome.getAbsolutePath();
             gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
 
@@ -564,9 +544,9 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception ex) {
             gradleVersion = "0";
         }
-        log("FOUND gradleVersion "+gradleVersion);
+        debug("FOUND gradleVersion "+gradleVersion);
         int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
-        log("Found gradleVersionInt="+gradleVersionInt);
+        debug("Found gradleVersionInt="+gradleVersionInt);
         if (gradleVersionInt <  MIN_GRADLE_VERSION) {
             // The minimum version is too low.
             if (managedGradleHome.exists()) {
@@ -637,33 +617,12 @@ public class AndroidGradleBuilder extends Executor {
         File androidToolsDir = new File(androidSDKDir, "tools");
         File androidCommand = new File(androidToolsDir, "android" + bat);
         File projectDir = new File(tmpFile, request.getMainClass());
-        //projectDir.mkdirs();
         gradleProjectDirectory = projectDir;
 
-        //String androidVersion = "android-21";
         String androidVersion = "android-14";
         String defaultVersion = maxPlatformVersion;
         String usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
-        if (buildVersion > 0) {
 
-            if (buildVersion <= 7) {
-                defaultVersion = "29";
-                usesLibrary = "        <uses-library android:name=\"org.apache.http.legacy\" android:required=\"false\" />\n";
-            }
-            if(buildVersion <= 6) {
-                usesLibrary = "";
-                defaultVersion = "27";
-            }
-            if(buildVersion <= 4) {
-                usesLibrary = "";
-                defaultVersion = "23";
-            }
-            if(buildVersion <= 3.5) {
-                usesLibrary = "";
-                defaultVersion = "21";
-            }
-
-        }
         String targetNumber = request.getArg("android.targetSDKVersion", defaultVersion);
 
         if(!targetNumber.equals(defaultVersion)) {
@@ -705,7 +664,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         boolean androidAppBundle = request.getArg("android.appBundle", gradleVersionInt >= 5 ? "true" : "false").equals("true");
 
-        log("gradlePluginVersion="+gradlePluginVersion);
+        debug("gradlePluginVersion="+gradlePluginVersion);
         projectDir = new File(projectDir, "app");
         File studioProjectDir = projectDir.getParentFile();
 
@@ -723,7 +682,7 @@ public class AndroidGradleBuilder extends Executor {
                 createAndroidStudioProject(studioProjectDir);
 
             } catch (Exception ex) {
-                log("Failed to create AndroidStudioProject: "+ex.getMessage());
+                error("Failed to create AndroidStudioProject: "+ex.getMessage(), ex);
                 throw new BuildException("Failed to create android project", ex);
             }
         }
@@ -756,6 +715,7 @@ public class AndroidGradleBuilder extends Executor {
         File libsDir = new File(projectDir, "libs");
         libsDir.mkdirs();
         try {
+            debug("Extracting "+sourceZip);
             unzip(sourceZip, dummyClassesDir, assetsDir, srcDir, libsDir, xmlDir);
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
@@ -841,7 +801,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "-dontnote android.support.**\n"
                     + "-dontnote androidx.**";
 
-            //facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"" + request.getArg("facebook.appId", "706695982682332") + "\"/>\n";
+
             facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"@string/facebook_app_id\"/>\n";
             facebookActivity = " <activity android:name=\"com.facebook.FacebookActivity\"/>\n";
             additionalKeyVals += "<string name=\"facebook_app_id\">" + request.getArg("facebook.appId", "706695982682332") + "</string>";
@@ -912,11 +872,11 @@ public class AndroidGradleBuilder extends Executor {
                         capturePermission = true;
                     }
                     if (cls.indexOf("com/codename1/ads") == 0) {
-                        System.out.println("Adding phone permission because of class " + cls);
+                        debug("Adding phone permission because of class " + cls);
                         phonePermission = true;
                     }
                     if (cls.indexOf("com/codename1/components/Ads") == 0) {
-                        System.out.println("Adding phone permission because of class " + cls);
+                        debug("Adding phone permission because of class " + cls);
                         phonePermission = true;
                     }
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
@@ -935,27 +895,13 @@ public class AndroidGradleBuilder extends Executor {
                         if (!"true".equals(playServicesValue)) {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
-                            System.out.println("Adding location playservice");
+                            debug("Adding location playservice");
                             request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
                             playServicesLocation = true;
                             playFlag = "false";
                         }
                     }
-                
-                /*if (cls.indexOf("com/codename1/components/ShareButton") > -1) {
-                    //contactsReadPermission = true;
-                    phonePermission = true;
-                }*/
-                /*
-                // Disabling this as I can't see any reason why the media package 
-                // requires phone permission.
-                // REF: https://github.com/codenameone/CodenameOne/issues/1945
-                
-                if (cls.indexOf("com/codename1/media") > -1) {
-                    //contactsReadPermission = true;
-                    phonePermission = true;
-                }
-                */
+
                     if (cls.indexOf("com/codename1/social") > -1) {
                         credentialsPermission = true;
                         getAccountsPermission = true;
@@ -969,10 +915,7 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && (method.indexOf("vibrate") > -1 || method.indexOf("notifyStatusBar") > -1)) {
                         vibratePermission = true;
                     }
-                /*if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("share")  == 0) {
-                    System.out.println("Adding phone permission because of Display.share method");
-                    phonePermission = true;
-                }*/
+
                     if ((cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("createBackgroundMedia") > -1)) {
                         if (targetSDKVersionInt >= 28) {
                             foregroundServicePermission = true;
@@ -990,25 +933,21 @@ public class AndroidGradleBuilder extends Executor {
                         if (!"true".equals(playServicesValue)) {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
-                            System.out.println("Adding location playservice");
+                            debug("Adding location playservice");
                             request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
                             playServicesLocation = true;
                             playFlag = "false";
                         }
                     }
                     if (cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("setRemoteControlListener") > -1) {
-                        System.out.println("Adding wake lock permission due to use of MediaManager.setRemoteControlListener");
+                        debug("Adding wake lock permission due to use of MediaManager.setRemoteControlListener");
                         //smsPermission = true;
                         wakeLock = true;
                         addRemoteControlService = true;
                     }
-                /*if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("sendSMS") > -1) {
-                    System.out.println("Adding phone permission because of Display.sendSMS method");
-                    //smsPermission = true;
-                    phonePermission = true;
-                }*/
+
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getUdid") > -1) {
-                        System.out.println("Adding phone permission because of Display.getUdid method");
+                        debug("Adding phone permission because of Display.getUdid method");
                         phonePermission = true;
                     }
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getMsisdn") > -1) {
@@ -1050,27 +989,27 @@ public class AndroidGradleBuilder extends Executor {
         if (useFCM) {
             request.putArgument("android.fcm.minPlayServicesVersion", "12.0.0");
         }
-        System.out.println("Starting playServicesVersion "+playServicesVersion);
+        debug("Starting playServicesVersion "+playServicesVersion);
 
         for (String arg : request.getArgs()) {
             if (arg.endsWith(".minPlayServicesVersion")) {
                 if (compareVersions(request.getArg(arg, null), playServicesVersion) > 0) {
                     playServicesVersion = request.getArg(arg, null);
-                    System.out.println("playServicesVersion increased to "+playServicesVersion+" due to "+arg);
+                    debug("playServicesVersion increased to "+playServicesVersion+" due to "+arg);
                 }
             }
         }
         request.putArgument("android.playServicesVersion", playServicesVersion);
 
-        System.out.println("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
+        debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
         if (useFCM) {
             if (!googleServicesJson.exists()) {
-                log("google-services.json not found.  When using FCM for push notifications (i.e. android.messagingService=fcm), you must include valid google-services.json file.  Use the Firebase console to add Firebase messaging to your app.  https://console.firebase.google.com/u/0/ Then download the google-services.json file and place it in the native/android directory of your project. If you still want to use GCM (which no longer works) define the build hint android.messagingService=gcm");
+                error("google-services.json not found.  When using FCM for push notifications (i.e. android.messagingService=fcm), you must include valid google-services.json file.  Use the Firebase console to add Firebase messaging to your app.  https://console.firebase.google.com/u/0/ Then download the google-services.json file and place it in the native/android directory of your project. If you still want to use GCM (which no longer works) define the build hint android.messagingService=gcm", new RuntimeException());
                 return false;
             }
             if (buildToolsVersionInt < 27) {
-                log("FCM push notifications require build tools version 27 or higher.  Please set the android.buildToolsVersion to 27.0.0 or higher or remove the android.messagingService=fcm build hint.");
+                error("FCM push notifications require build tools version 27 or higher.  Please set the android.buildToolsVersion to 27.0.0 or higher or remove the android.messagingService=fcm build hint.", new RuntimeException());
                 return false;
             }
 
@@ -1081,11 +1020,11 @@ public class AndroidGradleBuilder extends Executor {
                 request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
             }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-core")) {
-                System.out.println("Adding firebase core to gradle dependencies.");
-                System.out.println("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
-                System.out.println("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
+                debug("Adding firebase core to gradle dependencies.");
+                debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
+                debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
                 request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\ncompile \"com.google.firebase:firebase-core:${var.android.playServicesVersion}\"\n");
-                System.out.println("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
+                debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
             }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
                 request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\ncompile \"com.google.firebase:firebase-messaging:${var.android.playServicesVersion}\"\n");
@@ -1122,28 +1061,25 @@ public class AndroidGradleBuilder extends Executor {
 
 
         boolean legacyGplayServicesMode = false;
-        if(buildVersion == 3.3f ) {
-            legacyGplayServicesMode = true;
-            playFlag = "false";
-        } else {
-            if(playServicesValue != null) {
-                if(playServicesValue.equals("true")){
-                    // compatibility mode...
-                    legacyGplayServicesMode = true;
-                    if(playFlag.equals("false")) {
-                        // legacy gplay can't be mixed with explicit gplay fail the build right now!
-                        if (googleServicesJson.exists()) {
-                            log("The android.playService.auth flag was automatically enabled because the project includes the google-services.json file");
-                        }
-                        log("Error: you can't use the build hint android.includeGPlayServices together with android.playService.* build hints. They are exclusive of one another. Please remove the old android.includeGPlayServices hint from your code or from the cn1lib that might have injected it");
-                        return false;
+
+        if(playServicesValue != null) {
+            if(playServicesValue.equals("true")){
+                // compatibility mode...
+                legacyGplayServicesMode = true;
+                if(playFlag.equals("false")) {
+                    // legacy gplay can't be mixed with explicit gplay fail the build right now!
+                    if (googleServicesJson.exists()) {
+                        debug("The android.playService.auth flag was automatically enabled because the project includes the google-services.json file");
                     }
-                    playFlag = "true";
-                } else {
-                    playFlag = "false";
+                    error("Error: you can't use the build hint android.includeGPlayServices together with android.playService.* build hints. They are exclusive of one another. Please remove the old android.includeGPlayServices hint from your code or from the cn1lib that might have injected it", new RuntimeException());
+                    return false;
                 }
+                playFlag = "true";
+            } else {
+                playFlag = "false";
             }
         }
+
 
         playServicesPlus = request.getArg("android.playService.plus", "false" ).equals("true");
         playServicesAuth = request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("true");
@@ -1176,11 +1112,10 @@ public class AndroidGradleBuilder extends Executor {
 
         if (googleAdUnitId == null && playServicesAds) {
             minSDK = maxInt("9", minSDK);
-            //targetSDKVersion = "      android:targetSdkVersion=\"14\" ";
             googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
         }
         if (playServicesLocation) {
-            log("Play Services Location Enabled");
+            debug("Play Services Location Enabled");
             googlePlayObfuscation += "-keep class com.codename1.location.AndroidLocationPlayServiceManager {\n"
                     + "*;\n"
                     + "}\n\n";
@@ -1202,7 +1137,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
         } else {
-            log("Play services location disabled");
+            debug("Play services location disabled");
         }
 
         shouldIncludeGoogleImpl = playServicesAuth;
@@ -1214,16 +1149,6 @@ public class AndroidGradleBuilder extends Executor {
                     + "}\n\n";
         }
 
-//        if (dep.exists() && dep.listFiles().length > 0) {
-//            Properties p = new Properties();
-//            p.load(new FileInputStream(new File(projectDir, "project.properties")));
-//            File[] deps = dep.listFiles();
-//            for (int i = 0; i < deps.length; i++) {
-//                File lib = deps[i];
-//                p.put("android.library.reference." + (i + 1), "/dependency/" + lib.getName() + "/");
-//            }
-//            p.store(new FileOutputStream(new File(projectDir, "project.properties")), "");
-//        }
         File stubFileSourceDir = new File(srcDir, request.getPackageName().replace('.', File.separatorChar));
         stubFileSourceDir.mkdirs();
 
@@ -1373,48 +1298,8 @@ public class AndroidGradleBuilder extends Executor {
             integrateMoPub = true;
         }
 
-        final String zoozAppId = request.getArg("zooz.andappId", null);
-        final String zoozSandBox = request.getArg("zooz.sandbox", null);
-        if (buildVersion > 0 && buildVersion <= 3.8) {
-            if (zoozAppId != null && zoozSandBox != null) {
-                integrateZooz = true;
-            } else {
-                try {
-                    File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
-                    DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
-                    byte[] data = new byte[(int) zoozCode.length()];
-                    dis.readFully(data);
-                    dis.close();
-                    FileWriter fios = new FileWriter(zoozCode);
-                    String str = new String(data);
-                    str = str.replaceAll("// ZOOZMARKER_START", "/*");
-                    str = str.replaceAll("// ZOOZMARKER_END", "*/");
-                    fios.write(str);
-                    fios.close();
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to inject ZOOZ code into the ZoozPurchase class", ex);
-                }
-            }
-        } else {
-            if (zoozAppId != null && zoozSandBox != null) {
-                try {
-                    integrateZooz = true;
-                    File zoozCode = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "ZoozPurchase.java");
-                    DataInputStream dis = new DataInputStream(new FileInputStream(zoozCode));
-                    byte[] data = new byte[(int) zoozCode.length()];
-                    dis.readFully(data);
-                    dis.close();
-                    FileWriter fios = new FileWriter(zoozCode);
-                    String str = new String(data);
-                    str = str.replaceAll("/* ZOOZMARKER_START", "");
-                    str = str.replaceAll("ZOOZMARKER_END */", "");
-                    fios.write(str);
-                    fios.close();
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to inject ZOOZ ode into the ZoozPurchase class", ex);
-                }
-            }
-        }
+
+
         if (request.getArg("android.textureView", "false").equals("true")) {
             File impl = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidImplementation.java");
             try {
@@ -1528,30 +1413,9 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        String zoozActivities = "";
 
-        //if(purchasePermissions) {
-        if (integrateZooz) {
-            try {
-                createFile(new File(libsDir, "zooz_iap.jar"), getResourceAsStream("zooz_iap.jar"));
-            } catch (IOException ex) {
-                throw new BuildException("Failed to add the zooz_iap.jar", ex);
-            }
-            System.out.println("Adding phone permission because of Zooz integration");
-            phonePermission = true;
-            accessNetworkStatePermission = true;
-            accessWifiStatePermissions = true;
-            vibratePermission = true;
-            getAccountsPermission = true;
-            zoozActivities = "<!-- ZooZ Activity -->"
-                    + "<activity android:name=\"com.zooz.android.lib.CheckoutActivity\""
-                    + " android:theme=\"@android:style/Theme.Translucent\""
-                    + " android:configChanges=\"keyboardHidden|orientation\"/>"
-                    + "<!-- Pay Pal -->"
-                    + "<activity android:name=\"com.paypal.android.MEP.PayPalActivity\""
-                    + " android:theme=\"@android:style/Theme.Translucent.NoTitleBar\""
-                    + " android:configChanges=\"keyboardHidden|orientation\"/>";
-        }
+
+
 
         File stringsFile = new File(valsDir, "strings.xml");
 
@@ -1580,6 +1444,7 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
         } catch (IOException ex) {
+            error("Failed to generate strings file", ex);
             throw new BuildException("Failed to generate strings file "+stringsFile, ex);
         }
 
@@ -1604,17 +1469,14 @@ public class AndroidGradleBuilder extends Executor {
                     colorsStr += "<item name=\"android:" + k + "\">@color/" + k + "</item>\n";
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                error("Failed to create DocumentBuilder", e);
             }
         }
 
         String themeName = "android:Theme.Black";
         String itemName = androidAppBundle ? "cn1Style" : "attr/cn1Style";
 
-        String stylesFileContent;
-
-        if(useNewBuildTools) {
-            stylesFileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        String stylesFileContent  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                     + "<resources>\n" +
                     "    <style name=\"CustomTheme\" parent=\"" + themeName + "\">\n" +
                     "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1625,19 +1487,7 @@ public class AndroidGradleBuilder extends Executor {
                     "    </style>\n" +
                     request.getArg("android.style", "") +
                     "</resources>";
-        } else {
-            stylesFileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                    + "<resources>\n"
-                    + "    <style name=\"CustomTheme\" parent=\"" + themeName + "\">\n"
-                    + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>\n"
-                    + "    </style>\n"
-                    + "    <attr name=\"cn1Style\" format=\"reference\" />\n"
-                    + "    <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">\n"
-                    + "        <item name=\"android:textCursorDrawable\">@null</item>\n"
-                    + "    </style>\n"
-                    + request.getArg("android.style", "")
-                    + "</resources>";
-        }
+
         try {
             OutputStream stylesSourceStream = new FileOutputStream(stylesFile);
             stylesSourceStream.write(stylesFileContent.getBytes());
@@ -1651,10 +1501,7 @@ public class AndroidGradleBuilder extends Executor {
             }
 
             File styles11File = new File(vals11Dir, "styles.xml");
-            String styles11FileContent;
-
-            if (useNewBuildTools) {
-                styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            String styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                         "<resources>\n" +
                         "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Holo" + theme + "\">\n" +
                         "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1665,29 +1512,14 @@ public class AndroidGradleBuilder extends Executor {
                         "        <item name=\"android:textCursorDrawable\">@null</item>\n" +
                         "    </style>\n" +
                         "</resources>\n";
-            } else {
-                styles11FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Holo" + theme + "\">"
-                        + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>"
-                        + "        <item name=\"android:windowActionBar\">false</item>"
-                        + "       <item name=\"android:windowTitleSize\">0dp</item>"
-                        + "   </style>"
-                        + "   <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">"
-                        + "       <item name=\"android:textCursorDrawable\">@null</item>"
-                        + "   </style>"
-                        + "</resources>";
-            }
+
 
             OutputStream styles11SourceStream = new FileOutputStream(styles11File);
             styles11SourceStream.write(styles11FileContent.getBytes());
             styles11SourceStream.close();
 
             File styles21File = new File(vals21Dir, "styles.xml");
-            String styles21FileContent;
-
-            if (useNewBuildTools) {
-                styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            String styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                         "<resources>\n" +
                         "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Material" + theme + "\">\n" +
                         "        <item name=\"" + itemName + "\">@style/CN1.EditText.Style</item>\n" +
@@ -1699,25 +1531,13 @@ public class AndroidGradleBuilder extends Executor {
                         "        <item name=\"android:textCursorDrawable\">@null</item>\n" +
                         "    </style>\n" +
                         "</resources>\n";
-            } else {
-                styles21FileContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <style name=\"CustomTheme\" parent=\"@android:style/Theme.Material" + theme + "\">"
-                        + "        <item name=\"@attr/cn1Style\">@style/CN1.EditText.Style</item>"
-                        + "        <item name=\"android:windowActionBar\">false</item>"
-                        + "       <item name=\"android:windowTitleSize\">0dp</item>"
-                        + colorsStr
-                        + "   </style>"
-                        + "   <style name=\"CN1.EditText.Style\" parent=\"@android:style/Widget.EditText\">"
-                        + "       <item name=\"android:textCursorDrawable\">@null</item>"
-                        + "   </style>"
-                        + "</resources>";
-            }
+
 
             OutputStream styles21SourceStream = new FileOutputStream(styles21File);
             styles21SourceStream.write(styles21FileContent.getBytes());
             styles21SourceStream.close();
         } catch (IOException ex) {
+            error("Failed to generate style files", ex);
             throw new BuildException("Failed to generate styles files", ex);
         }
 
@@ -2001,9 +1821,6 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        if (integrateZooz) {
-            minSDK = maxInt("8", minSDK);
-        }
 
         String sharedUserId = request.getArg("android.sharedUserId", "");
         if (sharedUserId.length() > 0) {
@@ -2040,7 +1857,7 @@ public class AndroidGradleBuilder extends Executor {
             applicationNode += " android:icon=\"@drawable/icon\" ";
         }
         if (request.getArg("android.multidex", "false").equals("true") && Integer.parseInt(minSDK) < 21) {
-            System.out.println("Setting Application node to MultiDexApplication because minSDK="+minSDK+" < 21");
+            debug("Setting Application node to MultiDexApplication because minSDK="+minSDK+" < 21");
             applicationNode += " android:name=\""+xclass("android.support.multidex.MultiDexApplication")+"\" ";
         }
 
@@ -2095,9 +1912,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "                <action android:name=\"com.google.android.c2dm.intent.REGISTRATION\" />\n"
                 + "                <category android:name=\"" + request.getPackageName() + "\" />\n"
                 + "            </intent-filter>\n"
-                /*+ "            <intent-filter>\n"
-                + "                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />\n"
-                + "            </intent-filter>\n"*/
+
                 + "        </receiver>\n";
         if (!pushPermission) {
             pushManifestEntries = "";
@@ -2150,7 +1965,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "        </activity>\n"
                 + facebookActivityMetaData
                 + facebookActivity
-                + zoozActivities
                 + googlePlayAdsActivity
                 + pushManifestEntries
                 + billingServiceData
@@ -2177,7 +1991,7 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to write manifest file", ex);
         }
-        log("Generated manifest file: " + manifestSource);
+        debug("Generated manifest file: " + manifestSource);
 
         String oncreate = request.getArg("android.onCreate", "");
 
@@ -2208,42 +2022,34 @@ public class AndroidGradleBuilder extends Executor {
 
 
         String localNotificationCode = "";
-        if (buildVersion < 0 || buildVersion > 3.1) {
-            localNotificationCode = ""
-                    + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
-                    + "            Intent intent = getIntent();\n"
-                    + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
-                    + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
-                    + "                intent.removeExtra(\"LocalNotificationID\");\n"
-                    + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
-                    + "            }\n"
-                    + "        }\n";
-        }
+
+        localNotificationCode = ""
+                + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
+                + "            Intent intent = getIntent();\n"
+                + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
+                + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
+                + "                intent.removeExtra(\"LocalNotificationID\");\n"
+                + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
+                + "            }\n"
+                + "        }\n";
+
 
         String reinitCode0 = "Display.init(this);\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
-            // We need to explicitly call initImpl() to setup the activity in case the 
-            // last used context is a service, since Display.init() won't actually do 
-            // a reinitialize in this case. 
-            // We don't want to actually call deinitialize here because this is too heavy-handed,
-            // (if the service is running, this will create a new implementation and edt thread
-            // which will cause problems for existing background procresses.  
-            // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
-            // but other things will be set up properly.
-            reinitCode0 = "AndroidImplementation.startContext(this);\n";
-        }
+
+        reinitCode0 = "AndroidImplementation.startContext(this);\n";
+
         String reinitCode = "Display.init(this);\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
-            // We need to explicitly call initImpl() to setup the activity in case the 
-            // last used context is a service, since Display.init() won't actually do 
-            // a reinitialize in this case. 
-            // We don't want to actually call deinitialize here because this is too heavy-handed,
-            // (if the service is running, this will create a new implementation and edt thread
-            // which will cause problems for existing background procresses.  
-            // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
-            // but other things will be set up properly.
-            reinitCode = "AndroidImplementation.startContext(this);\n";
-        }
+
+        // We need to explicitly call initImpl() to setup the activity in case the
+        // last used context is a service, since Display.init() won't actually do
+        // a reinitialize in this case.
+        // We don't want to actually call deinitialize here because this is too heavy-handed,
+        // (if the service is running, this will create a new implementation and edt thread
+        // which will cause problems for existing background procresses.
+        // Doing it this way ensures that the EDT and implemenation objects will remain unchanged,
+        // but other things will be set up properly.
+        reinitCode = "AndroidImplementation.startContext(this);\n";
+
         String waitingForPermissionsRequestOnStop = "        if (isWaitingForPermissionResult()) {\n" +
                         "            return;\n" +
                         "        }\n";
@@ -2260,7 +2066,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "        Display.getInstance().callSerially(new Runnable() { public void run() {i.stop();} });\n"
                 + "        running = false;\n"
                 + "    }\n\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
 
             // Added a bit of blocking to onStop() to prevent onDestroy() from being
             // run before stop() is completed.  This probably only shows up if the 
@@ -2268,9 +2074,9 @@ public class AndroidGradleBuilder extends Executor {
             // to developer options... but it is still better to finish onStop()
             // before onDestroy() is run.
             onStopCode = "protected void onStop() {\n";
-            if (buildVersion < 0 || buildVersion >= 5) {
+
                 onStopCode += "        com.codename1.impl.android.AndroidImplementation.writeServiceProperties(this);\n";
-            }
+
             onStopCode +=
                     "        super.onStop();\n" +
                             "        if(isWaitingForResult()){\n" +
@@ -2302,24 +2108,24 @@ public class AndroidGradleBuilder extends Executor {
                             "        }\n" +
                             "        running = false;\n" +
                             "    }\n\n";
-        }
+
 
         String onDestroyCode = "    protected void onDestroy() {\n"
-                + createOnDestroyCode(request, buildVersion)
+                + createOnDestroyCode(request)
                 + "        super.onDestroy();\n"
                 + "        Display.getInstance().callSerially(new Runnable() { public void run() {i.destroy(); Display.deinitialize();} });\n"
                 + "        running = false;\n"
                 + "    }\n";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
             onDestroyCode = "protected void onDestroy() {\n" +
-                    createOnDestroyCode(request, buildVersion) +
+                    createOnDestroyCode(request) +
                     "        super.onDestroy();\n" +
                     "\n" +
                     "        Display.getInstance().callSerially(new Runnable() { public void run() {i.destroy();} });\n" +
                     "        AndroidImplementation.stopContext(this);\n" +
                     "        running = false;\n" +
                     "    }";
-        }
+
 
         File stubFileSourceFile = new File(stubFileSourceDir, request.getMainClass() + "Stub.java");
         String consumableCode;
@@ -2331,9 +2137,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "}\n";
 
         String firstTimeStatic = "";
-        if (buildVersion < 0 || buildVersion > 3.51) {
+
             firstTimeStatic = " static";
-        }
+
 
         String notificationChannelId = request.getArg("android.NotificationChannel.id", "cn1-channel");
         String notificationChannelName = request.getArg("android.NotificationChannel.name", "Notifications");
@@ -2422,9 +2228,9 @@ public class AndroidGradleBuilder extends Executor {
                     + facebookHashCode
                     + facebookSupport
                     + streamMode
-                    + registerNativeImplementationsAndCreateStubs(srcDir, dummyClassesDir)
+                    + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), srcDir, dummyClassesDir)
                     + oncreate + "\n"
-                    + createOnCreateCode(request, buildVersion)
+                    + createOnCreateCode(request)
                     + "    }\n"
                     + "    protected void onResume() {\n"
                     + "        running = true;\n"
@@ -2572,10 +2378,6 @@ public class AndroidGradleBuilder extends Executor {
         }
         boolean backgroundPushHandling = "true".equals(request.getArg("android.background_push_handling", "false"));
         if (!useFCM) {
-            //File fcmMessagingServiceFile = new File(androidImplDir, "CN1FirebaseMessagingService.java");
-            //fcmMessagingServiceFile.delete();
-
-
             File pushServiceFileSourceFile = new File(stubFileSourceDir, "PushNotificationService.java");
 
             String pushServiceOnCreate = "";
@@ -2951,17 +2753,19 @@ public class AndroidGradleBuilder extends Executor {
         } else {
             InputStream is = null;
             OutputStream os = null;
+            debug("Generating FirebaseMessagingService...");
             File fcmMessagingServiceFile = new File(androidImplDir, "CN1FirebaseMessagingService.java");
 
             try {
-                String fireBaseMessagingServiceSourcePath = "/com/codename1/build/daemon/android/CN1FirebaseMessagingService.javas";
+                String fireBaseMessagingServiceSourcePath = "CN1FirebaseMessagingService.javas";
 
-                fireBaseMessagingServiceSourcePath = "/com/codename1/build/daemon/android/CN1FirebaseMessagingService7.javas";
+                fireBaseMessagingServiceSourcePath = "CN1FirebaseMessagingService7.javas";
 
                 is = getClass().getResourceAsStream(fireBaseMessagingServiceSourcePath);
                 os = new FileOutputStream(fcmMessagingServiceFile);
                 copy(is, os);
             } catch (IOException ex) {
+                error("Failed to generate FirebaseMessagingService", ex);
                 throw new BuildException("Failed to generate FirebaseMessagingService", ex);
             } finally {
                 if (is != null) {
@@ -3028,7 +2832,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontoptimize\n"
                 + dontObfuscate
                 + "\n"
-                + "-keepclassmembers class com.zooz.android.lib.** {\n"
                 + "public *;\n"
                 + "}\n\n"
                 + "-dontwarn com.google.android.gms.**\n"
@@ -3084,7 +2887,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "    public "+xclass("android.support.v4.app.NotificationCompat")+"$Builder setChannelId(java.lang.String);\n"
                 + "}\n\n"
                 + facebookProguard
-                //+ goodProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 + googlePlayObfuscation
                 + "-keep class com.google.mygson.**{\n"
@@ -3236,10 +3038,10 @@ public class AndroidGradleBuilder extends Executor {
 
         String compileSdkVersion = "'android-21'";
         String quotedBuildToolsVersion = "'23.0.1'";
-        if (buildVersion < 0 || buildVersion > 3.4) {
+
             compileSdkVersion = "'android-" + request.getArg("android.sdkVersion", "23") + "'";
             quotedBuildToolsVersion = "'" +buildToolsVersion + "'";
-        }
+
 
 
 
@@ -3280,35 +3082,35 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String supportV4Default = "    compile 'com.android.support:support-v4:23.+'";
-        if(useNewBuildTools) {
-            compileSdkVersion = maxPlatformVersion;
-            String supportLibVersion = maxPlatformVersion;
-            if (buildToolsVersion.startsWith("28")) {
-                compileSdkVersion = "28";
-                supportLibVersion = "28";
-            }
-            if (buildToolsVersion.startsWith("29")) {
-                compileSdkVersion = "29";
-                supportLibVersion = "28";
-            }
-            jcenter =
-                    "      google()\n" +
-                            "     jcenter()\n" +
-                            "     mavenLocal()\n" +
-                            "      mavenCentral()\n";
 
-            injectRepo += "      google()\n" +
-                    "     mavenLocal()\n" +
-                    "      mavenCentral()\n";
-            if(!androidAppBundle){
-                gradlePropertiesObject.put("android.enableAapt2", "false");
-            }
-            if (!useAndroidX) {
-                supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
-            } else {
-                supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
-            }
+        compileSdkVersion = maxPlatformVersion;
+        String supportLibVersion = maxPlatformVersion;
+        if (buildToolsVersion.startsWith("28")) {
+            compileSdkVersion = "28";
+            supportLibVersion = "28";
         }
+        if (buildToolsVersion.startsWith("29")) {
+            compileSdkVersion = "29";
+            supportLibVersion = "28";
+        }
+        jcenter =
+                "      google()\n" +
+                        "     jcenter()\n" +
+                        "     mavenLocal()\n" +
+                        "      mavenCentral()\n";
+
+        injectRepo += "      google()\n" +
+                "     mavenLocal()\n" +
+                "      mavenCentral()\n";
+        if(!androidAppBundle){
+            gradlePropertiesObject.put("android.enableAapt2", "false");
+        }
+        if (!useAndroidX) {
+            supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
+        } else {
+            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
+        }
+
         String compile = "compile";
         if (useAndroidX) {
             compile = "implementation";
@@ -3402,9 +3204,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "}\n"
                 + request.getArg("android.xgradle", "");
 
-        log("Gradle File start\n-------\n");
-        log(gradleProps);
-        log("-------\nGradle File end \n");
+        debug("Gradle File start\n-------\n");
+        debug(gradleProps);
+        debug("-------\nGradle File end \n");
         File gradleFile = new File(projectDir, "build.gradle");
 
         try {
@@ -3482,59 +3284,6 @@ public class AndroidGradleBuilder extends Executor {
         return s;
     }
 
-    @Override
-    public File[] getResults() {
-        if(aab != null){
-            if (sourceReturnValue != null) {
-                if (debugAab != null && debugAab != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, aab, debugAab, mapping, sourceReturnValue};
-                    }
-                    return new File[]{apk, aab, debugAab, sourceReturnValue};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, aab, mapping, sourceReturnValue};
-                }
-                return new File[]{apk, aab, sourceReturnValue};
-            } else {
-                if (debugAab != null && debugAab != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, aab, debugAab, mapping};
-                    }
-                    return new File[]{apk, aab, debugApk};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, aab, mapping};
-                }
-                return new File[]{apk, aab};
-            }
-        }
-        else{
-            if (sourceReturnValue != null) {
-                if (debugApk != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, debugApk, mapping, sourceReturnValue};
-                    }
-                    return new File[]{apk, debugApk, sourceReturnValue};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, mapping, sourceReturnValue};
-                }
-                return new File[]{apk, sourceReturnValue};
-            } else {
-                if (debugApk != null) {
-                    if (mapping != null && mapping.exists()) {
-                        return new File[]{apk, debugApk, mapping};
-                    }
-                    return new File[]{apk, debugApk};
-                }
-                if (mapping != null && mapping.exists()) {
-                    return new File[]{apk, mapping};
-                }
-                return new File[]{apk};
-            }
-        }
-    }
 
     @Override
     protected String generatePeerComponentCreationCode(String methodCallString) {
@@ -3546,7 +3295,7 @@ public class AndroidGradleBuilder extends Executor {
         return "(android.view.View)" + param + ".getNativePeer()";
     }
 
-    private String createOnDestroyCode(BuildRequest request, float version) {
+    private String createOnDestroyCode(BuildRequest request) {
         String retVal = "";
         if (integrateMoPub) {
             retVal += "moPubView.destroy();\n";
@@ -3555,9 +3304,9 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "    com.codename1.impl.android.AndroidNativeUtil.removeLifecycleListener(com.codename1.location.AndroidLocationPlayServiceManager.getInstance());\n";
         }
         if(shouldIncludeGoogleImpl){
-            if (version < 0 || version > 3) {
+
                 retVal += "    com.codename1.impl.android.AndroidNativeUtil.removeLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
-            }
+
         }
         return retVal;
     }
@@ -3567,7 +3316,7 @@ public class AndroidGradleBuilder extends Executor {
         return retVal;
     }
 
-    private String createOnCreateCode(BuildRequest request, float version) {
+    private String createOnCreateCode(BuildRequest request) {
         String retVal = "";
 
         if (request.getArg("android.includeGPlayServices", "true").equals("true") || playServicesLocation) {
@@ -3577,10 +3326,10 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener(com.codename1.location.AndroidLocationPlayServiceManager.getInstance());\n";
         }
         if(shouldIncludeGoogleImpl){
-            if (version < 0 || version > 3) {
+
                 retVal += "com.codename1.social.GoogleImpl.init();\n";
                 retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
-            }
+
         }
 
         if (request.getArg("android.web_loading_hidden", "false").equalsIgnoreCase("true")) {
@@ -3599,13 +3348,6 @@ public class AndroidGradleBuilder extends Executor {
             retVal += "Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
 
-        if (integrateZooz) {
-            String zoozAppId = request.getArg("zooz.andappId", null);
-            String zoozSandBox = request.getArg("zooz.sandbox", null);
-
-            retVal += "Display.getInstance().setProperty(\"ZoozAppKey\", \"" + zoozAppId + "\");\n"
-                    + "Display.getInstance().setProperty(\"ZoozSandBox\", \"" + zoozSandBox + "\");\n";
-        }
 
         return retVal;
     }
@@ -3628,7 +3370,7 @@ public class AndroidGradleBuilder extends Executor {
             ZipEntry entry;
             boolean addedSDKDir = false;
             while ((entry = zis.getNextEntry()) != null) {
-                System.out.println("Extracting: " + entry);
+                debug("Extracting: " + entry);
                 if (entry.isDirectory()) {
                     File d = new File(dir, entry.getName());
                     d.mkdirs();
@@ -3836,7 +3578,7 @@ public class AndroidGradleBuilder extends Executor {
                     entryName = entryName.substring(5);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
-                    System.out.println("Packaging entry " + entryName + " size: " + entry.getSize());
+                    debug("Packaging entry " + entryName + " size: " + entry.getSize());
                     tos.putNextEntry(tEntry);
                     int count;
                     byte[] data = new byte[8192];
@@ -4057,7 +3799,7 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private void replaceAndroidXClassesInTree(File root) throws IOException {
-        System.out.println("Replacing Android Support classes with AndroidX classes in "+root);
+        debug("Replacing Android Support classes with AndroidX classes in "+root);
         replaceInTree(root, loadAndroidXClassMapping(), new FilenameFilter() {
             @Override
             public boolean accept(File parent, String dir) {
@@ -4120,7 +3862,7 @@ public class AndroidGradleBuilder extends Executor {
         if (out == null) {
             out = new LinkedHashMap<String,String>();
         }
-        log("Loading CSV mapping for android X from "+csvResourcePath);
+        debug("Loading CSV mapping for android X from "+csvResourcePath);
         InputStream csvMappingStream = AndroidGradleBuilder.class.getResourceAsStream(csvResourcePath);
         if (csvMappingStream == null) {
             throw new IOException("Cannot find android X CSV mapping at "+csvResourcePath);
@@ -4171,4 +3913,5 @@ public class AndroidGradleBuilder extends Executor {
         }
 
     }
+
 }

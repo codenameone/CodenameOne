@@ -16,10 +16,11 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.util.*;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
@@ -824,16 +825,96 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (isUnix && is64Bit) return "linux64";
         return null;
     }
-    
-    protected boolean isCefSetup() {
-        
+
+    protected File getCefDir() {
         String path = System.getProperty("cef.dir", null);
-        if (path == null) return false;
-        return new File(path).exists();
+
+        if (path == null || path.isEmpty()) return null;
+        return new File(path);
     }
-     
+
+    protected boolean isCefSetup() {
+        File cefDir = getCefDir();
+        if (cefDir == null) return false;
+        return cefDir.exists();
+    }
+
+    private void fixCefPermissions(File cefDir) {
+        getLog().debug("Checking permissions on "+cefDir+" and fixing if necessary");
+        Set<String> patterns = new HashSet<String>();
+        patterns.add("*.dylib");
+        patterns.add("*.so");
+        patterns.add("jcef_helper");
+        patterns.add("*.framework");
+        patterns.add("jcef Helper*");
+        patterns.add("Chromium Embedded Framework");
+        setExecutableRecursive(cefDir, patterns);
+
+        if ("linux64".equals(getCefPlatform())) {
+            getLog().debug("On linux platform.  Checking if we need to workaround issue with libjawt.so");
+            // There is a bug on many versions of linux because libjawt.so isn't in the LD_LIBRARY_PATH
+            // An easy way to fix this is to just copy it into the lib directory
+            File dest = new File(getCefDir(), path("lib", "linux64", "libjawt.so") );
+            File javaHome = new File(System.getProperty("java.home"));
+            File src = new File(javaHome, path("lib", "amd64", "libjawt.so"));
+            if (!src.exists()) {
+                src = new File(javaHome, path("lib", "libjawt.so"));
+            }
+            if (!dest.exists()) {
+                getLog().debug("libjawt.so fix has not been applied yet as "+dest+" does not exist");
+                if (src.exists()) {
+                    getLog().debug("We can attempt to apply libjawt.so fix since "+src+ " was found");
+                } else {
+                    getLog().debug("Cannot attempt to apply libjawt.so fix since "+src+" does not exist");
+                }
+            }
+
+            if (!dest.exists() && src.exists()) {
+                try {
+                    getLog().info("Copying "+src+" to "+dest+" to workaround issue with UnsatisfiedLinkError in CEF related to libjawt.so not being found in LD_LIBRARY_PATH");
+                    FileUtils.copyFile(src, dest);
+                } catch (Exception ex) {
+                    getLog().warn("Failed to copy libjawt.so into CEF lib directory.  There may be problems using the BrowserComponent and media.  If you experience problems try copying the file "+src+" into "+dest, ex);
+
+                }
+            }
+        }
+    }
+
+
+    private boolean match(File file, Collection<String> patterns) {
+        for (String pattern : patterns) {
+            if (pattern.contains("*")) {
+                PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:"+pattern);
+                if (matcher.matches(file.toPath().getFileName())) {
+                    return true;
+                }
+            } else {
+                if (pattern.equals(file.getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void setExecutableRecursive(File root, Collection<String> patterns) {
+        if (match(root, patterns)) {
+            if (root.exists()) {
+                root.setExecutable(true, false);
+            }
+        }
+        if (root.isDirectory()) {
+            for (File child : root.listFiles()) {
+                setExecutableRecursive(child, patterns);
+            }
+        }
+
+    }
+
     protected void setupCef() {
         if (isCefSetup()) {
+            fixCefPermissions(getCefDir());
             return;
         }
         String platform = getCefPlatform();
@@ -856,9 +937,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             expand.setSrc(cefZip);
             expand.execute();
         }
-        
+        if (new File(extractedDir, "cef").exists()) {
+            extractedDir = new File(extractedDir, "cef");
+        }
         project.getProperties().setProperty("cef.dir", extractedDir.getAbsolutePath());
         System.setProperty("cef.dir", extractedDir.getAbsolutePath());
+        fixCefPermissions(extractedDir);
         
     }
 

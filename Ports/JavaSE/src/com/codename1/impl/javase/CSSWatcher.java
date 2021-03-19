@@ -164,7 +164,11 @@ public class CSSWatcher implements Runnable {
             if (overrideInputs == null) {
                 System.out.println("Found theme.css file.  Watching for changes...");
             } else {
-                System.out.println("Watching CSS files for changes: "+overrideInputs);
+                if (overrideInputs.trim().isEmpty()) {
+                    System.out.println("CSS file "+overrideInputs+" does not exist.  Not activating CSS watcher");
+                    return;
+                }
+                System.out.println("Watching CSS files for changes: ["+overrideInputs+"]");
             }
         }
         File destFile = new File("src", "theme.res");
