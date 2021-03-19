@@ -400,11 +400,12 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
             // If there are jar files in the resources directory, we should issue a warning that
             // they should replace these with dependencies in the pom.xml
-
-            for (File child : resDir.listFiles()) {
-                if (child.getName().endsWith(".jar")) {
-                    getLog().warn("Found jar file '"+child.getName()+"' in the native/javase directory.  This has been copied to "+child+", but you should " +
-                            "remove this file and replace it with the equivalent Maven dependency inside your "+new File(targetJavaseDir(), "pom.xml")+" file.");
+            if (resDir.isDirectory()) {
+                for (File child : resDir.listFiles()) {
+                    if (child.getName().endsWith(".jar")) {
+                        getLog().warn("Found jar file '" + child.getName() + "' in the native/javase directory.  This has been copied to " + child + ", but you should " +
+                                "remove this file and replace it with the equivalent Maven dependency inside your " + new File(targetJavaseDir(), "pom.xml") + " file.");
+                    }
                 }
             }
 
@@ -706,6 +707,9 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
 
     private void copyCn1libs() throws MojoExecutionException, MojoFailureException{
+        if (sourceLibDir() == null || !sourceLibDir().exists() || !sourceLibDir().isDirectory()) {
+            return;
+        }
         for (File cn1lib : sourceLibDir().listFiles()) {
             if (cn1lib.getName().startsWith("kotlin-runtime")) {
                 getLog().debug("Skipping "+cn1lib+" because kotlin no longer requires a cn1lib.");
