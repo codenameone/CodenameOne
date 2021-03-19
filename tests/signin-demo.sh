@@ -17,7 +17,8 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
   -Dversion=1.0-SNAPSHOT \
   -DinteractiveMode=false \
   -DsourceProject=$ANT_PROJECT_DIR \
-  -Dcn1Version=$CN1_VERSION
+  -Dcn1Version=$CN1_VERSION \
+  -e
 
 cd signin-demo
 mvn package -Dcodename1.platform=javase
