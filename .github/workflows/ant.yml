@@ -34,7 +34,8 @@ jobs:
       run: |
         unzip cn1-maven-archetypes.zip
         cd cn1-maven-archetypes-master
-        xvfb-run -a mvn install
+        xvfb-run -a mvn install archetype:update-local-catalog
+        mvn archetype:crawl
     - name: Run Maven Unit Tests
       run: |
         pwd
