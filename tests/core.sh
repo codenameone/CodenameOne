@@ -1,6 +1,7 @@
 #!/bin/bash
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
-source env.sh
+source $SCRIPTPATH/env.sh
 cd $SCRIPTPATH
 ANT_PROJECT_DIR=$SCRIPTPATH/core
 cd build
