@@ -248,8 +248,10 @@ public class TestRunner {
      * The main method accepts several arguments of which only the main class is a requirement
      * @param argv
      */
-    public static void main(String[] argv) {
-        
+    public static void main(String[] argv) throws Exception {
+        if (CN1Bootstrap.run(TestRunner.class, argv)) {
+            return;
+        }
         new TestRunner().init(argv);
     }
 }

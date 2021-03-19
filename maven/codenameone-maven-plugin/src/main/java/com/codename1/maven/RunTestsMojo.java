@@ -232,6 +232,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         java.createJvmarg().setValue("-Dcef.dir="+System.getProperty("cef.dir", System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef"));
         java.setClassname("com.codename1.impl.javase.TestRunner");
         java.createArg().setValue(properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
+        //java.createArg().setValue("-quietMode");
         java.setFork(true);
         int result = java.executeJava();
         if (result != 0) {
