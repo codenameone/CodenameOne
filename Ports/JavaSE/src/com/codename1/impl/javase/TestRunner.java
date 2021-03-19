@@ -178,8 +178,13 @@ public class TestRunner {
             }
             
             System.out.println("Preparing to execute " + tests.length + " tests");
-            
-            StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
+
+            String classPathStr = System.getProperty("java.class.path");
+            if (System.getProperty("cn1.class.path") != null) {
+                classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");
+            }
+
+            StringTokenizer t = new StringTokenizer(classPathStr, File.pathSeparator);
             File[] files = new File[t.countTokens()];
             for (int iter = 0; iter < files.length; iter++) {
                 files[iter] = new File(t.nextToken());
