@@ -36,7 +36,9 @@ jobs:
         cd cn1-maven-archetypes-master
         xvfb-run -a mvn install
     - name: Run Maven Unit Tests
-      run: xvfb-run -a bash tests/all.sh
+      run: |
+        pwd
+        xvfb-run -a bash tests/all.sh
     - name: Fetch JavaDoc Source Embed
       uses: carlosperate/download-file-action@v1.0.3
       with:
