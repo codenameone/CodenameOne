@@ -19,9 +19,24 @@ jobs:
         java-package: jdk+fx
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install xvfb
-    - name: Build with Ant
-      run: xvfb-run ant test-javase
+    - name: Build with Maven
+      run: |
+        cd maven
+        mvn install
+      
 
+    - name: Fetch archetype projects
+      uses: carlosperate/download-file-action@v1.0.3
+      with:
+        file-url: https://github.com/shannah/cn1-maven-archetypes/archive/refs/heads/master.zip
+        file-name: cn1-maven-archetypes.zip 
+    - name: Install archetype projects
+      run: |
+        unzip cn1-maven-archetypes.zip
+        cd cn1-maven-archetypes-master
+        mvn install
+    - name: Run Maven Unit Tests
+      run: bash maven/tests/all.sh
     - name: Fetch JavaDoc Source Embed
       uses: carlosperate/download-file-action@v1.0.3
       with:
