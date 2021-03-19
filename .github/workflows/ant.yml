@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build-linux-jdk8-fx:
+  build-linux-jdk8:
 
     runs-on: ubuntu-latest
 
@@ -16,7 +16,7 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
-        java-package: jdk+fx
+        java-package: jdk
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install xvfb
     - name: Build with Maven
@@ -36,7 +36,9 @@ jobs:
         cd cn1-maven-archetypes-master
         xvfb-run -a mvn install
     - name: Run Maven Unit Tests
-      run: xvfb-run -a bash tests/all.sh
+      run: |
+        pwd
+        xvfb-run -a bash tests/all.sh
     - name: Fetch JavaDoc Source Embed
       uses: carlosperate/download-file-action@v1.0.3
       with:
