@@ -413,6 +413,11 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     }
 
     private void copyTestSourceFiles() {
+        if (!sourceTestsDir().exists()) {
+            getLog().debug("Source project does not include a test directory.  Skipping copying test source files");
+            return;
+        }
+        getLog().debug("Copying test source files from "+sourceTestsDir());
         {
             Copy copy = (Copy) antProject().createTask("copy");
             copy.setTodir(targetTestSrcDir("java"));
