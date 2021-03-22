@@ -1,5 +1,6 @@
 package com.codename1.maven;
 
+import com.codename1.ant.SortedProperties;
 import com.codename1.util.RichPropertiesReader;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.MavenExecutionException;
@@ -17,9 +18,7 @@ import org.apache.tools.ant.input.InputHandler;
 import org.apache.tools.ant.taskdefs.Copy;
 import org.apache.tools.ant.types.FileSet;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
@@ -180,6 +179,62 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         }
     }
 
+    private Properties sourceProperties;
+    private Properties sourceProperties() throws IOException {
+        if (sourceProperties == null) {
+            sourceProperties = loadSourceProjectProperties();
+        }
+        return sourceProperties;
+    }
+
+
+    private File sourceIconFile() throws IOException {
+        Properties props = sourceProperties();
+        String icon = props.getProperty("codename1.icon");
+        if (icon == null || icon.isEmpty()) {
+            icon = "icon.png";
+        }
+        File iconFile = new File(icon);
+        if (!iconFile.isAbsolute()) {
+            iconFile = new File(sourceProject, icon);
+            if (iconFile.isFile()) {
+                return iconFile;
+            }
+        }
+
+        return new File(sourceProject, "icon.png");
+
+    }
+
+    private File destIconFile() throws IOException {
+        return new File(targetCommonDir(), sourceIconFile().getName());
+
+    }
+
+    private void copyIcon() throws IOException {
+        File sourceIconFile = sourceIconFile();
+        if (sourceIconFile.exists() && sourceIconFile.isFile()) {
+            FileUtils.copyFile(sourceIconFile(), destIconFile());
+        } else {
+            try (InputStream iconStream = getClass().getResourceAsStream("codenameone-icon.png")) {
+                FileUtils.copyInputStreamToFile(iconStream, destIconFile());
+            }
+        }
+        SortedProperties props = new SortedProperties();
+        File propertiesFile = new File(targetCommonDir(), "codenameone_settings.properties");
+        try (InputStream input = new FileInputStream(propertiesFile)) {
+            props.load(input);
+        }
+        if (!destIconFile().getName().equals(props.getProperty("codename1.icon"))) {
+            props.setProperty("codename1.icon", destIconFile().getName());
+            try (OutputStream output = new FileOutputStream(propertiesFile)) {
+                props.store(output, "Updated icon");
+            }
+        }
+
+
+    }
+
     private boolean hasFilesWithSuffix(File root, String suffix) {
         if (root.isDirectory()) {
             for (File child : root.listFiles()) {
@@ -209,7 +264,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("ios"));
-                files.setIncludes("**/*.m, **/*.c, **/*.h");
+                files.setIncludes("**/*.m, **/*.c, **/*.h, *.m, *.c, *.h");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -222,7 +277,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("ios"));
-                files.setExcludes("**/*.m, **/*.c, **/*.h");
+                files.setExcludes("**/*.m, **/*.c, **/*.h, *.m, *.c, *.h");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -243,7 +298,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("android"));
-                files.setIncludes("**/*.java");
+                files.setIncludes("**/*.java, *.java");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -256,7 +311,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("android"));
-                files.setExcludes("**/*.java");
+                files.setExcludes("**/*.java, *.java");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -277,7 +332,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javascript"));
-                files.setIncludes("**/*.js");
+                files.setIncludes("**/*.js, *.js");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -290,7 +345,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javascript"));
-                files.setExcludes("**/*.js");
+                files.setExcludes("**/*.js, *.js");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -310,7 +365,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
-                files.setIncludes("**/*.cs");
+                files.setIncludes("**/*.cs, *.cs");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -323,7 +378,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
-                files.setExcludes("**/*.cs");
+                files.setExcludes("**/*.cs, *.cs");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -377,7 +432,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javase"));
-                files.setIncludes("**/*.java");
+                files.setIncludes("**/*.java, *.java");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -390,7 +445,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("javase"));
-                files.setExcludes("**/*.java");
+                files.setExcludes("**/*.java, *.java");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -425,7 +480,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceTestsDir());
-            files.setIncludes("**/*.java");
+            files.setIncludes("**/*.java, *.java");
             copy.addFileset(files);
 
             copy.execute();
@@ -438,7 +493,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceTestsDir());
-            files.setExcludes("**/*.kt, **/*.java, **/*.mirah");
+            files.setExcludes("**/*.kt, **/*.java, **/*.mirah, *.kt, *.java, *.mirah");
             copy.addFileset(files);
 
             copy.execute();
@@ -453,7 +508,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceTestsDir());
-            files.setIncludes("**/*.kt");
+            files.setIncludes("**/*.kt, *.kt");
             copy.addFileset(files);
 
             copy.execute();
@@ -466,7 +521,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceTestsDir());
-            files.setIncludes("**/*.mirah");
+            files.setIncludes("**/*.mirah, *.mirah");
             copy.addFileset(files);
 
             copy.execute();
@@ -482,7 +537,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
-            files.setIncludes("**/*.java");
+            files.setIncludes("**/*.java, *.java");
             copy.addFileset(files);
 
             copy.execute();
@@ -495,7 +550,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
-            files.setExcludes("**/*.kt, **/*.java, **/*.mirah");
+            files.setExcludes("**/*.kt, **/*.java, **/*.mirah, *.kt, *.java, *.mirah");
             copy.addFileset(files);
 
             copy.execute();
@@ -510,7 +565,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
-            files.setIncludes("**/*.kt");
+            files.setIncludes("**/*.kt, *.kt");
             copy.addFileset(files);
 
             copy.execute();
@@ -523,7 +578,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             FileSet files = new FileSet();
             files.setProject(antProject());
             files.setDir(sourceSrcDir());
-            files.setIncludes("**/*.mirah");
+            files.setIncludes("**/*.mirah, *.mirah");
             copy.addFileset(files);
 
             copy.execute();
@@ -655,6 +710,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             if (templateType == null || "ant".equalsIgnoreCase(templateType)) {
                 // The source project was an ANT project
                 copyPropertiesFiles();
+                copyIcon();
                 copySourceFiles();
                 copyTestSourceFiles();
                 copyAndroidFiles();
@@ -679,6 +735,12 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 if (cn1Settings.exists()) {
                     FileUtils.copyFile(cn1Settings, destCn1Settings);
                 }
+                for (File child : new File(sourceProject, "common").listFiles()) {
+                    if (child.getName().endsWith(".png")) {
+                        FileUtils.copyFile(child, new File(targetProjectDir(), path("common", child.getName())));
+                    }
+                }
+
                 injectDependencies();
             }
 
