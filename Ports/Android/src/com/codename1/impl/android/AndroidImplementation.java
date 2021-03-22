@@ -5131,6 +5131,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
+    /**
+     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only Android and iOS ports support this.
+     * @return
+     */
+    @Override
+    public boolean isNativeCookieSharingSupported() {
+        return true;
+    }
+
     @Override
     public void clearNativeCookies() {
         CookieManager mgr = getCookieManager();

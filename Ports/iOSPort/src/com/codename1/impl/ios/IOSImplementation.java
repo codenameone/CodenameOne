@@ -308,9 +308,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void clearNativeCookies() {
         nativeInstance.clearNativeCookies();
     }
-    
-    
-    
+
+    /**
+     *
+     * {@inheritDoc }
+     */
+    @Override
+    public boolean isNativeCookieSharingSupported() {
+        return true;
+    }
+
     @Override
     public void addCookie(Cookie[] cookiesArray) {
         if(isUseNativeCookieStore()) {
