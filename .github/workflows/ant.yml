@@ -40,43 +40,5 @@ jobs:
       run: |
         pwd
         xvfb-run -a bash tests/all.sh
-    - name: Fetch JavaDoc Source Embed
-      uses: carlosperate/download-file-action@v1.0.3
-      with:
-        file-url: https://github.com/codenameone/JavaDocSourceEmbed/releases/download/refs%2Fheads%2Fmaster/JavaDocSourceEmbed-1.0-SNAPSHOT.jar
-        file-name: JavaDocSourceEmbed.jar
-            
-    - name: Build Release
-      run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
-    - name: Build iOS Port
-      run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
-
-    - name: Build iOS VM API
-      run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
-
-    - name: Build iOS VM
-      run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
-
-    - name: Build Android Port
-      run: ant -noinput -buildfile Ports/Android/build.xml jar
-
-    - name: Build JavaDoc
-      if: github.ref == 'refs/heads/master'
-      run: |
-        echo "Deleting old/temporary files"
-        rm -Rf CodenameOne/dist/javadoc
-        rm -Rf CodenameOne/build/tempJavaSources
-        echo "Creating JavaDoc Dir"
-        mkdir -p CodenameOne/build
-        mkdir -p CodenameOne/build/tempJavaSources
-        echo "Running JavaDocSourceEmbed"
-        java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
-        echo "Analyzing packages"
-        find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | grep -v /impl/ > tmp.packages
-        echo "Running JavaDoc"
-        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API" || true
-        echo "Zipping JavaDoc bundle"
-        cd CodenameOne/dist/javadoc
-        zip -r ../../../javadoc.zip *
-        cd ../../..
+  
