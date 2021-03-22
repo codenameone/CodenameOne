@@ -40,5 +40,7 @@ jobs:
       run: |
         pwd
         xvfb-run -a bash tests/all.sh
+        cd maven/integration-tests
+        xvfb-run -a bash all.sh
 
   
