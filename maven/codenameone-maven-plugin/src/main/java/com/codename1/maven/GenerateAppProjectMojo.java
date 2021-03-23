@@ -395,6 +395,131 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         return new File(sourceProject, "css");
     }
 
+
+
+
+    private void fixCSS(File cssFile) throws IOException {
+        String contents = FileUtils.readFileToString(cssFile, "UTF-8");
+        int pos = 0;
+        int matchPos = -1;
+        boolean changed = false;
+        while ((matchPos = contents.indexOf("url(../", pos)) >= 0) {
+            int closingParen = contents.indexOf(")", matchPos+4);
+
+            if (closingParen < 0) {
+                // No closing parenthesis... probably an error
+                // but we dont' want this fixing to be strict
+                break;
+            }
+
+
+            String path = contents.substring(matchPos + 4, closingParen);
+
+            if (path.contains("(") || path.contains("{") || path.contains("}") || path.contains("\n")) {
+                // This path contains invalid characters..
+                // this may be in a comment. In any case we don't want to
+                // mess with it for fear of deleting important stuff
+                pos = matchPos+4;
+                continue;
+            }
+
+            File referencedFile = new File(sourceCSSDir(), path.replace("/", File.separator));
+            if (referencedFile.exists()) {
+                File targetFile = new File(targetSrcDir("css"), referencedFile.getName());
+                if (targetFile.exists()) {
+                    pos = closingParen+1;
+                    continue;
+                }
+                FileUtils.copyFile(referencedFile, targetFile);
+                contents = contents.substring(0, matchPos) + "url(\""+targetFile.getName()+"\")" + contents.substring(closingParen+1);
+                // Need to get closingParen position again because we changed the contents.
+                closingParen = contents.indexOf(")", matchPos+4);
+                changed = true;
+            }
+
+            pos = closingParen+1;
+
+        }
+        while ((matchPos = contents.indexOf("url(\"../", pos)) >= 0) {
+            int closingQuote = contents.indexOf("\"", matchPos+5);
+
+            if (closingQuote < 0) {
+                // No closing parenthesis... probably an error
+                // but we dont' want this fixing to be strict
+                break;
+            }
+
+
+            String path = contents.substring(matchPos + 5, closingQuote);
+
+            if (path.contains("(") || path.contains("{") || path.contains("}") || path.contains("\n")) {
+                // This path contains invalid characters..
+                // this may be in a comment. In any case we don't want to
+                // mess with it for fear of deleting important stuff
+                pos = matchPos+5;
+                continue;
+            }
+
+            File referencedFile = new File(sourceCSSDir(), path.replace("/", File.separator));
+            if (referencedFile.exists()) {
+                File targetFile = new File(targetSrcDir("css"), referencedFile.getName());
+                if (targetFile.exists()) {
+                    pos = closingQuote+1;
+                    continue;
+                }
+                FileUtils.copyFile(referencedFile, targetFile);
+                contents = contents.substring(0, matchPos) + "url(\""+targetFile.getName()+"\"" + contents.substring(closingQuote+1);
+                // Need to get closingParen position again because we changed the contents.
+                closingQuote = contents.indexOf("\"", matchPos+5);
+                changed = true;
+            }
+
+            pos = closingQuote+1;
+
+        }
+        while ((matchPos = contents.indexOf("url('../", pos)) >= 0) {
+            int closingQuote = contents.indexOf("'", matchPos+5);
+
+            if (closingQuote < 0) {
+                // No closing parenthesis... probably an error
+                // but we dont' want this fixing to be strict
+                break;
+            }
+
+
+            String path = contents.substring(matchPos + 5, closingQuote);
+
+            if (path.contains("(") || path.contains("{") || path.contains("}") || path.contains("\n")) {
+                // This path contains invalid characters..
+                // this may be in a comment. In any case we don't want to
+                // mess with it for fear of deleting important stuff
+                pos = matchPos+5;
+                continue;
+            }
+
+            File referencedFile = new File(sourceCSSDir(), path.replace("/", File.separator));
+            if (referencedFile.exists()) {
+                File targetFile = new File(targetSrcDir("css"), referencedFile.getName());
+                if (targetFile.exists()) {
+                    pos = closingQuote+1;
+                    continue;
+                }
+                FileUtils.copyFile(referencedFile, targetFile);
+                contents = contents.substring(0, matchPos) + "url(\""+targetFile.getName()+"\"" + contents.substring(closingQuote+1);
+                // Need to get closingParen position again because we changed the contents.
+                closingQuote = contents.indexOf("\"", matchPos+5);
+                changed = true;
+            }
+
+            pos = closingQuote+1;
+
+        }
+
+        if (changed) {
+            FileUtils.writeStringToFile(cssFile, contents, "UTF-8");
+        }
+    }
+
     private void copyCSSFiles() throws IOException {
         File srcDir = targetSrcDir("css");
         if (sourceCSSDir().exists()) {
@@ -411,6 +536,24 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 copy.addFileset(files);
 
                 copy.execute();
+
+                if (srcDir.isDirectory()) {
+                    for (File child : srcDir.listFiles()) {
+                        if (child.getName().endsWith(".css")) {
+                            fixCSS(child);
+
+                        } else if (child.getName().endsWith(".checksums")) {
+                            child.delete();
+                        }
+                    }
+                }
+
+                File backups = new File(srcDir, ".backups");
+                if (backups.isDirectory()) {
+                    FileUtils.deleteDirectory(backups);
+                }
+
+
             }
         } else {
             if (srcDir.exists()) {
@@ -554,6 +697,27 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             copy.addFileset(files);
 
             copy.execute();
+
+            File cn1PropertiesFile = new File(sourceProject, "codenameone_settings.properties");
+            if (cn1PropertiesFile.exists()) {
+                Properties cn1Properties = new SortedProperties();
+                try (FileInputStream input = new FileInputStream(cn1PropertiesFile)) {
+                    cn1Properties.load(input);
+                } catch (IOException ex) {
+                    getLog().error("Failed to open "+cn1Properties+" while checking or cssTheme property", ex);
+                }
+                if ("true".equals(cn1Properties.getProperty("codename1.cssTheme", "false"))) {
+                    // If we're using a CSS theme, then we need to delete the theme.res file
+                    File themeRes = new File(targetSrcDir("resources"), "theme.res");
+                    if (themeRes.exists()) {
+                        getLog().debug("Deleting "+themeRes+" because this project uses CSS themes.  In maven the theme.res is generated at build time, and is never saved in the source directory.");
+                        themeRes.delete();
+                    }
+                }
+
+            }
+
+
         }
 
 

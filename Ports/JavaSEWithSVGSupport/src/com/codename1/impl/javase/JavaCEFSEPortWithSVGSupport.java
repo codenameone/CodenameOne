@@ -24,6 +24,7 @@
 package com.codename1.impl.javase;
 
 import static com.codename1.impl.javase.SVGSupport.scaleSVG;
+import com.codename1.impl.javase.cef.JavaCEFSEPort;
 import java.io.IOException;
 
 /**
@@ -31,7 +32,7 @@ import java.io.IOException;
  *
  * @author Shai Almog
  */
-public class JavaSEPortWithSVGSupport extends JavaJMFSEPort {
+public class JavaCEFSEPortWithSVGSupport extends JavaCEFSEPort {
     
     @Override
     public boolean isSVGSupported() {
@@ -51,8 +52,6 @@ public class JavaSEPortWithSVGSupport extends JavaJMFSEPort {
         return svgImage;
     }
 
-    
-
     /**
      * @inheritDoc
      */
@@ -68,6 +67,7 @@ public class JavaSEPortWithSVGSupport extends JavaJMFSEPort {
     /**
      * @inheritDoc
      */
+    @Override
     public int getImageWidth(Object i) {
         if(i instanceof SVG) {
             return ((SVG) i).getImg().getWidth();
