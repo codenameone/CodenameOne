@@ -767,7 +767,19 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         Java java = createJava();
         java.setFork(true);
         java.setJar(new File(JPDATE_CODENAMEONE_JAR_PATH));
-        java.createArg().setFile(getCN1ProjectDir());
+        File dummyProject = new File(project.getBuild().getDirectory(), path("codenameone", "update-dummy"));
+        File dummyProjectLib = new File(dummyProject, "lib");
+        dummyProjectLib.mkdirs();
+        File cn1Properties = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (cn1Properties.exists()) {
+            try {
+                FileUtils.copyFile(cn1Properties, new File(dummyProject, cn1Properties.getName()));
+            } catch (IOException ex) {
+                getLog().warn("Failed to copy "+cn1Properties+" into dummy project", ex);
+            }
+        }
+        //java.createArg().setFile(getCN1ProjectDir());
+        java.createArg().setFile(dummyProject);
         java.createArg().setValue("force");
         java.executeJava();
     }
