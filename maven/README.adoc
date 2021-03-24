@@ -1,0 +1,29 @@
+= Codename One Maven Support
+
+This folder contains Maven projects for building Codename One.
+
+Use the https://start.codenameone.com[Codename One initializr] to generate a Maven Codename one project.
+
+For information about using Codename One's Maven support see https://shannah.github.io/codenameone-maven-manual/[The Codename One Maven Manual].
+
+== Building From Source
+
+=== Building the Main Codename One Project
+
+[source, bash]
+----
+git clone https://github.com/codenameone/CodenameOne
+cd CodenameOne/maven
+mvn install
+----
+
+=== Building Archetype Projects
+[source, bash]
+----
+git clone https://github.com/shannah/cn1-maven-archetypes
+cd cn1-maven-archetypes
+mvn install
+----
+
+
+
