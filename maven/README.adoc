@@ -25,5 +25,8 @@ cd cn1-maven-archetypes
 mvn install
 ----
 
+=== Deploying to Maven Central
+
+
 
 

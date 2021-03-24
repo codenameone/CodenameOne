@@ -12,5 +12,15 @@
 # Typical Workflow is:
 # bash update-version 8.0.1 && bash deploy-to-sonatype.sh && bash update-version 8.0.2-SNAPSHOT
 set -e
-export GPG_TTY=$(tty)
-mvn deploy -Psign-artifacts
+version=$(bash print-version.sh)
+if [[ "$version" == *-SNAPSHOT ]]; then
+  echo "This is a snapshot version so not deploying"
+else
+  echo "Deploying version ${version} to sonatype staging"
+  MAVEN_ARGS=""
+  if [ ! -z $MAVEN_GPG_PASSPHRASE ]; then
+    MAVEN_ARGS="-Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE"
+  fi
+  export GPG_TTY=$(tty)
+  mvn deploy -Psign-artifacts $MAVEN_ARGS
+fi
