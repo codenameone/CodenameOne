@@ -45,7 +45,10 @@ mvn versions:set -DnewVersion=$version
 mvn versions:commit
 
 echo "Committing version change in git"
-git commit -a -m "Updated version to $version"
+git add -u .
+# Note: the -u is to prevent adding files that aren't added to git yet.  Only changed
+# files.  This is to help avoid accidents.
+git commit -m "Updated version to $version"
 if [[ "$version" == *-SNAPSHOT ]]; then
   echo "This is a snapshot version so not adding a tag"
 else
