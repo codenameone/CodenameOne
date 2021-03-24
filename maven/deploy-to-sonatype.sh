@@ -19,7 +19,7 @@ else
   echo "Deploying version ${version} to sonatype staging"
   MAVEN_ARGS="-X"
   if [ ! -z $MAVEN_GPG_PASSPHRASE ]; then
-    MAVEN_ARGS="-Dgpg.passphrase='$MAVEN_GPG_PASSPHRASE' -X"
+    MAVEN_ARGS="-Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -X"
   fi
   export GPG_TTY=$(tty)
   mvn deploy -Psign-artifacts $MAVEN_ARGS
