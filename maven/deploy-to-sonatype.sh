@@ -17,9 +17,9 @@ if [[ "$version" == *-SNAPSHOT ]]; then
   echo "This is a snapshot version so not deploying"
 else
   echo "Deploying version ${version} to sonatype staging"
-  MAVEN_ARGS="-e"
+  MAVEN_ARGS="-X"
   if [ ! -z $MAVEN_GPG_PASSPHRASE ]; then
-    MAVEN_ARGS="-Dgpg.passphrase='$MAVEN_GPG_PASSPHRASE' -e"
+    MAVEN_ARGS="-Dgpg.passphrase='$MAVEN_GPG_PASSPHRASE' -X"
   fi
   export GPG_TTY=$(tty)
   mvn deploy -Psign-artifacts $MAVEN_ARGS
