@@ -48,6 +48,7 @@
     </scm>
 
 
+
     <properties>
         <cn1.version>${project.version}</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -447,6 +448,7 @@
                                 </goals>
                                 <configuration>
                                     <passphrase>${gpg.passphrase}</passphrase>
+
                                 </configuration>
                             </execution>
                         </executions>
@@ -584,6 +586,13 @@
                                 </goals>
                             </execution>
                         </executions>
+                        <configuration>
+                            <!-- Prevent gpg from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
                     </plugin>
                 </plugins>
 
