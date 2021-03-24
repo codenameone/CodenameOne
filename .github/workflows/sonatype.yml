@@ -20,6 +20,7 @@ jobs:
 
       - name: Deploy with Maven
         run: |
+          cat $HOME/.m2/settings.xml
           cd maven
           bash deploy-to-sonatype.sh
         env:
