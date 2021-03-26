@@ -24,11 +24,10 @@ package com.codename1.testing;
 
 import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
-import com.codename1.ui.Button;
-import com.codename1.ui.CN;
+import com.codename1.ui.*;
+
 import static com.codename1.ui.ComponentSelector.$;
-import com.codename1.ui.Container;
-import com.codename1.ui.Form;
+
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -142,6 +141,7 @@ public class TestRunnerComponent extends Container {
         Form f = getComponentForm();
         resultsPane.removeAll();
         resultsPane.revalidate();
+        resultsPane.add(new Label("Running "+tests.size()+" tests"));
         for (final AbstractTest test : tests) {
             final Button statusLabel = new Button(test+": Running...");
             if (f != CN.getCurrentForm()) {

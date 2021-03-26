@@ -807,14 +807,12 @@ public class CSSTheme {
         }
         
         File getFontFile() {
-            
             if (fontFile == null) {
                 try {
                     URL url = getURL();
                     if (url == null) {
                         return null;
                     }
-                    //File cssFile = new File(url.toURI());
                     File parentDir = cssFile.getParentFile();
                     if (url.getProtocol().startsWith("http")) {
                         // If it is remote, check so see if we've already downloaded
@@ -4252,69 +4250,16 @@ public class CSSTheme {
                             iFontFace = Font.FACE_MONOSPACE;
                             break loop;
                         default : {
-                            /*
-                            int ttfFontSize = 1; // medium
-                            float actualSize = 14f;
-                            switch (iFontSizeType) {
-                                case Font.SIZE_SMALL:
-                                    ttfFontSize = 0;
-                                    actualSize = 11f;
-                                    break;
-                                case Font.SIZE_LARGE:
-                                    ttfFontSize = 2;
-                                    actualSize = 20f;
-                                    break;
-                            }
-                            // Check for a more specific font size
-                            if (fontSize != null) {
-                                switch (fontSize.getLexicalUnitType()) {
-                                    case LexicalUnit.SAC_MILLIMETER:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue();
-                                        break;
-                                    case LexicalUnit.SAC_PIXEL:
-                                    case LexicalUnit.SAC_POINT:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue();
-                                        break;
-
-                                    case LexicalUnit.SAC_CENTIMETER:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue()*10f;
-                                        break;
-                                    case LexicalUnit.SAC_INCH:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue()*25f;
-                                        break;
-                                    case LexicalUnit.SAC_EM:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue()* 14f;
-                                        break;
-                                    case LexicalUnit.SAC_PERCENTAGE:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue() /100f * 14f;
-                                        break;
-
-                                }
-                            }*/
+                            
                             FontFace face = findFontFace(fontFamily.getStringValue());
                             if (face != null) {
                                 ttfFontFile = face.getFontFile();
-                                /*
-                                if (fontFile != null) {
-                                    Font sys = Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-                                    
-                                    ttfFont = new EditorTTFFont(fontFile, ttfFontSize, actualSize, sys);
-                                    break loop;
-                                }
-                                */
+                                
                             } else {
                                 
                                 if(fontFamily.getStringValue().startsWith("native:")) {
                                     ttfFontName = fontFamily.getStringValue();
-                                    //Font sys = Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-                                    //ttfFont = new EditorTTFFont(fontFamily.getStringValue(), ttfFontSize, actualSize, sys);
-                                    //break loop;
+                                    
                                 }
                             }
                         }   
@@ -4332,12 +4277,7 @@ public class CSSTheme {
                     return new EditorTTFFont(ttfFontName, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
                 }
             }
-            /*
-            if (ttfFont != null) {
-                return ttfFont;
-            } else {
-                return Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-            }*/
+            
             
         }
         

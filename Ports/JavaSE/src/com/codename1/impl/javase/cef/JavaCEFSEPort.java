@@ -110,6 +110,7 @@ public class JavaCEFSEPort extends JavaSEPort {
     }
     
     public PeerComponent createCEFBrowserComponent(final Object parent) {
+        Log.p("Attempting to create browser component", Log.DEBUG);
         final PeerComponent[] out = new PeerComponent[1];
         final Throwable[] error = new Throwable[1];
         if (!EventQueue.isDispatchThread()) {
@@ -124,9 +125,11 @@ public class JavaCEFSEPort extends JavaSEPort {
                         }
                 });
             } catch (Throwable ex) {
+                Log.e(ex);
                 throw new RuntimeException("Failed to create CEF browser", ex);
             }
             if (error[0] != null) {
+                Log.e(error[0]);
                 throw new RuntimeException("Failed to create CEF browser", error[0]);
             }
             

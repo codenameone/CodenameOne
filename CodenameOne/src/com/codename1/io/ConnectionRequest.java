@@ -2383,10 +2383,28 @@ public class ConnectionRequest implements IOProgressListener {
     
     /**
      * Indicates whether the native Cookie stores should be used
+     * <p>NOTE: If the platform doesn't support Native Cookie sharing, then this method will
+     * have no effect.  Use {@link #isNativeCookieSharingSupported()}} to check if the platform
+     * supports native cookie sharing at runtime.</p>
+     *
      * @param b true to enable native cookie stores when applicable
      */
     public static void setUseNativeCookieStore(boolean b) {
         Util.getImplementation().setUseNativeCookieStore(b);
+    }
+
+    /**
+     * Checks if the platform supports sharing cookies between the native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only iOS and Android support this.
+     *
+     * <p>If the platform does not support native cookie sharing, then methods like {@link #setUseNativeCookieStore(boolean)} will
+     * have no effect.</p>
+     *
+     * @return true if the platform supports native cookie sharing.
+     * @since 8.0
+     */
+    public static boolean isNativeCookieSharingSupported() {
+        return Util.getImplementation().isNativeCookieSharingSupported();
     }
 
     /**

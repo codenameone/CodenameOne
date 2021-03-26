@@ -9,6 +9,8 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -21,6 +23,8 @@ import org.apache.tools.ant.types.resources.Sort;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
@@ -64,8 +68,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     @Parameter(property = "open", defaultValue = "true")
     private boolean open;
 
+
+    private String cn1MavenPluginVersion = "";
+    private String cn1MavenVersion = "";
+
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        cn1MavenPluginVersion = project.getProperties().getProperty("cn1.plugin.version", "");
+        cn1MavenVersion = project.getProperties().getProperty("cn1.version", "");
+
 
         File retrolambdaJar = getJar("net.orfjackal.retrolambda", "retrolambda");
         if (retrolambdaJar != null && retrolambdaJar.exists()) {
@@ -201,10 +213,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             }
         }
+
+
+
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
 
             List<String> blackListJars = new ArrayList<String>();
+            getLog().info("Project artifacts: "+project.getArtifacts());
             for (Artifact artifact : project.getArtifacts()) {
                 boolean addToBlacklist = false;
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
@@ -318,7 +334,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
-
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-maven-plugin", cn1MavenPluginVersion);
         try (FileOutputStream fos = new FileOutputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.store(fos,"");
 

@@ -23,7 +23,12 @@
  */
 package com.codename1.impl;
 
+import com.codename1.impl.javase.JavaCEFSEPortWithSVGSupport;
+import com.codename1.impl.javase.JavaFXSEPortWithSVGSupport;
+import com.codename1.impl.javase.JavaJMFSEPort;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
+import com.codename1.impl.javase.cef.JavaCEFSEPort;
+import com.codename1.impl.javase.fx.JavaFXSEPort;
 
 /**
  * Generic class allowing 3rd parties to replace the underlying implementation in
@@ -66,6 +71,41 @@ public class ImplementationFactory {
      * @return a newly created implementation instance
      */
     public Object createImplementation() {
+
+        boolean cefSupported = false;
+        boolean fxSupported = false;
+        try {
+            Class.forName("javafx.embed.swing.JFXPanel");
+            fxSupported = true;
+        } catch (Throwable ex) {}
+
+        try {
+            Class.forName("org.cef.CefApp");
+            cefSupported = true;
+        } catch (Throwable ex){}
+
+        String implementation = System.getProperty("cn1.javase.implementation", "");
+
+        if (implementation.equalsIgnoreCase("cef") && cefSupported) {
+            // We will use CEF
+            return new JavaCEFSEPortWithSVGSupport();
+        }
+        if (implementation.equalsIgnoreCase("fx") && fxSupported) {
+            return new JavaFXSEPortWithSVGSupport();
+        }
+        if (implementation.equalsIgnoreCase("jmf")) {
+            return new JavaSEPortWithSVGSupport();
+        }
+        if ("".equals(implementation)) {
+            if (cefSupported) {
+                return new JavaCEFSEPortWithSVGSupport();
+            } else if (fxSupported) {
+                return new JavaFXSEPortWithSVGSupport();
+            } else {
+                return new JavaSEPortWithSVGSupport();
+            }
+        }
+
         return new JavaSEPortWithSVGSupport();
     }
 }

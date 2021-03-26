@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0.13-SNAPSHOT</version>
+    <version>7.0.16-SNAPSHOT</version>
 
     <packaging>pom</packaging>
 
@@ -46,6 +46,7 @@
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
+
 
 
     <properties>
@@ -214,6 +215,11 @@
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-plugin-api</artifactId>
                 <version>3.3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven.surefire</groupId>
+                <artifactId>surefire-api</artifactId>
+                <version>3.0.0-M5</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven.plugin-tools</groupId>
@@ -432,7 +438,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.4</version>
+                        <version>1.5</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -442,9 +448,17 @@
                                 </goals>
                                 <configuration>
                                     <passphrase>${gpg.passphrase}</passphrase>
+
                                 </configuration>
                             </execution>
                         </executions>
+                        <configuration>
+                            <!-- Prevent gpg from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>
@@ -579,6 +593,13 @@
                                 </goals>
                             </execution>
                         </executions>
+                        <configuration>
+                            <!-- Prevent gpg from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
                     </plugin>
                 </plugins>
 
