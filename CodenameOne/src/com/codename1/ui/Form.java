@@ -223,6 +223,8 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+        
+        initPointerTracking();
     }
 
     /**
@@ -3568,6 +3570,8 @@ public class Form extends Container {
 
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        xPointerTracking = x;
+        yPointerTracking = y;
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(dragStopFlag) {
@@ -4722,8 +4726,104 @@ public class Form extends Container {
         this.editOnShow = editOnShow;
     }
     
+    private int[] xPointerTracking;
+    private int[] yPointerTracking;
+    private Image trackingImage;
+    private Painter previousGlassPlane;
     
+    @Override
+    public void pointerPressed(int[] x, int[] y) {
+        xPointerTracking = x;
+        yPointerTracking = y;
+        super.pointerPressed(x, y);
+    }
+    
+    @Override
+    public void pointerReleased(int[] x, int[] y) {
+        xPointerTracking = null;
+        yPointerTracking = null;
+        super.pointerReleased(x, y);
+    }
         
-        
+    /**
+     * super-impose the image at the pointerPosition(s), useful for example when recording a 
+     * demo video on the device. The pointerTracking is automatically propagated to Dialogs
+     * and Menus created from the Form. This feature uses the glasspane (this disables the Component Inspector
+     * which also uses the glasspane in the Simulator). NB. Also works with two fingers eg when pinching. 
+     * @param on turn the feature on or off
+     * @param image the image to show at pointer (finger) position(s)
+     */
+    public void setPointerTracking(boolean on, Image image) {
+        if (on && image != null) {
+            trackingImage = image;
+            previousGlassPlane = getGlassPane();
+            setGlassPane((g, rect) -> {
+                if (xPointerTracking != null) {
+                    g.drawImage(trackingImage, xPointerTracking[0] - image.getWidth() / 2, yPointerTracking[0] - image.getHeight() / 2); //show image center at pointer position
+                    if (xPointerTracking.length >= 2) {
+                        g.drawImage(trackingImage, xPointerTracking[1] - image.getWidth() / 2, yPointerTracking[1] - image.getHeight() / 2); //show image center at pointer position
+                    }
+                }
+            });
+        } else {
+            if (previousGlassPlane != null) {
+                setGlassPane(previousGlassPlane);
+            }
+            trackingImage = null;
+        }
+    }
+
+    /**
+     * super-impose the image at the pointerPosition(s), useful for example when
+     * recording a demo video on the device. The pointerTracking is
+     * automatically propagated to Dialogs and Menus created from the Form. This
+     * feature uses the glasspane (this disables the Component Inspector which
+     * also uses the glasspane in the Simulator). NB. Also works with two
+     * fingers eg when pinching. Uses a default Material Icon
+     * MATERIAL_TRIP_ORIGIN
+     *
+     * @param on turn the feature on or off
+     */
+    public void setPointerTracking(boolean on) {
+        if (on) {
+            Style s = UIManager.getInstance().getComponentStyle("Label");
+            s.setFgColor(0xff0000);
+            s.setBgTransparency(0);
+            Image fingerPosImage = FontImage.createMaterial(FontImage.MATERIAL_TRIP_ORIGIN, s).toImage();
+            setPointerTracking(true, fingerPosImage);
+        } else {
+            setPointerTracking(false, null);
+        }
+    }
+
+    /**
+     * get the image used for PointerTracking
+     *
+     * @return
+     */
+    public Image getPointerTrackingImage() {
+        return trackingImage;
+    }
+
+    /**
+     * returns the status of PointerTracking
+     *
+     * @return true if active
+     */
+    public boolean isPointerTracking() {
+        return getPointerTrackingImage() != null;
+    }
+
+    /**
+     * called by Forms, Dialogs, Menus etc created from this Form to
+     * automatically set the PointerTracking
+     */
+    private void initPointerTracking() {
+        if (Display.getInstance().getCurrent() != null) {
+            if (Display.getInstance().getCurrent().isPointerTracking()) {
+                setPointerTracking(true, Display.getInstance().getCurrent().getPointerTrackingImage());
+            }
+        }
+    }
     
 }
