@@ -589,7 +589,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
         r.setType("android");
 
-        r.setKeystoreAlias(props.getProperty("codenamekeystore1.android.keystoreAlias"));
+        r.setKeystoreAlias(props.getProperty("codename1.android.keystoreAlias"));
         String keystorePath = props.getProperty("codename1.android.keystore");
         if (keystorePath != null) {
             File keystoreFile = new File(keystorePath);
@@ -648,6 +648,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         r.setCertificatePassword(props.getProperty("codename1.android.keystorePassword"));
+
         for (Object k : props.keySet()) {
             String key = (String)k;
             if(key.startsWith("codename1.arg.")) {
