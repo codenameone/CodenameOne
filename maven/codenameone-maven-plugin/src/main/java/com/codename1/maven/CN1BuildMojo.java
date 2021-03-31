@@ -921,6 +921,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if(!merged.containsKey(key)){
                 merged.put(key, libProps.getProperty(key));
             }else{
+
                 //if this property already exists with a different value the
                 //install will fail
                 if(!merged.get(key).equals(libProps.getProperty(key))){

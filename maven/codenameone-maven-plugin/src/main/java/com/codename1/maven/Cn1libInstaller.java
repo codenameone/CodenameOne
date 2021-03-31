@@ -366,7 +366,7 @@ public class Cn1libInstaller {
         }
         if (requiredProps.exists()) {
             try {
-                FileUtils.copyFile(appendedProps, new File(metaDir, requiredProps.getName()));
+                FileUtils.copyFile(requiredProps, new File(metaDir, requiredProps.getName()));
             } catch (IOException ex) {
                 throw new MojoExecutionException("Failed to copy "+requiredProps, ex);
             }
