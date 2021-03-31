@@ -2,6 +2,7 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
 source $SCRIPTPATH/inc/env.sh
+bash migrate-googlemapsdemo-test.sh
 bash migrate-coderad-lib.sh
 bash cssfonts.sh
 bash native-interfaces.sh
