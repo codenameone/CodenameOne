@@ -4816,7 +4816,7 @@ public class Form extends Container {
 
     /**
      * called by Forms, Dialogs, Menus etc created from this Form to
-     * automatically set the PointerTracking
+     * automatically set the PointerTracking 
      */
     private void initPointerTracking() {
         if (Display.getInstance().getCurrent() != null) {
