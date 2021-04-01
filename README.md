@@ -113,6 +113,8 @@ You can click the image to enlarge or view a PDF version [here](https://www.code
 
 ## Quick Start
 
+TIP: We are currently transitioning to Maven, and have created a new, simpler method for creating projects.  Check out https://start.codenameone.com to get started now.
+
 There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
 
 [![Hello Codename One](http://img.youtube.com/vi/oR3KHYf5OrY/0.jpg)](http://www.youtube.com/watch?v=oR3KHYf5OrY "Hello World Codename One")
@@ -137,6 +139,8 @@ You can get started with the binary and the birds eye view in the [download sect
 
 
 ## Setup & Getting Started With The Code
+
+NOTE: We are in the process of migrating from Ant to Maven, which simplifies the process for building from source.  This section still refers to the process for for building with Ant.  See [Maven Quick Start](#maven) for the new Maven build instructions.
 
 Setup is covered in depth in [this article and video](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html). Notice that this covers debugging the simulator and working with the code that requires the Codename One plugin for NetBeans. You can install that by installing NetBeans and typing "Codename One" in the plugin search section see [the getting started tutorial](https://www.codenameone.com/getting-started.html).
 
@@ -177,6 +181,29 @@ You can launch the sample runner app from the command-line using:
 ~~~
 $ ant samples
 ~~~
+
+<a id="maven">
+
+### Quick Start with Maven
+
+~~~~
+git clone https://github.com/codenameone/CodenameOne
+cd CodenameOne/maven
+mvn install
+~~~~
+
+This will build and install Codename One in your local Maven repository.
+
+To build the archetype projects from source, you should check out the [cn1-maven-archetypes](https://github.com/shannah/cn1-maven-archetypes) repository and build it also:
+
+~~~~
+git clone https://github.com/shannah/cn1-maven-archetypes
+cd cn1-maven-archetypes
+mvn install
+~~~~
+
+To get started building projects using Maven, see https://start.codenameone.com.
+
 
 ## ParparVM
 Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
