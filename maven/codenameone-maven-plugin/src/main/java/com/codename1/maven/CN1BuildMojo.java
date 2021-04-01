@@ -75,6 +75,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if ("none".equalsIgnoreCase(buildTarget)) {
+            getLog().info("BuildTarget is None.  Skipping cn1build goal");
+            return;
+        }
         cn1MavenPluginVersion = project.getProperties().getProperty("cn1.plugin.version", "");
         cn1MavenVersion = project.getProperties().getProperty("cn1.version", "");
 
