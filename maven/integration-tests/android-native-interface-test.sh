@@ -18,13 +18,9 @@ chmod 755 build.sh
 ./build.sh jar
 if [ -d /Applications/Xcode.app ]; then
   "mvn" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=ios-source" -Dopen=false
-else
-  "mvn" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=none" -Dopen=false
 fi
 if [ -d $HOME/Library/Android/sdk ]; then
   "mvn" "package" "-DskipTests" "-Dcodename1.platform=android" "-Dcodename1.buildTarget=android-source" -Dopen=false
-else
-  "mvn" "package" "-DskipTests" "-Dcodename1.platform=android" "-Dcodename1.buildTarget=none" -Dopen=false
 fi
 
 # Now update cn1 version and try to build again.
