@@ -75,6 +75,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if ("none".equalsIgnoreCase(buildTarget)) {
+            getLog().info("BuildTarget is None.  Skipping cn1build goal");
+            return;
+        }
         cn1MavenPluginVersion = project.getProperties().getProperty("cn1.plugin.version", "");
         cn1MavenVersion = project.getProperties().getProperty("cn1.version", "");
 
@@ -589,7 +593,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
         r.setType("android");
 
-        r.setKeystoreAlias(props.getProperty("codenamekeystore1.android.keystoreAlias"));
+        r.setKeystoreAlias(props.getProperty("codename1.android.keystoreAlias"));
         String keystorePath = props.getProperty("codename1.android.keystore");
         if (keystorePath != null) {
             File keystoreFile = new File(keystorePath);
@@ -648,6 +652,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         r.setCertificatePassword(props.getProperty("codename1.android.keystorePassword"));
+
         for (Object k : props.keySet()) {
             String key = (String)k;
             if(key.startsWith("codename1.arg.")) {
@@ -920,6 +925,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if(!merged.containsKey(key)){
                 merged.put(key, libProps.getProperty(key));
             }else{
+
                 //if this property already exists with a different value the
                 //install will fail
                 if(!merged.get(key).equals(libProps.getProperty(key))){

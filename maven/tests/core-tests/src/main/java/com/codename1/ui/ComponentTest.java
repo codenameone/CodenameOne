@@ -42,8 +42,9 @@ public class ComponentTest {
             return;
         }
         TestRunnerComponent testRunner = new TestRunnerComponent();
-        testRunner.add(new GeneralPathTest());
-        testRunner.add(new TestComponent());
+        //testRunner.add(new GeneralPathTest());
+        //testRunner.add(new TestComponent());
+        testRunner.add(new TestToolbar());
         testRunner.showForm();
        
         

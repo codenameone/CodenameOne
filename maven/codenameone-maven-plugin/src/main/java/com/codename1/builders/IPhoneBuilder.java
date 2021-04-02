@@ -1070,7 +1070,7 @@ public class IPhoneBuilder extends Executor {
         }
 
         try {
-            if (!execWithFiles(stubSource, stubSource, ".java", "javac", "-classpath",
+            if (!execWithFiles(stubSource, stubSource, ".java", "javac", "-source", "1.6", "-target", "1.6", "-classpath",
                     classesDir.getAbsolutePath(),
                     "-d", classesDir.getAbsolutePath())) {
                 return false;

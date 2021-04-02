@@ -1,6 +1,8 @@
 package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -42,18 +44,31 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
     private String version;
 
     private void generateProject() throws MojoExecutionException{
+
+        String archetypeVersion = "LATEST";
+        try {
+            MavenXpp3Reader reader = new MavenXpp3Reader();
+            Model model = reader.read(getClass().getResourceAsStream("/META-INF/maven/com.codenameone/codenameone-maven-plugin/pom.xml"));
+            archetypeVersion = model.getVersion();
+        } catch (Exception ex) {
+            getLog().warn("Attempted to read archetype version from embedded pom.xml file but failed", ex);
+        }
+
         InvocationRequest request = new DefaultInvocationRequest();
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
+        archetypeVersion = System.getProperty("cn1Version", archetypeVersion);
+        String cn1Version = System.getProperty("cn1Version", null);
 
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
         String[] propsArr = {
                 "interactiveMode=false",
             "archetypeArtifactId=cn1lib-archetype",
             "archetypeGroupId=com.codenameone",
-            "archetypeVersion=LATEST",
+            "archetypeVersion="+archetypeVersion,
             "artifactId="+artifactId,
                 "groupId="+groupId,
-                "version="+version
+                "version="+version,
+
         };
         Properties props = new Properties();
         for (String prop : propsArr) {
@@ -63,6 +78,9 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
             } else if (eqpos < 0) {
                 props.setProperty(prop, "true");
             }
+        }
+        if (cn1Version != null) {
+            props.setProperty("cn1Version", cn1Version);
         }
 
 
