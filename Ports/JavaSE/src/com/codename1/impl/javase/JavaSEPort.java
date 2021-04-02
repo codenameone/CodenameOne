@@ -8066,7 +8066,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fUrl = url;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
-                    launchBrowserThatWorks(fURL);
+                    launchBrowserThatWorks(fUrl);
                 }
             });
             
