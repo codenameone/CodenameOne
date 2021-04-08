@@ -6748,6 +6748,8 @@ public class Component implements Animation, StyleListener, Editable {
      * Sets the hint text and Icon, the hint text and icon are
      * displayed on the component when it is empty
      *
+     * <p>The default UIID for the text hint is "TextHint"</p>
+     *
      * @param hint the hint text to display
      * @param icon the hint icon to display
      */
