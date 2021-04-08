@@ -97,19 +97,21 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
             }
         });
         themes.removeAllItems();
-        
-        for(File r : resFiles) {
-            try {
-                Resources rr = Resources.open("/" + r.getName());
-                for(String themeName : rr.getThemeResourceNames()) {
-                    themes.addItem(r.getName() + " - " + themeName);
-                    themePaths.add(r.getAbsolutePath());
-                    themeNames.add(themeName);
+        if (resFiles != null) {
+            for(File r : resFiles) {
+                try {
+                    Resources rr = Resources.open("/" + r.getName());
+                    for(String themeName : rr.getThemeResourceNames()) {
+                        themes.addItem(r.getName() + " - " + themeName);
+                        themePaths.add(r.getAbsolutePath());
+                        themeNames.add(themeName);
+                    }
+                } catch(IOException err) {
+                    err.printStackTrace();
                 }
-            } catch(IOException err) {
-                err.printStackTrace();
             }
         }
+
         
         refreshComponentTree();
         
