@@ -2343,7 +2343,12 @@ public class CSSTheme {
             if (res == null) {
                 res = new EditableResourcesForCSS(resourceFile);
             }
-            res.openFile(new FileInputStream(resourceFile));
+            try {
+                res.openFile(new FileInputStream(resourceFile));
+            } catch (IOException ex) {
+                System.err.println("Failed to load resource file from "+resourceFile);
+                throw ex;
+            }
             imagesMetadata.load(res);
         }
     }

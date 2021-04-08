@@ -290,7 +290,7 @@ public class CN1CSSCLI {
         }
         
         if (!destDir.exists()) {
-            destDir.mkdir();
+            destDir.mkdirs();
         }
         
         if (contains(srcDir, destDir) || contains(destDir, srcDir)) {
