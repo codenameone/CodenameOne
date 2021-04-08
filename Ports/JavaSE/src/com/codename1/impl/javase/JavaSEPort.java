@@ -3542,11 +3542,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             javadocs.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/javadoc/"));
-                    } catch (Exception ex) {
-                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/javadoc/");
                 }
             });
             helpMenu.add(javadocs);
@@ -3555,10 +3551,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             how.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/how-do-i.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/how-do-i.html");
                 }
             });
             helpMenu.add(how);
@@ -3567,10 +3560,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             forum.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/discussion-forum.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/discussion-forum.html");
                 }
             });
             helpMenu.add(forum);
@@ -3579,10 +3569,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bserver.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://cloud.codenameone.com/buildapp/index.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://cloud.codenameone.com/secure/index.html");
                 }
             });
             helpMenu.addSeparator();
@@ -3621,10 +3608,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     link.addActionListener(new ActionListener() {
 
                         public void actionPerformed(ActionEvent e) {
-                            try {
-                                Desktop.getDesktop().browse(new URI("https://www.codenameone.com"));
-                            } catch (Exception ex) {                        
-                            }
+                        launchBrowserThatWorks("https://www.codenameone.com");
                         }
                     });
                     linkPanel.add(link);
@@ -8029,6 +8013,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         return s;
     }
 
+    private void launchBrowserThatWorks(String url) {
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        String externalBrowserExe = p.get("externalBrowserExe", null);
+        try {
+            try {
+                if (externalBrowserExe != null && new File(externalBrowserExe).exists()) {
+                    ProcessBuilder pb = new ProcessBuilder(externalBrowserExe, url);
+                    pb.start();
+                    return;
+                }
+            } catch (Exception err) {
+                err.printStackTrace();
+                p.remove("externalBrowserExe");
+            }
+            Desktop.getDesktop().browse(new URI(url));
+        } catch (Exception ex) {
+            try {
+                if (url.startsWith("file:") && new File(new URI(url)).exists()) {
+                    Desktop.getDesktop().open(new File(new URI(url)));
+                } else {
+                    int val = JOptionPane.showConfirmDialog(window, "Error Launching Browser", "Do you want to pick a browser executable manually?", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                    if(val == JOptionPane.YES_OPTION) {
+                        File file = pickFile(new String[] {"*"}, "Browser Executable");
+                        if (file != null && file.exists() && file.canExecute()) {
+                            p.put("externalBrowserExe", file.getAbsolutePath());
+                            launchBrowserThatWorks(url);
+                        }
+                    }
+
+                }
+            } catch (Exception ex2) {
+                ex2.printStackTrace();
+            }
+        }
+
+    }
+
     /**
      * @inheritDoc
      */
@@ -8045,19 +8066,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fUrl = url;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
-                    try {
-                        
-                        Desktop.getDesktop().browse(new URI(fUrl));
-                    } catch (Exception ex) {
-                        try {
-                            if (fUrl.startsWith("file:") && new File(new URI(fUrl)).exists()) {
-                                Desktop.getDesktop().open(new File(new URI(fUrl)));
-                                
-                            }
-                        } catch (Exception ex2) {
-                            ex2.printStackTrace();
-                        }
-                    }
+                    launchBrowserThatWorks(fUrl);
                 }
             });
             

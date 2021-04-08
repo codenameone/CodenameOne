@@ -130,7 +130,7 @@ public class JSDialogHandler extends CefJSDialogHandlerAdapter {
                         SpanLabel lbl = new SpanLabel(message_text);
                         sheet.getContentPane().setLayout(new BorderLayout());
                         
-                        TextField input = new TextField();
+                        final TextField input = new TextField();
                         if (default_prompt_text != null) {
                             input.setText(default_prompt_text);
                         }
