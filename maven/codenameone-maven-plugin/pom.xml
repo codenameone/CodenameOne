@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.21-SNAPSHOT</version>
+        <version>7.0.21</version>
     </parent>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-maven-plugin</artifactId>
-    <version>7.0.21-SNAPSHOT</version>
+    <version>7.0.21</version>
     <packaging>maven-plugin</packaging>
     <name>codenameone-maven-plugin</name>
   
