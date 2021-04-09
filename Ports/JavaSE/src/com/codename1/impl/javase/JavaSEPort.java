@@ -3268,7 +3268,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
                     if(!fxExists){
-                        System.err.println("This simulation requires jdk 7");
+                        System.err.println("This simulation requires a JDK with JavaFX");
                         return;
                     }
                     if(locSimulation==null) {
