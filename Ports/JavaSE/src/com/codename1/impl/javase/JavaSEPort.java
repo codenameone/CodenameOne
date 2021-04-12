@@ -2475,15 +2475,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
                 landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
                 safeAreaPortrait.setBounds(
-                        Integer.parseInt(props.getProperty("safePortaitX", "0")), 
-                        Integer.parseInt(props.getProperty("safePortraitY", "0")), 
-                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safePortraitX", "0")),
+                        Integer.parseInt(props.getProperty("safePortraitY", "0")),
+                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)),
                         Integer.parseInt(props.getProperty("safePortraitHeight", ""+portraitScreenCoordinates.height))
                 );
                 safeAreaLandscape.setBounds(
-                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")), 
-                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")), 
-                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")),
+                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")),
+                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)),
                         Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
                 );
                 roundedSkin = true;
@@ -2491,7 +2491,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
             }
-            
+
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
