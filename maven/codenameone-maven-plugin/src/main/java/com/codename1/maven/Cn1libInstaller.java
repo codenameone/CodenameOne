@@ -600,7 +600,14 @@ public class Cn1libInstaller {
                     "    <file><exists>${basedir}/"+libName+"/pom.xml</exists></file>\n" +
                     "  </activation>" +
                     "  <modules><module>"+libName+"</module></modules>\n" +
-                    "</profile>\n";
+                    "</profile>\n" +
+                    "<profile>\n" +
+                    "  <id>"+file.getName()+"-cn1lib-fromroot</id>\n" +
+                    "  <activation>\n" +
+                    "    <file><exists>${basedir}/cn1libs/"+libName+"/pom.xml</exists></file>\n" +
+                    "  </activation>" +
+                    "  <modules><module>"+libName+"</module></modules>\n" +
+                    "</profile>\n";;
 
             String parentPomContents;
             if (parentPomFile.exists()) {
