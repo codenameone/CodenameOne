@@ -26,6 +26,7 @@ import com.codename1.components.InteractionDialog;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -722,6 +723,8 @@ public class Validator {
     
     class ComponentListener implements ActionListener, DataChangedListener, Painter {
         private Component cmp;
+        private Rectangle visibleRect = new Rectangle();
+
         public ComponentListener(Component cmp) {
             this.cmp = cmp;
         }
@@ -750,11 +753,23 @@ public class Validator {
                     float height = c.getHeight();
                     xpos += Math.round(width * validationEmblemPositionX);
                     ypos += Math.round(height * validationEmblemPositionY);
+
+                    Container parent = c.getParent();
+                    visibleRect = parent.getVisibleBounds(visibleRect);
+                    Container grandParent = parent.getParent();
+                    if (grandParent != null){
+                        visibleRect.setX(visibleRect.getX() + grandParent.getAbsoluteX());
+                        visibleRect.setY(visibleRect.getY() + grandParent.getAbsoluteY());
+                    }
+
+                    int[] originalClip = g.getClip();
+                    g.setClip(visibleRect);
                     if(xpos + validationFailedEmblem.getWidth() > Display.getInstance().getDisplayWidth()) {
                         g.drawImage(validationFailedEmblem, xpos - validationFailedEmblem.getWidth(), ypos - validationFailedEmblem.getHeight() / 2);
                     } else {
                         g.drawImage(validationFailedEmblem, xpos - validationFailedEmblem.getWidth() / 2, ypos - validationFailedEmblem.getHeight() / 2);
                     }
+                    g.setClip(originalClip);
                 }
             }
         }
