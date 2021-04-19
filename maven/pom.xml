@@ -4,7 +4,7 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0.23-SNAPSHOT</version>
+    <version>7.0.24-SNAPSHOT</version>
 
     <packaging>pom</packaging>
 

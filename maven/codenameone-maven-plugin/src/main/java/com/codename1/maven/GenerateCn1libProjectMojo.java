@@ -83,7 +83,10 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
             props.setProperty("cn1Version", cn1Version);
         }
 
-
+        request.setShowErrors(true);
+        if (getLog().isDebugEnabled()) {
+            request.setDebug(true);
+        }
         request.setProperties(props);
 
         Invoker invoker = new DefaultInvoker();

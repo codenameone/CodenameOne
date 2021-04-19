@@ -7938,8 +7938,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {
@@ -7985,8 +7990,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {

@@ -74,6 +74,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
 
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
+
         String[] propsArr = {
                 "interactiveMode=false",
             "archetypeArtifactId=cn1app-archetype",
@@ -95,6 +96,10 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             }
         }
 
+        if (getLog().isDebugEnabled()) {
+            request.setDebug(true);
+        }
+        request.setShowErrors(true);
 
         request.setProperties(props);
 
