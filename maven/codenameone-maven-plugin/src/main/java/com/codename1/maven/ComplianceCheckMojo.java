@@ -37,6 +37,18 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
     private File complianceOutputFile;
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if ("true".equals(System.getProperty("skipComplianceCheck", "false"))) {
+            return;
+        }
+        if ("true".equals(project.getProperties().getProperty("skipComplianceCheck", "false"))) {
+            return;
+        }
+        if ("true".equals(System.getProperty("reloadClasses", "false"))) {
+            return;
+        }
+        if ("true".equals(project.getProperties().getProperty("reloadClasses", "false"))) {
+            return;
+        }
         if (!isCN1ProjectDir()) {
             return;
         }
