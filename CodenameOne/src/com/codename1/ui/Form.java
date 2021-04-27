@@ -2358,6 +2358,10 @@ public class Form extends Container {
         dragged = null;
     }
 
+    void setPreviousForm(Form previousForm) {
+        this.previousForm = previousForm;
+    }
+
     /**
      * {@inheritDoc}
      */
