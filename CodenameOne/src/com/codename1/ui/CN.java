@@ -218,6 +218,28 @@ public class CN extends  CN1Constants {
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
     
     CN() {}
+
+    /**
+     * Sets a bookmark that can restore the app to a particular state.  This takes a
+     * {@link Runnable} that will be run when {@link #refresh() } is called.
+     *
+     * <p>The primary purpose of this feature is live code refresh.</p>
+     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
+     * @since 8.0
+     *
+     */
+    public static void setBookmark(Runnable bookmark) {
+        Display.getInstance().setBookmark(bookmark);
+    }
+
+    /**
+     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
+     *
+     * @since 8.0
+     */
+    public static void refresh() {
+        Display.getInstance().refresh();
+    }
     
     /**
      * This method allows us to manipulate the drag started detection logic.
@@ -1547,7 +1569,7 @@ public class CN extends  CN1Constants {
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal period}ms
      * repeating every {@literal period}ms.
-     * @param period The delay and repeat in milliseconds.
+     * @param timeout The delay and repeat in milliseconds.
      * @param r The runnable to run on the EDT.
      * @return The timer object which can be used to cancel the task.
      * @since 7.0

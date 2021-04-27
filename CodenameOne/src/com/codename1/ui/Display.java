@@ -91,6 +91,7 @@ public final class Display extends CN1Constants {
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
     private boolean inNativeUI;
+    private Runnable bookmark;
 
     private EventDispatcher messageListeners;
     
@@ -166,6 +167,32 @@ public final class Display extends CN1Constants {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     private boolean disableInvokeAndBlock;
+    
+    
+    /**
+     * Sets a bookmark that can restore the app to a particular state.  This takes a 
+     * {@link Runnable} that will be run when {@link #refresh() } is called.
+     * 
+     * <p>The primary purpose of this feature is live code refresh.</p>
+     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
+     * @since 8.0
+     * 
+     */
+    public void setBookmark(Runnable bookmark) {
+        this.bookmark = bookmark;
+    }
+    
+    /**
+     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
+     * 
+     * @since 8.0
+     */
+    public void refresh() {
+        if (this.bookmark != null) {
+            this.bookmark.run();
+        }
+    }
+    
     
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
