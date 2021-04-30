@@ -155,7 +155,7 @@ public class CN1Bootstrap {
                 
             
                 cefSupported = true;
-                System.out.println("Adding CEF to classpath");
+                System.out.println("Adding CEF to classpath " + cef);
                 String cn1LibPath = System.getProperty("cn1.library.path", ".");
                 String bitSuffix = is64Bit ? "64" : "32";
                 String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("lib" + File.separator + "linux"+bitSuffix);

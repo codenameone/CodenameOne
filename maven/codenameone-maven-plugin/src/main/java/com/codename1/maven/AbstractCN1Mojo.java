@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.PathMatcher;
 import java.util.*;
 
@@ -38,10 +39,7 @@ import org.apache.maven.repository.RepositorySystem;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.input.DefaultInputHandler;
 import org.apache.tools.ant.input.InputHandler;
-import org.apache.tools.ant.taskdefs.Copy;
-import org.apache.tools.ant.taskdefs.Expand;
-import org.apache.tools.ant.taskdefs.Java;
-import org.apache.tools.ant.taskdefs.Redirector;
+import org.apache.tools.ant.taskdefs.*;
 import org.apache.tools.ant.types.FileSet;
 
 /**
@@ -940,14 +938,40 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         File extractedDir = new File(cefZip.getParentFile(), cefZip.getName()+"-extracted");
-        if (!extractedDir.exists() || extractedDir.lastModified() < cefZip.lastModified()) {
-            if (extractedDir.exists()) {
-                delTree(extractedDir);
+
+        boolean missingSymlinks = false;
+        if (isMac) {
+            File chromiumEmbeddedFramework = new File(extractedDir, "cef/macos64/Chromium Embedded Framework.framework/Chromium Embedded Framework");
+            if (!Files.isSymbolicLink(chromiumEmbeddedFramework.toPath())) {
+                missingSymlinks = true;
             }
-            Expand expand = (Expand)antProject.createTask("unzip");
-            expand.setDest(extractedDir);
-            expand.setSrc(cefZip);
-            expand.execute();
+        }
+
+        if (!extractedDir.exists() || extractedDir.lastModified() < cefZip.lastModified() || missingSymlinks) {
+            if (isMac) {
+                // Mac needs to retain symlinks when extracting the package
+                if (extractedDir.exists()) {
+                    delTree(extractedDir);
+                }
+                extractedDir.mkdirs();
+                getLog().info("Expanding CEF");
+                ExecTask unzip = (ExecTask) antProject.createTask("exec");
+                unzip.setExecutable("unzip");
+                unzip.createArg().setFile(cefZip);
+                unzip.createArg().setValue("-d");
+                unzip.createArg().setFile(extractedDir);
+                unzip.execute();
+
+            } else {
+                if (extractedDir.exists()) {
+                    delTree(extractedDir);
+                }
+                getLog().info("Expanding CEF");
+                Expand expand = (Expand) antProject.createTask("unzip");
+                expand.setDest(extractedDir);
+                expand.setSrc(cefZip);
+                expand.execute();
+            }
         }
         if (new File(extractedDir, "cef").exists()) {
             extractedDir = new File(extractedDir, "cef");
@@ -981,6 +1005,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
         File extracted = new File(file.getParentFile(), file.getName()+"-extracted");
         File designerJar = new File(extracted, "designer_1.jar");
+
         if (!designerJar.exists() || designerJar.lastModified() < file.lastModified()) {
             Expand expand = (Expand)antProject.createTask("unzip");
             expand.setSrc(file);
