@@ -113,7 +113,7 @@ public class SourceChangeWatcher implements Runnable {
                         start.invoke(app, new Class[0]);
                     }
                     
-                    CN.refresh();
+                    CN.restoreToBookmark();
                 } catch (Exception ex) {
                     Log.e(ex); 
                 }

@@ -237,8 +237,8 @@ public class CN extends  CN1Constants {
      *
      * @since 8.0
      */
-    public static void refresh() {
-        Display.getInstance().refresh();
+    public static void restoreToBookmark() {
+        Display.getInstance().restoreToBookmark();
     }
     
     /**

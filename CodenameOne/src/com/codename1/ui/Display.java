@@ -187,7 +187,7 @@ public final class Display extends CN1Constants {
      * 
      * @since 8.0
      */
-    public void refresh() {
+    public void restoreToBookmark() {
         if (this.bookmark != null) {
             this.bookmark.run();
         }
