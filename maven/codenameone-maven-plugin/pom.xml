@@ -109,7 +109,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-cef</artifactId>
-            <version>84.4.1-M2</version>
+            <version>84.4.1-M3</version>
             <type>pom</type>
         </dependency>
 
