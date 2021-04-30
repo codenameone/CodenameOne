@@ -11769,7 +11769,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         String sep = File.separator;
         File[] searchPaths = new File[]{
+            new File(f.getParent(), "target" + sep + "classes"+ sep + "html"),
             new File(f.getParent(), "build" + sep + "classes"+ sep + "html"),
+            new File(f.getParent(), "src" + sep + "main"+ sep + "resources" + sep +"html"),
             new File(f.getParent(), "src" + sep + "html"),
             new File(f.getParent(), "lib" + sep + "impl" + sep + "cls" + sep + "html")
         };
