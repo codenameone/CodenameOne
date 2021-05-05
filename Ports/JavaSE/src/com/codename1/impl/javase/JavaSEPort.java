@@ -5064,6 +5064,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 this.jcmp = jcmp;
             }
             void repaint(long tm, int x, int y, int width, int height) {
+
                 int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
                 int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                 int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
@@ -5152,14 +5153,35 @@ public class JavaSEPort extends CodenameOneImplementation {
             swingT = t;
             textCmp = swingT;
         } else {
+
+            // Forward references so that we can access the scroll pane and its
+            // repainter from inside the JTextArea.
+            final Repainter[] fRepainter = new Repainter[1];
+            final JScrollPane[] fPane = new JScrollPane[1];
+
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(); 
+            JTextArea t = new JTextArea() {
+                @Override
+
+                public void repaint(long tm, int x, int y, int width, int height) {
+                    // We need to catch JTextArea repaints in addition to the
+                    // JScrollPane repaints because the ScrollPane doesn't seem to repaint
+                    // enough.
+                    if (fRepainter[0] != null && fPane[0] != null) {
+                        Point p = SwingUtilities.convertPoint(this, x, y, fPane[0]);
+                        fRepainter[0].repaint(tm, p.x, p.y, width, height);
+                    }
+                }
+            };
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
             JScrollPane pane = new JScrollPane(swingT){
                 
                 Repainter repainter = new Repainter(this);
+                {
+                    fRepainter[0] = repainter;
+                }
                 
                 @Override
                 public void repaint(long tm, int x, int y, int width, int height) {
@@ -5171,6 +5193,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             };
+            fPane[0] = pane;
+
             if (ta.isGrowByContent()) {
                 pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             }
