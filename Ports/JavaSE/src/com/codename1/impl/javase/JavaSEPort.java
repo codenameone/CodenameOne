@@ -12728,7 +12728,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
                         (int)(containerPoint.y * retinaScale));
                 
-                if (textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                if (textCmp != null && SwingUtilities.getWindowAncestor(textCmp) != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
                     
                     Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
                     java.awt.Component target = SwingUtilities.getDeepestComponentAt(
