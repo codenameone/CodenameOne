@@ -122,7 +122,7 @@ public class Executor {
     }
     
     
-    public static void main(Class launcherClass, final String[] argv) throws Exception {
+    public static void main(final Class launcherClass, final String[] argv) throws Exception {
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
