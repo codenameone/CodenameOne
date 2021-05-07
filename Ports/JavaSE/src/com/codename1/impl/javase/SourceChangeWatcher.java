@@ -21,6 +21,7 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  *
@@ -166,10 +167,13 @@ public class SourceChangeWatcher implements Runnable {
                     
                     Path path = getPathForKey(key);
                     requiresRecompile = false;
-                    key.pollEvents().forEach(evt -> {
-                        System.out.println("[Watcher "+SourceChangeWatcher.this+"] File changedL: "+evt.context()+" key="+key);
-                        if (evt.context().toString().endsWith(".java") || evt.context().toString().endsWith(".kt")) {
-                            requiresRecompile = true;
+                    key.pollEvents().forEach(new Consumer<WatchEvent<?>>() {
+                        @Override
+                        public void accept(WatchEvent<?> evt) {
+                            System.out.println("[Watcher " + SourceChangeWatcher.this + "] File changedL: " + evt.context() + " key=" + key);
+                            if (evt.context().toString().endsWith(".java") || evt.context().toString().endsWith(".kt")) {
+                                requiresRecompile = true;
+                            }
                         }
                     });
                     if (requiresRecompile) {
