@@ -159,7 +159,7 @@ public class SourceChangeWatcher implements Runnable {
             
             while (!stopped && Display.isInitialized()) {
                 try {
-                    WatchKey key = watchService.take();
+                    final WatchKey key = watchService.take();
                     
                     if (stopped) {
                         return;
