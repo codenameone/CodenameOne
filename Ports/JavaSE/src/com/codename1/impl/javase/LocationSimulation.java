@@ -55,7 +55,7 @@ public class LocationSimulation extends javax.swing.JFrame {
     /**
      * single symbol for m/s2 and yd/s2 from symbol font set
      */
-    public static final char[] E_MeasUnitS_ms2_Char = {'°', '"', 'h'};
+    public static final char[] E_MeasUnitS_ms2_Char = {'"', 'h'};
     private static final double[] E_MeasUnitPerM = {1, 1 / 0.91440, 1 / 1 / 0.91440};
     /**
      * Creates new form LocationSimulation

@@ -80,7 +80,7 @@ public class Executor {
         
         List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
         isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
-        usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+        usingHotswapAgent = true;//inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
     }
     
     /**
@@ -749,7 +749,12 @@ public class Executor {
             if (srcMain.exists()) {
                 sourceWatcher.addWatchFolder(srcMain);
             }
-            
+
+
+            File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
+            if (srcRad.exists()) {
+                sourceWatcher.addWatchFolder(srcRad);
+            }
             
             File hotswapPropsFile = new File(props.getParentFile().getParentFile(), "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");
             

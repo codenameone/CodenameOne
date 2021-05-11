@@ -5,10 +5,13 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.io.Log;
-import com.codename1.ui.CN;
-import com.codename1.ui.Display;
-import com.codename1.ui.Form;
+import com.codename1.ui.*;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import java.io.File;
 import java.io.IOException;
@@ -85,7 +88,7 @@ public class SourceChangeWatcher implements Runnable {
             }
         }
         
-        ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck");
+        ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck", "-e");
         pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
         pb.directory(pom.getParentFile());
         pb.inheritIO();
@@ -104,19 +107,56 @@ public class SourceChangeWatcher implements Runnable {
         
         CN.callSeriallyAndWait(new Runnable() {
             public void run() {
-                try {
-                    if (app != null) {
-                        Method stop = app.getClass().getMethod("stop", new Class[0]);
-                        stop.invoke(app, new Class[0]);
 
-                        Method start = app.getClass().getMethod("start", new Class[0]);
-                        start.invoke(app, new Class[0]);
+                final Sheet sheet = new Sheet(null, "Source Change Detected");
+                Container contentPane = sheet.getContentPane();
+                contentPane.setLayout(new BorderLayout());
+                contentPane.add(BorderLayout.CENTER, new SpanLabel("Changes were detected to files in the classpath.  Apply these changes now and refresh?"));
+                Container buttons = new Container(BoxLayout.y());
+                Button refreshSimulator = new Button("Refresh Simulator");
+                Button refreshForm = new Button("Refresh Current Form");
+                Button ignore = new Button("Ignore");
+
+                refreshSimulator.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        System.setProperty("reload.simulator", "true");
+                        sheet.back();
                     }
-                    
-                    CN.restoreToBookmark();
-                } catch (Exception ex) {
-                    Log.e(ex); 
-                }
+                });
+
+                refreshForm.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        sheet.back();
+                        try {
+                            if (app != null) {
+                                Method stop = app.getClass().getMethod("stop", new Class[0]);
+                                stop.invoke(app, new Class[0]);
+
+                                Method start = app.getClass().getMethod("start", new Class[0]);
+                                start.invoke(app, new Class[0]);
+                            }
+
+                            CN.restoreToBookmark();
+                        } catch (Exception ex) {
+                            Log.e(ex);
+                        }
+                    }
+                });
+
+                ignore.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        sheet.back();
+                    }
+                });
+
+                buttons.addAll(refreshForm, refreshSimulator, ignore);
+                contentPane.add(BorderLayout.SOUTH, buttons);
+                sheet.setPosition(BorderLayout.CENTER);
+                sheet.show();
+
+
+
+
             }
         });
         
@@ -168,7 +208,7 @@ public class SourceChangeWatcher implements Runnable {
                     requiresRecompile = false;
                     key.pollEvents().forEach(evt -> {
                         System.out.println("[Watcher "+SourceChangeWatcher.this+"] File changedL: "+evt.context()+" key="+key);
-                        if (evt.context().toString().endsWith(".java") || evt.context().toString().endsWith(".kt")) {
+                        if (evt.context().toString().endsWith(".java") || evt.context().toString().endsWith(".kt") || evt.context().toString().endsWith(".xml")) {
                             requiresRecompile = true;
                         }
                     });
