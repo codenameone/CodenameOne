@@ -117,7 +117,7 @@ TIP: We are currently transitioning to Maven, and have created a new, simpler me
 
 There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
 
-[![Hello Codename One](http://img.youtube.com/vi/oR3KHYf5OrY/0.jpg)](http://www.youtube.com/watch?v=oR3KHYf5OrY "Hello World Codename One")
+[![Hello Codename One](http://img.youtube.com/vi/rl6z7DD2-vg/0.jpg)](http://www.youtube.com/watch?v=rl6z7DD2-vg "Hello World Codename One")
 
 ## Extensible
 
