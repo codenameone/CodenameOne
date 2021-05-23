@@ -1337,4 +1337,58 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     public Image getIconFromState() {
         return icon.getIconFromState();
     }
+
+    /**
+     * Sets the badge text to be used on this label.  Badges are rendered in the
+     * upper right corner of the label inside round border.  The style of the badge can be
+     * configured using {@link #setBadgeUIID(java.lang.String) }, but the default style uses
+     * the "Badge" UIID, which, by default, uses white text on a red round border background.
+     *
+     * @param badgeText The text to include in the badge.   null or empty strings will result in the
+     * badge not being rendered.
+     * @since 8.0
+     * @see #getBadgeText()
+     * @see #getBadgeStyleComponent()
+     * @see #setBadgeUIID(java.lang.String)
+     */
+    public void setBadgeText(String badgeText) {
+        icon.setBadgeText(badgeText);
+    }
+
+    /**
+     * Gets the text to be used in a badge on this label.
+     * @return the badge text to be used on this label.  May return if no text is set.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #setBadgeUIID(java.lang.String)
+     * @see #getBadgeStyleComponent()
+     */
+    public String getBadgeText() {
+        return icon.getBadgeText();
+    }
+
+    /**
+     * Sets the style that should be used for rendering badges.  By default it will use
+     * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
+     *
+     * @param badgeUIID The UIID to use for the badge.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #getBadgeStyleComponent()
+     */
+    public void setBadgeUIID(String badgeUIID) {
+        icon.setBadgeUIID(badgeUIID);
+    }
+
+    /**
+     * Gets a component that can be used for the style of the badge.
+     * @return The component whose style can be used to style the badge.  May return null if none set.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #setBadgeUIID(java.lang.String)
+     * @see #getBadgeText()
+     */
+    public Component getBadgeStyleComponent() {
+        return icon.getBadgeStyleComponent();
+    }
 }
