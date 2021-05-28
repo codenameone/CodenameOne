@@ -4636,7 +4636,18 @@ hi.show();}</pre></noscript>
     public boolean isScreenSaverDisableSupported() {
         return impl.isScreenLockSupported();
     }
-    
+
+    /**
+     * Checks is the scroll-wheel mouse is currently scrolling.  The scroll-wheel simulates pointer presses and drags
+     * so there are cases when you are processing pointer events when you may want to know if it was driggered by
+     * a scroll wheel.
+     * @return True if the scroll-wheel is responsible for current pointer events.
+     * @since 8.0
+     */
+    public boolean isScrollWheeling() {
+        return impl.isScrollWheeling();
+    }
+
     /** 
      * If isScreenSaverDisableSupported() returns true calling this method will 
      * lock the screen display on

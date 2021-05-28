@@ -11,6 +11,8 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.LinkedList;
+import java.util.function.Function;
 
 
 import org.apache.commons.text.StringEscapeUtils;
@@ -26,7 +28,6 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
@@ -45,6 +46,10 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
         if (!isCN1ProjectDir()) {
             return;
         }
+        if (System.getProperty("generate-gui-sources-done") != null) {
+            return;
+        }
+        System.setProperty("generate-gui-sources-done", "true");
         System.setProperty("javax.xml.bind.context.factory", "com.sun.xml.bind.v2.ContextFactory");
                 
         GenerateGuiSources g = new GenerateGuiSources();
@@ -55,66 +60,134 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
 
         // Generate the RAD templates while we're at it
 
-        File radFragments = new File(getCN1ProjectDir(), path("src", "main", "rad", "fragments"));
-        getLog().info("Looking for fragments in "+radFragments);
-        if (radFragments.isDirectory()) {
+        File radViews = getRADViewsDirectory();
+        getLog().debug("Looking for views in "+radViews);
+        if (radViews.isDirectory()) {
             project.addCompileSourceRoot(getRADGeneratedSourcesDirectory().getAbsolutePath());
-            for (File child : radFragments.listFiles()) {
-                File destClassFile = getDestClassForRADFragment(child);
-                getLog().info("Found fragment "+child+".  Checking against "+destClassFile);
+            Exception res = forEach(radViews, child -> {
+                if (!child.getName().endsWith(".xml")) {
+                    return null;
+                }
+                File destClassFile = getDestClassForRADView(child);
+                getLog().debug("Found view "+child+".  Checking against "+destClassFile);
                 if (!destClassFile.exists() || child.lastModified() > destClassFile.lastModified()) {
                     try {
-                        generateRADFragmentClass(child);
+                        generateRADViewClass(child);
                     } catch (IOException ex) {
-                        throw new MojoFailureException("Failed to generate class for RAD fragment XML file "+child, ex);
+                        return new MojoFailureException("Failed to generate class for RAD fragment XML file "+child, ex);
                     }
                 }
+                return null;
+            });
+            if (res != null) {
+                if (res instanceof MojoExecutionException) {
+                    throw (MojoFailureException) res;
+                } else {
+                    throw new MojoFailureException("Failed to compile RAD views:" + res.getMessage(), res);
+                }
             }
+
         }
+    }
+
+    private File getRADViewsDirectory() {
+        return new File(getCN1ProjectDir(), path("src", "main", "rad", "views"));
     }
 
     private File getRADGeneratedSourcesDirectory() {
-        return new File(path(project.getBuild().getDirectory(), "generated-sources" , "rad-fragments"));
+        return new File(path(project.getBuild().getDirectory(), "generated-sources" , "rad-views"));
     }
 
-    private File getDestClassForRADFragment(File fragment) {
-        String ext = fragment.getName().substring(fragment.getName().lastIndexOf("."));
-        String base = fragment.getName().substring(0, fragment.getName().lastIndexOf("."));
-
-        File genSrcDir =  getRADGeneratedSourcesDirectory();
-        return new File(genSrcDir, base.replace(".", File.separator) + ".java");
+    private static Exception forEach(File root, Function<File, Exception> callback) {
+        Exception res = callback.apply(root);
+        if (res != null) return res;
+        if (root.isDirectory()) {
+            for (File child : root.listFiles()) {
+                res = forEach(child, callback);
+                if (res != null) return res;
+            }
+        }
+        return null;
 
     }
 
-    private void generateRADFragmentClass(File fragment) throws IOException {
-        getLog().info("Generating RAD Fragment for XML template "+fragment);
-        StringBuilder sb = new StringBuilder();
-        String ext = fragment.getName().substring(fragment.getName().lastIndexOf("."));
-        String base = fragment.getName().substring(0, fragment.getName().lastIndexOf("."));
-        String packageName = "";
-        String className = base;
-        if (base.indexOf(".") > 0) {
-            packageName = base.substring(0, base.lastIndexOf("."));
-            className = base.substring(base.lastIndexOf(".")+1);
+    private File getDestClassForRADView(File viewXMLFile) {
+        String ext = viewXMLFile.getName().substring(viewXMLFile.getName().lastIndexOf("."));
+        String base = viewXMLFile.getName().substring(0, viewXMLFile.getName().lastIndexOf("."));
+        File viewsDirectory = getRADViewsDirectory();
+
+        int levels = 0;
+        LinkedList<String> pathParts = new LinkedList<String>();
+        File f = viewXMLFile.getParentFile();
+        while (f != null && !f.equals(viewsDirectory)) {
+            pathParts.addFirst(f.getName());
+            f = f.getParentFile();
+        }
+        StringBuilder pathSb = new StringBuilder();
+        for (String part : pathParts) {
+            pathSb.append(part).append(File.separator);
         }
 
-        String xmlFragmentString = FileUtils.readFileToString(fragment, "utf-8");
-        xmlFragmentString = addElementIdentifiersToXML(xmlFragmentString);
+        File genSrcDir =  new File(getRADGeneratedSourcesDirectory(), pathSb.substring(0, pathSb.length()-1));
+
+        File out =  new File(genSrcDir, base + ".java");
+        out = new File(out.getParentFile(), "Abstract" + out.getName());
+        return out;
+
+    }
+
+    private String getPackageForRADView(File viewXMLFile) {
+        String ext = viewXMLFile.getName().substring(viewXMLFile.getName().lastIndexOf("."));
+        String base = viewXMLFile.getName().substring(0, viewXMLFile.getName().lastIndexOf("."));
+        File viewsDirectory = getRADViewsDirectory();
+
+        int levels = 0;
+        LinkedList<String> pathParts = new LinkedList<String>();
+        File f = viewXMLFile.getParentFile();
+        while (f != null && !f.equals(viewsDirectory)) {
+            pathParts.addFirst(f.getName());
+            f = f.getParentFile();
+        }
+        StringBuilder pathSb = new StringBuilder();
+        for (String part : pathParts) {
+            pathSb.append(part).append(".");
+        }
+        return pathSb.substring(0, pathSb.length()-1);
+    }
+
+    private void generateRADViewClass(File xmlViewFile) throws IOException {
+        getLog().debug("Generating RAD View for XML template "+xmlViewFile);
+        StringBuilder sb = new StringBuilder();
+
+        String packageName = getPackageForRADView(xmlViewFile);
+        String className = xmlViewFile.getName().substring(0, xmlViewFile.getName().indexOf("."));
+
+        className = "Abstract" + className;
+
+        String radViewString = FileUtils.readFileToString(xmlViewFile, "utf-8");
+        radViewString = addElementIdentifiersToXML(radViewString);
 
         if (!packageName.isEmpty()) {
             sb.append("package ").append(packageName).append(";\n");
         }
         sb.append("import com.codename1.rad.annotations.RAD;\n");
-        sb.append("import com.codename1.rad.ui.EntityViewFragment;\n");
+        sb.append("import com.codename1.rad.ui.AbstractEntityView;\n");
         sb.append("import com.codename1.rad.ui.EntityView;\n");
+        sb.append("import com.codename1.rad.models.Entity;\n");
+        sb.append("import com.codename1.rad.nodes.Node;\n");
         sb.append("import com.codename1.io.CharArrayReader;\n");
+        sb.append("import com.codename1.rad.ui.ViewContext;\n");
         sb.append("@RAD\n");
-        sb.append("public abstract class ").append(className).append(" extends EntityViewFragment {\n");
+        String parentClassName = parentEntityViewClass;
+        if (parentClassName.equals("AbstractEntityView")) {
+            parentClassName += "<T>";
+        }
+        sb.append("public abstract class ").append(className).append("<T extends ").append(viewModelType).append(">  extends ").append(parentClassName).append(" {\n");
         sb.append("    private static final String FRAGMENT_XML=\"");
-        sb.append(StringEscapeUtils.escapeJava(xmlFragmentString));
+        sb.append(StringEscapeUtils.escapeJava(radViewString));
         sb.append("\";\n");
-        sb.append("    public ").append(className).append("(EntityView contextView) {\n");
-        sb.append("        super(contextView);\n");
+        sb.append("    public ").append(className).append("(ViewContext<T> context) {\n");
+        sb.append("        super(context);\n");
         sb.append("    }\n\n");
 
         sb.append("}\n");
@@ -124,7 +197,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
 
 
 
-        File destFile = getDestClassForRADFragment(fragment);
+        File destFile = getDestClassForRADView(xmlViewFile);
         if (!destFile.getParentFile().exists()) {
             destFile.getParentFile().mkdirs();
         }
@@ -133,6 +206,9 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
     }
 
     private static final String RAD_XML_NAMESPACE = "http://www.codenameone.com/rad";
+
+    private String parentEntityViewClass = "AbstractEntityView";
+    private String viewModelType = "Entity";
 
     private String addElementIdentifiersToXML(String xml) throws IOException {
         try {
@@ -143,7 +219,16 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
             class Context {
                 int index=0;
                 void crawl(org.w3c.dom.Element el) {
-                    el.setAttribute("elementId", String.valueOf(index++));
+                    if (index == 0) {
+                        if (el.hasAttribute("rad-extends")) {
+                            parentEntityViewClass = el.getAttribute("rad-extends");
+                        }
+                        if (el.hasAttribute("rad-model")) {
+                            viewModelType = el.getAttribute("rad-model");
+                        }
+
+                    }
+                    el.setAttribute("rad-id", String.valueOf(index++));
                     NodeList children = el.getChildNodes();
                     int len = children.getLength();
                     for (int i=0; i<len; i++) {

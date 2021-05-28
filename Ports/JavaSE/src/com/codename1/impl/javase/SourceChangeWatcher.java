@@ -89,7 +89,7 @@ public class SourceChangeWatcher implements Runnable {
             }
         }
         
-        ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck", "-e");
+        ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck", "-Dmaven.compiler.useIncrementalCompilation=false", "-e");
         pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
         pb.directory(pom.getParentFile());
         pb.inheritIO();
@@ -115,16 +115,18 @@ public class SourceChangeWatcher implements Runnable {
                 contentPane.add(BorderLayout.CENTER, new SpanLabel("Changes were detected to files in the classpath.  Apply these changes now and refresh?"));
                 Container buttons = new Container(BoxLayout.y());
                 Button refreshSimulator = new Button("Refresh Simulator");
-                Button refreshForm = new Button("Refresh Current Form");
+                //Button refreshForm = new Button("Refresh Current Form");
                 Button ignore = new Button("Ignore");
 
                 refreshSimulator.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
+                        stopped = true;
                         System.setProperty("reload.simulator", "true");
                         sheet.back();
                     }
                 });
 
+                /*
                 refreshForm.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         sheet.back();
@@ -143,14 +145,14 @@ public class SourceChangeWatcher implements Runnable {
                         }
                     }
                 });
-
+                */
                 ignore.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         sheet.back();
                     }
                 });
 
-                buttons.addAll(refreshForm, refreshSimulator, ignore);
+                buttons.addAll(refreshSimulator, ignore);
                 contentPane.add(BorderLayout.SOUTH, buttons);
                 sheet.setPosition(BorderLayout.CENTER);
                 sheet.show();

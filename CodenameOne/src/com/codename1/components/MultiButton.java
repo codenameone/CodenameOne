@@ -40,6 +40,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import java.util.StringTokenizer;
 
 /**
  * <p>A powerful button like component that allows multiple rows/and an icon to be added
@@ -808,7 +809,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     }
 
     /**
-     * Returns the line 1 text
+     * Sets the line 1 text
      * {@inheritDoc}
      */
     @Override
@@ -817,7 +818,73 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     }
 
     /**
-     * Sets the line 1 text
+     * Sets textLine1, textLine2, textLine3, and textLine4 in single method with single string
+     * using "\n" as a delimiter.
+     * @param text The text to set.
+     * @since 8.0
+     */
+    public void setTextLines(String text) {
+        //String currTextVal = btn.getText();
+        String newTextVal0 = text;
+        int line = 0;
+        StringTokenizer strtok = new StringTokenizer(newTextVal0, "\n");
+        while (strtok.hasMoreTokens()) {
+            line++;
+            String currTextVal;
+            switch (line) {
+                case 1: currTextVal = getTextLine1(); break;
+                case 2: currTextVal = getTextLine2(); break;
+                case 3: currTextVal = getTextLine3(); break;
+                case 4: currTextVal = getTextLine4(); break;
+                default: currTextVal = getText();
+            }
+            String newTextVal = strtok.nextToken().trim();
+            if (!com.codename1.compat.java.util.Objects.equals(currTextVal, newTextVal)) {
+                switch (line) {
+                    case 1: setTextLine1(newTextVal); break;
+                    case 2: setTextLine2(newTextVal); break;
+                    case 3: setTextLine3(newTextVal); break;
+                    case 4: setTextLine4(newTextVal); break;
+                    default: setText(newTextVal);
+
+                }
+            }
+        }
+        while (line < 4) {
+            line++;
+            String currTextVal;
+            switch (line) {
+                case 1: currTextVal = getTextLine1(); break;
+                case 2: currTextVal = getTextLine2(); break;
+                case 3: currTextVal = getTextLine3(); break;
+                case 4: currTextVal = getTextLine4(); break;
+                default: currTextVal = getText();
+            }
+            if (!com.codename1.compat.java.util.Objects.equals(currTextVal, "")) {
+                switch (line) {
+                    case 1: setTextLine1(""); break;
+                    case 2: setTextLine2(""); break;
+                    case 3: setTextLine3(""); break;
+                    case 4: setTextLine4(""); break;
+                    default: setText(""); break;
+
+                }
+
+            }
+        }
+    }
+
+    /**
+     * Gets all text in multibutton in a single string delimited by "\n" character.
+     * @since 8.0
+     * @return String with textLine1 to textLine4 delimited by "\n"
+     */
+    public String getTextLines() {
+        return getTextLine1() + "\n" + getTextLine2() + "\n" + getTextLine3() + "\n" + getTextLine4();
+    }
+
+    /**
+     * Returns the line 1 text
      * {@inheritDoc}
      */
     @Override

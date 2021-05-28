@@ -6839,7 +6839,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             InputStream i = null;
             try {
                 serviceProperties = new HashMap<String,String>();
-                i = a.openFileInput("CN1$AndroidServiceProperties");
+                try {
+                    i = a.openFileInput("CN1$AndroidServiceProperties");
+                } catch (FileNotFoundException notFoundEx){}
                 if(i == null) {
                     return serviceProperties;
                 }
