@@ -29,6 +29,7 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.ComponentSelector;
@@ -92,6 +93,7 @@ public class Picker extends Button {
      */
     public static void setDefaultUseLightweightPopup(
         boolean aDefaultUseLightweightPopup) {
+        defaultLightweightModeSet = true;
         defaultUseLightweightPopup = aDefaultUseLightweightPopup;
     }
     private int type = Display.PICKER_TYPE_DATE;
@@ -118,6 +120,7 @@ public class Picker extends Button {
      * the theme constant {@code lightweightPickerBool}
      */
     private static boolean defaultUseLightweightPopup;
+    private static boolean defaultLightweightModeSet;
     
     /**
      * Flag to indicate that the picker should prefer lightweight components 
@@ -279,6 +282,13 @@ public class Picker extends Button {
     public Picker() {
         setUIID("Picker");
         setPreferredTabIndex(0);
+
+        // Fixes iOS picker issue https://github.com/codenameone/CodenameOne/issues/3283
+        if(!defaultLightweightModeSet) {
+            defaultLightweightModeSet = true;
+            defaultUseLightweightPopup = CN.getPlatformName().equals("ios");
+        }
+
         if (!Display.getInstance().isNativePickerTypeSupported(Display.PICKER_TYPE_STRINGS)) {
             // For platforms that don't support native pickers, we'll make lightweight mode
             // the default.  This will result in these platforms using the new Spinner3D classes
