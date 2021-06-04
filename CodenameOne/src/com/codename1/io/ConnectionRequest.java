@@ -785,6 +785,7 @@ public class ConnectionRequest implements IOProgressListener {
     void performOperation() throws IOException {
         performOperationComplete();
     }
+    private Object _connection;
     /**
      * Performs the actual network request on behalf of the network manager
      * @return true if the operation completed, false if the network request is scheduled to be retried.
@@ -818,6 +819,7 @@ public class ConnectionRequest implements IOProgressListener {
             } else {
                 connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());
             }
+            _connection = connection;
             if(shouldStop()) {
                 return true;
             }
@@ -865,7 +867,7 @@ public class ConnectionRequest implements IOProgressListener {
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
                 checkSSLCertificates(sslCertificates);
-                    if(shouldStop()) {
+                if(shouldStop()) {
                     return true;
                 }
             }
@@ -1014,6 +1016,7 @@ public class ConnectionRequest implements IOProgressListener {
             input = null;
             output = null;
             connection = null;
+            _connection = null;
         }
         if(!isKilled()) {
             Display.getInstance().callSerially(new Runnable() {
@@ -1409,11 +1412,23 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public SSLCertificate[] getSSLCertificates() throws IOException {
         if (sslCertificates == null) {
+            if (_connection != null && Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
+                // On iOS we need to do some contortions to get the SSL certificates there at the right time.
+                // The _connection object will only be set while a connection is in progress.
+                // It is a reference to the native connection object.
+                // The native certificate callback will be triggered in the iOS port after it has set its SSL certificates
+                // so they should be available.
+
+                sslCertificates = getSSLCertificatesImpl(_connection, url);
+            }
+
+        }
+        if (sslCertificates == null) {
             sslCertificates = new SSLCertificate[0];
         }
         return sslCertificates;
     }
-    
+
     private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
         String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
