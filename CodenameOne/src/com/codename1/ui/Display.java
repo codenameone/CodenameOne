@@ -4733,7 +4733,7 @@ hi.show();}</pre></noscript>
      * <p>Schedules a local notification that will occur after the given time elapsed.<br>
      * The sample below combines this with the geofence API to show a local notification
      * when entering a radius with the app in the background:</p>
-     * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+     * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
      * 
      * @param n The notification to schedule.
      * @param firstTime time in milliseconds when to schedule the notification
