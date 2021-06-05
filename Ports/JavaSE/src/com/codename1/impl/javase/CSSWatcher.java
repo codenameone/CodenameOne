@@ -35,6 +35,7 @@ import java.util.logging.Logger;
  * @author shannah
  */
 public class CSSWatcher implements Runnable {
+    private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private Thread watchThread, pulseThread;
     private ServerSocket pulseSocket;
     private Process childProcess;
@@ -55,6 +56,20 @@ public class CSSWatcher implements Runnable {
             }
             
         }));
+    }
+
+    public void stop() {
+        closing = true;
+        if (childProcess != null && childProcess.isAlive()) {
+            try {
+                childProcess.destroyForcibly();
+            } catch (Throwable t){}
+        }
+        if (pulseSocket != null && !pulseSocket.isClosed()) {
+            try {
+                pulseSocket.close();
+            } catch (Exception ex){}
+        }
     }
     
     /**
@@ -140,13 +155,14 @@ public class CSSWatcher implements Runnable {
             pulseSocket = new ServerSocket(0);
             pulseThread = new Thread(new Runnable() {
                 public void run() {
-                    while (true) {
+                    while (!closing) {
                         try {
                             Socket clientSocket = pulseSocket.accept();
                             
                         } catch (IOException ex) {
                             Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
                         }
+
                     }
                 }
             });
@@ -227,7 +243,13 @@ public class CSSWatcher implements Runnable {
         final BufferedReader errorReader = new BufferedReader(new InputStreamReader(stderr));
         new Thread(new Runnable() {
             public void run() {
+
                 while (true) {
+                    int reloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                    if (reloadVersion != simulatorReloadVersion) {
+                        stop();
+                        break;
+                    }
                     try {
                         String l = errorReader.readLine();
                         if (l != null) {
@@ -251,6 +273,11 @@ public class CSSWatcher implements Runnable {
         final String fOverrideInputs = overrideInputs;
         while (true) {
             try {
+                int reloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                if (reloadVersion != simulatorReloadVersion) {
+                    stop();
+                    return;
+                }
                 String l = reader.readLine();
                 if (l == null) {
                     if (!p.isAlive()) {

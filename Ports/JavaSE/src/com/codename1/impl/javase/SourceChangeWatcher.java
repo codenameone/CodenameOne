@@ -15,6 +15,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -31,6 +32,7 @@ import java.util.function.Consumer;
  * @author shannah
  */
 public class SourceChangeWatcher implements Runnable {
+    private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private WatchService watchService;
     private List<File> watchDirectories = new ArrayList<File>();
     private List<Watch> watches = new ArrayList<Watch>();
@@ -62,6 +64,9 @@ public class SourceChangeWatcher implements Runnable {
     
     
     private boolean recompile(Path path) throws IOException, InterruptedException {
+        int hotReloadSetting = Integer.parseInt(System.getProperty("hotReload", "0"));
+        if (hotReloadSetting == 0) return false;
+
         File f = path.toFile();
         File pom = findPom(f.getParentFile());
         if (pom == null) {
@@ -88,7 +93,7 @@ public class SourceChangeWatcher implements Runnable {
                 return false;
             }
         }
-        
+
         ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck", "-Dmaven.compiler.useIncrementalCompilation=false", "-e");
         pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
         pb.directory(pom.getParentFile());
@@ -98,14 +103,47 @@ public class SourceChangeWatcher implements Runnable {
         if (result != 0) {
             return false;
         }
-        
-        /// Sleep for a secont to allow the classloader to pick up the new classes.
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException ex) {
-            
+        if (hotReloadSetting == 2) {
+
+
+            /// Sleep for a secont to allow the classloader to pick up the new classes.
+
+            int startingVersion = Integer.parseInt(System.getProperty("hotswap-agent-classes-version", "-1"));
+            System.out.println("Waiting for version to change from "+startingVersion);
+            if (startingVersion < 0) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ex) {
+
+                }
+            } else {
+                for (int i = 0; i < 30; i++) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+
+                    }
+                    int newVersion = Integer.parseInt(System.getProperty("hotswap-agent-classes-version", "-1"));
+                    if (startingVersion != newVersion) {
+                        break;
+                    }
+                }
+            }
+
+            CN.callSeriallyAndWait(new Runnable() {
+                public void run() {
+                    System.out.println("Restoring to bookmark");
+                    CN.restoreToBookmark();
+                }
+            });
+            return true;
+        } else if (hotReloadSetting == 1) {
+            stopped = true;
+            System.setProperty("reload.simulator", "true");
+            return true;
         }
-        
+
+        /*
         CN.callSeriallyAndWait(new Runnable() {
             public void run() {
 
@@ -115,7 +153,7 @@ public class SourceChangeWatcher implements Runnable {
                 contentPane.add(BorderLayout.CENTER, new SpanLabel("Changes were detected to files in the classpath.  Apply these changes now and refresh?"));
                 Container buttons = new Container(BoxLayout.y());
                 Button refreshSimulator = new Button("Refresh Simulator");
-                //Button refreshForm = new Button("Refresh Current Form");
+                Button refreshForm = new Button("Refresh Current Form");
                 Button ignore = new Button("Ignore");
 
                 refreshSimulator.addActionListener(new ActionListener() {
@@ -126,33 +164,30 @@ public class SourceChangeWatcher implements Runnable {
                     }
                 });
 
-                /*
+
                 refreshForm.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         sheet.back();
+
+
                         try {
-                            if (app != null) {
-                                Method stop = app.getClass().getMethod("stop", new Class[0]);
-                                stop.invoke(app, new Class[0]);
 
-                                Method start = app.getClass().getMethod("start", new Class[0]);
-                                start.invoke(app, new Class[0]);
-                            }
-
+                            System.setProperty("restore-to-bookmark", "true");
                             CN.restoreToBookmark();
+
                         } catch (Exception ex) {
                             Log.e(ex);
                         }
                     }
                 });
-                */
+
                 ignore.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         sheet.back();
                     }
                 });
 
-                buttons.addAll(refreshSimulator, ignore);
+                buttons.addAll(refreshForm, refreshSimulator, ignore);
                 contentPane.add(BorderLayout.SOUTH, buttons);
                 sheet.setPosition(BorderLayout.CENTER);
                 sheet.show();
@@ -162,7 +197,7 @@ public class SourceChangeWatcher implements Runnable {
 
             }
         });
-        
+        */
         return true;
         
     }
@@ -200,6 +235,11 @@ public class SourceChangeWatcher implements Runnable {
             }
             
             while (!stopped && Display.isInitialized()) {
+                int reloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                if (reloadVersion != simulatorReloadVersion) {
+                    stop();
+                    break;
+                }
                 try {
                     final WatchKey key = watchService.take();
                     

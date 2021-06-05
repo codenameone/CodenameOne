@@ -99,6 +99,21 @@ public class Simulator {
         List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
         final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
         final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+        File cn1Props = new File("codenameone_settings.properties");
+        if (!cn1Props.exists()) {
+            cn1Props = new File("common" + File.separator + "codenameone_settings.properties");
+
+        }
+        if (!cn1Props.exists()) {
+            cn1Props = new File(".." + File.separator + "common" + File.separator + "codenamene_settings.properties").getAbsoluteFile();
+
+        }
+        if (cn1Props.exists()) {
+            File commonClasses = new File(cn1Props.getParentFile(), "target" + File.separator + "classes");
+            if (commonClasses.exists()) {
+                files.add(commonClasses);
+            }
+        }
         if (isDebug && usingHotswapAgent) { 
             HotswapProperties hotswapProperties = new HotswapProperties();
             files.addAll(hotswapProperties.getExtraClasses());
@@ -208,8 +223,9 @@ public class Simulator {
                     }
                     String r = System.getProperty("reload.simulator");
                     if (r != null && r.equals("true")) {
-                        System.out.println("Detected reload of simulator");
                         System.setProperty("reload.simulator", "");
+                        int version = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                        System.setProperty("reload.simulator.count", String.valueOf(version+1));
                         try {
                             main(argv);
                         } catch (Exception ex) {

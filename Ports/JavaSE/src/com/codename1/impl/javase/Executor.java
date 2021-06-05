@@ -80,7 +80,7 @@ public class Executor {
         
         List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
         isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
-        usingHotswapAgent = true;//inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+        usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
     }
     
     /**
@@ -272,7 +272,8 @@ public class Executor {
                             }
                             Display.init(null);
                             
-                            if (isDebug && usingHotswapAgent) {
+                            //if (isDebug && usingHotswapAgent) {
+                            if (System.getProperty("maven.home") != null) {
                                 // In debug mode, when the Hotswap Agent is present, the simulator
                                 // will monitor all the source files for changes, and automatically
                                 // trigger a re-compile - then hotswap the classes.
@@ -282,7 +283,6 @@ public class Executor {
                                 // https://github.com/HotswapProjects/HotswapAgent
                                 // https://github.com/TravaOpenJDK/trava-jdk-11-dcevm/releases
                                 // 
-                                System.out.println("Hotswap Agent Detected.  Starting source watcher");
                                 startSourceWatcher(fProps, launcherClass);
                                 if (sourceWatcher != null) {
                                     sourceWatcher.setApp(app);
@@ -773,7 +773,10 @@ public class Executor {
                     hotswapPropsStream.close();
                 } catch (Exception ex){}
                 
+                //String extraClasspath = new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath();//hotswapProps.getProperty("extraClasspath");
                 String extraClasspath = hotswapProps.getProperty("extraClasspath");
+                extraClasspath = extraClasspath == null ? new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() :
+                        new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() + "; " + extraClasspath;
                 if (extraClasspath != null) {
                     System.out.println("extraClasspath="+extraClasspath);
                     String[] extraPaths = extraClasspath.split(";");
