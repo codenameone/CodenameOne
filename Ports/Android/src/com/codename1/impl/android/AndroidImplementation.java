@@ -2727,7 +2727,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 String filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
-                                if(file.startsWith("file:")) {
+                                if(filePath.startsWith("file:")) {
                                     filePath = filePath.substring(5);
                                 }
                                 File f = new File(filePath);
