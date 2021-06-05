@@ -178,6 +178,26 @@ public class Font extends CN {
     }
 
     /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} &amp;
+     * {@code derive(size)} which is useful for cases such as native: fonts.
+     * @param fontName the native font name
+     * @param size the size in the specified unit.
+     * @param sizeUnit The unit type of the size.  One of {@link com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_REM},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VW},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VH},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN},
+     *      *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX}.
+     * @return a font object
+     * @since 8.0
+     */
+    public static Font createTrueTypeFont(String fontName, float size, byte sizeUnit) {
+        return createTrueTypeFont(fontName, fontName).
+                derive(Display.getInstance().convertToPixels(size, sizeUnit), STYLE_PLAIN);
+    }
+
+    /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
      * order to be detectable. The file name should contain no slashes or any such value.<br>
@@ -221,7 +241,28 @@ public class Font extends CN {
         derivedFontCache.put(fileName + "_" + h + "_"+ Font.STYLE_PLAIN, f);
         return f;
     }
-    
+
+    /**
+     * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
+     * will only work in the case of truetype fonts!<br>
+     * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!
+     * @param size the size of the font in the specified unit type.
+     * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
+     * @param unitType The unit type of the size.  One of {@link com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_REM},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VW},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VH},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX}.
+     * @return scaled font instance
+     * @since 8.0
+     */
+    public Font derive(float size, int weight, byte unitType) {
+        return derive(Display.getInstance().convertToPixels(size, unitType), weight);
+    }
+
     /**
      * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
      * will only work in the case of truetype fonts!<br>

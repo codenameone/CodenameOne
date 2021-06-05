@@ -24,10 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.Log;
-import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Font;
-import com.codename1.ui.Image;
+import com.codename1.ui.*;
 import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
@@ -1252,17 +1249,35 @@ public class Resources {
     
     Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         switch(sizeSetting) {
-            case 0:
+            case 0: // small
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
                 break;
-            case 1:
+            case 1: // medium
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM).getHeight();
                 break;
-            case 2:
+            case 2: // large
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight();
                 break;
-            case 3:
+            case 3: // millimetres
                 fontSize = Display.getInstance().convertToPixels((int)(fontSize * 10), true) / 10.0f;
+                break;
+
+            case 4: // pixels
+                break;
+            case 5: // rem
+                fontSize = Font.getDefaultFont().getHeight() * fontSize;
+                break;
+            case 6: // vw
+                fontSize = CN.getDisplayWidth() * fontSize / 100f;
+                break;
+            case 7: // vh
+                fontSize = CN.getDisplayHeight() * fontSize / 100f;
+                break;
+            case 8: // vmin
+                fontSize = Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()) * fontSize / 100f;
+                break;
+            case 9: // vmax
+                fontSize = Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * fontSize / 100f;
                 break;
         }
         if(!failOnMissingTruetype) {

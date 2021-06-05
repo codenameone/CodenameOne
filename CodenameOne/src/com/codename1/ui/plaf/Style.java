@@ -62,7 +62,7 @@ import com.codename1.ui.util.EventDispatcher;
  * <p>Styles fire a change event for each style change that occurs.  {@link Component} listens to all changes events
  * of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
  * a {@link Container#revalidate() } call on the Style's Component's parent container, which is expensive.  You can disable this
- * {@link Container#revalidate() } call by calling {@link CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will 
+ * {@link Container#revalidate() } call by calling {@literal CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will
  * likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
  * to avoid regressions when the default is changed.</p>
  * @author Chen Fishbein
@@ -368,6 +368,39 @@ public class Style {
      */
     public static final byte UNIT_TYPE_DIPS = 2;
 
+    /**
+     * Indicates the unit type for padding/margin as a percentage of the screen width.
+     * @since 8.0
+     */
+    public static final byte UNIT_TYPE_VW = 3;
+
+    /**
+     * Indicates the unit type for padding/margin as a percentage of the screen height.
+     * @since 8.0
+     */
+    public static final byte UNIT_TYPE_VH = 4;
+
+    /**
+     * Indicates the unit type for padding/margin as a percentage the minimum of screen width and height.
+     * @since 8.0
+     */
+    public static final byte UNIT_TYPE_VMIN = 5;
+
+    /**
+     * Indicates the unit type for padding/margin as a percentage the maximum of screen width and height.
+     * @since 8.0
+     */
+    public static final byte UNIT_TYPE_VMAX = 6;
+
+    /**
+     * Indicates the unit type for padding/margin relative to the font size of the default font.
+     * {@literal 1rem == Font.getDefaultFont().getHeight()}
+     *
+     * @since 8.0
+     */
+    public static final byte UNIT_TYPE_REM = 7;
+
+
 
     private int fgColor = 0x000000;
     private int bgColor = 0xFFFFFF;
@@ -379,13 +412,15 @@ public class Style {
     
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      */
     byte[] paddingUnit;
 
     /**
      * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      */
     byte[] marginUnit;
     private byte transparency = (byte) 0xFF; //no transparency
@@ -1937,6 +1972,16 @@ public class Style {
     private int convertUnit(byte[] unitType, float v, int orientation) {
         if(unitType != null) {
             switch(unitType[orientation]) {
+                case UNIT_TYPE_REM:
+                    return (int)Math.round(v * Font.getDefaultFont().getHeight());
+                case UNIT_TYPE_VH:
+                    return (int)Math.round(v / 100f * CN.getDisplayHeight());
+                case UNIT_TYPE_VW:
+                    return (int)Math.round(v / 100f * CN.getDisplayWidth());
+                case UNIT_TYPE_VMIN:
+                    return (int)Math.round(v/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                case UNIT_TYPE_VMAX:
+                    return (int)Math.round(v/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
                 case UNIT_TYPE_DIPS:
                     return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:
@@ -2567,7 +2612,8 @@ public class Style {
 
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @return the paddingUnit
      */
     public byte[] getPaddingUnit() {
@@ -2576,7 +2622,8 @@ public class Style {
 
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @param paddingUnit the paddingUnit to set
      */
     public void setPaddingUnit(byte... paddingUnit) {
@@ -2605,7 +2652,8 @@ public class Style {
 
     /**
      * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @return the marginUnit
      */
     public byte[] getMarginUnit() {
@@ -2614,7 +2662,8 @@ public class Style {
 
     /**
      * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
+     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @param marginUnit the marginUnit to set
      */
     public void setMarginUnit(byte... marginUnit) {
@@ -2649,7 +2698,8 @@ public class Style {
     
     /**
      * Sets left margin unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitLeft(byte unit) {
@@ -2659,7 +2709,8 @@ public class Style {
     
     /**
      * Sets right margin unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitRight(byte unit) {
@@ -2669,7 +2720,8 @@ public class Style {
     
     /**
      * Sets top margin unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitTop(byte unit) {
@@ -2679,7 +2731,8 @@ public class Style {
     
     /**
      * Sets bottom margin unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitBottom(byte unit) {

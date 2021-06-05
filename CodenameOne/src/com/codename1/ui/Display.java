@@ -29,6 +29,8 @@ import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
+import com.codename1.media.MediaManager;
+import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
@@ -51,6 +53,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
@@ -171,7 +174,7 @@ public final class Display extends CN1Constants {
     
     /**
      * Sets a bookmark that can restore the app to a particular state.  This takes a 
-     * {@link Runnable} that will be run when {@link #refresh() } is called.
+     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
      * 
      * <p>The primary purpose of this feature is live code refresh.</p>
      * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
@@ -722,8 +725,8 @@ public final class Display extends CN1Constants {
 
     /**
      * Stops the remote control service.  This should be implemented in the platform
-     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
-     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * to handle unbinding the {@link com.codename1.media.RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link com.codename1.media.MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
      * @since 7.0
      */
     public void stopRemoteControl() {
@@ -837,7 +840,7 @@ public final class Display extends CN1Constants {
             }
         }
         
-        @Override
+        
         public void run() {
             if (exceptionWrapper != null) {
                 try {
@@ -2654,6 +2657,62 @@ public final class Display extends CN1Constants {
      */
     public int convertToPixels(int dipCount, boolean horizontal) {
         return impl.convertToPixels(dipCount, horizontal);
+    }
+
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public int convertToPixels(float value, byte unitType) {
+        return convertToPixels(value, unitType, true);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public int convertToPixels(float value, byte unitType, boolean horizontal) {
+
+
+        switch(unitType) {
+            case Style.UNIT_TYPE_REM:
+                return (int)Math.round(value * Font.getDefaultFont().getHeight());
+            case Style.UNIT_TYPE_VH:
+                return (int)Math.round(value / 100f * CN.getDisplayHeight());
+            case Style.UNIT_TYPE_VW:
+                return (int)Math.round(value / 100f * CN.getDisplayWidth());
+            case Style.UNIT_TYPE_VMIN:
+                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case Style.UNIT_TYPE_VMAX:
+                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case Style.UNIT_TYPE_DIPS:
+                return Display.getInstance().convertToPixels(value);
+            case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+                if(!horizontal) {
+                    float h = Display.getInstance().getDisplayHeight();
+                    h = h / 100.0f * value;
+                    return (int)h;
+                } else {
+                    float w = Display.getInstance().getDisplayWidth();
+                    w = w / 100.0f * value;
+                    return (int)w;
+                }
+            default:
+                return (int)value;
+        }
+
     }
 
 
@@ -4774,7 +4833,7 @@ hi.show();}</pre></noscript>
      * @param seconds The time interval in seconds.
      * 
      * @see #isBackgroundFetchSupported() 
-     * @see #getPreferredBackgroundFetchInterval() 
+     * @see #getPreferredBackgroundFetchInterval(int) () 
      * @see com.codename1.background.BackgroundFetch
      */
     public void setPreferredBackgroundFetchInterval(int seconds) {
@@ -4796,7 +4855,7 @@ hi.show();}</pre></noscript>
      * Checks to see if the current platform supports background fetch.
      * @return True if the current platform supports background fetch.
      * @see #setPreferredBackgroundFetchInterval(int) 
-     * @see #getPreferredBackgroundFetchInterval() 
+     * @see #getPreferredBackgroundFetchInterval(int) ()
      * @see com.codename1.background.BackgroundFetch
      */
     public boolean isBackgroundFetchSupported() {

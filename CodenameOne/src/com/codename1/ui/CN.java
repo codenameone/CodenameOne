@@ -33,6 +33,7 @@ import com.codename1.messaging.Message;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
 import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
@@ -221,7 +222,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Sets a bookmark that can restore the app to a particular state.  This takes a
-     * {@link Runnable} that will be run when {@link #refresh() } is called.
+     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
      *
      * <p>The primary purpose of this feature is live code refresh.</p>
      * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
@@ -504,6 +505,33 @@ public class CN extends  CN1Constants {
      */
     public static int convertToPixels(int dipCount, boolean horizontal) {
         return Display.impl.convertToPixels(dipCount, horizontal);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public static int convertToPixels(float value, byte unitType, boolean horizontal) {
+        return Display.INSTANCE.convertToPixels(value, unitType, horizontal);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public static int convertToPixels(float value, byte unitType) {
+        return Display.INSTANCE.convertToPixels((float)value, unitType);
     }
 
 
