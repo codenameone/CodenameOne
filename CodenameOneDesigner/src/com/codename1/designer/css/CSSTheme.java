@@ -4201,25 +4201,35 @@ public class CSSTheme {
                         }
                         break;
                     default:
-                        if ("rem".equals(fontSize.getDimensionUnitText())) {
-                            ttfSizeType = TTF_SIZE_TYPE_REM;
-                            ttfSize = (float)fontSize.getNumericValue();
-                        } else if ("vw".equals(fontSize.getDimensionUnitText())) {
-                            ttfSizeType = TTF_SIZE_TYPE_VW;
-                            ttfSize = (float)fontSize.getNumericValue();
+                        String unitText = null;
+                        try {
+                            unitText = fontSize.getDimensionUnitText();
 
-                        } else if ("vh".equals(fontSize.getDimensionUnitText())) {
-                            ttfSizeType = TTF_SIZE_TYPE_VH;
-                            ttfSize = (float)fontSize.getNumericValue();
+                        } catch (Exception ex) {
+                            System.err.println("Warning: No dimension unit supplied for fontSize "+fontSize);
+                            ex.printStackTrace();
+                        }
+                        if (unitText != null) {
+                            if ("rem".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_REM;
+                                ttfSize = (float) fontSize.getNumericValue();
+                            } else if ("vw".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VW;
+                                ttfSize = (float) fontSize.getNumericValue();
 
-                        } else if ("vmin".equals(fontSize.getDimensionUnitText())) {
-                            ttfSizeType = TTF_SIZE_TYPE_VMIN;
-                            ttfSize = (float)fontSize.getNumericValue();
+                            } else if ("vh".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VH;
+                                ttfSize = (float) fontSize.getNumericValue();
 
-                        } else if ("vmax".equals(fontSize.getDimensionUnitText())) {
-                            ttfSizeType = TTF_SIZE_TYPE_VMAX;
-                            ttfSize = (float)fontSize.getNumericValue();
+                            } else if ("vmin".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VMIN;
+                                ttfSize = (float) fontSize.getNumericValue();
 
+                            } else if ("vmax".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VMAX;
+                                ttfSize = (float) fontSize.getNumericValue();
+
+                            }
                         }
                         
                         
@@ -6271,25 +6281,35 @@ public class CSSTheme {
                 fvalue = value.getFloatValue() * 10;
                 break;
             default :
-                if ("rem".equals(value.getDimensionUnitText())) {
-                    unit = (byte)Style.UNIT_TYPE_REM;
+                String unitText = null;
+                try {
+                    unitText = value.getDimensionUnitText();
+
+                } catch (Exception ex) {
+
+                    ex.printStackTrace();
+                    throw new RuntimeException("No unit provided for "+value+" when parsing inset.", ex);
+                }
+
+                if ("rem".equals(unitText)) {
+                    unit = (byte) Style.UNIT_TYPE_REM;
                     fvalue = value.getFloatValue();
-                } else if ("vw".equals(value.getDimensionUnitText())) {
+                } else if ("vw".equals(unitText)) {
                     unit = Style.UNIT_TYPE_VW;
                     fvalue = value.getFloatValue();
-                } else if ("vh".equals(value.getDimensionUnitText())) {
+                } else if ("vh".equals(unitText)) {
                     unit = Style.UNIT_TYPE_VH;
                     fvalue = value.getFloatValue();
-                } else if ("vmin".equals(value.getDimensionUnitText())) {
+                } else if ("vmin".equals(unitText)) {
                     unit = Style.UNIT_TYPE_VMIN;
                     fvalue = value.getFloatValue();
-                } else if ("vmax".equals(value.getDimensionUnitText())) {
+                } else if ("vmax".equals(unitText)) {
                     unit = Style.UNIT_TYPE_VMAX;
                     fvalue = value.getFloatValue();
                 } else {
-
-                    throw new RuntimeException("Unsupported unit for inset " + value.getDimensionUnitText());
+                    throw new RuntimeException("Unsupported unit for inset " + unitText);
                 }
+
         }
         
         out.value = fvalue;
