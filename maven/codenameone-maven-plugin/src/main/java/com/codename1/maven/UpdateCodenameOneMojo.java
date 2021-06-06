@@ -10,6 +10,9 @@ import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.apache.maven.model.jdom.etl.JDomModelETLFactory;
+import org.apache.maven.model.jdom.etl.ModelETL;
+import org.apache.maven.model.jdom.etl.ModelETLRequest;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -64,15 +67,30 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         if (newVersion != null && !newVersion.isEmpty() && (!newVersion.equals(existingCn1Version) || !newVersion.equals(existingCn1PluginVersion))) {
 
             getLog().info("Attempting to update project to version " + newVersion);
-            MavenXpp3Reader pomReader = new MavenXpp3Reader();
+            //MavenXpp3Reader pomReader = new MavenXpp3Reader();
+
             Model model = null;
+            ModelETL modelETL;
             File pomFile = new File(project.getParent().getBasedir(), "pom.xml");
+            /*
             try (FileInputStream fis = new FileInputStream(pomFile)) {
                 model = pomReader.read(new InputStreamReader(fis, "UTF-8"), false);
             } catch (Exception ex) {
                 getLog().error("Failed to load pom.xml file from parent project", ex);
                 throw new MojoExecutionException("Failed to read pom.xml file", ex);
             }
+
+             */
+            try {
+                ModelETLRequest modelETLRequest = new ModelETLRequest();
+                modelETL = new JDomModelETLFactory().newInstance(modelETLRequest);
+                modelETL.extract(pomFile);
+                model = modelETL.getModel();
+            } catch (Exception ex) {
+                getLog().error("Failed to load pom.xml file from parent project", ex);
+                throw new MojoExecutionException("Failed to read pom.xml file", ex);
+            }
+
             boolean changed = false;
             if (!isAutoVersion || !existingCn1Version.endsWith("-SNAPSHOT")) {
                 if (!existingCn1Version.equals(newVersion)) {
@@ -103,6 +121,7 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
                 } catch (Exception ex) {
                     throw new MojoExecutionException("Failed to back up pom.xml file", ex);
                 }
+                /*
                 try (FileOutputStream fos = new FileOutputStream(pomFile)) {
                     MavenXpp3Writer pomWriter = new MavenXpp3Writer();
                     getLog().info("Updating "+pomFile+" with new cn1.version and cn1.plugin.version properties");
@@ -114,6 +133,16 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
                     getLog().error("Failed to write changes to the pom file", e);
                     throw new MojoExecutionException("Failed to write canges to the pom file.", e);
                 }
+
+                 */
+                try {
+                    modelETL.load(pomFile);
+
+                } catch (IOException e) {
+                    getLog().error("Failed to write changes to the pom file", e);
+                    throw new MojoExecutionException("Failed to write canges to the pom file.", e);
+                }
+
             }
 
 

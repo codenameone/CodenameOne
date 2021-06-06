@@ -90,6 +90,13 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                 
                 File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
                 getLog().debug("Checking for extracted CSS bundle "+extracted);
+                if (extracted.exists() && artifact.isSnapshot() && getLastModified(artifact) > extracted.lastModified()) {
+                    try {
+                        FileUtils.deleteDirectory(extracted);
+                    } catch (IOException ex){
+                        getLog().error(ex);
+                    }
+                }
                 if (!extracted.exists()) {
                     getLog().debug("CSS bundle "+zip+" not extracted yet.  Extracting to "+extracted);
                     // This is a cn1css artifact, which is a zip file.

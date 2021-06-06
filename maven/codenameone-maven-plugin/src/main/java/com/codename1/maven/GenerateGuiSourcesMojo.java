@@ -165,6 +165,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
         className = "Abstract" + className;
 
         String radViewString = FileUtils.readFileToString(xmlViewFile, "utf-8");
+        generateSchemaFor(xmlViewFile, radViewString);
         radViewString = addElementIdentifiersToXML(radViewString);
 
         if (!packageName.isEmpty()) {
@@ -209,6 +210,58 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
 
     private String parentEntityViewClass = "AbstractEntityView";
     private String viewModelType = "Entity";
+
+
+    private void generateSchemaFor(File xmlViewFile, String contents) throws IOException {
+        File generatedSources = new File(getCN1ProjectDir(), path("target", "generated-sources"));
+        File xmlSchemasDirectory = new File(generatedSources, "rad" + File.separator + "xmlSchemas");
+        String packageName = getPackageForRADView(xmlViewFile);
+        String baseName = xmlViewFile.getName();
+        baseName = baseName.substring(0, baseName.lastIndexOf("."));
+        File actualXsdFile = new File(xmlSchemasDirectory, packageName.replace('.', File.separatorChar) + File.separator + baseName + ".xsd");
+        File xsdAliasFile = new File(xmlViewFile.getParentFile(), baseName + ".xsd");
+        if (!xsdAliasFile.exists()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("<?xml version=\"1.0\"?>\n");
+            sb.append("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">\n");
+            sb.append("  <xs:include schemaLocation=\"").append("file://").append(actualXsdFile.getAbsolutePath()).append("\"/>\n");
+            sb.append("</xs:schema>\n");
+            getLog().info("Writing XSD alias file at "+xsdAliasFile);
+            FileUtils.writeStringToFile(xsdAliasFile, sb.toString(), "UTF-8");
+
+        }
+        if (!contents.contains("xsi:noNamespaceSchemaLocation=\"") || !contents.contains("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")) {
+            int rootTagStart = contents.indexOf("?>");
+            if (rootTagStart < 0) {
+                getLog().info("Not adding schema declaration to "+xmlViewFile+" because it failed to find the root element.  The file may be malformed.");
+                return;
+            }
+            rootTagStart = contents.indexOf("<", rootTagStart);
+            if (rootTagStart < 0) {
+                getLog().info("Not adding schema declaration to "+xmlViewFile+" because it failed to find the root element.  The file may be malformed.");
+                return;
+            }
+            int rootTagEnd = contents.indexOf(">", rootTagStart);
+            if (rootTagEnd < 0) {
+                getLog().info("Not adding schema declaration to "+xmlViewFile+" because it failed to find the close of the root element. The file may be malformed.");
+            }
+            String toInject = !contents.contains("xsi:noNamespaceSchemaLocation=\"") ? " xsi:noNamespaceSchemaLocation=\"" + baseName + ".xsd\"" : "";
+            if (!contents.contains("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")) {
+                toInject += " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"";
+            }
+            if (!contents.substring(0, rootTagEnd).contains("xsi:xsi:noNamespaceSchemaLocation") || !contents.substring(0, rootTagEnd).contains("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")) {
+                contents = contents.substring(0, rootTagEnd) + toInject + contents.substring(rootTagEnd);
+                FileUtils.writeStringToFile(xmlViewFile, contents, "utf-8");
+                getLog().info("Injected schema declaration into document element of " + xmlViewFile);
+            }
+        }
+
+
+
+
+
+    }
+
 
     private String addElementIdentifiersToXML(String xml) throws IOException {
         try {

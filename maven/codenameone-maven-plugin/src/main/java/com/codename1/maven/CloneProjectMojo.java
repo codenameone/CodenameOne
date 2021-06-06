@@ -200,9 +200,15 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
         writer.write(baos, dummyModel);
 
         String dummyPomStr = new String(baos.toByteArray(), "UTF-8");
-        int startPos = dummyPomStr.indexOf("<dependencies>")+"<dependencies>".length();
-        int endPos = dummyPomStr.indexOf("</dependencies>");
-        sb.append(dummyPomStr.substring(startPos, endPos)).append("\n");
+        int startPos = dummyPomStr.indexOf("<dependencies>");
+        if (startPos >= 0 ) startPos += +"<dependencies>".length();
+        if (startPos >= 0) {
+            int endPos = dummyPomStr.indexOf("</dependencies>");
+            if (endPos < 0) {
+                throw new IOException("Malformed pom.xml generated for dependencies.  Could not find closing dependencies tag.");
+            }
+            sb.append(dummyPomStr.substring(startPos, endPos)).append("\n");
+        }
 
 
     }

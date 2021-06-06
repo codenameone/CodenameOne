@@ -4,8 +4,14 @@ import com.codename1.ant.SortedProperties;
 import com.codename1.util.RichPropertiesReader;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.MavenExecutionException;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.apache.maven.model.jdom.etl.JDomModelETL;
+import org.apache.maven.model.jdom.etl.JDomModelETLFactory;
+import org.apache.maven.model.jdom.etl.ModelETL;
+import org.apache.maven.model.jdom.etl.ModelETLRequest;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -892,11 +898,13 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 injectDependencies();
             } else if ("maven".equalsIgnoreCase(templateType)) {
                 //The source project was a Maven project
-                File src = new File(sourceProject, path("common", "src"));
-                File destSrc = new File(targetProjectDir(), path("common", "src"));
-                if (src.exists()) {
-                    FileUtils.deleteDirectory(destSrc);
-                    FileUtils.copyDirectory(src, destSrc);
+                {
+                    File src = new File(sourceProject, path("common", "src"));
+                    File destSrc = new File(targetProjectDir(), path("common", "src"));
+                    if (src.exists()) {
+                        FileUtils.deleteDirectory(destSrc);
+                        FileUtils.copyDirectory(src, destSrc);
+                    }
                 }
 
                 File cn1Settings = new File(sourceProject, path("common", "codenameone_settings.properties"));
@@ -980,6 +988,10 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         return new File(targetCommonDir(), "pom.xml");
     }
 
+    private File targetRootPomXml() {
+        return new File(targetProjectDir(), "pom.xml");
+    }
+
     private void injectDependencies() throws MojoExecutionException {
         if (!generateAppProjectConfigFile().exists()) {
             return;
@@ -988,15 +1000,113 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             Properties props = new Properties();
             new RichPropertiesReader().load(generateAppProjectConfigFile(), props);
             String dependencies = props.getProperty("dependencies");
+            String parentDependencies = props.getProperty("parentDependencies");
             if (targetCommonPomXml().exists()) {
-                String contents = FileUtils.readFileToString(targetCommonPomXml(), "UTF-8");
+                Model model;
+                ModelETL modelETL;
+                /*
+                try (FileInputStream fis = new FileInputStream(targetCommonPomXml())){
+                    MavenXpp3Reader reader = new MavenXpp3Reader();
+                    model = reader.read(fis);
+
+                } catch (Exception ex) {
+                    throw new MojoExecutionException("Failed to read pom.xml file from "+targetCommonPomXml(), ex);
+                }
+                */
+                try {
+                    ModelETLRequest modelETLRequest = new ModelETLRequest();
+                    modelETL = new JDomModelETLFactory().newInstance(modelETLRequest);
+                    modelETL.extract(targetCommonPomXml());
+                    model = modelETL.getModel();
+
+                } catch (Exception ex) {
+                    throw new MojoExecutionException("Failed to read pom.xml file from "+targetCommonPomXml(), ex);
+                }
                 if (dependencies != null) {
-                    String marker = "<!-- INJECT DEPENDENCIES -->";
-                    if (!contents.contains(marker)) {
-                        throw new MojoExecutionException("Failed to inject dependencies into "+targetCommonPomXml()+" because the expected marker '"+marker+"' could not be found.  Please place this marker inside the '<dependencies>' section.");
+                    String dummyModelStr = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                            "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n" +
+                            "    <modelVersion>4.0.0</modelVersion>\n" +
+                            "    <groupId>link.sharpe</groupId>\n" +
+                            "    <artifactId>mavenproject1</artifactId>\n" +
+                            "    <version>1.0-SNAPSHOT</version>\n" +
+                            "    <dependencies>\n" +
+                            dependencies +
+                            "    </dependencies>\n" +
+                            "</project>";
+                    Model dummyModel;
+                    try {
+                        MavenXpp3Reader reader = new MavenXpp3Reader();
+                        dummyModel = reader.read(new CharArrayReader(dummyModelStr.toCharArray()));
+                    } catch (Exception ex) {
+                        throw new MojoExecutionException("Failed to read dummy pom.xml file while injecting dependencies into "+targetCommonPomXml(), ex);
                     }
-                    contents = contents.replace(marker, dependencies + System.lineSeparator() + marker);
-                    FileUtils.writeStringToFile(targetCommonPomXml(), contents, "UTF-8");
+                    for(Dependency dep : dummyModel.getDependencies()) {
+                        model.addDependency(dep);
+                    }
+                    /*
+                    MavenXpp3Writer writer = new MavenXpp3Writer();
+                    try (FileOutputStream fos = new FileOutputStream(targetCommonPomXml())) {
+                        writer.write(fos, model);
+                    }
+                    */
+                    modelETL.load(targetCommonPomXml());
+
+                }
+
+
+            }
+            if (targetRootPomXml().exists()) {
+                Model model;
+                ModelETL modelETL;
+                /*
+                try (FileInputStream fis = new FileInputStream(targetRootPomXml())){
+                    MavenXpp3Reader reader = new MavenXpp3Reader();
+                    model = reader.read(fis);
+
+                } catch (Exception ex) {
+                    throw new MojoExecutionException("Failed to read pom.xml file from "+targetRootPomXml(), ex);
+                }
+
+                 */
+                try {
+                    ModelETLRequest modelETLRequest = new ModelETLRequest();
+                    modelETL = new JDomModelETLFactory().newInstance(modelETLRequest);
+                    modelETL.extract(targetRootPomXml());
+                    model = modelETL.getModel();
+
+                } catch (Exception ex) {
+                    throw new MojoExecutionException("Failed to read pom.xml file from "+targetRootPomXml(), ex);
+                }
+                if (dependencies != null) {
+                    String dummyModelStr = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                            "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n" +
+                            "    <modelVersion>4.0.0</modelVersion>\n" +
+                            "    <groupId>link.sharpe</groupId>\n" +
+                            "    <artifactId>mavenproject1</artifactId>\n" +
+                            "    <version>1.0-SNAPSHOT</version>\n" +
+                            "    <dependencies>\n" +
+                            parentDependencies +
+                            "    </dependencies>\n" +
+                            "</project>";
+                    Model dummyModel;
+                    try {
+                        MavenXpp3Reader reader = new MavenXpp3Reader();
+                        dummyModel = reader.read(new CharArrayReader(dummyModelStr.toCharArray()));
+                    } catch (Exception ex) {
+                        throw new MojoExecutionException("Failed to read dummy pom.xml file while injecting dependencies into "+targetRootPomXml(), ex);
+                    }
+                    for(Dependency dep : dummyModel.getDependencies()) {
+                        model.addDependency(dep);
+                    }
+                    /*
+                    MavenXpp3Writer writer = new MavenXpp3Writer();
+                    try (FileOutputStream fos = new FileOutputStream(targetRootPomXml())) {
+                        writer.write(fos, model);
+                    }
+
+                     */
+                    modelETL.load(targetRootPomXml());
+
                 }
 
 
