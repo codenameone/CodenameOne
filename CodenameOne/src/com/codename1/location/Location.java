@@ -42,7 +42,7 @@ import java.util.Comparator;
  * <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
  * 
  * <p>The sample below demonstrates the usage of the background geofencing API:</p>
- * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+ * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
  */
 public class Location {
     
