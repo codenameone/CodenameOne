@@ -1500,28 +1500,31 @@ public class CSSTheme {
         if (Math.ceil(numVal) == Math.floor(numVal)) {
             num = ((int)numVal)+"";
         }
-        String unitText = lu.getDimensionUnitText();
+        String unitText = "";
+        try {
+            unitText = lu.getDimensionUnitText();
+        } catch (Exception ex){} // This might throw an exception if there was no unit given, but we don't care.
         switch (lu.getLexicalUnitType()) {
-                case LexicalUnit.SAC_MILLIMETER:
-                    return num+"mm";
+            case LexicalUnit.SAC_MILLIMETER:
+                return num+"mm";
 
-                case LexicalUnit.SAC_INTEGER:
-                case LexicalUnit.SAC_REAL:
-                    return num+"";
-                case LexicalUnit.SAC_POINT:
-                    return num+"pt";
+            case LexicalUnit.SAC_INTEGER:
+            case LexicalUnit.SAC_REAL:
+                return num+"";
+            case LexicalUnit.SAC_POINT:
+                return num+"pt";
 
-                case LexicalUnit.SAC_PIXEL:
-                    return ((int)Math.round(su.getNumericValue()))+"px";
-
-
-                case LexicalUnit.SAC_INCH:
-                    return num+"in";
-                case LexicalUnit.SAC_EM:
-                    return num+"em";
+            case LexicalUnit.SAC_PIXEL:
+                return ((int)Math.round(su.getNumericValue()))+"px";
 
 
-            }
+            case LexicalUnit.SAC_INCH:
+                return num+"in";
+            case LexicalUnit.SAC_EM:
+                return num+"em";
+
+
+        }
         return num+unitText;
     }
     
