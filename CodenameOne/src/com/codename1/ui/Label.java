@@ -62,6 +62,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
         
     };
+    private boolean iconChangeListenerInstalled;
     
     /**
      * Fallback to the old default look and feel renderer for cases where compatibility is essential
@@ -504,9 +505,15 @@ public class Label extends Component implements IconHolder, TextHolder {
             setMask(UIManager.getInstance().getThemeMaskConstant(maskName));
         }
         if(getIcon() != null) {
+            if (!iconChangeListenerInstalled) {
+                getIcon().addActionListener(iconChangeListener);
+                iconChangeListenerInstalled = true;
+            }
             getIcon().lock();
         }
     }
+
+
 
     /**
      * {@inheritDoc}
@@ -517,7 +524,9 @@ public class Label extends Component implements IconHolder, TextHolder {
         if(f != null) {
             f.deregisterAnimated(this);
         }
+
         if(getIcon() != null) {
+            getIcon().removeActionListener(iconChangeListener);
             getIcon().unlock();
         }
     }
@@ -544,6 +553,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
         if (this.icon != null) {
             this.icon.removeActionListener(iconChangeListener);
+            iconChangeListenerInstalled = false;
         }
         widthAtLastCheck = -1;
         if(icon != null) {
@@ -557,7 +567,10 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
         this.icon = icon;
         if (this.icon != null) {
-            this.icon.addActionListener(iconChangeListener);
+            if (isInitialized()) {
+                this.icon.addActionListener(iconChangeListener);
+                iconChangeListenerInstalled = true;
+            }
         }
         setShouldCalcPreferredSize(true);
         checkAnimation();
