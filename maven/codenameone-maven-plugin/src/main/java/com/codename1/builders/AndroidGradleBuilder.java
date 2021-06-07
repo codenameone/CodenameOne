@@ -87,6 +87,7 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     public static final String[] ANDROID_PERMISSIONS = new String[]{
+            "android.permission.ACCESS_BACKGROUND_LOCATION",
             "android.permission.ACCESS_CHECKIN_PROPERTIES",
             "android.permission.ACCESS_COARSE_LOCATION",
             "android.permission.ACCESS_FINE_LOCATION",
@@ -256,6 +257,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean recieveBootCompletedPermission;
     private boolean getAccountsPermission;
     private boolean credentialsPermission;
+    private boolean backgroundLocationPermission;
 
     private boolean accessWifiStatePermissions;
     private boolean browserBookmarksPermissions;
@@ -638,7 +640,7 @@ public class AndroidGradleBuilder extends Executor {
         String targetSDKVersion = targetNumber;
         final int targetSDKVersionInt = Integer.parseInt(targetSDKVersion);
 
-        if (Integer.parseInt(targetSDKVersion) > 14) {
+        if (targetSDKVersionInt > 14) {
             androidVersion = "android-" + targetSDKVersion;
         }
         targetSDKVersion = " android:targetSdkVersion=\"" + targetSDKVersion + "\" ";
@@ -899,6 +901,9 @@ public class AndroidGradleBuilder extends Executor {
                             request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
                             playServicesLocation = true;
                             playFlag = "false";
+                            if (targetSDKVersionInt >= 29) {
+                                backgroundLocationPermission = true;
+                            }
                         }
                     }
 
@@ -928,6 +933,14 @@ public class AndroidGradleBuilder extends Executor {
                         }
                     }
 
+                    if (cls.indexOf("com/codename1/location/LocationManager") == 0 && (method.indexOf("addGeoFencing") > -1 || method.indexOf("setBackgroundLocationListener") > -1)) {
+
+                        if (!"true".equals(playServicesValue)) {
+                            if (targetSDKVersionInt >= 29) {
+                                backgroundLocationPermission = true;
+                            }
+                        }
+                    }
                     if (cls.indexOf("com/codename1/location/LocationManager") == 0 && (method.indexOf("addGeoFencing") > -1 || method.indexOf("getLocationManager") > -1)) {
 
                         if (!"true".equals(playServicesValue)) {
@@ -1254,6 +1267,16 @@ public class AndroidGradleBuilder extends Executor {
 
         }
 
+        if (targetSDKVersionInt >= 29) {
+            File androidLocationPlayServicesManager = new File(srcDir, "com/codename1/location/AndroidLocationPlayServicesManager.java");
+            if (androidLocationPlayServicesManager.exists()) {
+                try {
+                    replaceInFile(androidLocationPlayServicesManager, "//29+", "");
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to activate lines in "+androidLocationPlayServicesManager+" for API 29+");
+                }
+            }
+        }
 
         //Delete the Facebook implemetation if this app does not use FB.
         if (!facebookSupported) {
@@ -1651,10 +1674,6 @@ public class AndroidGradleBuilder extends Executor {
                 "<activity android:name=\"com.codename1.impl.android.CodenameOneBackgroundFetchActivity\" android:theme=\"@android:style/Theme.NoDisplay\" />\n";
 
 
-        for (String perm : ANDROID_PERMISSIONS) {
-
-        }
-
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
@@ -1761,6 +1780,9 @@ public class AndroidGradleBuilder extends Executor {
         if (credentialsPermission) {
             permissions += permissionAdd(request, "USE_CREDENTIALS",
                     "<uses-permission android:name=\"android.permission.USE_CREDENTIALS\" />\n");
+        }
+        if (backgroundLocationPermission && !xPermissions.contains("android.permission.ACCESS_BACKGROUND_LOCATION")) {
+            permissions += "<uses-permission android:name=\"android.permission.ACCESS_BACKGROUND_LOCATION\"  android:required=\"false\" />\n";
         }
 
         String billingServiceData = "";
@@ -2008,6 +2030,10 @@ public class AndroidGradleBuilder extends Executor {
         } else {
             androidLicenseKey = "";
         }
+        String useBackgroundPermissionSnippet = "";
+        if (backgroundLocationPermission) {
+            useBackgroundPermissionSnippet = "Display.getInstance().setProperty(\"android.requiresBackgroundLocationPermissionForAPI29\", \"true\");\n";
+        }
 
         String streamMode = request.getArg("android.streamMode", null);
         if (streamMode != null) {
@@ -2246,6 +2272,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"
+                    + useBackgroundPermissionSnippet
                     + pushInitDisplayProperties
                     //+ corporateServer
                     + androidLicenseKey
@@ -3102,7 +3129,7 @@ public class AndroidGradleBuilder extends Executor {
         injectRepo += "      google()\n" +
                 "     mavenLocal()\n" +
                 "      mavenCentral()\n";
-        if(!androidAppBundle){
+        if(!androidAppBundle && gradleVersionInt < 6 && buildToolsVersionInt < 30){
             gradlePropertiesObject.put("android.enableAapt2", "false");
         }
         if (!useAndroidX) {

@@ -6578,9 +6578,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        if(!checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")){
+        boolean permissionGranted = false;
+        if (Build.VERSION.SDK_INT >= 29  && "true".equals(Display.getInstance().getProperty("android.requiresBackgroundLocationPermissionForAPI29", "false"))) {
+
+            if (checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION", "This is required to get the location")) {
+                permissionGranted = true;
+            }
+
+        }
+        if (!permissionGranted && !checkForPermission( Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")) {
             return null;
         }
+
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
         if (includesPlayServices && hasAndroidMarket()) {

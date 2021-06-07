@@ -26,6 +26,7 @@ import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,6 +35,9 @@ import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
+import android.support.v4.app.ActivityCompat;
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
@@ -41,13 +45,12 @@ import com.codename1.impl.android.PlayServices;
 import com.codename1.ui.Display;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.FusedLocationProviderApi;
+import com.google.android.gms.location.*;
 import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.LocationAvailability;
-import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -60,6 +63,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         GoogleApiClient.OnConnectionFailedListener,
         com.google.android.gms.location.LocationListener,
         LifecycleListener {
+
 
 
     static class ParcelableUtil {
@@ -99,6 +103,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     public static AndroidLocationPlayServiceManager inMemoryBackgroundLocationListener;
     
     private GoogleApiClient mGoogleApiClient;
+    private GeofencingClient geofencingClient;
 
     private LocationRequest locationRequest;
 
@@ -307,11 +312,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     protected void bindBackgroundListener() {
-        /*
-        if(!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, "This is required to get the location")){
-            System.out.println("Request for background location access is denied");
+        if (!checkBackgroundLocationPermission()) {
+            return;
         }
-        */
 
         final Class bgListenerClass = getBackgroundLocationListener();
         if (bgListenerClass == null) {
@@ -463,9 +466,55 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         }
     }
 
+    private PendingIntent geofencePendingIntent;
+
+    private PendingIntent createGeofencePendingIntent(Class geofenceListenerClass, com.codename1.location.Geofence gf, boolean forceService) {
+        Context context = AndroidNativeUtil.getContext().getApplicationContext();
+
+
+        if (!forceService && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (geofencePendingIntent != null) {
+                return geofencePendingIntent;
+            }
+            Intent intent = new Intent(context, BackgroundLocationBroadcastReceiver.class);
+            intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_GEOFENCE_TRANSITIONS);
+            intent.setData(Uri.parse("http://codenameone.com/a?" + geofenceListenerClass.getName()));
+            //intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_GEOFENCE_TRANSITIONS);
+            geofencePendingIntent = PendingIntent.getBroadcast(AndroidNativeUtil.getContext().getApplicationContext(), 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            return geofencePendingIntent;
+        } else {
+
+            Intent intent = new Intent(context, GeofenceHandler.class);
+            intent.putExtra("geofenceClass", geofenceListenerClass.getName());
+            intent.putExtra("geofenceID", gf.getId());
+            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+
+
+            return pendingIntent;
+        }
+    }
+
+    @RequiresApi(api = 29)
+    private boolean checkBackgroundLocationPermission() {
+ //29+       if (!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, "This is required to get the location")) {
+ //29+           System.out.println("Request for background location access is denied");
+ //29+           return false;
+ //29+       }
+        return true;
+    }
+
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
         //Display.getInstance().scheduleBackgroundTask(new Runnable() {
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+
+            if (!checkBackgroundLocationPermission()) {
+                return;
+            }
+
+        }
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -484,15 +533,10 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        Context context = AndroidNativeUtil.getContext();
+                        Context context = AndroidNativeUtil.getContext().getApplicationContext();
 
-                        Intent intent = new Intent(context, GeofenceHandler.class);
-                        intent.putExtra("geofenceClass", GeofenceListenerClass.getName());
-                        intent.putExtra("geofenceID", gf.getId());
-                        PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT);
-                        ArrayList<Geofence> geofences = new ArrayList<Geofence>();
+                        PendingIntent pendingIntent = createGeofencePendingIntent(GeofenceListenerClass, gf, false);
+                        final ArrayList<Geofence> geofences = new ArrayList<Geofence>();
                         geofences.add(new Geofence.Builder()
                                 .setRequestId(gf.getId())
                                 .setCircularRegion(gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius())
@@ -500,8 +544,42 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                                         | Geofence.GEOFENCE_TRANSITION_EXIT)
                                 .setExpirationDuration(gf.getExpiration() > 0 ? gf.getExpiration() : Geofence.NEVER_EXPIRE)
                                 .build());
-                        
-                        LocationServices.GeofencingApi.addGeofences(getmGoogleApiClient(), geofences, pendingIntent);
+
+                        GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
+                        builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
+                        builder.addGeofences(geofences);
+
+                        if (ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                            // TODO: Consider calling
+                            //    ActivityCompat#requestPermissions
+                            // here to request the missing permissions, and then overriding
+                            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                            //                                          int[] grantResults)
+                            // to handle the case where the user grants the permission. See the documentation
+                            // for ActivityCompat#requestPermissions for more details.
+                            System.out.println("No permission");
+                            return;
+                        }
+                        geofencingClient = geofencingClient == null ? LocationServices.getGeofencingClient(AndroidNativeUtil.getContext().getApplicationContext()) :
+                                geofencingClient;
+                        geofencingClient.addGeofences(builder.build(), pendingIntent)
+                                .addOnSuccessListener(AndroidNativeUtil.getActivity(), new OnSuccessListener<Void>() {
+                                    @Override
+                                    public void onSuccess(Void aVoid) {
+                                        // Geofences added
+                                        // ...
+
+                                        //com.codename1.io.Log.p("Geofence added successfully " + geofences);
+                                    }
+                                })
+                                .addOnFailureListener(AndroidNativeUtil.getActivity(), new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+                                        // Failed to add geofences
+                                        // ...
+                                        com.codename1.io.Log.e(e);
+                                    }
+                                });
                     }
                 });
             }
@@ -539,7 +617,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                         ArrayList<String> ids = new ArrayList<String>();
                         ids.add(id);
-                        LocationServices.GeofencingApi.removeGeofences(getmGoogleApiClient(), ids);
+                        geofencingClient = geofencingClient == null ? LocationServices.getGeofencingClient(AndroidNativeUtil.getContext().getApplicationContext()) :
+                                geofencingClient;
+                        geofencingClient.removeGeofences(ids);
                     }
                 });
             }
