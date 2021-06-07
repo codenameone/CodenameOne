@@ -1077,7 +1077,8 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 } catch (Exception ex) {
                     throw new MojoExecutionException("Failed to read pom.xml file from "+targetRootPomXml(), ex);
                 }
-                if (dependencies != null) {
+                if (parentDependencies != null) {
+                    //getLog().info("Parent dependencies: "+parentDependencies);
                     String dummyModelStr = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                             "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n" +
                             "    <modelVersion>4.0.0</modelVersion>\n" +
