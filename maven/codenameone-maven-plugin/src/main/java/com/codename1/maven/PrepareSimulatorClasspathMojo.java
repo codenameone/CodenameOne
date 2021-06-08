@@ -6,6 +6,7 @@
 package com.codename1.maven;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -171,6 +172,30 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
         }
 
+        Properties simulatorProperties = new Properties();
+        File simulatorPropertiesFile = new File(getCN1ProjectDir(), path("target", "codenameone", "simulator.properties"));
+        if (!simulatorPropertiesFile.getParentFile().exists()) {
+            simulatorPropertiesFile.getParentFile().mkdirs();
+        }
+
+
+        try {
+            StringBuilder compileClasspath = new StringBuilder();
+            for (String el : project.getCompileClasspathElements()) {
+                if (compileClasspath.length() > 0) {
+                    compileClasspath.append(File.pathSeparator);
+                }
+                compileClasspath.append(el);
+            }
+           simulatorProperties.setProperty("cn1.maven.compileClasspathElements", compileClasspath.toString());
+
+        } catch (Exception ex){}
+
+        try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
+            simulatorProperties.store(fos, "Updated simulator properties in PrepareSimulatorClasspathMojo");
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to write simulator.properties file", ex);
+        }
         
     }
 

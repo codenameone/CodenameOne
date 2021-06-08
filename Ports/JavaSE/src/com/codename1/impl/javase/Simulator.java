@@ -29,11 +29,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * A simple class that can invoke a lifecycle object to allow it to run a
@@ -46,15 +42,51 @@ public class Simulator {
     
     private static final String DEFAULT_SKIN="/iPhoneX.skin";
     private static ClassPathLoader rootClassLoader;
-    
-    
-   
+
+
+    /**
+     * Loads properties from the target/codenameone/simulator.properties file into the System properties.
+     * This file is created by the PrepareSimulatorClasspathMojo
+     * @param projectDir
+     */
+    private static void loadSimulatorProperties(File projectDir) {
+       if (System.getProperty("maven.home") == null) {
+           // simulator.properties file is only for maven.
+           // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder.
+           return;
+       }
+       if (System.getProperty("cn1.simulator.properties.loaded") != null) {
+           // properties are already loaded.
+           return;
+       }
+       System.setProperty("cn1.simulator.properties.loaded", "true");
+       File simulatorProperties = new File(projectDir, "target" + File.separator + "codenameone" + File.separator + "simulator.properties");
+       if (simulatorProperties.exists()) {
+           Properties props = new Properties();
+           try (FileInputStream fis = new FileInputStream(simulatorProperties)) {
+               props.load(fis);
+           } catch (IOException ex) {
+               System.err.println("Failed to load simulator.properties file");
+               ex.printStackTrace();
+           }
+           for (Object key : props.keySet()) {
+               String stringKey = (String)key;
+               if (stringKey.isEmpty()) continue;
+               System.setProperty(stringKey, props.getProperty(stringKey));
+           }
+
+
+       }
+
+   }
     
 
     /**
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
+
+
         try {
             // Load the sqlite database Engine JDBC driver in the top level classloader so it's shared
             // this works around the exception: java.lang.UnsatisfiedLinkError: Native Library sqlite already loaded in another classloader
@@ -105,7 +137,7 @@ public class Simulator {
 
         }
         if (!cn1Props.exists()) {
-            cn1Props = new File(".." + File.separator + "common" + File.separator + "codenamene_settings.properties").getAbsoluteFile();
+            cn1Props = new File(".." + File.separator + "common" + File.separator + "codenameone_settings.properties").getAbsoluteFile();
 
         }
         if (cn1Props.exists()) {
@@ -113,6 +145,7 @@ public class Simulator {
             if (commonClasses.exists()) {
                 files.add(commonClasses);
             }
+            loadSimulatorProperties(cn1Props.getParentFile());
         }
         if (isDebug && usingHotswapAgent) { 
             HotswapProperties hotswapProperties = new HotswapProperties();
@@ -207,6 +240,14 @@ public class Simulator {
             ldr = new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
             
         }
+        StringBuilder filesPath = new StringBuilder();
+        for (File f : files) {
+            if (filesPath.length() > 0) {
+                filesPath.append(File.pathSeparator);
+            }
+            filesPath.append(f.getAbsolutePath());
+        }
+        System.setProperty("cn1.classPathLoader.Path", filesPath.toString());
         ((ClassPathLoader)ldr).addExclude("org.cef.");
         
         final ClassLoader fLdr = ldr;
