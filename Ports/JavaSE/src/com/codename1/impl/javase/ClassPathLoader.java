@@ -27,11 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -268,7 +264,58 @@ class ClassPathLoader extends ClassLoader {
         }
         return findSystemClass(className);
     }
-    
+
+    private Set<String> resourceMisses = new HashSet<>();
+
+    @Override
+    public URL getResource(String name) {
+        if (resources.containsKey(name)) {
+            return resources.get(name);
+        } else if (resourceMisses.contains(name) && getParent() != null) {
+            return getParent().getResource(name);
+        } else {
+            URL url = findResource(name);
+            if (url == null) {
+                resourceMisses.add(name);
+                return null;
+            } else {
+                resources.put(name, url);
+                return url;
+            }
+        }
+    }
+
+    @Override
+    protected URL findResource(String name) {
+        for (File f : classpath) {
+            if (f.isDirectory()) {
+                File current = new File(f, name);
+                if (current.exists()) {
+                    try {
+                        return current.toURI().toURL();
+                    } catch (Exception ex){
+                        ex.printStackTrace();
+                    }
+                }
+
+            } else {
+                try {
+                    JarFile jar = new JarFile(f);
+                    JarEntry entry = jar.getJarEntry(name);
+                    if (entry == null) {
+                        continue;
+                    }
+                    File entryFile = new File(new File(f.getParentFile(), f.getName()+"!"), name);
+                    return new URL("jar:"+entryFile.toURI().toURL());
+                } catch (Throwable t) {
+                    continue;
+                }
+            }
+
+        }
+        return null;
+    }
+
     private static String OS = System.getProperty("os.name").toLowerCase();
     private static boolean isWindows = (OS.indexOf("win") >= 0);
     
