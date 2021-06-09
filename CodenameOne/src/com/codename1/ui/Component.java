@@ -5631,7 +5631,14 @@ public class Component implements Animation, StyleListener, Editable {
         } 
     }
 
+    /**
+     * A flag that tracks whether the component is current registered as an animated with {@link Form#registerAnimatedInternal(Animation)}.
+     * Using this flag allows for a small efficiency improvement.  The flag is set in {@link Form#registerAnimatedInternal(Animation)} and
+     * unset in {@link Form#deregisterAnimatedInternal()}.
+     */
+    boolean internalRegisteredAnimated;
     void deregisterAnimatedInternal() {
+        if (!internalRegisteredAnimated) return;
         Form f = getComponentForm();
         if (f != null) {
             f.deregisterAnimatedInternal(this);
@@ -6111,6 +6118,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
             }
+            deregisterAnimatedInternal();
             deinitialize();
             if(refreshTaskDragListener != null) {
                 Form f = getComponentForm();

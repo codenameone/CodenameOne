@@ -580,7 +580,7 @@ public class Form extends Container {
                 bar.setUIID("StatusBar");
             }
             bar.addActionListener(new ActionListener() {
-                @Override
+
                 public void actionPerformed(ActionEvent evt) {
                     Component c = findScrollableChild(getContentPane());
                     if(c != null) {
@@ -672,7 +672,7 @@ public class Form extends Container {
     public Component findCurrentlyEditingComponent() {
         return ComponentSelector.select("*", this).filter(new Filter() {
 
-            @Override
+
             public boolean filter(Component c) {
                 return c.isEditing();
             }
@@ -1943,6 +1943,13 @@ public class Form extends Container {
      * That is why we can dynamically register/deregister without interfering with user interaction.
      */
     void registerAnimatedInternal(Animation cmp) {
+        if (cmp instanceof Component) {
+            Component c = (Component)cmp;
+            if (c.internalRegisteredAnimated) {
+                return;
+            }
+            c.internalRegisteredAnimated = true;
+        }
         if (internalAnimatableComponents == null) {
             internalAnimatableComponents = new ArrayList<Animation>();
         }
@@ -1955,10 +1962,17 @@ public class Form extends Container {
     /**
      * Identical to the none-internal version, the difference between the internal/none-internal
      * is that it references a different vector that is unaffected by the user actions.
-     * That is why we can dynamically register/deregister without interfearing with user interaction.
+     * That is why we can dynamically register/deregister without interfering with user interaction.
      */
     void deregisterAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents != null) {
+            if (cmp instanceof Component) {
+                Component c = (Component)cmp;
+                if (!c.internalRegisteredAnimated) {
+                    return;
+                }
+                c.internalRegisteredAnimated = false;
+            }
             internalAnimatableComponents.remove(cmp);
         }
     }
@@ -2960,7 +2974,7 @@ public class Form extends Container {
          * 
          * @return The "next" component in the iterator.
          */
-        @Override
+
         public Component next() {
             Component next = getNext();
             setCurrent(next);
@@ -2971,7 +2985,7 @@ public class Form extends Container {
          * Checks if this iterator has a "previous" component.
          * @return 
          */
-        @Override
+
         public boolean hasPrevious() {
             return getPrevious() != null;
         }
@@ -2980,7 +2994,7 @@ public class Form extends Container {
          * Returns the previous component in this iterator, and repositions the iterator at this component.
          * @return 
          */
-        @Override
+
         public Component previous() {
             Component prev = getPrevious();
             setCurrent(prev);
@@ -2991,7 +3005,7 @@ public class Form extends Container {
          * Gets the index within the iterator of the next component.
          * @return 
          */
-        @Override
+
         public int nextIndex() {
             Component next = getNext();
             if (next == null) {
@@ -3004,7 +3018,7 @@ public class Form extends Container {
          * Gets the index within the iterator of the previous component.
          * @return 
          */
-        @Override
+
         public int previousIndex() {
             Component prev = getPrevious();
             if (prev == null) {
@@ -3017,7 +3031,7 @@ public class Form extends Container {
          * Removes the current component from the iterator, and repositions the iterator to the previous 
          * component, or the next component (if previous doesn't exist).
          */
-        @Override
+
         public void remove() {
             Component newCurr = getPrevious();
             if (newCurr == null) {
@@ -3036,7 +3050,7 @@ public class Form extends Container {
          * the iterator.
          * @param e The component to set as the current component.
          */
-        @Override
+
         public void set(Component e) {
             if (currPos >= 0 && currPos < components.size()-1) {
                 components.set(currPos, e);
@@ -3048,7 +3062,7 @@ public class Form extends Container {
          * Adds a component to the end of the iterator.
          * @param e The component to add to the iterator.
          */
-        @Override
+
         public void add(Component e) {
             components.add(e);
         }
@@ -3073,7 +3087,7 @@ public class Form extends Container {
         java.util.List<Component> out = new ArrayList<Component>();
         out.addAll(ComponentSelector.select("*", this).filter(new Filter() {
 
-            @Override
+
             public boolean filter(Component c) {
                 return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled();
             }
@@ -3081,7 +3095,7 @@ public class Form extends Container {
         }));
         Collections.sort(out, new Comparator<Component>() {
 
-            @Override
+
             public int compare(Component o1, Component o2) {
                 return o1.getTabIndex() < o2.getTabIndex() ? -1 :
                         o2.getTabIndex() < o1.getTabIndex() ? 1 :
