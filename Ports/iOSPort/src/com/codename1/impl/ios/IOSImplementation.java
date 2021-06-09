@@ -7336,16 +7336,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                     String key = uUrl.getHost()+":"+uUrl.getPort();
                     String certs = nativeInstance.getSSLCertificates(peer);
                     if (certs == null) {
-                        if (sslCertificatesCache.containsKey(key)) {
-                            sslCertificates = sslCertificatesCache.get(key);
-                        }
+                        //if (sslCertificatesCache.containsKey(key)) {
+                        //    sslCertificates = sslCertificatesCache.get(key);
+                        //}
                         if (sslCertificates == null) {
                             return new String[0];
                         }
                         return sslCertificates;
                     }
                     sslCertificates = Util.split(certs, ",");
-                    sslCertificatesCache.put(key, sslCertificates);
+                    //sslCertificatesCache.put(key, sslCertificates);
                     return sslCertificates;
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -7357,7 +7357,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
-    private static Map<String, String[]> sslCertificatesCache = new HashMap<String,String[]>();
+    //private static Map<String, String[]> sslCertificatesCache = new HashMap<String,String[]>();
     
     public boolean isTimeoutSupported() {
         return true;

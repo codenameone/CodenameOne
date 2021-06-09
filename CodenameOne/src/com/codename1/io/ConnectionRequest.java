@@ -751,7 +751,6 @@ public class ConnectionRequest implements IOProgressListener {
     /**
      * This callback is used internally to check SSL certificates, only on platforms that require
      * native callbacks for checking SSL certs.  Currently only iOS requires this.
-     * @param req The ConnectionRequest to check SSL certificates for.
      * @return True if the certificates checkout OK, or if the request doesn't require SSL cert checks.
      * @deprecated For internal use only.
      * @see NetworkManager#checkCertificatesNativeCallback(int) 
