@@ -12,12 +12,14 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Method;
 import java.nio.file.FileSystems;
@@ -448,6 +450,9 @@ public class SourceChangeWatcher implements Runnable {
             return true;
         } else if (hotReloadSetting == 1) {
             stopped = true;
+            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            JavaSEPort.instance.deinitializeSync();
+            win.dispose();
             System.setProperty("reload.simulator", "true");
             return true;
         }
