@@ -167,7 +167,9 @@ public class SourceChangeWatcher implements Runnable {
     }
 
     private String parentEntityViewClass = "AbstractEntityView", viewModelType = "Entity" ;
+    private StringBuilder importStatements = new StringBuilder();
     private String addElementIdentifiersToXML(String xml) throws IOException {
+        importStatements.setLength(0);
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
             //an instance of builder to parse the specified xml file
@@ -184,6 +186,9 @@ public class SourceChangeWatcher implements Runnable {
                             viewModelType = el.getAttribute("rad-model");
                         }
 
+                    }
+                    if (el.getTagName().equalsIgnoreCase("import")) {
+                        importStatements.append(el.getTextContent()).append("\n");
                     }
                     el.setAttribute("rad-id", String.valueOf(index++));
                     NodeList children = el.getChildNodes();
@@ -254,6 +259,7 @@ public class SourceChangeWatcher implements Runnable {
         sb.append("import com.codename1.rad.nodes.Node;\n");
         sb.append("import com.codename1.io.CharArrayReader;\n");
         sb.append("import com.codename1.rad.ui.ViewContext;\n");
+        sb.append(importStatements);
         sb.append("@RAD\n");
         String parentClassName = parentEntityViewClass;
         if (parentClassName.equals("AbstractEntityView")) {

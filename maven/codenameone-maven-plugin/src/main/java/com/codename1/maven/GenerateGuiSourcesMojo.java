@@ -21,6 +21,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.surefire.shared.io.FileUtils;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -178,6 +179,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
         sb.append("import com.codename1.rad.nodes.Node;\n");
         sb.append("import com.codename1.io.CharArrayReader;\n");
         sb.append("import com.codename1.rad.ui.ViewContext;\n");
+        sb.append(importStatements);
         sb.append("@RAD\n");
         String parentClassName = parentEntityViewClass;
         if (parentClassName.equals("AbstractEntityView")) {
@@ -262,6 +264,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
 
     }
 
+    private StringBuilder importStatements = new StringBuilder();
 
     private String addElementIdentifiersToXML(String xml) throws IOException {
         try {
@@ -280,6 +283,9 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
                             viewModelType = el.getAttribute("rad-model");
                         }
 
+                    }
+                    if (el.getTagName().equalsIgnoreCase("import")) {
+                        importStatements.append(el.getTextContent()).append("\n");
                     }
                     el.setAttribute("rad-id", String.valueOf(index++));
                     NodeList children = el.getChildNodes();
