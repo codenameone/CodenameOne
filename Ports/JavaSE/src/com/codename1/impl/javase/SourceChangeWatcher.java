@@ -359,7 +359,7 @@ public class SourceChangeWatcher implements Runnable {
 
 
 
-        boolean isRADView = isRADView(path);
+        final boolean isRADView = isRADView(path);
 
 
         if (isRADView) {
