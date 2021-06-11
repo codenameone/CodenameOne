@@ -3669,7 +3669,7 @@ public class Component implements Animation, StyleListener, Editable {
         
         if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
             // allows for fractional font sizes
-            m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, duration);
+            m = Motion.createLinearMotion(Math.round(sourceStyle.getFont().getPixelSize() * 100), Math.round(destStyle.getFont().getPixelSize() * 100), duration);
         }
 
         final Motion fontMotion = m;
@@ -3887,41 +3887,62 @@ public class Component implements Animation, StyleListener, Editable {
                         setUIID(destUIID);
                     }
                 } else {
+                    boolean requiresRevalidate = false;
                     if (opacityMotion != null) {
                         sourceStyle.setOpacity(opacityMotion.getValue());
                     }
-                    if(fgColorMotion != null) {
+                    if (fgColorMotion != null) {
                         sourceStyle.setFgColor(fgColorMotion.getValue());
                     }
                     ap.alpha = bgMotion.getValue();
-                    if(fontMotion != null) {
+                    if (fontMotion != null) {
                         Font fnt = sourceStyle.getFont();
-                        fnt = fnt.derive(((float)fontMotion.getValue()) / 100.0f, fnt.getStyle());
+                        fnt = fnt.derive(((float) fontMotion.getValue()) / 100.0f, fnt.getStyle());
+                        requiresRevalidate = true;
                         sourceStyle.setFont(fnt);
                     }
-                    if(paddingTop != null) {
+                    if (paddingTop != null) {
                         sourceStyle.setPadding(TOP, paddingTop.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(paddingBottom != null) {
+                    if (paddingBottom != null) {
                         sourceStyle.setPadding(BOTTOM, paddingBottom.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(paddingLeft != null) {
+                    if (paddingLeft != null) {
                         sourceStyle.setPadding(LEFT, paddingLeft.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(paddingRight != null) {
+                    if (paddingRight != null) {
                         sourceStyle.setPadding(RIGHT, paddingRight.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(marginTop != null) {
+                    if (marginTop != null) {
                         sourceStyle.setMargin(TOP, marginTop.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(marginBottom != null) {
+                    if (marginBottom != null) {
                         sourceStyle.setMargin(BOTTOM, marginBottom.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(marginLeft != null) {
+                    if (marginLeft != null) {
                         sourceStyle.setMargin(LEFT, marginLeft.getValue());
+                        requiresRevalidate = true;
                     }
-                    if(marginRight != null) {
+                    if (marginRight != null) {
                         sourceStyle.setMargin(RIGHT, marginRight.getValue());
+                        requiresRevalidate = true;
+                    }
+                    if (!Component.revalidateOnStyleChange) {
+                        // If revalidation on stylechange is not enabled, then the style animation
+                        // won't work. We need to explicitly revalidate or repaint here.
+                        if (requiresRevalidate) {
+                            Container parent = getParent();
+                            if (parent != null) parent.revalidate();
+                            else repaint();
+                        } else {
+                            repaint();
+                        }
                     }
                 }
             }
