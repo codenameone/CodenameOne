@@ -365,7 +365,7 @@ public class SourceChangeWatcher implements Runnable {
 
 
 
-        boolean isRADView = isRADView(path);
+        final boolean isRADView = isRADView(path);
 
 
         if (isRADView) {
@@ -723,7 +723,7 @@ public class SourceChangeWatcher implements Runnable {
                         return;
                     }
 
-                    Path path = getPathForKey(key);
+                    final Path path = getPathForKey(key);
                     requiresRecompile = false;
                     fileToRecompile = null;
 
