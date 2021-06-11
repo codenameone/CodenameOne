@@ -374,16 +374,24 @@ public class Sheet extends Container {
         
         int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
         int positionInt = getPositionInt();
+        Rectangle displaySafeArea = new Rectangle();
+        Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        int bottomPadding = s.getPaddingBottom();
+        int safeAreaBottomPadding = CN.getDisplayHeight() - (displaySafeArea.getY() + displaySafeArea.getHeight());
+        bottomPadding = bottomPadding + safeAreaBottomPadding;
         if (positionInt == S || positionInt == C) {
             // For Center and South position we use margin to 
             // prevent overlap with top notch.  This looks better as overlap is only
             // an edge case that occurs when the sheet is the full screen height.
             $(this).setMargin(topPadding, 0 , 0, 0);
+            $(this).setPadding(s.getPaddingTop(), s.getPaddingRightNoRTL(), bottomPadding, s.getPaddingLeftNoRTL());
         } else {
             // For other cases we use padding to prevent overlap with top notch.  This looks
             // better as it appears that the sheet bleeds all the way to the top edge of the screen,
             // but the content is not obscured by the notch.
-            $(this).setPadding(topPadding, s.getPaddingRightNoRTL(), s.getPaddingBottom(), s.getPaddingLeftNoRTL());
+
+
+            $(this).setPadding(topPadding, s.getPaddingRightNoRTL(), bottomPadding, s.getPaddingLeftNoRTL());
         }
        
         // END Deal with iPhoneX notch
