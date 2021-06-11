@@ -717,7 +717,7 @@ public class SourceChangeWatcher implements Runnable {
                         return;
                     }
 
-                    Path path = getPathForKey(key);
+                    final Path path = getPathForKey(key);
                     requiresRecompile = false;
                     fileToRecompile = null;
 
