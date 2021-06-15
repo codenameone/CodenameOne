@@ -81,6 +81,7 @@ public class RequestBuilder {
     private ArrayList<ActionListener<NetworkEvent>> errorCallbacks = new ArrayList<ActionListener<NetworkEvent>>();
     private ConnectionRequest.CachingMode cache;
     private boolean fetched;
+    private Boolean postParameters;
     
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -102,7 +103,17 @@ public class RequestBuilder {
         this.cache = cache;
         return this;
     }
-    
+
+    /**
+     * Overrides the default behavior of methods so they can be sent using the post/get method
+     * @param postParameters true to force post, false to use get method. Defaults to true for all methods other than GET
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder postParameters(Boolean postParameters) {
+        this.postParameters = postParameters;
+        return this;
+    }
+
     /**
      * Sets the value of the content type
      * @param s the content type
@@ -840,7 +851,11 @@ public class RequestBuilder {
         req.setDuplicateSupported(true);
         req.setUrl(url);
         req.setHttpMethod(method);
-        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
+        if(postParameters == null) {
+            req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
+        } else {
+            req.setPost(postParameters);
+        }
         if(body != null){
             req.setRequestBody(body);
             req.setWriteRequest(true);
