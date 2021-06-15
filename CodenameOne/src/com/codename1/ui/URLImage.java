@@ -362,7 +362,7 @@ public class URLImage extends EncodedImage {
                                 if(exceptionHandler != null) {
                                     exceptionHandler.onError(URLImage.this, ex);
                                 } else {
-                                    throw new RuntimeException(ex.toString());
+                                    Log.e(new RuntimeException(ex.toString()));
                                 }
                             }
                         }
@@ -371,7 +371,7 @@ public class URLImage extends EncodedImage {
                     if(exceptionHandler != null) {
                         exceptionHandler.onError(URLImage.this, t);
                     } else {
-                        throw new RuntimeException(t.toString());
+                        Log.e(new RuntimeException(t.toString()));
                     }
                 }
             }
@@ -396,7 +396,7 @@ public class URLImage extends EncodedImage {
                                 if(exceptionHandler != null) {
                                     exceptionHandler.onError(URLImage.this, ex);
                                 } else {
-                                    throw new RuntimeException(ex.toString());
+                                    Log.e(new RuntimeException(ex.toString()));
                                 }
                             }
                         }
@@ -405,7 +405,7 @@ public class URLImage extends EncodedImage {
                     if(exceptionHandler != null) {
                         exceptionHandler.onError(URLImage.this, t);
                     } else {
-                        throw new RuntimeException(t.toString());
+                        Log.e(new RuntimeException(t.toString()));
                     }
                 }
             }
@@ -431,7 +431,7 @@ public class URLImage extends EncodedImage {
                                 if(exceptionHandler != null) {
                                     exceptionHandler.onError(URLImage.this, ex);
                                 } else {
-                                    throw new RuntimeException(ex.toString());
+                                    Log.e(new RuntimeException(ex.toString()));
                                 }
                             }
                         }
@@ -440,7 +440,7 @@ public class URLImage extends EncodedImage {
                     if(exceptionHandler != null) {
                         exceptionHandler.onError(URLImage.this, t);
                     } else {
-                        throw new RuntimeException(t.toString());
+                        Log.e(new RuntimeException(t.toString()));
                     }
                 }
             }
@@ -465,7 +465,7 @@ public class URLImage extends EncodedImage {
                                 if(exceptionHandler != null) {
                                     exceptionHandler.onError(URLImage.this, ex);
                                 } else {
-                                    throw new RuntimeException(ex.toString());
+                                    Log.e(new RuntimeException(ex.toString()));
                                 }
                             }
                         }
@@ -474,7 +474,7 @@ public class URLImage extends EncodedImage {
                     if(exceptionHandler != null) {
                         exceptionHandler.onError(URLImage.this, t);
                     } else {
-                        throw new RuntimeException(t.toString());
+                        Log.e(new RuntimeException(t.toString()));
                     }
                 }
             }
