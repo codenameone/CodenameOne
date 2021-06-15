@@ -2702,6 +2702,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
             if (u == null && intent.getExtras() != null) {
@@ -2772,9 +2773,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return encodedPath;
                     }
                     */
-                    setAppArg(u.toString());
-                    return u.toString();
+                    if (sharedText != null) {
+                        setAppArg(sharedText);
+                        return sharedText;
+                    } else {
+                        setAppArg(u.toString());
+                        return u.toString();
+                    }
+
                 }
+            } else if (sharedText != null) {
+                setAppArg(sharedText);
+                return sharedText;
             }
         }
         return null;
