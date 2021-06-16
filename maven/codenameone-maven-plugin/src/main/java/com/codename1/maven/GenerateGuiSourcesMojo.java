@@ -157,6 +157,8 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
     }
 
     private void generateRADViewClass(File xmlViewFile) throws IOException {
+        parentEntityViewClass = "AbstractEntityView";
+        viewModelType = "Entity";
         getLog().debug("Generating RAD View for XML template "+xmlViewFile);
         StringBuilder sb = new StringBuilder();
 

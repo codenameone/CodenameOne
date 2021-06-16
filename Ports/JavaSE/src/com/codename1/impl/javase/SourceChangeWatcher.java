@@ -238,6 +238,8 @@ public class SourceChangeWatcher implements Runnable {
 
     private void generateRADViewClass(File xmlViewFile) throws IOException {
         //getLog().debug("Generating RAD View for XML template "+xmlViewFile);
+        parentEntityViewClass = "AbstractEntityView";
+        viewModelType = "Entity" ;
         StringBuilder sb = new StringBuilder();
 
         String packageName = getPackageForRADView(xmlViewFile);
