@@ -39,6 +39,16 @@ public class PropertyBase<T, K> {
     private static PropertyChangeListener lastChangeListener;
 
     /**
+     * Used internally to detect if a property was read by a user
+     */
+    static PropertyChangeListener onGlobalGetProperty;
+
+    /**
+     * Used internally to detect if a property was modified by a user
+     */
+    static PropertyChangeListener onGlobalSetProperty;
+
+    /**
      * All properties must have a name
      * @param name the name of the property
      */
@@ -55,8 +65,45 @@ public class PropertyBase<T, K> {
         return listeners;
     }
 
-    
-    
+    void internalGet() {
+        if(onGlobalGetProperty != null) {
+            onGlobalGetProperty.propertyChanged(this);
+        }
+    }
+
+    void internalSet() {
+        if(onGlobalSetProperty != null) {
+            onGlobalSetProperty.propertyChanged(this);
+        }
+    }
+
+
+    /**
+     * Binds an event callback for set calls and property mutation
+     * @param listener will be invoked whenever any mutable property is changed
+     * @throws RuntimeException if a set listener is already bound, there can be only one per application
+     * @deprecated Usage of this method isn't recommended, it's designed for internal use
+     */
+    public static void bindGlobalSetListener(PropertyChangeListener listener) {
+        if (onGlobalSetProperty != null) {
+            throw new RuntimeException("Set Listener already bound");
+        }
+        onGlobalSetProperty = listener;
+    }
+
+    /**
+     * Binds an event callback for get calls and property reads
+     * @param listener will be invoked whenever any property is read
+     * @throws RuntimeException if a get listener is already bound, there can be only one per application
+     * @deprecated Usage of this method isn't recommended, it's designed for internal use
+     */
+    public static void bindGlobalGetListener(PropertyChangeListener listener) {
+        if (onGlobalGetProperty != null) {
+            throw new RuntimeException("Get Listener already bound");
+        }
+        onGlobalGetProperty = listener;
+    }
+
     /**
      * All properties must have a name, a generic type is helpful
      * @param name the name of the property
