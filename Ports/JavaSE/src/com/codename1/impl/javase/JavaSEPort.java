@@ -3170,8 +3170,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
             List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
-            final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
-            final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+            //final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+            //final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
             ButtonGroup hotReloadGroup = new ButtonGroup();
             JRadioButtonMenuItem disableHotReload = new JRadioButtonMenuItem("Disabled");
             disableHotReload.addActionListener(new ActionListener() {
@@ -3187,15 +3187,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     System.setProperty("hotReload", "1");
                 }
             });
-            JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Experimental)");
-            if (isDebug && usingHotswapAgent) {
-                reloadCurrentForm.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        pref.putInt("hotReload", 2);
-                        System.setProperty("hotReload", "2");
-                    }
-                });
-            }
+            JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Requires CodeRAD)");
+
+            reloadCurrentForm.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 2);
+                    System.setProperty("hotReload", "2");
+                }
+            });
+
             switch (pref.getInt("hotReload", 0)) {
                 case 0:
                     disableHotReload.setSelected(true);
@@ -3206,13 +3206,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     System.setProperty("hotReload", "1");
                     break;
                 case 2:
-                    if (isDebug && usingHotswapAgent) {
-                        reloadCurrentForm.setSelected(true);
-                        System.setProperty("hotReload", "2");
-                    } else {
-                        reloadSimulator.setSelected(true);
-                        System.setProperty("hotReload", "1");
-                    }
+                    reloadCurrentForm.setSelected(true);
+                    System.setProperty("hotReload", "2");
                     break;
 
             }
@@ -3220,9 +3215,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             JMenu hotReloadMenu = new JMenu("Hot Reload");
             hotReloadMenu.add(disableHotReload);
             hotReloadMenu.add(reloadSimulator);
-            if (isDebug && usingHotswapAgent) {
-                hotReloadMenu.add(reloadCurrentForm);
-            }
+            hotReloadMenu.add(reloadCurrentForm);
 
             if (System.getProperty("maven.home") != null) {
                 toolsMenu.add(hotReloadMenu);

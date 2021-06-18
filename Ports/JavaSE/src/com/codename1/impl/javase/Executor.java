@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.components.ToastBar;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -34,12 +35,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 import java.util.List;
 import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
@@ -311,6 +311,46 @@ public class Executor {
                                     } catch (Exception err) {
                                         err.printStackTrace();
                                         System.exit(1);
+                                    }
+
+                                    String reloadForm = System.getProperty("rad.reload.form");
+                                    if (reloadForm != null) {
+                                        System.clearProperty("rad.reload.form");
+                                        try {
+                                            Class formControllerClass = Class.forName(reloadForm);
+                                            Class applicationController = Class.forName("com.codename1.rad.controllers.ApplicationController");
+
+                                            Field applicationControllerInstanceField = applicationController.getField("instance");
+                                            Object applicationControllerInstance = applicationControllerInstanceField.get(null);
+                                            if (applicationControllerInstance != null) {
+                                                Class controllerClass = Class.forName("com.codename1.rad.controllers.Controller");
+                                                Constructor formControllerConstructor = formControllerClass.getConstructor(new Class[]{controllerClass});
+                                                Object formControllerInstance = formControllerConstructor.newInstance(applicationControllerInstance);
+
+                                                Method show = formControllerClass.getMethod("show");
+                                                show.invoke(formControllerInstance);
+
+                                                Timer timer = new Timer();
+                                                TimerTask timerTask = new TimerTask() {
+
+                                                    @Override
+                                                    public void run() {
+                                                        Display.getInstance().callSerially(new Runnable() {
+
+                                                            @Override
+                                                            public void run() {
+                                                                ToastBar.showInfoMessage("Hot Reload 'Reload Current Form' mode is active. Disable this in the Tools > Hot Reload menu.");
+                                                            }
+                                                        });
+                                                    }
+                                                };
+
+                                                timer.schedule(timerTask, 1500);
+
+                                            }
+                                        } catch (Exception ex) {
+                                            ex.printStackTrace();
+                                        }
                                     }
                                 }
                             });

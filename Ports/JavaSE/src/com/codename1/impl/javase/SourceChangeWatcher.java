@@ -409,13 +409,14 @@ public class SourceChangeWatcher implements Runnable {
         if (result != 0) {
             return false;
         }
-        if (hotReloadSetting == 2) {
-
+        System.clearProperty("rad.reload.form");
+        if (hotReloadSetting == 2 && usingHotswapAgent && isDebug) {
+            // Using hotswap agent.  Try actual hot reload
 
             /// Sleep for a secont to allow the classloader to pick up the new classes.
 
             int startingVersion = Integer.parseInt(System.getProperty("hotswap-agent-classes-version", "-1"));
-            System.out.println("Waiting for version to change from "+startingVersion);
+            System.out.println("Waiting for version to change from " + startingVersion);
             if (startingVersion < 0) {
                 try {
                     Thread.sleep(2000);
@@ -443,7 +444,7 @@ public class SourceChangeWatcher implements Runnable {
                             Class cls = Class.forName("com.codename1.rad.controllers.FormController");
                             Method method = cls.getMethod("tryCloneAndReplaceCurrentForm", new Class[0]);
 
-                            Boolean result = (Boolean)method.invoke(cls, new Object[0]);
+                            Boolean result = (Boolean) method.invoke(cls, new Object[0]);
                             if (!result) {
                                 CN.restoreToBookmark();
                             }
@@ -456,6 +457,16 @@ public class SourceChangeWatcher implements Runnable {
                 }
             });
             return true;
+        } else if (hotReloadSetting == 2) {
+            // Not using hotswap agent, but the option is selected to refresh current form.
+            stopped = true;
+            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            JavaSEPort.instance.deinitializeSync();
+            win.dispose();
+            registerCurrentFormForReload();
+            System.setProperty("reload.simulator", "true");
+            return true;
+
         } else if (hotReloadSetting == 1) {
             stopped = true;
             Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
@@ -524,6 +535,21 @@ public class SourceChangeWatcher implements Runnable {
 
 
     }
+
+    private void registerCurrentFormForReload() {
+        try {
+            Class formController = getClass().getClassLoader().loadClass("com.codename1.rad.controllers.FormController");
+            if (formController != null) {
+                Method getCurrentFormController = formController.getMethod("getCurrentFormController", new Class[0]);
+                Object currentFormController = getCurrentFormController.invoke(null, new Object[0]);
+                if (currentFormController != null) {
+                    System.setProperty("rad.reload.form", currentFormController.getClass().getName());
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
     
     private boolean recompileWithMaven(Path path) throws IOException, InterruptedException {
         int hotReloadSetting = Integer.parseInt(System.getProperty("hotReload", "0"));
@@ -580,13 +606,14 @@ public class SourceChangeWatcher implements Runnable {
         if (result != 0) {
             return false;
         }
-        if (hotReloadSetting == 2) {
+        System.clearProperty("rad.reload.form");
+        if (hotReloadSetting == 2 && isDebug && usingHotswapAgent) {
 
 
             /// Sleep for a secont to allow the classloader to pick up the new classes.
 
             int startingVersion = Integer.parseInt(System.getProperty("hotswap-agent-classes-version", "-1"));
-            System.out.println("Waiting for version to change from "+startingVersion);
+            System.out.println("Waiting for version to change from " + startingVersion);
             if (startingVersion < 0) {
                 try {
                     Thread.sleep(2000);
@@ -614,8 +641,20 @@ public class SourceChangeWatcher implements Runnable {
                 }
             });
             return true;
+        } else if (hotReloadSetting == 2) {
+            stopped = true;
+            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            JavaSEPort.instance.deinitializeSync();
+            win.dispose();
+            registerCurrentFormForReload();
+            System.setProperty("reload.simulator", "true");
+            return true;
+
         } else if (hotReloadSetting == 1) {
             stopped = true;
+            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            JavaSEPort.instance.deinitializeSync();
+            win.dispose();
             System.setProperty("reload.simulator", "true");
             return true;
         }
@@ -744,6 +783,11 @@ public class SourceChangeWatcher implements Runnable {
                             if (isRADView(changedFile.toPath()) || isEligibleJavaFile) {
                                 fileToRecompile = changedFile.toPath();
                             }
+                            if (changedFile.isDirectory()) {
+                                if (!watchDirectories.contains(changedFile)) {
+                                    addWatchFolder(changedFile);
+                                }
+                            }
                         }
                     });
                     if (requiresRecompile) {
@@ -785,9 +829,13 @@ public class SourceChangeWatcher implements Runnable {
         } catch (Exception ex){}
         
     }
-    
+
+
+    private boolean isDebug, usingHotswapAgent;
     public SourceChangeWatcher() {
-     
+        List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+        isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+        usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
     }
     
     public void addWatchFolder(File path) {
