@@ -158,6 +158,11 @@ public class ProjectTemplate {
                     String replacement = "import ${packageName}.";
                     contents = contents.replace(pattern, replacement);
                 }
+                {
+                    String pattern = "=\"" + packageName + ".";
+                    String replacement = "=\"${packageName}.";
+                    contents = contents.replace(pattern, replacement);
+                }
 
             }
             if (!contents.equals(origContents)) {
