@@ -12,6 +12,8 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.shared.invoker.*;
 
+import javax.swing.*;
+import java.awt.*;
 import java.io.*;
 import java.util.Collections;
 import java.util.Properties;
@@ -25,15 +27,17 @@ import static com.codename1.maven.PathUtil.path;
 @Mojo(name = "clone")
 public class CloneProjectMojo extends AbstractCN1Mojo {
 
-    @Parameter(property="artifactId", required = true)
+    @Parameter(property="artifactId", required = false, defaultValue = "")
     private String artifactId;
 
-    @Parameter(property="groupId", required = true)
+    @Parameter(property="groupId", required = false, defaultValue = "")
     private String groupId;
 
     @Parameter(property="version", defaultValue = "1.0-SNAPSHOT")
     private String version;
 
+    @Parameter(property="gui", defaultValue = "false")
+    private boolean gui;
 
 
     private String artifactIdToMainName(String artifactId) {
@@ -56,11 +60,70 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
         return sb.toString();
     }
 
+    private boolean showGUIPrompt() {
+
+        if (!EventQueue.isDispatchThread()) {
+            try {
+                final boolean[] result = new boolean[1];
+                EventQueue.invokeAndWait(() -> {
+                    result[0] = showGUIPrompt();
+                });
+                return result[0];
+            } catch (Exception ex) {
+                return false;
+            }
+        }
+
+        JTextField tfArtifactId = new JTextField();
+        JTextField tfGroupId = new JTextField();
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        tfArtifactId.setText(artifactId);
+        if (artifactId == null || artifactId.isEmpty()) {
+            tfArtifactId.setText(project.getParent().getArtifactId());
+        }
+        tfArtifactId.setToolTipText("Enter artifact ID for cloned project");
+        tfArtifactId.setColumns(30);
+        tfGroupId.setText(groupId);
+        if (groupId == null || groupId.isEmpty()) {
+            tfGroupId.setText(project.getGroupId());
+        }
+        tfGroupId.setColumns(30);
+        tfGroupId.setToolTipText("Enter Group ID for cloned project");
+
+        panel.add(new JLabel("Group ID: "));
+        panel.add(tfGroupId);
+        panel.add(new JLabel("Artifact ID:"));
+        panel.add(tfArtifactId);
+
+        int result = JOptionPane.showOptionDialog(null, panel, "Enter New Project Details", JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE, null, null, null);
+        if (result == JOptionPane.OK_OPTION) {
+            artifactId = tfArtifactId.getText();
+            groupId = tfGroupId.getText();
+            return true;
+        }
+
+        return false;
+
+    }
+
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
 
         if (!isCN1ProjectDir()) return;
+
+        if (gui) {
+            showGUIPrompt();
+        }
+
+        if (artifactId == null || artifactId.isEmpty()) {
+            throw new MojoFailureException("artifactId is a required parameter.");
+        }
+
+        if (groupId == null || groupId.isEmpty()) {
+            throw new MojoFailureException("groupId is a required parameter.");
+        }
 
         File generateAppProjectProps = new File(getCN1ProjectDir().getParentFile(), "generate-app-project.rpf");
 
