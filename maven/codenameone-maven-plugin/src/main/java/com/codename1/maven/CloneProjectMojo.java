@@ -39,6 +39,8 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
     @Parameter(property="gui", defaultValue = "false")
     private boolean gui;
 
+    @Parameter(property="destination", defaultValue = "${project.build.directory}/generated-sources/cn1-cloned-projects")
+    private File destination;
 
     private String artifactIdToMainName(String artifactId) {
         StringBuilder sb = new StringBuilder();
@@ -58,6 +60,15 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
             }
         }
         return sb.toString();
+    }
+
+    private JPanel wrapLeft(Component cmp) {
+        JPanel panel = new JPanel();
+        FlowLayout layout = new FlowLayout();
+        layout.setAlignment(FlowLayout.LEFT);
+        panel.setLayout(layout);
+        panel.add(cmp);
+        return panel;
     }
 
     private boolean showGUIPrompt() {
@@ -91,15 +102,43 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
         tfGroupId.setColumns(30);
         tfGroupId.setToolTipText("Enter Group ID for cloned project");
 
-        panel.add(new JLabel("Group ID: "));
+        panel.add(wrapLeft(new JLabel("Group ID: ", SwingConstants.LEFT)));
         panel.add(tfGroupId);
-        panel.add(new JLabel("Artifact ID:"));
+        panel.add(wrapLeft(new JLabel("Artifact ID:", SwingConstants.LEFT)));
         panel.add(tfArtifactId);
+
+        JTextField tfDestination = new JTextField();
+        tfDestination.setColumns(30);
+        if (destination != null) {
+            tfDestination.setText(destination.getAbsolutePath());
+        }
+        panel.add(wrapLeft(new JLabel("Destination:", SwingConstants.LEFT)));
+
+        JButton browse = new JButton("Browse...");
+        browse.addActionListener(evt->{
+            JFileChooser chooser = new JFileChooser();
+            if (destination != null) chooser.setCurrentDirectory(destination);
+            chooser.setDialogTitle("Select Destination Directory");
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            int result = chooser.showOpenDialog(SwingUtilities.getWindowAncestor(browse));
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = chooser.getSelectedFile();
+                if (selectedFile != null && selectedFile.isDirectory()) {
+                    tfDestination.setText(selectedFile.getAbsolutePath());
+                }
+            }
+        });
+        JPanel destinationPanel = new JPanel();
+        destinationPanel.setLayout(new BorderLayout());
+        destinationPanel.add(tfDestination, BorderLayout.CENTER);
+        destinationPanel.add(browse, BorderLayout.EAST);
+        panel.add(destinationPanel);
 
         int result = JOptionPane.showOptionDialog(null, panel, "Enter New Project Details", JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE, null, null, null);
         if (result == JOptionPane.OK_OPTION) {
             artifactId = tfArtifactId.getText();
             groupId = tfGroupId.getText();
+            destination = new File(tfDestination.getText());
             return true;
         }
 
@@ -171,7 +210,7 @@ public class CloneProjectMojo extends AbstractCN1Mojo {
 
         String mainName = artifactIdToMainName(artifactId);
 
-        File outputDirectory = new File(path(project.getBuild().getDirectory(), "generated-sources", "cn1-cloned-projects"));
+        File outputDirectory = destination;//new File(path(project.getBuild().getDirectory(), "generated-sources", "cn1-cloned-projects"));
         outputDirectory.mkdirs();
         InvocationRequest request = new DefaultInvocationRequest();
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
