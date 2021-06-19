@@ -396,6 +396,7 @@ public class SourceChangeWatcher implements Runnable {
                 "-cp" , classPath.toString(),
                 "-d", classDestination.getAbsolutePath(),
                 "-source", "1.8",
+                "-target", "1.8",
                 "-encoding", "utf-8",
                 "-s", generatedSources.getAbsolutePath(),
                 "-sourcepath", sourcePath.getAbsolutePath(),
@@ -409,7 +410,7 @@ public class SourceChangeWatcher implements Runnable {
         if (result != 0) {
             return false;
         }
-        System.clearProperty("rad.reload.form");
+        System.clearProperty("rad.reloadrad.reload.form");
         if (hotReloadSetting == 2 && usingHotswapAgent && isDebug) {
             // Using hotswap agent.  Try actual hot reload
 
