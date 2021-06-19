@@ -84,6 +84,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @return the property value
      */
     public T2 get(T1 key) {
+        internalGet();
         return value.get(key);
     }
     
@@ -92,6 +93,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @return the number of elements
      */
     public int size() {
+        internalGet();
         return value.size();
     }
     
@@ -103,6 +105,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
     public K set(T1 key, T2 v) {
         value.put(key, v);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
 
@@ -122,6 +125,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      */
     public K remove(T1 key) {
         value.remove(key);
+        internalSet();
         return (K)parent.parent;
     }
     
@@ -153,6 +157,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @return an iterator
      */
     public Iterator<Map.Entry<T1, T2>> iterator() {
+        internalGet();
         return value.entrySet().iterator();
     }
     
@@ -177,6 +182,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @return a map
      */
     public Map<T1, T2> asMap() {
+        internalGet();
         return new LinkedHashMap<T1, T2>(value);
     }
 
@@ -195,6 +201,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
                 m.put(k, v);
             }
         }
+        internalGet();
         return m;
     }
     
@@ -206,7 +213,8 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
     public K setMap(Map<T1, T2> t) {
         value.clear();
         value.putAll(t);
-        firePropertyChanged();        
+        firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     } 
     
@@ -214,6 +222,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * Remove all the elements from the map
      */
     public void clear() {
+        internalSet();
         value.clear();
     }
 }
