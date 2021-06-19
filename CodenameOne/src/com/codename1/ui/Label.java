@@ -346,6 +346,28 @@ public class Label extends Component implements IconHolder, TextHolder {
         this.font = font;
         fontIcon = c;
     }
+
+    /**
+     * Sets an icon font using either the same icon font that was used to set the icon font last, or using the font
+     * from the icon UIID.
+     *
+     * @param c The character to render in the font.
+     * @since 8.0
+     */
+    public void setFontIcon(char c) {
+        Component iconStyle = getIconStyleComponent();
+        if (this.font == null) {
+            if (iconStyle == null) {
+                throw new IllegalStateException("Cannot set FontIcon without an IconStyleComponent set first.");
+            }
+            Font font = iconStyle.getStyle().getFont();
+            if (font == null) {
+                throw new IllegalStateException("Cannot set FontIcon without an IconStyleComponent with a fond set first.");
+            }
+            this.font = font;
+        }
+        setFontIcon(this.font, c);
+    }
     
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
