@@ -31,6 +31,7 @@ import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.Resources;
 import com.codename1.util.EasyThread;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.OnComplete;
@@ -378,17 +379,29 @@ public class URLImage extends EncodedImage {
         });
     }
 
-    private void loadImageFromFileURLToStorage(final String targetKey) {
+    private void loadImageFromLocalUrl(final String targetKey, final boolean useFileSystemStorage) {
         imageLoader.run(new Runnable() {
             public void run() {
                 try {
-                    InputStream input = FileSystemStorage.getInstance().openInputStream(url);
-                    OutputStream output = Storage.getInstance().createOutputStream(targetKey);
-                    Util.copy(input, output);
+                    InputStream input;
+                    if (url.startsWith("file:/")) {
+                        input = FileSystemStorage.getInstance().openInputStream(url);
+                    } else if (url.startsWith("jar:/")) {
+                        input = CN.getResourceAsStream(url.substring(url.lastIndexOf("/")));
+                    } else if (url.startsWith("image:")) {
+                        input = null;
+                    } else {
+                        input = Storage.getInstance().createInputStream(url);
+                    }
+                    if (input != null) {
+                        OutputStream output = useFileSystemStorage ? FileSystemStorage.getInstance().openOutputStream(targetKey) : Storage.getInstance().createOutputStream(targetKey);
+                        Util.copy(input, output);
+                    }
                     runAndWait(new Runnable() {
                         public void run() {
                             try {
-                                Image value = Image.createImage(Storage.getInstance().createInputStream(targetKey));
+                                Image value = url.startsWith("image:") ? Resources.getGlobalResources().getImage(url) :
+                                        Image.createImage(useFileSystemStorage ? FileSystemStorage.getInstance().openInputStream(targetKey) : Storage.getInstance().createInputStream(targetKey));
                                 DownloadCompleted onComplete = new DownloadCompleted();
                                 onComplete.setSourceImage(value);
                                 onComplete.actionPerformed(new ActionEvent(value));
@@ -412,74 +425,9 @@ public class URLImage extends EncodedImage {
         });
     }
 
-    private void loadImageFromStorageURLToFileSystem(final String targetFile) {
-        imageLoader.run(new Runnable() {
-            public void run() {
-                try {
 
-                    InputStream input = Storage.getInstance().createInputStream(url);
-                    OutputStream output = FileSystemStorage.getInstance().openOutputStream(targetFile);
-                    Util.copy(input, output);
-                    runAndWait(new Runnable() {
-                        public void run() {
-                            try {
-                                Image value = Image.createImage(FileSystemStorage.getInstance().openInputStream(targetFile));
-                                DownloadCompleted onComplete = new DownloadCompleted();
-                                onComplete.setSourceImage(value);
-                                onComplete.actionPerformed(new ActionEvent(value));
-                            } catch (Exception ex) {
-                                if(exceptionHandler != null) {
-                                    exceptionHandler.onError(URLImage.this, ex);
-                                } else {
-                                    Log.e(new RuntimeException(ex.toString()));
-                                }
-                            }
-                        }
-                    });
-                } catch (Exception t) {
-                    if(exceptionHandler != null) {
-                        exceptionHandler.onError(URLImage.this, t);
-                    } else {
-                        Log.e(new RuntimeException(t.toString()));
-                    }
-                }
-            }
-        });
-    }
 
-    private void loadImageFromFileURLToFileSystem(final String targetFile) {
-        imageLoader.run(new Runnable() {
-            public void run() {
-                try {
-                    InputStream input = FileSystemStorage.getInstance().openInputStream(url);
-                    OutputStream output = FileSystemStorage.getInstance().openOutputStream(targetFile);
-                    Util.copy(input, output);
-                    runAndWait(new Runnable() {
-                        public void run() {
-                            try {
-                                Image value = Image.createImage(FileSystemStorage.getInstance().openInputStream(targetFile));
-                                DownloadCompleted onComplete = new DownloadCompleted();
-                                onComplete.setSourceImage(value);
-                                onComplete.actionPerformed(new ActionEvent(value));
-                            } catch (Exception ex) {
-                                if(exceptionHandler != null) {
-                                    exceptionHandler.onError(URLImage.this, ex);
-                                } else {
-                                    Log.e(new RuntimeException(ex.toString()));
-                                }
-                            }
-                        }
-                    });
-                } catch (Exception t) {
-                    if(exceptionHandler != null) {
-                        exceptionHandler.onError(URLImage.this, t);
-                    } else {
-                        Log.e(new RuntimeException(t.toString()));
-                    }
-                }
-            }
-        });
-    }
+
 
     /**
      * Images are normally fetched from storage or network only as needed,
@@ -528,11 +476,9 @@ public class URLImage extends EncodedImage {
                                     }
 
                                 });
-                    } else if (url.startsWith("file:/")) {
-                        // from file
-                        loadImageFromFileURLToStorage(storageFile + IMAGE_SUFFIX);
                     } else {
-                        loadImageFromStorageURLToStorage(storageFile + IMAGE_SUFFIX);
+                        // from file
+                        loadImageFromLocalUrl(storageFile + IMAGE_SUFFIX, false);
                     }
                 } else {
                     if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -555,13 +501,9 @@ public class URLImage extends EncodedImage {
 
                                     }
                                 });
-                    } else if (url.startsWith("file:/")) {
-                        //load image from file system
-                        loadImageFromFileURLToStorage(storageFile);
                     } else {
-                        // load image from storage
-                        loadImageFromStorageURLToStorage(storageFile);
-
+                        //load image from file system
+                        loadImageFromLocalUrl(storageFile, false);
                     }
                 }
             } else {
@@ -599,13 +541,9 @@ public class URLImage extends EncodedImage {
                                     }
 
                                 });
-                    } else if (url.startsWith("file:/")) {
+                    } else  {
                         // load image from file system
-                        loadImageFromFileURLToFileSystem(fileSystemFile + IMAGE_SUFFIX);
-                    } else {
-                        // load image from storage
-                        loadImageFromStorageURLToFileSystem(fileSystemFile + IMAGE_SUFFIX);
-
+                        loadImageFromLocalUrl(fileSystemFile + IMAGE_SUFFIX, true);
                     }
                 } else {
                     if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -629,10 +567,8 @@ public class URLImage extends EncodedImage {
                                     }
 
                                 });
-                    } else if (url.startsWith("file:")) {
-                        loadImageFromFileURLToFileSystem(fileSystemFile);
                     } else {
-                        loadImageFromStorageURLToFileSystem(fileSystemFile);
+                        loadImageFromLocalUrl(fileSystemFile, true);
                     }
                 }
             }
