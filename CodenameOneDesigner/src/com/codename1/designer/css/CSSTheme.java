@@ -1385,7 +1385,6 @@ public class CSSTheme {
             
             out.put(id, el.getChecksum());
         }
-        out.put("#Constants", constants.toString());
        
         return out;
     }
@@ -1764,11 +1763,10 @@ public class CSSTheme {
             }
             
         }
-        
+
         for (String constantKey : constants.keySet()) {
             try {
                 LexicalUnit lu = constants.get(constantKey);
-
                 if (lu.getLexicalUnitType() == LexicalUnit.SAC_STRING_VALUE || lu.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
                     if (constantKey.endsWith("Image")) {
                         // We have an image

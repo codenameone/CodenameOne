@@ -189,8 +189,17 @@ public class Executor {
         
         setProxySettings();
         if (CSSWatcher.isSupported()) {
-            CSSWatcher cssWatcher = new CSSWatcher();
-            cssWatcher.start();
+            // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
+            Timer t = new Timer();
+            TimerTask tt = new TimerTask() {
+                @Override
+                public void run() {
+                    CSSWatcher cssWatcher = new CSSWatcher();
+                    cssWatcher.start();
+                }
+            };
+            t.schedule(tt, 2000);
+
         }
         
         final Properties p = new Properties();
