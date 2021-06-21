@@ -1325,19 +1325,44 @@ public class Resources {
             
         }
         Map<String,MediaRule> mediaRules = new HashMap<String,MediaRule>();
+        int defaultFontSizeSetPriority = 0;
         for(int iter = 0 ; iter < size ; iter++) {
             String key = input.readUTF();
             if(key.startsWith("@")) {
                 theme.put(key, input.readUTF());
                 if (enableMediaQueries) {
                     if (key.endsWith("-font-scale")) {
-                        if (fontScaleRules ==null) {
-                            fontScaleRules = new LinkedHashMap<String,Float>();
+                        if (fontScaleRules == null) {
+                            fontScaleRules = new LinkedHashMap<String, Float>();
                         }
-                        fontScaleRules.put(key, Float.parseFloat((String)theme.get(key)));
+                        fontScaleRules.put(key, Float.parseFloat((String) theme.get(key)));
                     }
                 }
-                continue;
+                if (key.equals("@defaultFontSizeInt") && defaultFontSizeSetPriority < 1) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 / (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 1;
+                    }
+                }
+                if (CN.isTablet() && key.equals("@defaultTabletFontSizeInt") && defaultFontSizeSetPriority < 2) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 /  (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 2;
+                    }
+                }
+                if (CN.isDesktop() && key.equals("@defaultDesktopFontSizeInt") && defaultFontSizeSetPriority < 3) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 /  (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 3;
+                    }
+                }
+               continue;
             }
             if (enableMediaQueries) {
                 String subkey = key;

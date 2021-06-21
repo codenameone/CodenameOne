@@ -1385,6 +1385,7 @@ public class CSSTheme {
             
             out.put(id, el.getChecksum());
         }
+        out.put("#Constants", constants.toString());
        
         return out;
     }

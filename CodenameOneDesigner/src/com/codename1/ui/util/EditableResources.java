@@ -1947,7 +1947,9 @@ public class EditableResources extends Resources implements TreeModel {
         theme.remove("name");
         
         output.writeShort(theme.size());
-        for(Object currentKey : theme.keySet()) {
+        ArrayList<String> setOfKeys = new ArrayList<String>(theme.keySet());
+        Collections.sort(setOfKeys);
+        for(Object currentKey : setOfKeys) {
             String key = (String)currentKey;
             output.writeUTF(key);
 
