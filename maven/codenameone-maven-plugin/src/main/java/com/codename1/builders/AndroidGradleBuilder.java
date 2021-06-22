@@ -455,7 +455,15 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        if (maxPlatformVersionInt == 0) {
+            maxPlatformVersionInt = 30;
+            maxPlatformVersion = "30";
+        }
 
+        if (maxBuildToolsVersionInt == 0) {
+            maxBuildToolsVersionInt = 30;
+            maxBuildToolsVersion = "30";
+        }
 
 
 
