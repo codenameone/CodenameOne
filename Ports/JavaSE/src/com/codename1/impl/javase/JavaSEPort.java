@@ -5117,7 +5117,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 this.jcmp = jcmp;
             }
             void repaint(long tm, int x, int y, int width, int height) {
-
+                boolean oldShowEdtWarnings = showEDTWarnings;
+                showEDTWarnings = false;
                 int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
                 int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                 int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
@@ -5148,7 +5149,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     jcmp.setBorder( BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight));
                 }
 
-
+                showEDTWarnings = oldShowEdtWarnings;
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         cmp.repaint();
