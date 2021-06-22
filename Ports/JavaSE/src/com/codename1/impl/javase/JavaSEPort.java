@@ -8943,12 +8943,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             try {    
                 conn.connect();
                 java.security.cert.Certificate[] certs = conn.getServerCertificates();
-                String[] out = new String[certs.length];
+                String[] out = new String[certs.length*2];
                 int i=0;
                 for (java.security.cert.Certificate cert : certs) {
-                    MessageDigest md = MessageDigest.getInstance("SHA1");
-                    md.update(cert.getEncoded());
-                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA-256");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA-256:" + dumpHex(md.digest());
+                    }
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA1");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA1:" + dumpHex(md.digest());
+                    }
+
                 }
                 return out;
             } catch (Exception ex) {
