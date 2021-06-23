@@ -3089,7 +3089,7 @@ public class Form extends Container {
 
 
             public boolean filter(Component c) {
-                return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled();
+                return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
             }
             
         }));
