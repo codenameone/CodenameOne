@@ -85,7 +85,7 @@ public class PropertyBase<T, K> {
      * @deprecated Usage of this method isn't recommended, it's designed for internal use
      */
     public static void bindGlobalSetListener(PropertyChangeListener listener) {
-        if (onGlobalSetProperty != null) {
+        if (onGlobalSetProperty != null && listener != null) {
             throw new RuntimeException("Set Listener already bound");
         }
         onGlobalSetProperty = listener;
@@ -98,7 +98,7 @@ public class PropertyBase<T, K> {
      * @deprecated Usage of this method isn't recommended, it's designed for internal use
      */
     public static void bindGlobalGetListener(PropertyChangeListener listener) {
-        if (onGlobalGetProperty != null) {
+        if (onGlobalGetProperty != null && listener != null) {
             throw new RuntimeException("Get Listener already bound");
         }
         onGlobalGetProperty = listener;
