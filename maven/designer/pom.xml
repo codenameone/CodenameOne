@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.29-SNAPSHOT</version>
+        <version>7.0.29</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-designer</artifactId>
-    <version>7.0.29-SNAPSHOT</version>
+    <version>7.0.29</version>
     <packaging>jar</packaging>
     
     <dependencies>
