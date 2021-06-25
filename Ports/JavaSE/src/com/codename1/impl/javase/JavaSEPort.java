@@ -722,6 +722,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
+    protected static boolean fxExists = false;
     private JFrame window;
     private long lastIdleTime;
     private static boolean showEDTWarnings = true;
@@ -3328,10 +3329,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void actionPerformed(ActionEvent ae) {
+                    if(!fxExists){
+                        System.err.println("This simulation requires a JDK with JavaFX");
+                        return;
+                    }
                     if(locSimulation==null) {
                             locSimulation = new LocationSimulation();
                     }
-                    locSimulation.setVisible(true);
+                            locSimulation.setVisible(true);
+                    
                 }
             });
             simulateMenu.add(locactionSim);
