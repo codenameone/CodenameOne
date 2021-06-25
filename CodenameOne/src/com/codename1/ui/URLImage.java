@@ -332,7 +332,13 @@ public class URLImage extends EncodedImage {
 
     private void runAndWait(Runnable r) {
         if (platformSupportsImageLoadingOffEdt()) {
-            r.run();
+            String oldShowEDTWarnings = CN.getProperty("platformHint.showEDTWarnings", "false");
+            CN.setProperty("platformHint.showEDTWarnings", "false");
+            try {
+                r.run();
+            } finally {
+                CN.setProperty("platformHint.showEDTWarnings", oldShowEDTWarnings);
+            }
         } else {
             CN.callSeriallyAndWait(r);
         }

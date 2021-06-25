@@ -623,6 +623,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         return showEDTWarnings;
     }
 
+    @Override
+    public void setPlatformHint(String key, String value) {
+        if (key.equalsIgnoreCase("platformHint.showEDTWarnings")) {
+            setShowEDTWarnings("true".equalsIgnoreCase(value));
+        }
+        super.setPlatformHint(key, value);
+
+    }
+
     /**
      * @param aShowEDTWarnings the showEDTWarnings to set
      */
@@ -8005,6 +8014,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
+        if ("platformHint.showEDTWarnings".equals(key)) {
+            return String.valueOf(showEDTWarnings);
+        }
         if ("simulator.skin".equalsIgnoreCase(key)) {
             return getCurrentSkinName();
         }
