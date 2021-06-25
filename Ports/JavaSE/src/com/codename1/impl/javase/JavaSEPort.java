@@ -3326,18 +3326,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             JMenuItem locactionSim = new JMenuItem("Location Simulation");
             locactionSim.addActionListener(new ActionListener() {
-
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    if(!fxExists){
-                        System.err.println("This simulation requires a JDK with JavaFX");
-                        return;
-                    }
                     if(locSimulation==null) {
                             locSimulation = new LocationSimulation();
                     }
-                            locSimulation.setVisible(true);
-                    
+                    locSimulation.setVisible(true);
                 }
             });
             simulateMenu.add(locactionSim);
