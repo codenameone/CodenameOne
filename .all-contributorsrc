@@ -58,6 +58,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "jsfan3",
+      "name": "Francesco Galgani",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1997316?v=4",
+      "profile": "https://www.informatica-libera.net/",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
