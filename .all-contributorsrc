@@ -139,6 +139,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "shannah",
+      "name": "Steve Hannah",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2677562?v=4",
+      "profile": "http://sjhannah.com",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
