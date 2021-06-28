@@ -121,6 +121,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "Firethunder",
+      "name": "Robert Edelmann",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1608647?v=4",
+      "profile": "https://github.com/Firethunder",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
