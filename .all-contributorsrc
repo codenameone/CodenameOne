@@ -49,6 +49,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "diamondobama",
+      "name": "Diamond",
+      "avatar_url": "https://avatars.githubusercontent.com/u/7268931?v=4",
+      "profile": "https://diamonddevgroup.com",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
