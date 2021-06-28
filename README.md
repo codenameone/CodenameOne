@@ -1,6 +1,6 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -242,6 +242,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tr>
     <td align="center"><a href="https://github.com/beazl-peter"><img src="https://avatars.githubusercontent.com/u/68695557?v=4?s=100" width="100px;" alt=""/><br /><sub><b>beazl-peter</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=beazl-peter" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/liannacasper"><img src="https://avatars.githubusercontent.com/u/67953602?v=4?s=100" width="100px;" alt=""/><br /><sub><b>liannacasper</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=liannacasper" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://github.com/sergeyCodenameOne"><img src="https://avatars.githubusercontent.com/u/69102702?v=4?s=100" width="100px;" alt=""/><br /><sub><b>sergeyCodenameOne</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=sergeyCodenameOne" title="Code">💻</a></td>
   </tr>
 </table>
 
