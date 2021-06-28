@@ -292,6 +292,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "ericleong",
+      "name": "Eric Leong",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1572011?v=4",
+      "profile": "https://ericleong.me",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
