@@ -249,6 +249,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <td align="center"><a href="https://www.informatica-libera.net/"><img src="https://avatars.githubusercontent.com/u/1997316?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Francesco Galgani</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=jsfan3" title="Code">💻</a></td>
   </tr>
   <tr>
+    <td align="center"><a href="https://github.com/kutoman"><img src="https://avatars.githubusercontent.com/u/5825645?v=4?s=100" width="100px;" alt=""/><br /><sub><b>kutoman</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=kutoman" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/ramsestom"><img src="https://avatars.githubusercontent.com/u/636758?v=4?s=100" width="100px;" alt=""/><br /><sub><b>ramsestom</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ramsestom" title="Code">💻</a></td>
   </tr>
 </table>
