@@ -1,6 +1,6 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-33-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-34-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -281,6 +281,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <td align="center"><a href="https://github.com/sannysanoff"><img src="https://avatars.githubusercontent.com/u/952071?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Sanny Sanoff</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=sannysanoff" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/McSym28"><img src="https://avatars.githubusercontent.com/u/8185872?v=4?s=100" width="100px;" alt=""/><br /><sub><b>McSym28</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=McSym28" title="Code">💻</a></td>
     <td align="center"><a href="https://ericleong.me"><img src="https://avatars.githubusercontent.com/u/1572011?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Eric Leong</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ericleong" title="Code">💻</a></td>
+    <td align="center"><a href="http://www.codrut.pro"><img src="https://avatars.githubusercontent.com/u/3746963?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Codruț Constantin Gușoi</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=sdwolfz" title="Code">💻</a></td>
   </tr>
 </table>
 
