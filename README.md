@@ -1,6 +1,6 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-13-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-14-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -255,6 +255,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <td align="center"><a href="https://github.com/DurankGts"><img src="https://avatars.githubusercontent.com/u/16245755?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Durank</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=DurankGts" title="Code">💻</a></td>
     <td align="center"><a href="https://boardspace.net/"><img src="https://avatars.githubusercontent.com/u/5963076?v=4?s=100" width="100px;" alt=""/><br /><sub><b>ddyer0</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ddyer0" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/carlosverdier"><img src="https://avatars.githubusercontent.com/u/14301433?v=4?s=100" width="100px;" alt=""/><br /><sub><b>carlosverdier</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=carlosverdier" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/Firethunder"><img src="https://avatars.githubusercontent.com/u/1608647?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Robert Edelmann</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Firethunder" title="Code">💻</a></td>
   </tr>
 </table>
 
