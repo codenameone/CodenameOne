@@ -1,6 +1,6 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-18-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-19-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -262,6 +262,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <td align="center"><a href="http://sjhannah.com"><img src="https://avatars.githubusercontent.com/u/2677562?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Steve Hannah</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=shannah" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/digappsepp"><img src="https://avatars.githubusercontent.com/u/32707062?v=4?s=100" width="100px;" alt=""/><br /><sub><b>digappsepp</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=digappsepp" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/Pavneet-Sing"><img src="https://avatars.githubusercontent.com/u/11755381?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Pavneet Singh</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Pavneet-Sing" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/vprise"><img src="https://avatars.githubusercontent.com/u/16166226?v=4?s=100" width="100px;" alt=""/><br /><sub><b>vprise</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=vprise" title="Documentation">📖</a></td>
   </tr>
 </table>
 
