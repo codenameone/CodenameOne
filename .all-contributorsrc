@@ -265,6 +265,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "Mat2095",
+      "name": "Matthias Bay",
+      "avatar_url": "https://avatars.githubusercontent.com/u/11258252?v=4",
+      "profile": "https://mat2095.de",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
