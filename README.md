@@ -1,6 +1,6 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-28-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-29-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -274,6 +274,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <td align="center"><a href="https://neptunedreams.com"><img src="https://avatars.githubusercontent.com/u/19262903?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Miguel Muñoz</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=SwingGuy1024" title="Code">💻</a></td>
     <td align="center"><a href="https://ahmedengu.com"><img src="https://avatars.githubusercontent.com/u/2976004?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Ahmed Aboumalwa</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ahmedengu" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/FabioConceicao"><img src="https://avatars.githubusercontent.com/u/13354592?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Fabio</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=FabioConceicao" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="http://forann.eu"><img src="https://avatars.githubusercontent.com/u/12081628?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Piotr</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=PiotrZub" title="Code">💻</a></td>
   </tr>
 </table>
 
