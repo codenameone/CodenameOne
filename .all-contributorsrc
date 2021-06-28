@@ -175,6 +175,15 @@
       "contributions": [
         "doc"
       ]
+    },
+    {
+      "login": "JrmyDev",
+      "name": "JrmyDev",
+      "avatar_url": "https://avatars.githubusercontent.com/u/10810617?v=4",
+      "profile": "https://jrmydev.000webhostapp.com/",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
