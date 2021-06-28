@@ -22,6 +22,15 @@
       "contributions": [
         "doc"
       ]
+    },
+    {
+      "login": "sergeyCodenameOne",
+      "name": "sergeyCodenameOne",
+      "avatar_url": "https://avatars.githubusercontent.com/u/69102702?v=4",
+      "profile": "https://github.com/sergeyCodenameOne",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
