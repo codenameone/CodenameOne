@@ -193,6 +193,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "jaanushansen",
+      "name": "Jaanus Hansen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/11716510?v=4",
+      "profile": "https://github.com/jaanushansen",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
