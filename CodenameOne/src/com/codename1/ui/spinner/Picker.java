@@ -1001,20 +1001,24 @@ public class Picker extends Button {
         
         if (tmpContentPaneMarginUnit != null && f != null) {
             Container contentPane = f.getContentPane();
-            Style style = contentPane.getStyle();
-            style.setMarginUnit(tmpContentPaneMarginUnit);
-            style.setMarginBottom(tmpContentPaneBottomMargin);
-            tmpContentPaneMarginUnit=null;
-            f.revalidate();
-            // If we remove the margin, it sometimes leaves the content pane
-            // in a negative scroll position - which leaves a gap at the top.
-            // Simulating a drag will trigger tensile drag to push the content
-            // back up to the top.
-            // See https://github.com/codenameone/CodenameOne/issues/2476
-            if (f != null && f.getContentPane() != null && f.getContentPane().getScrollY() < 0) {
-                f.getContentPane().pointerPressed(100, 100);
-                f.getContentPane().pointerDragged(100, 100);
-                f.getContentPane().pointerReleased(100, 100);
+            if (f.isFormBottomPaddingEditingMode()) {
+                Style style = contentPane.getStyle();
+                style.setMarginUnit(tmpContentPaneMarginUnit);
+                style.setMarginBottom(tmpContentPaneBottomMargin);
+                tmpContentPaneMarginUnit = null;
+                f.revalidate();
+                // If we remove the margin, it sometimes leaves the content pane
+                // in a negative scroll position - which leaves a gap at the top.
+                // Simulating a drag will trigger tensile drag to push the content
+                // back up to the top.
+                // See https://github.com/codenameone/CodenameOne/issues/2476
+                if (f != null && f.getContentPane() != null && f.getContentPane().getScrollY() < 0) {
+                    f.getContentPane().pointerPressed(100, 100);
+                    f.getContentPane().pointerDragged(100, 100);
+                    f.getContentPane().pointerReleased(100, 100);
+                }
+            } else {
+                f.setOverrideInvisibleAreaUnderVKB(-1);
             }
         }
     }
@@ -1027,28 +1031,32 @@ public class Picker extends Button {
             f.getAnimationManager().flushAnimation(new Runnable() {
                 public void run() {
                     Container contentPane = f.getContentPane();
-                    Style style = contentPane.getStyle();
-                    byte[] marginUnits = style.getMarginUnit();
-                    if (marginUnits == null) {
-                        marginUnits = new byte[]{
-                                Style.UNIT_TYPE_PIXELS,
-                                Style.UNIT_TYPE_PIXELS,
-                                Style.UNIT_TYPE_PIXELS,
-                                Style.UNIT_TYPE_PIXELS
-                        };
+                    if (f.isFormBottomPaddingEditingMode()) {
+
+                        Style style = contentPane.getStyle();
+                        byte[] marginUnits = style.getMarginUnit();
+                        if (marginUnits == null) {
+                            marginUnits = new byte[]{
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS
+                            };
+                        }
+                        if (tmpContentPaneMarginUnit == null) {
+                            tmpContentPaneMarginUnit = new byte[4];
+                            System.arraycopy(marginUnits, 0, tmpContentPaneMarginUnit, 0, 4);
+                            tmpContentPaneBottomMargin = style.getMarginBottom();
+                        }
+
+
+                        marginUnits[Component.BOTTOM] = Style.UNIT_TYPE_PIXELS;
+                        style.setMarginUnit(marginUnits);
+                        style.setMarginBottom(Math.max(0, contentPane.getHeight() - top));
+                        f.revalidate();
+                    } else {
+                        f.setOverrideInvisibleAreaUnderVKB(Math.max(0, contentPane.getHeight() - top));
                     }
-                    if (tmpContentPaneMarginUnit == null) {
-                        tmpContentPaneMarginUnit = new byte[4];
-                        System.arraycopy(marginUnits, 0, tmpContentPaneMarginUnit, 0, 4);
-                        tmpContentPaneBottomMargin = style.getMarginBottom();
-                    }
-
-
-                    marginUnits[Component.BOTTOM] = Style.UNIT_TYPE_PIXELS;
-                    style.setMarginUnit(marginUnits);
-                    style.setMarginBottom(Math.max(0, contentPane.getHeight() - top));
-                    f.revalidate();
-
                     f.scrollComponentToVisible(Picker.this);
                 }
 
