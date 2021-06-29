@@ -577,6 +577,14 @@ public abstract class Executor {
                                 }
 
                                 @Override
+                                public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                                    scanner.usesClass(owner);
+                                    if (name != null && !name.equals("<init>")) {
+                                        scanner.usesClassMethod(owner, name);
+                                    }
+                                }
+
+                                @Override
                                 public void visitJumpInsn(int i, Label label) {
                                 }
 

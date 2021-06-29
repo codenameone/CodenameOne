@@ -159,6 +159,11 @@ public class ProjectTemplate {
                     contents = contents.replace(pattern, replacement);
                 }
                 {
+                    String pattern = "=\"" + packageName + "." + mainName;
+                    String replacement = "=\"${packageName}.${mainName}";
+                    contents = contents.replace(pattern, replacement);
+                }
+                {
                     String pattern = "=\"" + packageName + ".";
                     String replacement = "=\"${packageName}.";
                     contents = contents.replace(pattern, replacement);

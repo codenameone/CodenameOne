@@ -652,7 +652,7 @@ public class AndroidGradleBuilder extends Executor {
             androidVersion = "android-" + targetSDKVersion;
         }
         targetSDKVersion = " android:targetSdkVersion=\"" + targetSDKVersion + "\" ";
-
+        log("TargetSDKVersion="+targetSDKVersion);
 
 
 
@@ -868,7 +868,6 @@ public class AndroidGradleBuilder extends Executor {
         playFlag = "true";
 
         gpsPermission = request.getArg("android.gpsPermission", "false").equals("true");
-
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
 

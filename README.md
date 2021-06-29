@@ -1,4 +1,7 @@
 <img src="https://www.codenameone.com/img/blog/github-banner-1.jpg"> 
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-34-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
 ## Codename One - Cross Platform Native Apps with Java or Kotlin
@@ -227,3 +230,64 @@ Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port
 We provide support over at [StackOverflow when you tag using codenameone](http://stackoverflow.com/tags/codenameone), you can ask anything there and we try to be pretty responsive. [The StackOverflow link](http://stackoverflow.com/tags/codenameone) also serves as an excellent community driven FAQ since it literally maps user questions to answers.
 
 Codename One has a [discussion group](https://www.codenameone.com/discussion-forum.html) where you can post questions. However, due to the nature of that group we try to limit discussions over the source. The discussion forum is intended for simpler usage and more complex source code hacks/native compilation might create noise there.
+
+## Contributors ✨
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/beazl-peter"><img src="https://avatars.githubusercontent.com/u/68695557?v=4?s=100" width="100px;" alt=""/><br /><sub><b>beazl-peter</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=beazl-peter" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/liannacasper"><img src="https://avatars.githubusercontent.com/u/67953602?v=4?s=100" width="100px;" alt=""/><br /><sub><b>liannacasper</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=liannacasper" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://github.com/sergeyCodenameOne"><img src="https://avatars.githubusercontent.com/u/69102702?v=4?s=100" width="100px;" alt=""/><br /><sub><b>sergeyCodenameOne</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=sergeyCodenameOne" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/ThomasH99"><img src="https://avatars.githubusercontent.com/u/16265939?v=4?s=100" width="100px;" alt=""/><br /><sub><b>ThomasH99</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ThomasH99" title="Code">💻</a></td>
+    <td align="center"><a href="https://www.groupsapp.online"><img src="https://avatars.githubusercontent.com/u/11293898?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Javier Anton</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=javieranton-zz" title="Code">💻</a></td>
+    <td align="center"><a href="https://diamonddevgroup.com"><img src="https://avatars.githubusercontent.com/u/7268931?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Diamond</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=diamondobama" title="Code">💻</a></td>
+    <td align="center"><a href="https://www.informatica-libera.net/"><img src="https://avatars.githubusercontent.com/u/1997316?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Francesco Galgani</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=jsfan3" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/kutoman"><img src="https://avatars.githubusercontent.com/u/5825645?v=4?s=100" width="100px;" alt=""/><br /><sub><b>kutoman</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=kutoman" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/ramsestom"><img src="https://avatars.githubusercontent.com/u/636758?v=4?s=100" width="100px;" alt=""/><br /><sub><b>ramsestom</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ramsestom" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/Maaartinus"><img src="https://avatars.githubusercontent.com/u/2324516?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Maaartinus</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Maaartinus" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/DurankGts"><img src="https://avatars.githubusercontent.com/u/16245755?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Durank</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=DurankGts" title="Code">💻</a></td>
+    <td align="center"><a href="https://boardspace.net/"><img src="https://avatars.githubusercontent.com/u/5963076?v=4?s=100" width="100px;" alt=""/><br /><sub><b>ddyer0</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ddyer0" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/carlosverdier"><img src="https://avatars.githubusercontent.com/u/14301433?v=4?s=100" width="100px;" alt=""/><br /><sub><b>carlosverdier</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=carlosverdier" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/Firethunder"><img src="https://avatars.githubusercontent.com/u/1608647?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Robert Edelmann</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Firethunder" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/Adalbert393"><img src="https://avatars.githubusercontent.com/u/18614910?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Adalbert393</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Adalbert393" title="Code">💻</a></td>
+    <td align="center"><a href="http://sjhannah.com"><img src="https://avatars.githubusercontent.com/u/2677562?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Steve Hannah</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=shannah" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/digappsepp"><img src="https://avatars.githubusercontent.com/u/32707062?v=4?s=100" width="100px;" alt=""/><br /><sub><b>digappsepp</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=digappsepp" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/Pavneet-Sing"><img src="https://avatars.githubusercontent.com/u/11755381?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Pavneet Singh</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Pavneet-Sing" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/vprise"><img src="https://avatars.githubusercontent.com/u/16166226?v=4?s=100" width="100px;" alt=""/><br /><sub><b>vprise</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=vprise" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://jrmydev.000webhostapp.com/"><img src="https://avatars.githubusercontent.com/u/10810617?v=4?s=100" width="100px;" alt=""/><br /><sub><b>JrmyDev</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=JrmyDev" title="Code">💻</a></td>
+    <td align="center"><a href="https://csdesigninc.ca"><img src="https://avatars.githubusercontent.com/u/1958073?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Terry Wilkinson</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=twilkinson" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/jaanushansen"><img src="https://avatars.githubusercontent.com/u/11716510?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Jaanus Hansen</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=jaanushansen" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/jegesh"><img src="https://avatars.githubusercontent.com/u/6535446?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Yaakov Gesher</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=jegesh" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/Munken"><img src="https://avatars.githubusercontent.com/u/773660?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Michael Munch</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Munken" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/saeder"><img src="https://avatars.githubusercontent.com/u/9945131?v=4?s=100" width="100px;" alt=""/><br /><sub><b>saeder</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=saeder" title="Code">💻</a></td>
+    <td align="center"><a href="https://neptunedreams.com"><img src="https://avatars.githubusercontent.com/u/19262903?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Miguel Muñoz</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=SwingGuy1024" title="Code">💻</a></td>
+    <td align="center"><a href="https://ahmedengu.com"><img src="https://avatars.githubusercontent.com/u/2976004?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Ahmed Aboumalwa</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ahmedengu" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/FabioConceicao"><img src="https://avatars.githubusercontent.com/u/13354592?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Fabio</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=FabioConceicao" title="Code">💻</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="http://forann.eu"><img src="https://avatars.githubusercontent.com/u/12081628?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Piotr</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=PiotrZub" title="Code">💻</a></td>
+    <td align="center"><a href="https://mat2095.de"><img src="https://avatars.githubusercontent.com/u/11258252?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Matthias Bay</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Mat2095" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/sannysanoff"><img src="https://avatars.githubusercontent.com/u/952071?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Sanny Sanoff</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=sannysanoff" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/McSym28"><img src="https://avatars.githubusercontent.com/u/8185872?v=4?s=100" width="100px;" alt=""/><br /><sub><b>McSym28</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=McSym28" title="Code">💻</a></td>
+    <td align="center"><a href="https://ericleong.me"><img src="https://avatars.githubusercontent.com/u/1572011?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Eric Leong</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ericleong" title="Code">💻</a></td>
+    <td align="center"><a href="https://davidday.tw/"><img src="https://avatars.githubusercontent.com/u/47077427?v=4?s=100" width="100px;" alt=""/><br /><sub><b>David Day</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=dj6082013" title="Code">💻</a></td>
+  </tr>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
