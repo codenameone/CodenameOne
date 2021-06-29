@@ -142,7 +142,7 @@ TIP: We are currently transitioning to Maven, and have created a new, simpler me
 There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
 
 <div>
-  <a href="https://www.youtube.com/watch?v=rl6z7DD2-vg " target="_blank"><img src="https://i.imgur.com/gXfNhFR.png" alt="Hello Codename One" img width="70%"> </a>
+  <a href="https://www.youtube.com/watch?v=rl6z7DD2-vg "><img src="https://i.imgur.com/gXfNhFR.png" target="_blank" alt="Hello Codename One" img width="80%"> </a>
 </div>
 
 ## Extensible
@@ -171,7 +171,7 @@ NOTE: We are in the process of migrating from Ant to Maven, which simplifies the
 Setup is covered in depth in [this article and video](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html). Notice that this covers debugging the simulator and working with the code that requires the Codename One plugin for NetBeans. You can install that by installing NetBeans and typing "Codename One" in the plugin search section see [the getting started tutorial](https://www.codenameone.com/getting-started.html).
 
 <div>
-  <a href="http://www.youtube.com/watch?v=2nD75pODPWk " target="_blank"><img src="https://i.imgur.com/1lckS4d.png" alt="Using The Codename One Source Code" img width="70%"> </a>
+  <a href="http://www.youtube.com/watch?v=2nD75pODPWk " target="_blank"><img src="https://i.imgur.com/1lckS4d.png" alt="Using The Codename One Source Code" img width="80%"> </a>
 </div>
 
 <br>
@@ -315,4 +315,4 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome! ❤️
