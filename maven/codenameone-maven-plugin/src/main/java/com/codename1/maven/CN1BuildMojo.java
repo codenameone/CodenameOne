@@ -163,6 +163,75 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     private static String[] BUNDLE_ARTIFACT_ID_BLACKLIST = new String[] {"codenameone-core", "java-runtime"};
 
+    /**
+     * Gets the app extensions jar file that should be included in any iOS builds.
+     * @return The app extensions jar file if it exists.  null otherwise.
+     * @throws IOException
+     */
+    private File getAppExtensionsJar() throws IOException {
+
+        if (!project.getProperties().getProperty("codename1.platform", "").equalsIgnoreCase("ios")){
+            // App extensions are only for iOS
+            return null;
+        }
+        if (!project.getBasedir().getName().equalsIgnoreCase("ios")) {
+            // Make sure we're building the ios project
+            return null;
+        }
+
+        File appExtensionsDir = new File(project.getBasedir(), "app_extensions");
+
+        if (!appExtensionsDir.isDirectory()) return null;
+
+        File appExtensionsJar = new File(project.getBuild().getDirectory() + File.separator + "codenameone" + File.separator + "app_extensions.jar");
+        if (appExtensionsJar.exists() && appExtensionsJar.lastModified() < lastModifiedRecursive(appExtensionsDir)) {
+            // The app extensions jar is out of date.
+            appExtensionsJar.delete();
+        }
+
+        if (!appExtensionsJar.exists()) {
+            File tmpDir = new File(appExtensionsJar.getParentFile(), "app_extensions");
+            if (tmpDir.exists()) {
+                FileUtils.deleteDirectory(tmpDir);
+            }
+            tmpDir.mkdirs();
+            for (File appExtension : appExtensionsDir.listFiles()) {
+                Zip task = (Zip)antProject.createTask("zip");
+                File dest = new File(tmpDir, appExtension.getName()+".ios.appext");
+                task.setDestFile(dest);
+                task.setUpdate(false);
+                if (appExtension.isDirectory()) {
+                    FileSet fs = new FileSet();
+                    fs.setProject(this.antProject);
+                    fs.setDir(appExtension);
+                    task.addFileset(fs);
+                } else if (appExtension.getName().endsWith(".zip")) {
+                    ZipFileSet fileset = new ZipFileSet();
+                    fileset.setProject(antProject);
+                    fileset.setSrc(appExtension);
+                    task.addZipfileset(fileset);
+                }
+
+                task.execute();
+            }
+            Zip task = (Zip)antProject.createTask("zip");
+            task.setDestFile(appExtensionsJar);
+            task.setUpdate(false);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(tmpDir);
+            task.addFileset(fs);
+            task.execute();
+
+        }
+
+        if (appExtensionsJar.exists()) {
+            return appExtensionsJar;
+        }
+
+        return null;
+    }
+
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
         File cn1dir = new File(project.getBuild().getDirectory() + File.separator + "codenameone");
         File antProject = new File(cn1dir, "antProject");
@@ -192,6 +261,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } catch (Exception ex) {
             throw new MojoExecutionException("Failed to get classpath elements", ex);
 
+        }
+
+        File appExtensionsJar = getAppExtensionsJar();
+        if (appExtensionsJar != null) {
+            cpElements.add(appExtensionsJar.getAbsolutePath());
         }
         getLog().debug("Classpath Elements: "+cpElements);
         if (jarWithDependencies.exists()) {
@@ -263,13 +337,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 mergeJars(jarWithDependencies, new File(element));
             }
 
-
-
-
-
         }
-
-
 
         try {
             updateCodenameOne(false);
