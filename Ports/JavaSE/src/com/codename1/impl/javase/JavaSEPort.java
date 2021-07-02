@@ -3324,8 +3324,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             toolsMenu.add(debugWebViews);
             
-            JMenuItem locactionSim = new JMenuItem("Location Simulation");
-            locactionSim.addActionListener(new ActionListener() {
+            JMenuItem locationSim = new JMenuItem("Location Simulation");
+            locationSim.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
                     if(locSimulation==null) {
@@ -3334,7 +3334,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     locSimulation.setVisible(true);
                 }
             });
-            simulateMenu.add(locactionSim);
+            simulateMenu.add(locationSim);
             
             JMenuItem pushSim = new JMenuItem("Push Simulation");
             pushSim.addActionListener(new ActionListener() {
