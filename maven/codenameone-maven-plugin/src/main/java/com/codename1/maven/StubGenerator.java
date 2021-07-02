@@ -139,11 +139,11 @@ public class StubGenerator {
         csFile.getParentFile().mkdirs();
 
         String iosFilename = nativeInterface.getName().replace('.', '_') + "Impl.";
-        iosHFile = new File(path(destination.getAbsolutePath(), "src", "main", "objectivec", iosFilename+"h"));
-        iosMFile = new File(path(destination.getAbsolutePath(), "src", "main", "objectivec", iosFilename+"m"));
+        iosHFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"h"));
+        iosMFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"m"));
         iosMFile.getParentFile().mkdirs();
 
-        jsFile = new File(path(destination.getAbsolutePath(), "src", "main", "javascript", nativeInterface.getName().replace('.', '_') + ".js"));
+        jsFile = new File(path(destination.getAbsolutePath(), "javascript", "src", "main", "javascript", nativeInterface.getName().replace('.', '_') + ".js"));
         jsFile.getParentFile().mkdirs();
     }
 
