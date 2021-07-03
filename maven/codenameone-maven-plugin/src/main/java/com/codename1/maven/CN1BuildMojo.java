@@ -205,14 +205,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     fs.setProject(this.antProject);
                     fs.setDir(appExtension);
                     task.addFileset(fs);
+                    task.execute();
                 } else if (appExtension.getName().endsWith(".zip")) {
                     ZipFileSet fileset = new ZipFileSet();
                     fileset.setProject(antProject);
                     fileset.setSrc(appExtension);
                     task.addZipfileset(fileset);
+                    task.execute();
                 }
 
-                task.execute();
+
             }
             Zip task = (Zip)antProject.createTask("zip");
             task.setDestFile(appExtensionsJar);
