@@ -75,7 +75,7 @@ public class URLImage extends EncodedImage {
 
     private static final Map<String,URLImage> pendingToStorage = new HashMap<String,URLImage>();
     private static final Map<String,URLImage> pendingToFile = new HashMap<String,URLImage>();
-    private EasyThread imageLoader = EasyThread.start("ImageLoader");
+    private static EasyThread imageLoader = EasyThread.start("ImageLoader");
 
     /**
      * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.

@@ -459,16 +459,40 @@ public class Form extends Container {
         }
         return f.getInvisibleAreaUnderVKB();
     }
-    
+
+    private int overrideInvisibleAreaUnderVKB = -1;
+
+    /**
+     * Overrides the invisible area under the virtual keyboard with a given value.  This is used by lightweight components
+     * to simulate the virtual keyboard, so that they will respect {@link #setFormBottomPaddingEditingMode(boolean)}.
+     * 
+     * <p><strong>Warning:</strong> This setting is generally for internal use only, and should only be used if you know what you are doing.
+     * After setting this value to a non-negative value, it will override the "real" area under the VKB if the read VKB is shown.
+     * </p>
+     * 
+     * <p>To reset this after the lightweight component is hidden, set the value to {@literal -1}.</p>
+     * 
+     * @param invisibleAreaUnderVKB The area hidden by the VKB in pixels.
+     * @since 8.0
+     */
+    public void setOverrideInvisibleAreaUnderVKB(int invisibleAreaUnderVKB) {
+        overrideInvisibleAreaUnderVKB = invisibleAreaUnderVKB;
+    }
+
+
     /**
      * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of 
      * the virtual keyboard
      * 
      * @return height in pixels of the virtual keyboard
+     * @see #setOverrideInvisibleAreaUnderVKB(int) 
      */
     public int getInvisibleAreaUnderVKB() {
         if(bottomPaddingMode) {
             return 0;
+        }
+        if (overrideInvisibleAreaUnderVKB >= 0) {
+            return overrideInvisibleAreaUnderVKB;
         }
         return Display.impl.getInvisibleAreaUnderVKB();
     }

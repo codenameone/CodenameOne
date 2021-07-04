@@ -1537,6 +1537,90 @@ public class IPhoneBuilder extends Executor {
                             + "  puts 'An error occurred updating deployment target, but the build still might work...'\n"
                             + "end\n";
 
+                    // Let's extract and add app extensions here
+
+                    File[] appExtensions = extractAppExtensions(resDir, new File(tmpFile, "dist"));
+                    StringBuilder appExtensionsBuilder = new StringBuilder();
+                    {
+                        StringBuilder sb = appExtensionsBuilder;
+                        for (File appExtension : appExtensions) {
+                            // We are using the notification service extension so that we can support rich push notifications
+
+                            String buildSettingsStr = "CLANG_ANALYZER_NONNULL = YES;\n"
+                                    + "				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;\n"
+                                    + "				CLANG_CXX_LANGUAGE_STANDARD = \"gnu++14\";\n"
+                                    + "				CLANG_ENABLE_MODULES = YES;\n"
+                                    + "				CLANG_ENABLE_OBJC_ARC = YES;\n"
+                                    + "				CLANG_ENABLE_OBJC_WEAK = YES;\n"
+                                    + "				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;\n"
+                                    + "				CLANG_WARN_COMMA = YES;\n"
+                                    + "				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;\n"
+                                    + "				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;\n"
+                                    + "				CLANG_WARN_EMPTY_BODY = YES;\n"
+                                    + "				CLANG_WARN_ENUM_CONVERSION = YES;\n"
+                                    + "				CLANG_WARN_INFINITE_RECURSION = YES;\n"
+                                    + "				CLANG_WARN_INT_CONVERSION = YES;\n"
+                                    + "				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;\n"
+                                    + "				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;\n"
+                                    + "				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;\n"
+                                    + "				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;\n"
+                                    + "				CLANG_WARN_STRICT_PROTOTYPES = YES;\n"
+                                    + "				CLANG_WARN_SUSPICIOUS_MOVE = YES;\n"
+                                    + "				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;\n"
+                                    + "				CLANG_WARN_UNREACHABLE_CODE = YES;\n"
+                                    + "				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;";
+
+                            Map<String, String> buildSettingsMap = new HashMap<String, String>();
+                            String[] lines = buildSettingsStr.split("\n");
+                            for (String line : lines) {
+                                if (line.trim().isEmpty()) {
+                                    continue;
+                                }
+                                String key = line.substring(0, line.indexOf("=")).trim();
+                                String val = line.substring(line.indexOf("=") + 1).trim();
+                                if (val.endsWith(";")) {
+                                    val = val.substring(val.length() - 1);
+                                }
+                                buildSettingsMap.put(key, val);
+
+                            }
+                            String extensionName = appExtension.getName();
+                            buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
+                            buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+                            buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
+                            buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", "$(NS_CODE_SIGN_ENTITLEMENTS)");
+                            buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+                            buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
+
+
+                            sb.append("\nservice_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
+                                    + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
+                                    + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
+                                    + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
+                                    + "}\n"
+                                    //+ "service_target.frameworks_build_phase.add_file_reference(xcproj.files.find{|e|e.path.include? 'UserNotifications.framework'})\n"
+                                    + "service_group = xcproj.new_group('" + extensionName + "')\n");
+                            appendFilesToXcodeProjGroup(sb, appExtension, "service_group", "service_target", appExtension.getParentFile());
+                            sb.append("xcproj.targets.find{|e|e.name==main_class_name}.add_dependency(service_target)\n"
+                                    + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                                    + "embed_phase=xcproj.targets.find{|e| e.name=='" + request.getMainClass() + "'}.new_copy_files_build_phase('Embed App Extensions')\n"
+                                    + "embed_phase.build_action_mask = \"2147483647\"\n"
+                                    + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                                    + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                                    + "embed_phase.add_file_reference(fileref)\n"
+                                    + "service_target.build_configurations.each{|e| \n");
+                            for (String buildSettingKey : buildSettingsMap.keySet()) {
+                                sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+                            }
+                            sb.append("}\n");
+
+
+
+                        }
+                        if (appExtensions.length > 0) {
+                            sb.append("xcproj.save(project_file)\n");
+                        }
+                    }
 
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
@@ -1552,7 +1636,8 @@ public class IPhoneBuilder extends Executor {
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
                             + "  puts 'An error occurred recreating schemes, but the build still might work...'\n"
                             + "end\n"
-                            + deploymentTargetStr;
+                            + deploymentTargetStr
+                            + appExtensionsBuilder.toString();
                     File hooksDir = new File(tmpFile, "hooks");
                     hooksDir.mkdir();
                     File fixSchemesFile = new File(hooksDir, "fix_xcode_schemes.rb");
@@ -1741,6 +1826,27 @@ public class IPhoneBuilder extends Executor {
         return xcodeProjectDir;
     }
 
+    private void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
+
+        String basePath = baseDir.getAbsolutePath();
+        if (!basePath.endsWith("/")) {
+            basePath += "/";
+        }
+        int basePathLen = basePath.length();
+        for (File f : dir.listFiles()) {
+            if (f.isFile()) {
+                sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
+                if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
+                    sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");
+                } else if (!f.getName().endsWith("Info.plist")){
+                    sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
+                }
+            } else {
+                appendFilesToXcodeProjGroup(sb, f, serviceGroupVarName, serviceTargetVarName, baseDir);
+            }
+        }
+    }
+
     
     private String convertToJavaMethod(Class type) {
         if(type.isArray()) {
@@ -1877,7 +1983,42 @@ public class IPhoneBuilder extends Executor {
         boolean useSignIn;
         
     }
-    
+
+    private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
+        if (sourceDirectory == null || !sourceDirectory.isDirectory()) {
+            throw new IllegalArgumentException("extractAppExtensions sourceDirectory must be an existing directory but received "+sourceDirectory);
+        }
+        List<File> out = new ArrayList<>();
+        for (File appExtension : sourceDirectory.listFiles()) {
+            if (!appExtension.getName().endsWith(".ios.appext")) {
+                // Only interested in files ending in .ios.appext since
+                // Maven would have bundled the app extensions in this way.
+                continue;
+            }
+            File extractedDir = new File(targetDirectory, appExtension.getName().substring(0, appExtension.getName().lastIndexOf(".ios.appext")));
+            if (extractedDir.exists()) {
+                delTree(extractedDir);
+            }
+            extractedDir.mkdir();
+            try {
+                boolean result = exec(sourceDirectory, "/usr/bin/unzip", appExtension.getName(), "-d", extractedDir.getAbsolutePath());
+                if (!result) {
+                    throw new IOException("Failed to unzip appExtension "+appExtension);
+                }
+
+                out.add(extractedDir);
+            } catch (IOException ex) {
+                throw ex;
+            } catch (Exception ex) {
+                throw new IOException("Failed to unzip app extension "+appExtension, ex);
+            }
+            // Once we have extracted it, we should delete it because we don't need it anymore.
+            appExtension.delete();
+
+        }
+        return out.toArray(new File[out.size()]);
+    }
+
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request) throws IOException {
         File buildinRes = new File(tmpFile, "btres");
         File mat = new File(buildinRes, "material-design-font.ttf");
