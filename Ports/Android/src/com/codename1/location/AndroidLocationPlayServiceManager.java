@@ -498,18 +498,19 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @RequiresApi(api = 29)
     private boolean checkBackgroundLocationPermission() {
- //29+       if (!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, "This is required to get the location")) {
- //29+           System.out.println("Request for background location access is denied");
- //29+           return false;
- //29+       }
+        if (!AndroidNativeUtil.checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION", "This is required to get the location")) {
+            System.out.println("Request for background location access is denied");
+            return false;
+        }
         return true;
     }
 
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
         //Display.getInstance().scheduleBackgroundTask(new Runnable() {
+        final boolean[] requestedPermission = new boolean[1];
         if (android.os.Build.VERSION.SDK_INT >= 29) {
-
+            requestedPermission[0] = true;
             if (!checkBackgroundLocationPermission()) {
                 return;
             }
@@ -549,7 +550,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
                         builder.addGeofences(geofences);
 
-                        if (ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        if (!requestedPermission[0] && ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                             // TODO: Consider calling
                             //    ActivityCompat#requestPermissions
                             // here to request the missing permissions, and then overriding
