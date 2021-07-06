@@ -1592,6 +1592,21 @@ public class IPhoneBuilder extends Executor {
                             buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
                             buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
 
+                            File buildSettingsProps = new File(appExtension, "buildSettings.properties");
+                            if (buildSettingsProps.exists()) {
+                                Properties _buildSettingsProps = new Properties();
+                                try (FileInputStream fis = new FileInputStream(buildSettingsProps)) {
+                                    _buildSettingsProps.load(fis);
+                                }
+                                for (Object key : _buildSettingsProps.keySet()) {
+                                    if (key instanceof String) {
+                                        String val = _buildSettingsProps.getProperty((String)key);
+                                        buildSettingsMap.put((String)key, val);
+                                    }
+                                }
+                                buildSettingsProps.delete();
+                            }
+
 
                             sb.append("\nservice_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
                                     + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
