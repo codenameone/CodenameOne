@@ -79,13 +79,29 @@ public class Simulator {
        }
 
    }
-    
+
+
+    private static void setCWD() {
+        try {
+            File currDir = new File(System.getProperty("user.dir")).getCanonicalFile();
+            File codenameOneSettings = new File(currDir, "codenameone_settings.properties");
+            if (codenameOneSettings.exists()) {
+                return;
+            }
+            currDir = new File(currDir, "common");
+            codenameOneSettings = new File(currDir, codenameOneSettings.getName());
+            if (codenameOneSettings.exists()) {
+                System.setProperty("user.dir", currDir.getAbsolutePath());
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
 
     /**
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
-
 
         try {
             // Load the sqlite database Engine JDBC driver in the top level classloader so it's shared
@@ -394,6 +410,8 @@ public class Simulator {
             return null;
 
         }
+
+
         /**
          * The hotswap-agent.properties file may be added to the root of the
          * classpath to tune the Hotswap Agent to support enhanced live

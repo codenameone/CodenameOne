@@ -2582,7 +2582,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             String t = props.getProperty("nativeThemeAttribute", null);
                             if (t != null) {
                                 Properties cnop = new Properties();
-                                File cnopFile = new File("codenameone_settings.properties");
+                                File cnopFile = new File(getCWD(), "codenameone_settings.properties");
                                 if (cnopFile.exists()) {
                                     cnop.load(new FileInputStream(cnopFile));
                                     int themeConst = Integer.parseInt(cnop.getProperty("codename1.j2me.nativeThemeConst", "3"));
@@ -7100,7 +7100,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (baseResourceDir != null) {
                 fontFile = new File(baseResourceDir, fileName);
             } else {
-                fontFile = new File("src", fileName);
+                fontFile = new File(new File(getCWD(),"src"), fileName);
             }
             if (fontFile.exists()) {
                 try {
@@ -8034,7 +8034,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "SE";
         }
         if ("AppName".equals(key)) {
-            File f = new File("codenameone_settings.properties");
+            File f = new File(getCWD(),"codenameone_settings.properties");
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -8047,7 +8047,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return defaultValue;
         }
         if ("AppVersion".equals(key)) {
-            File f = new File("codenameone_settings.properties");
+            File f = new File(getCWD(), "codenameone_settings.properties");
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -10264,7 +10264,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
         if ("/theme.res".equals(resource)) {
-            File srcThemeRes = new File("src" + File.separator + "theme.res");
+            File srcThemeRes = new File(getCWD(), "src" + File.separator + "theme.res");
             if (srcThemeRes.exists()) {
                 try {
                     return new FileInputStream(srcThemeRes);
@@ -11842,7 +11842,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void installTar() throws IOException {
-        File f = new File("codenameone_settings.properties");        
+        File f = new File(getCWD(),"codenameone_settings.properties");
         if(!f.exists()) {
             super.installTar();
         }
@@ -11853,7 +11853,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
-        File f = new File("codenameone_settings.properties");        
+        File f = new File(getCWD(), "codenameone_settings.properties");
         if(!f.exists()) {
             super.setBrowserPageInHierarchy(browserPeer, url);
             return;
@@ -12629,12 +12629,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     
-    
+    public File getCWD() {
+        return new File(System.getProperty("user.dir"));
+    }
     
     
     @Override
     public Map<String, String> getProjectBuildHints() {
-        File cnopFile = new File("codenameone_settings.properties");
+        File cnopFile = new File(getCWD(), "codenameone_settings.properties");
         if(cnopFile.exists()) {
             java.util.Properties cnop = new java.util.Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
@@ -12658,7 +12660,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void setProjectBuildHint(String key, String value) {
-         File cnopFile = new File("codenameone_settings.properties");
+         File cnopFile = new File(getCWD(),"codenameone_settings.properties");
         if(cnopFile.exists()) {
             Properties cnop = new Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
