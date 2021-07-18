@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.location;
@@ -42,6 +42,7 @@ import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.impl.android.PlayServices;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -101,7 +102,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     };
 
     public static AndroidLocationPlayServiceManager inMemoryBackgroundLocationListener;
-    
+
     private GoogleApiClient mGoogleApiClient;
     private GeofencingClient geofencingClient;
 
@@ -192,7 +193,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                                     intent,
                                     PendingIntent.FLAG_UPDATE_CURRENT);
                             inMemoryBackgroundLocationListener = AndroidLocationPlayServiceManager.this;
-                            
+
 
                             //LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, pendingIntent);
                             requestLocationUpdates(context, r, pendingIntent);
@@ -375,7 +376,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 .setInterval(interval)
                 .setSmallestDisplacement(smallestDisplacement);
     }
-    
+
     @Override
     protected void clearBackgroundListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
@@ -499,7 +500,6 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @RequiresApi(api = 29)
     private boolean checkBackgroundLocationPermission() {
         if (!AndroidNativeUtil.checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION", "This is required to get the location")) {
-            System.out.println("Request for background location access is denied");
             return false;
         }
         return true;
@@ -508,13 +508,19 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
         //Display.getInstance().scheduleBackgroundTask(new Runnable() {
-        final boolean[] requestedPermission = new boolean[1];
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
-            requestedPermission[0] = true;
+        boolean fineLocationAllowed = ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (fineLocationAllowed && android.os.Build.VERSION.SDK_INT >= 29) {
+
             if (!checkBackgroundLocationPermission()) {
                 return;
             }
 
+        } else if (!fineLocationAllowed) {
+            fineLocationAllowed = AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location");
+        }
+        if (!fineLocationAllowed) {
+            Log.e(new RuntimeException("Permission denied for geofence"));
+            return;
         }
         Thread t = new Thread(new Runnable() {
 
@@ -550,7 +556,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
                         builder.addGeofences(geofences);
 
-                        if (!requestedPermission[0] && ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        if (ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                             // TODO: Consider calling
                             //    ActivityCompat#requestPermissions
                             // here to request the missing permissions, and then overriding
@@ -700,7 +706,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mGoogleApiClient.connect();
             }
         }
-        
+
         return mGoogleApiClient;
     }
 

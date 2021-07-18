@@ -137,6 +137,11 @@ public abstract class LocationManager {
             }
         }
     }
+
+    protected final LocationListener getListener() {
+        return listener;
+    }
+
     /**
      * Returns the current location synchronously, this is useful if you just want
      * to know the location NOW and don't care about tracking location. Notice that
@@ -160,7 +165,7 @@ public abstract class LocationManager {
      */
     public Location getCurrentLocationSync(long timeout) {
         try {
-            if(getStatus() != AVAILABLE) {
+            if(listener == null) {
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();
