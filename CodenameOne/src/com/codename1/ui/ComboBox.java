@@ -301,6 +301,17 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         return popupDialog;
     }
 
+    private boolean showingPopupDialog;
+
+    /**
+     * Returns true if the popup dialog is currently showing for this combobox.
+     * @return
+     * @since 8.0
+     */
+    public boolean isShowingPopupDialog() {
+        return showingPopupDialog;
+    }
+
     /**
      * Shows the popup dialog for the combo box and returns the resulting command.
      * This method can be overriden by subclasses to modify the behavior of the class.
@@ -345,11 +356,17 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popupDialog.getTitleComponent().setUIID("Container");
             popupDialog.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
             popupDialog.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 200));
-            return popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            showingPopupDialog = true;
+            Command out = popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            showingPopupDialog = false;
+            return out;
         }
 
         if(getUIManager().isThemeConstant("centeredPopupBool", false)) {
-            return popupDialog.showPacked(BorderLayout.CENTER, true);
+            showingPopupDialog = true;
+            Command out = popupDialog.showPacked(BorderLayout.CENTER, true);
+            showingPopupDialog = false;
+            return out;
         } else {
             int top, bottom, left, right;
             Form parentForm = getComponentForm();
@@ -398,10 +415,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                 right = 0;
             }
             popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
-            return popupDialog.show(Math.max(top, 0),
+            showingPopupDialog = true;
+            Command out =  popupDialog.show(Math.max(top, 0),
                     Math.max(bottom, 0),
                     Math.max(left, 0),
                     Math.max(right, 0), false, true);
+            showingPopupDialog = false;
+            return out;
         }
     }
 

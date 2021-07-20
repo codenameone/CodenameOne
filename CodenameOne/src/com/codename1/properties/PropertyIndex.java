@@ -42,6 +42,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Collection;
 import java.util.Date;
@@ -599,7 +600,28 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             } 
         }
     }
-    
+
+    /**
+     * This method works similarly to a constructor, it accepts the values for the properties in the order
+     * they appear within the index
+     * @param values values of properties in the order they appear in the index
+     */
+    public void init(Object... values) {
+        int offset = 0;
+        for(PropertyBase pb : properties) {
+            if(pb instanceof CollectionProperty) {
+                if(values[offset] instanceof Object[]) {
+                    ((CollectionProperty) pb).addAll(Arrays.asList((Object[])values[offset]));
+                } else {
+                    ((CollectionProperty) pb).addAll((Collection) values[offset]);
+                }
+            } else {
+                pb.setImpl(values[offset]);
+            }
+            offset++;
+        }
+    }
+
     /**
      * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
      * @param name the name of the storage file
