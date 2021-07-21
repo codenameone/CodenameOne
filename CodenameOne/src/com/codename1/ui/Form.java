@@ -1548,6 +1548,9 @@ public class Form extends Container {
             };
             formLayeredPane.setName("FormLayeredPane");
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
+            formLayeredPane.setWidth(getWidth());
+            formLayeredPane.setHeight(getHeight());
+            formLayeredPane.setShouldLayout(false);
         }
         if(c == null) {
             // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
