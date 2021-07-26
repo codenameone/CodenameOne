@@ -67,6 +67,8 @@ public class RequestBuilder {
     private Map<String, String> pathParams = new HashMap();
     
     private Integer timeout, readTimeout;
+
+    private Boolean cookiesEnabled;
     
     private Data body;
         
@@ -123,7 +125,19 @@ public class RequestBuilder {
         checkFetched();
         contentType = s;
         return this;
-    } 
+    }
+
+    /**
+     * Sets the cookiesEnabled parameter.
+     * @param cookiesEnabled True to enable cookies. False to disable.
+     * @return RequestBuilder instance.
+     * @since 8.0
+     */
+    public RequestBuilder cookiesEnabled(boolean cookiesEnabled) {
+        checkFetched();
+        this.cookiesEnabled = cookiesEnabled;
+        return this;
+    }
     
     /**
      * Add a path param to the request.
@@ -874,6 +888,9 @@ public class RequestBuilder {
         }
         for (ActionListener<NetworkEvent> l : errorCallbacks) {
             req.addExceptionListener(l);
+        }
+        if (cookiesEnabled != null) {
+            req.setCookiesEnabled(cookiesEnabled);
         }
         
         return req;

@@ -3225,6 +3225,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             hotReloadMenu.add(disableHotReload);
             hotReloadMenu.add(reloadSimulator);
             hotReloadMenu.add(reloadCurrentForm);
+            hotReloadGroup.add(disableHotReload);
+            hotReloadGroup.add(reloadSimulator);
+            hotReloadGroup.add(reloadCurrentForm);
 
             if (System.getProperty("maven.home") != null) {
                 toolsMenu.add(hotReloadMenu);
