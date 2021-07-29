@@ -3181,23 +3181,56 @@ public class JavaSEPort extends CodenameOneImplementation {
             List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
             //final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
             //final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
-            JCheckBoxMenuItem hotReload = new JCheckBoxMenuItem("Hot Reload");
-            hotReload.addActionListener(new ActionListener() {
+            ButtonGroup hotReloadGroup = new ButtonGroup();
+            JRadioButtonMenuItem disableHotReload = new JRadioButtonMenuItem("Disabled");
+            disableHotReload.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    if(hotReload.isSelected()) {
-                        pref.putInt("hotReload", 1);
-                        System.setProperty("hotReload", "1");
-                    } else {
-                        pref.putInt("hotReload", 0);
-                        System.setProperty("hotReload", "0");
-                    }
+                    pref.putInt("hotReload", 0);
+                    System.setProperty("hotReload", "0");
+                }
+            });
+            JRadioButtonMenuItem reloadSimulator = new JRadioButtonMenuItem("Reload Simulator");
+            reloadSimulator.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 1);
+                    System.setProperty("hotReload", "1");
+                }
+            });
+            JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Requires CodeRAD)");
+
+            reloadCurrentForm.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 2);
+                    System.setProperty("hotReload", "2");
                 }
             });
 
-            hotReload.setSelected(pref.getInt("hotReload", 1) > 0);
+            switch (pref.getInt("hotReload", 0)) {
+                case 0:
+                    disableHotReload.setSelected(true);
+                    System.setProperty("hotReload", "0");
+                    break;
+                case 1:
+                    reloadSimulator.setSelected(true);
+                    System.setProperty("hotReload", "1");
+                    break;
+                case 2:
+                    reloadCurrentForm.setSelected(true);
+                    System.setProperty("hotReload", "2");
+                    break;
+
+            }
+
+            JMenu hotReloadMenu = new JMenu("Hot Reload");
+            hotReloadMenu.add(disableHotReload);
+            hotReloadMenu.add(reloadSimulator);
+            hotReloadMenu.add(reloadCurrentForm);
+            hotReloadGroup.add(disableHotReload);
+            hotReloadGroup.add(reloadSimulator);
+            hotReloadGroup.add(reloadCurrentForm);
 
             if (System.getProperty("maven.home") != null) {
-                toolsMenu.add(hotReload);
+                toolsMenu.add(hotReloadMenu);
             }
             
             

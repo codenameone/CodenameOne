@@ -195,15 +195,6 @@ public final class Display extends CN1Constants {
             this.bookmark.run();
         }
     }
-
-    /**
-     * Indicates whether a restore point was set for this app
-     * @return true if a bookmark was set
-     * @since 8.0
-     */
-    public boolean hasBookmark() {
-        return bookmark != null;
-    }
     
     
     /**

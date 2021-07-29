@@ -608,9 +608,6 @@ public class SourceChangeWatcher implements Runnable {
             return false;
         }
         System.clearProperty("rad.reload.form");
-        if(CN.hasBookmark()) {
-            hotReloadSetting = 2;
-        }
         if (hotReloadSetting == 2 && isDebug && usingHotswapAgent) {
 
 
