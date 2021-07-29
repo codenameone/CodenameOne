@@ -230,7 +230,7 @@ public class CN extends  CN1Constants {
      *
      */
     public static void setBookmark(Runnable bookmark) {
-        Display.getInstance().setBookmark(bookmark);
+        Display.INSTANCE.setBookmark(bookmark);
     }
 
     /**
@@ -239,9 +239,18 @@ public class CN extends  CN1Constants {
      * @since 8.0
      */
     public static void restoreToBookmark() {
-        Display.getInstance().restoreToBookmark();
+        Display.INSTANCE.restoreToBookmark();
     }
-    
+
+    /**
+     * Indicates whether a restore point was set for this app
+     * @return true if a bookmark was set
+     * @since 8.0
+     */
+    public boolean hasBookmark() {
+        return Display.INSTANCE.hasBookmark();
+    }
+
     /**
      * This method allows us to manipulate the drag started detection logic.
      * If the pointer was dragged for more than this percentage of the display size it
