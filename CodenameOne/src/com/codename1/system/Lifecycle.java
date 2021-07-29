@@ -54,15 +54,14 @@ public class Lifecycle {
      */
     public void init(Object context) {
         // use two network threads instead of one
-        CN.updateNetworkThreadCount(2);
+        CN.updateNetworkThreadCount(getNetworkThreadCount());
 
-        theme = UIManager.initFirstTheme("/theme");
+        theme = UIManager.initFirstTheme(getThemeName());
 
         // Enable Toolbar on all Forms by default
         Toolbar.setGlobalToolbar(true);
 
-        // Pro only feature
-        Log.bindCrashProtection(true);
+        bindCrashProtection();
 
         addNetworkErrorListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -70,6 +69,39 @@ public class Lifecycle {
                 handleNetworkError(err);
             }
         });
+    }
+
+    /**
+     * Callback that can be overriden to disable or modify crash protection
+     */
+    protected void bindCrashProtection() {
+        // Pro only feature
+        Log.bindCrashProtection(true);
+    }
+
+    /**
+     * Returns the default number of network thread count
+     * @return currently two threads
+     */
+    protected int getNetworkThreadCount() {
+        return 2;
+    }
+
+    /**
+     * Returns the name of the global theme file, by default it's "/theme". Can be overriden by subclasses to
+     * load a different file name
+     * @return "/theme"
+     */
+    protected String getThemeName() {
+        return "/theme";
+    }
+
+    /**
+     * The theme instance
+     * @return the theme
+     */
+    public Resources getTheme() {
+        return theme;
     }
 
     /**
