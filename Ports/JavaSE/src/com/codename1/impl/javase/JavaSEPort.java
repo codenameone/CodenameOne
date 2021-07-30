@@ -11288,7 +11288,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public boolean wasPurchased(String sku) {
                 return getPurchases().contains(sku);
-            } 
+            }
+
+            @Override
+            public String getStoreCode() {
+                return Receipt.STORE_CODE_SIMULATOR;
+            }
         };
     }
 

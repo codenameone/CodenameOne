@@ -827,6 +827,16 @@ public abstract class Purchase {
     public void manageSubscriptions(String sku) {
         Dialog.show("Not Supported", "This platform doesn't support in-app subscription management. ", "OK", null);
     }
+
+    /**
+     * Returns the store code associated with this in-app purchase object.
+     * @return The store code.  One of {@link Receipt#STORE_CODE_ITUNES}, {@link Receipt#STORE_CODE_PLAY}, {@link Receipt#STORE_CODE_SIMULATOR}, or
+     * {@link Receipt#STORE_CODE_WINDOWS}.
+     * @since 8.0
+     */
+    public String getStoreCode() {
+        return null;
+    }
     
     
 }
