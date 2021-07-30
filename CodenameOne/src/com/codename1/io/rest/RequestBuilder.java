@@ -60,7 +60,8 @@ public class RequestBuilder {
 
     private String url;
 
-    private Map<String, String> queryParams = new HashMap();
+    private Map<String, Object> queryParams = new HashMap();
+
 
     private Map<String, String> headers = new HashMap();
 
@@ -165,6 +166,20 @@ public class RequestBuilder {
     public RequestBuilder queryParam(String key, String value) {
         checkFetched();
         queryParams.put(key, value);
+        return this;
+    }
+
+    /**
+     * Add multiple query parameter values to the request using same key.
+     *
+     * @param key param key
+     * @param values  param values
+     * @return RequestBuilder instance
+     * @since 8.0
+     */
+    public RequestBuilder queryParam(String key, String[] values) {
+        checkFetched();
+        queryParams.put(key, values);
         return this;
     }
 
@@ -881,7 +896,12 @@ public class RequestBuilder {
             req.setReadTimeout(readTimeout);
         }
         for (String key : queryParams.keySet()) {
-            req.addArgument(key, queryParams.get(key));
+            Object value = queryParams.get(key);
+            if (value instanceof String[]) {
+                req.addArgument(key, (String[])value);
+            } else {
+                req.addArgument(key, (String)value);
+            }
         }
         for (String key : headers.keySet()) {
             req.addRequestHeader(key, headers.get(key));
