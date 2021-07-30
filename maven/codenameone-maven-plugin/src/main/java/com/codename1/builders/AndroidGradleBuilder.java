@@ -2867,8 +2867,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontoptimize\n"
                 + dontObfuscate
                 + "\n"
-                + "public *;\n"
-                + "}\n\n"
                 + "-dontwarn com.google.android.gms.**\n"
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
