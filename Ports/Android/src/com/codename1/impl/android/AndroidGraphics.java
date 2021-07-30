@@ -148,6 +148,7 @@ class AndroidGraphics {
     }
 
     public void drawImage(Object img, int x, int y) {
+        if (img == null) return;
         canvas.save();
         applyTransform();
         canvas.drawBitmap((Bitmap) img, x, y, paint);
@@ -156,6 +157,7 @@ class AndroidGraphics {
     }
 
     void drawImageImpl(Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         Bitmap b = (Bitmap) img;
         Rect src = new Rect();
         src.top = 0;
@@ -171,6 +173,7 @@ class AndroidGraphics {
     }
 
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         canvas.save();
         applyTransform();
         drawImageImpl(img, x, y, w, h);
@@ -179,6 +182,7 @@ class AndroidGraphics {
     }
 
     public void tileImage(Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         Bitmap b = (Bitmap) img;
         Rect dest = new Rect();
         dest.top = 0;
@@ -198,6 +202,7 @@ class AndroidGraphics {
     }
     
     private void tileImageImpl(Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         Bitmap b = (Bitmap) img;
         Rect dest = new Rect();
         dest.top = 0;
