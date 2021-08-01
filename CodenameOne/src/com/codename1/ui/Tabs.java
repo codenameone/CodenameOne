@@ -150,8 +150,8 @@ public class Tabs extends Container {
         
     }
 
-    // A flag that is used internally to temporily override the output of the 
-    // shoudlBlockSideSwipe method, so that we don't block our own side swipes.
+    // A flag that is used internally to temporarily override the output of the
+    // shouldBlockSideSwipe method, so that we don't block our own side swipes.
     private boolean doNotBlockSideSwipe;
     
     @Override
@@ -1438,6 +1438,18 @@ public class Tabs extends Container {
                                 // start drag not imediately, giving components some sort
                                 // of weight.
                                 dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                                if(dragStarted) {
+                                    int diff = x - initialX;
+                                    if(shouldBlockSideSwipeLeft() && diff < 0 ||
+                                            shouldBlockSideSwipeRight() && diff > 0) {
+                                        lastX = -1;
+                                        initialX = -1;
+                                        initialY = -1;
+                                        blockSwipe = true;
+                                        dragStarted = false;
+                                        return;
+                                    }
+                                }
                                 Form parent = getComponentForm();
                                 parent.clearComponentsAwaitingRelease();
                             }

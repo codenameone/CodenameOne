@@ -26,6 +26,7 @@ import com.codename1.io.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import java.io.IOException;
@@ -54,6 +55,11 @@ class ZoozPurchase extends Purchase implements Runnable {
         this.nativeInstance = nativeInstance;
         this.ioImpl = ioImpl;
         this.callback = callback;
+    }
+
+    @Override
+    public String getStoreCode() {
+        return Receipt.STORE_CODE_ITUNES;
     }
 
     public boolean isManagedPaymentSupported() {

@@ -1799,7 +1799,8 @@ public class AndroidGradleBuilder extends Executor {
             String k = request.getArg("android.licenseKey", null);
             //if the android.licenseKey is not defined abort the build
             if (k == null) {
-                throw new BuildException("android.licenseKey must be defined in the build hints, grab the key from the \"Service & Apis\" section in the android dev portal\n\n");
+                throw new BuildException("android.licenseKey must be defined in the build hints, grab the key from the \"Monetization setup\" section in the android dev portal" +
+                        ", then paste the Base64-encoded RSA public key into the android.licenseKey build hint.\n\n");
             }
             String cons = request.getArg("android.nonconsumable", null);
             if (cons != null) {
@@ -2866,8 +2867,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontoptimize\n"
                 + dontObfuscate
                 + "\n"
-                + "public *;\n"
-                + "}\n\n"
                 + "-dontwarn com.google.android.gms.**\n"
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"

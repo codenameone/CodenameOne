@@ -1854,6 +1854,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng instanceof GlobalGraphics) {
             ng.checkControl();
@@ -1867,6 +1868,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void drawImage(Object graphics, Object img, int x, int y) {
+        if (img == null) return;
         NativeGraphics ng = (NativeGraphics)graphics;
         //System.out.println("Drawing image " + img);
         ng.checkControl();
@@ -5962,6 +5964,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        if (img == null) return;
         NativeGraphics ng = (NativeGraphics)graphics;
         //System.out.println("Drawing image " + img);
         ng.checkControl();

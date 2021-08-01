@@ -29,6 +29,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
@@ -1317,6 +1318,24 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     @Override
     public Component getIconStyleComponent() {
         return icon;
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 8.0
+     */
+    @Override
+    public void setMaterialIcon(char c, float size) {
+        icon.setMaterialIcon(c, size);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 8.0
+     */
+    @Override
+    public void setFontIcon(Font font, char c, float size) {
+        icon.setFontIcon(font, c, size);
     }
 
     /**
