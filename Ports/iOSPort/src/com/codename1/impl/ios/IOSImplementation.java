@@ -415,6 +415,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             if (currentEditing != null) {
                 editingUpdate(currentEditing.getText(), currentEditing.getCursorPosition(), true);
+                nativeInstance.foldVKB();
             }
         }
     }
@@ -487,10 +488,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
             Form form = cmp.getComponentForm();
-            if (form == null) {
+            if (form == null || form != CN.getCurrentForm()) {
+                instance.stopTextEditing();
                 return;
             }
-            
+
             int x = cmp.getAbsoluteX() + cmp.getScrollX();
             int y = cmp.getAbsoluteY() + cmp.getScrollY();
             int w = cmp.getWidth();
@@ -565,9 +567,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (h < 0) {
                 // There isn't room for the editor at all.
                 Log.p("No room for text editor.  h="+h);
+                instance.stopTextEditing();
                 return;
             }
             if (x <= 0 || y <= 0 || w <= 0 || h <= 0) {
+                instance.stopTextEditing();
                 return;
             }
             nativeInstance.resizeNativeTextView(x,
@@ -671,10 +675,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void setCurrentForm(Form f) {
-        super.setCurrentForm(f);
-        if(isAsyncEditMode() && isEditingText()) {
-            foldKeyboard();
+        if (isEditingText()) {
+            stopTextEditing();
         }
+        super.setCurrentForm(f);
+
     }
 
     @Override
@@ -6171,7 +6176,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             res.complete(value);
         }
     }
-    
+
     
     @Override
     public String getProperty(String key, String defaultValue) {
@@ -6187,6 +6192,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";
         }
+
         if(key.equalsIgnoreCase("User-Agent")) {
             /*if(isTablet()) {
                 return "Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/531.21.10";
