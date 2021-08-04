@@ -2230,9 +2230,29 @@ public class CSSTheme {
                 */
             }
             Image resimg = res.getImage(imageIdStr);
+            Integer defaultSourceDpi = null;
+            if (constants.containsKey("defaultSourceDPIInt")) {
+                Object v = constants.get("defaultSourceDPIInt");
+                if (v instanceof String) {
+                    defaultSourceDpi = Integer.parseInt((String)v);
+
+                } else if (v instanceof Number) {
+                    defaultSourceDpi = ((Number) v).intValue();
+                } else if (v instanceof ScaledUnit) {
+                    ScaledUnit su = (ScaledUnit)v;
+                    defaultSourceDpi = su.getIntegerValue();
+
+                } else {
+                    throw new IllegalArgumentException("defaultSourceDPIInt constant should be a String or a number but found "+v.getClass());
+                }
+            }
             if (resimg != null) {
                 ImageMetadata md = imagesMetadata.get(imageIdStr);
                 int srcDpi = (int)currentDpi;
+                if (defaultSourceDpi != null) {
+                    srcDpi = defaultSourceDpi;
+                }
+
                 if (styles.containsKey("cn1-source-dpi")) {
                 
                     srcDpi  = (int)((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
@@ -2291,12 +2311,19 @@ public class CSSTheme {
             
             
             if (styles.containsKey("cn1-source-dpi")) {
-                double densityVal = ((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
-                sourceDpi = (int)Math.round(densityVal);
+                double densityVal = ((ScaledUnit) styles.get("cn1-source-dpi")).getNumericValue();
+                sourceDpi = (int) Math.round(densityVal);
                 if (Math.abs(densityVal) < 0.5) {
                     resm.targetDensity = 0;
                 } else {
                     resm.targetDensity = getDensityForDpi(densityVal);
+                }
+            } else if (defaultSourceDpi != null) {
+                sourceDpi = defaultSourceDpi;
+                if (Math.abs(sourceDpi) < 0.5) {
+                    resm.targetDensity = 0;
+                } else {
+                    resm.targetDensity = getDensityForDpi(sourceDpi);
                 }
             } else if (dpis[0] > 0) {
                 resm.targetDensity = getImageDensity(encImg);
@@ -2312,6 +2339,8 @@ public class CSSTheme {
                     resm.setMultiImage(false);
                     
                 }
+            } else if (sourceDpi == 0) {
+                resm.setMultiImage(false);
             }
             
             
