@@ -10502,11 +10502,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     try {
                         final AudioFormat format = getAudioFormat();
                         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
                         if (!AudioSystem.isLineSupported(info)) {
                             fireMediaStateChange(State.Playing);
                             fireMediaStateChange(State.Paused);
                             
-                            throw new RuntimeException("Audio format not supported on this platform");
+                            throw new RuntimeException("Failed to access microphone. Check that the microphone is connected and that the app has permission to use it.");
                         }
                         line = (TargetDataLine) AudioSystem.getLine(info);
                         line.open(format);
