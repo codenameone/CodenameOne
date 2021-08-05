@@ -1584,11 +1584,22 @@ public class IPhoneBuilder extends Executor {
                                 buildSettingsMap.put(key, val);
 
                             }
+
                             String extensionName = appExtension.getName();
+                            String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
+                            if (appExtension.isDirectory()) {
+                                for (File f : appExtension.listFiles()) {
+                                    if (f.getName().endsWith(".entitlements")) {
+                                        codeSignEntitlements = extensionName + "/" + f.getName();
+                                    }
+                                }
+                            }
+
+
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
-                            buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", "$(NS_CODE_SIGN_ENTITLEMENTS)");
+                            buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
                             buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
                             buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
 
@@ -1606,6 +1617,7 @@ public class IPhoneBuilder extends Executor {
                                 }
                                 buildSettingsProps.delete();
                             }
+
 
 
                             sb.append("\nservice_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
@@ -1853,7 +1865,7 @@ public class IPhoneBuilder extends Executor {
                 sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
                 if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
                     sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");
-                } else if (!f.getName().endsWith("Info.plist")){
+                } else if (!f.getName().endsWith("Info.plist") && !f.getName().endsWith(".entitlements")){
                     sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
                 }
             } else {
