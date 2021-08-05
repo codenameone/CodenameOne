@@ -4406,6 +4406,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }, 250);
         Display.deinitialize();
+        if (netMonitor != null) {
+            netMonitor.dispose();
+            netMonitor = null;
+        }
         NetworkManager.getInstance().shutdownSync();
         try {
             if (t[0] != null) {
