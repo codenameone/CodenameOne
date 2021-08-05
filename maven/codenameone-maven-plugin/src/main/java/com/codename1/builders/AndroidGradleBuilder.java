@@ -169,6 +169,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.PACKAGE_USAGE_STATS",
             "android.permission.PERSISTENT_ACTIVITY",
             "android.permission.PROCESS_OUTGOING_CALLS",
+            "android.permission.QUERY_ALL_PACKAGES",
             "android.permission.READ_CALENDAR",
             "android.permission.READ_CALL_LOG",
             "android.permission.READ_CONTACTS",
