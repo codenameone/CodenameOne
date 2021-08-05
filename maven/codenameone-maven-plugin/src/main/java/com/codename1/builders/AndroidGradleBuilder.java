@@ -290,7 +290,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean playServicesSafetyNet;
     private boolean playServicesWallet;
     private boolean playServicesWear;
-    private String xPermissions;
+    private String xPermissions, xQueries;
     private int buildToolsVersionInt;
     private String buildToolsVersion;
     private boolean useAndroidX;
@@ -1284,6 +1284,10 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
         }
+        xQueries = "";
+        if (targetSDKVersionInt >= 30) {
+            xQueries = "<queries>\n" + request.getArg("android.manifest.queries", "") + "</queries>\n";
+        }
 
         //Delete the Facebook implemetation if this app does not use FB.
         if (!facebookSupported) {
@@ -2013,6 +2017,7 @@ public class AndroidGradleBuilder extends Executor {
                 + externalStoragePermission
                 + permissions
                 + "  " + xPermissions
+                + "  " + xQueries
                 + "</manifest>\n";
         try {
             OutputStream manifestSourceStream = new FileOutputStream(manifestFile);
