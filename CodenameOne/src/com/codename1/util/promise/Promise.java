@@ -101,7 +101,7 @@ public class Promise<T> {
     public Promise(ExecutorFunction executor) {
         resolve = new Functor<T, Object>() {
             @Override
-            public Object call(T o) {
+            public Object call(final T o) {
                 if (!CN.isEdt()) {
                     CN.callSerially(new Runnable() {
                         @Override
@@ -120,7 +120,7 @@ public class Promise<T> {
         };
         reject = new Functor<Throwable, Object>() {
             @Override
-            public Object call(Throwable o) {
+            public Object call(final Throwable o) {
                 if (!CN.isEdt()) {
                     CN.callSerially(new Runnable() {
                         @Override
@@ -152,7 +152,7 @@ public class Promise<T> {
      * @param resolved Whether the promise was resolved.  If {@literal true}, it will call the resolve
      * handler.  If {@literal false}, it will call the reject handler.
      */
-    private void processThens(Object o, boolean resolved) {
+    private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {
             CN.callSerially(new Runnable() {
                 @Override
@@ -199,7 +199,7 @@ public class Promise<T> {
      * @param rejectionFunc
      * @return
      */
-    public Promise ready(SuccessCallback<T> resolutionFunc, SuccessCallback<Throwable> rejectionFunc) {
+    public Promise ready(final SuccessCallback<T> resolutionFunc, final SuccessCallback<Throwable> rejectionFunc) {
         return then(resolutionFunc == null ? null : new Functor<T, Object>() {
             @Override
             public Object call(T o) {
@@ -358,13 +358,13 @@ public class Promise<T> {
      * @return
      * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
      */
-    public static Promise all(Promise... promises) {
+    public static Promise all(final Promise... promises) {
 
         return new Promise(new ExecutorFunction() {
             @Override
-            public void call(Functor resolve, Functor reject) {
+            public void call(final Functor resolve, final Functor reject) {
                 final int[] complete = new int[1];
-                int len = promises.length;
+                final int len = promises.length;
                 final Object[] results = new Object[len];
                 if (len > 0) {
                     for (int i = 0; i < len; i++) {
@@ -419,12 +419,12 @@ public class Promise<T> {
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
      *
      */
-    public static Promise allSettled(Promise... promises) {
+    public static Promise allSettled(final Promise... promises) {
         return new Promise(new ExecutorFunction() {
             @Override
-            public void call(Functor resolve, Functor reject) {
+            public void call(final Functor resolve, final Functor reject) {
                 final int[] complete = new int[1];
-                int len = promises.length;
+                final int len = promises.length;
                 if (len > 0) {
                     for (int i = 0; i < len; i++) {
                         Promise p = promises[i];
@@ -454,9 +454,9 @@ public class Promise<T> {
      * @return
      */
     public T await() {
-        boolean[] complete = new boolean[1];
-        Object[] out = new Object[1];
-        Throwable[] ex = new Throwable[1];
+        final boolean[] complete = new boolean[1];
+        final Object[] out = new Object[1];
+        final Throwable[] ex = new Throwable[1];
         this.onSuccess(new SuccessCallback<T>() {
             @Override
             public void onSucess(T res) {
@@ -494,7 +494,7 @@ public class Promise<T> {
         return (T)out[0];
     }
 
-    public static <V> Promise<V> resolve(V value) {
+    public static <V> Promise<V> resolve(final V value) {
         return new Promise<V>(new ExecutorFunction() {
             @Override
             public void call(Functor resolutionFunc, Functor rejectionFunc) {
@@ -503,7 +503,7 @@ public class Promise<T> {
         });
     }
 
-    public static Promise reject(Throwable err) {
+    public static Promise reject(final Throwable err) {
         return new Promise(new ExecutorFunction() {
             @Override
             public void call(Functor resolve, Functor reject) {
@@ -512,10 +512,10 @@ public class Promise<T> {
         });
     }
 
-    public static <V> Promise<V> promisify(AsyncResource<V> res) {
+    public static <V> Promise<V> promisify(final AsyncResource<V> res) {
         return new Promise<V>(new ExecutorFunction() {
             @Override
-            public void call(Functor resolutionFunc, Functor rejectionFunc) {
+            public void call(final Functor resolutionFunc, final Functor rejectionFunc) {
                 res.onResult(new AsyncResult<V>() {
                     @Override
                     public void onReady(V r, Throwable err) {
@@ -531,7 +531,7 @@ public class Promise<T> {
     }
 
     public AsyncResource<T> asAsyncResource() {
-        AsyncResource<T> out = new AsyncResource<T>();
+        final AsyncResource<T> out = new AsyncResource<T>();
         this.onSuccess(new SuccessCallback<T>() {
             @Override
             public void onSucess(T res) {
