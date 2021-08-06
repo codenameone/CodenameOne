@@ -1,10 +1,33 @@
-package ca.weblite.demos.cn1gram.util.promise;
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.promise;
 
 
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 import com.codename1.util.SuccessCallback;
 import java.util.LinkedList;
 import java.util.List;
@@ -76,26 +99,42 @@ public class Promise<T> {
      * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise
      */
     public Promise(ExecutorFunction executor) {
-        resolve = o -> {
-            if (!CN.isEdt()) {
-                CN.callSerially(()->resolve.call(o));
-                return null;
-            }
-            state = State.Fulfilled;
-            value = (T)o;
-            processThens(o, true);
-            return value;
+        resolve = new Functor<T, Object>() {
+            @Override
+            public Object call(T o) {
+                if (!CN.isEdt()) {
+                    CN.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            resolve.call(o);
+                        }
+                    });
+                    return null;
+                }
+                state = State.Fulfilled;
+                value = (T) o;
+                Promise.this.processThens(o, true);
+                return value;
 
-        };
-        reject = o -> {
-            if (!CN.isEdt()) {
-                CN.callSerially(()->reject.call(o));
-                return null;
             }
-            state = State.Rejected;
-            error = (Throwable)o;
-            processThens(o, false);
-            return error;
+        };
+        reject = new Functor<Throwable, Object>() {
+            @Override
+            public Object call(Throwable o) {
+                if (!CN.isEdt()) {
+                    CN.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            reject.call(o);
+                        }
+                    });
+                    return null;
+                }
+                state = State.Rejected;
+                error = (Throwable) o;
+                Promise.this.processThens(o, false);
+                return error;
+            }
         };
         if (executor != null) {
             executor.call(resolve, reject);
@@ -115,7 +154,12 @@ public class Promise<T> {
      */
     private void processThens(Object o, boolean resolved) {
         if (!CN.isEdt()) {
-            CN.callSerially(()->processThens(o, resolved));
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    Promise.this.processThens(o, resolved);
+                }
+            });
             return;
         }
         while (!then.isEmpty()) {
@@ -156,12 +200,18 @@ public class Promise<T> {
      * @return
      */
     public Promise ready(SuccessCallback<T> resolutionFunc, SuccessCallback<Throwable> rejectionFunc) {
-        return then(resolutionFunc == null ? null : o->{
-            resolutionFunc.onSucess((T)o);
-            return null;
-        }, rejectionFunc == null ? null : o->{
-            rejectionFunc.onSucess((Throwable)o);
-            return null;
+        return then(resolutionFunc == null ? null : new Functor<T, Object>() {
+            @Override
+            public Object call(T o) {
+                resolutionFunc.onSucess((T) o);
+                return null;
+            }
+        }, rejectionFunc == null ? null : new Functor<Throwable, Object>() {
+            @Override
+            public Object call(Throwable o) {
+                rejectionFunc.onSucess((Throwable) o);
+                return null;
+            }
         });
     }
 
@@ -234,11 +284,19 @@ public class Promise<T> {
      */
     public Promise then(Functor<T,?> resolutionFunc, Functor<Throwable,?> rejectionFunc) {
         if (resolutionFunc == null) {
-            resolutionFunc = o -> { return o; };
+            resolutionFunc = new Functor<T, Object>() {
+                @Override
+                public Object call(T o) {
+                    return o;
+                }
+            };
         }
         if (rejectionFunc == null) {
-            rejectionFunc = o -> {
-                throw (RuntimeException)o;
+            rejectionFunc = new Functor<Throwable, Object>() {
+                @Override
+                public Object call(Throwable o) {
+                    throw (RuntimeException) o;
+                }
             };
         }
 
@@ -302,31 +360,40 @@ public class Promise<T> {
      */
     public static Promise all(Promise... promises) {
 
-        return new Promise((final Functor resolve, final Functor reject) -> {
-            final int[] complete = new int[1];
-            int len = promises.length;
-            final Object[] results = new Object[len];
-            if (len > 0) {
-                for (int i=0; i<len; i++) {
-                    final int index = i;
-                    final Promise p = promises[i];
-                    p.then(res -> {
+        return new Promise(new ExecutorFunction() {
+            @Override
+            public void call(Functor resolve, Functor reject) {
+                final int[] complete = new int[1];
+                int len = promises.length;
+                final Object[] results = new Object[len];
+                if (len > 0) {
+                    for (int i = 0; i < len; i++) {
+                        final int index = i;
+                        final Promise p = promises[i];
+                        p.then(new Functor() {
+                            @Override
+                            public Object call(Object res) {
 
-                        results[index] = res;
-                        complete[0]++;
-                        if (complete[0] == len) {
-                            resolve.call(results);
-                        }
-                        return null;
-                    }).except(error-> {
-                        reject.call(error);
-                        return null;
-                    });
+                                results[index] = res;
+                                complete[0]++;
+                                if (complete[0] == len) {
+                                    resolve.call(results);
+                                }
+                                return null;
+                            }
+                        }).except(new Functor() {
+                            @Override
+                            public Object call(Object error) {
+                                reject.call(error);
+                                return null;
+                            }
+                        });
+                    }
+                } else {
+                    resolve.call(results);
                 }
-            } else {
-                resolve.call(results);
-            }
 
+            }
         });
     }
 
@@ -353,23 +420,29 @@ public class Promise<T> {
      *
      */
     public static Promise allSettled(Promise... promises) {
-        return new Promise((resolve, reject) -> {
-            final int[] complete = new int[1];
-            int len = promises.length;
-            if (len > 0) {
-                for (int i=0; i<len; i++) {
-                    Promise p = promises[i];
-                    p.always(res->{
-                        complete[0]++;
-                        if (complete[0] == len) {
-                            resolve.call(promises);
-                        }
+        return new Promise(new ExecutorFunction() {
+            @Override
+            public void call(Functor resolve, Functor reject) {
+                final int[] complete = new int[1];
+                int len = promises.length;
+                if (len > 0) {
+                    for (int i = 0; i < len; i++) {
+                        Promise p = promises[i];
+                        p.always(new Functor() {
+                            @Override
+                            public Object call(Object res) {
+                                complete[0]++;
+                                if (complete[0] == len) {
+                                    resolve.call(promises);
+                                }
 
-                        return null;
-                    });
+                                return null;
+                            }
+                        });
+                    }
+                } else {
+                    resolve.call(promises);
                 }
-            } else {
-                resolve.call(promises);
             }
         });
     }
@@ -384,25 +457,34 @@ public class Promise<T> {
         boolean[] complete = new boolean[1];
         Object[] out = new Object[1];
         Throwable[] ex = new Throwable[1];
-        this.onSuccess(res->{
-            synchronized(complete) {
-                out[0] = res;
-                complete[0] = true;
-                complete.notifyAll();
+        this.onSuccess(new SuccessCallback<T>() {
+            @Override
+            public void onSucess(T res) {
+                synchronized (complete) {
+                    out[0] = res;
+                    complete[0] = true;
+                    complete.notifyAll();
+                }
             }
-        }).onFail(res->{
-            synchronized(complete) {
-                ex[0] = (Throwable)res;
-                complete[0] = true;
-                complete.notifyAll();
+        }).onFail(new SuccessCallback() {
+            @Override
+            public void onSucess(Object res) {
+                synchronized (complete) {
+                    ex[0] = (Throwable) res;
+                    complete[0] = true;
+                    complete.notifyAll();
 
+                }
             }
         });
 
         while (!complete[0]) {
-            invokeAndBlock(()->{
-                synchronized(complete) {
-                    Util.wait(complete, 500);
+            invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (complete) {
+                        Util.wait(complete, 500);
+                    }
                 }
             });
         }
@@ -413,36 +495,54 @@ public class Promise<T> {
     }
 
     public static <V> Promise<V> resolve(V value) {
-        return new Promise<>((resolutionFunc, rejectionFunc) -> {
-            resolutionFunc.call(value);
+        return new Promise<V>(new ExecutorFunction() {
+            @Override
+            public void call(Functor resolutionFunc, Functor rejectionFunc) {
+                resolutionFunc.call(value);
+            }
         });
     }
 
     public static Promise reject(Throwable err) {
-        return new Promise((resolve, reject) -> {
-            reject(err);
+        return new Promise(new ExecutorFunction() {
+            @Override
+            public void call(Functor resolve, Functor reject) {
+                reject(err);
+            }
         });
     }
 
     public static <V> Promise<V> promisify(AsyncResource<V> res) {
-        return new Promise<V>((resolutionFunc, rejectionFunc) -> {
-            res.onResult((r, err) -> {
-                if (err != null) {
-                    rejectionFunc.call(err);
-                } else {
-                    resolutionFunc.call(r);
-                }
-            });
+        return new Promise<V>(new ExecutorFunction() {
+            @Override
+            public void call(Functor resolutionFunc, Functor rejectionFunc) {
+                res.onResult(new AsyncResult<V>() {
+                    @Override
+                    public void onReady(V r, Throwable err) {
+                        if (err != null) {
+                            rejectionFunc.call(err);
+                        } else {
+                            resolutionFunc.call(r);
+                        }
+                    }
+                });
+            }
         });
     }
 
     public AsyncResource<T> asAsyncResource() {
         AsyncResource<T> out = new AsyncResource<T>();
-        this.onSuccess(res->{
-            out.complete(res);
+        this.onSuccess(new SuccessCallback<T>() {
+            @Override
+            public void onSucess(T res) {
+                out.complete(res);
+            }
         });
-        this.onFail(err->{
-            out.error(err);
+        this.onFail(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable err) {
+                out.error(err);
+            }
         });
         return out;
     }
