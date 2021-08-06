@@ -53,7 +53,6 @@ import static com.codename1.ui.CN.invokeAndBlock;
  *
  * @author shannah
  * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">MDN documentation for Promise</a>
- *
  * @since 8.0
  */
 public class Promise<T> {

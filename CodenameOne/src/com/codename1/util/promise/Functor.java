@@ -22,9 +22,9 @@
  */
 package com.codename1.util.promise;
 
-
 /**
- * Encapsulates a function.  Used by Promise for callbacks that return a value.
+ * Promise API functor {@link com.codename1.util.promise.Promise}
+ *
  * @author shannah
  * @since 8.0
  */
@@ -35,5 +35,5 @@ public interface Functor<T,V> {
      * @param arg Argument for the function.
      * @return Function return value.
      */
-    public V call(T arg);
+    V call(T arg);
 }

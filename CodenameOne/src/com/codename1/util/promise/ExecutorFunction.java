@@ -24,7 +24,7 @@ package com.codename1.util.promise;
 
 
 /**
- * An executor function passed to a promise.
+ * Promise API function {@link com.codename1.util.promise.Promise}
  * @author shannah
  *
  * @since 8.0
@@ -35,5 +35,5 @@ public interface ExecutorFunction {
      * @param resolutionFunc Callback function to be called on resolution.
      * @param rejectionFunc Callback function to be called on rejection.
      */
-    public void call(Functor resolutionFunc, Functor rejectionFunc);
+    void call(Functor resolutionFunc, Functor rejectionFunc);
 }
