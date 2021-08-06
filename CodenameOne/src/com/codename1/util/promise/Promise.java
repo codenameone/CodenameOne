@@ -1,13 +1,37 @@
-package ca.weblite.demos.cn1gram.util.promise;
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.promise;
 
 
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
-import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 import com.codename1.util.SuccessCallback;
+
 import java.util.LinkedList;
-import java.util.List;
+
+import static com.codename1.ui.CN.invokeAndBlock;
 
 /**
  * An implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">Promise</a> for
@@ -18,31 +42,33 @@ import java.util.List;
  * <li>Instead of {@literal finally()}, we use {@literal always()}</li>
  * </ol>
  *
- * <p>Since {@link #then(com.codename1.webrtc.Functor, com.codename1.webrtc.Functor) }, {@link #except(com.codename1.webrtc.Functor) },
- * and {@link #always(com.codename1.webrtc.Functor) } take Functors as parameters, which must have a return value, this implementation
- * provides convenience wrappers {@link #onSuccess(com.codename1.util.SuccessCallback) }, {@link #onFail(com.codename1.util.SuccessCallback) },
- * and {@link #onComplete(com.codename1.util.SuccessCallback) } which take {@link SuccessCallback} objects instead.  For simple cases,
+ * <p>Since {@link #then(Functor, Functor) }, {@link #except(Functor) },
+ * and {@link #always(Functor) } take Functors as parameters, which must have a return value, this implementation
+ * provides convenience wrappers {@link #onSuccess(SuccessCallback) }, {@link #onFail(SuccessCallback) },
+ * and {@link #onComplete(SuccessCallback) } which take {@link SuccessCallback} objects instead.  For simple cases,
  * these wrappers will be easier to use because you don't need to return a dummy {@literal null} at the end of the callback.</p>
  *
  * <p>For more complex cases, where the return value of one Functor is meant to be piped into the subsequent Functor, then the Functor
  * variants should be used.</p>
  *
  * @author shannah
- * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
+ * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">MDN documentation for Promise</a>
+ *
+ * @since 8.0
  */
 public class Promise<T> {
 
-    private LinkedList<PromiseHandler> then = new LinkedList<PromiseHandler>();
+    private final LinkedList<PromiseHandler> then = new LinkedList<PromiseHandler>();
 
-    private Functor<T, ?> resolve;
-    private Functor<Throwable,?> reject;
+    private final Functor<T, ?> resolve;
+    private final Functor<Throwable,?> reject;
 
     private State state = State.Pending;
     private Throwable error;
     private T value;
 
 
-    private class PromiseHandler {
+    private static class PromiseHandler {
         private Promise promise;
         private Functor resolve;
         private Functor reject;
@@ -51,7 +77,7 @@ public class Promise<T> {
     /**
      * Encapsulates the state of a Promise.
      */
-    public static enum State {
+    public enum State {
         /**
          * initial state, neither fulfilled nor rejected.
          */
@@ -73,29 +99,41 @@ public class Promise<T> {
      * Creates a new promise with the given executor function.  Works the same as Javascript equivalent.
      * @param executor The executor function.  This is executed immediately, and should call either the passed {@literal resolve}
      * or {@literal reject} functor to mark success or failure.
-     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise">MDN documentation for Promise</a>
      */
     public Promise(ExecutorFunction executor) {
-        resolve = o -> {
-            if (!CN.isEdt()) {
-                CN.callSerially(()->resolve.call(o));
-                return null;
-            }
-            state = State.Fulfilled;
-            value = (T)o;
-            processThens(o, true);
-            return value;
+        resolve = new Functor<T, Object>() {
+            public Object call(final T o) {
+                if (!CN.isEdt()) {
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            resolve.call(o);
+                        }
+                    });
+                    return null;
+                }
+                state = State.Fulfilled;
+                value = o;
+                Promise.this.processThens(o, true);
+                return value;
 
-        };
-        reject = o -> {
-            if (!CN.isEdt()) {
-                CN.callSerially(()->reject.call(o));
-                return null;
             }
-            state = State.Rejected;
-            error = (Throwable)o;
-            processThens(o, false);
-            return error;
+        };
+        reject = new Functor<Throwable, Object>() {
+            public Object call(final Throwable o) {
+                if (!CN.isEdt()) {
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            reject.call(o);
+                        }
+                    });
+                    return null;
+                }
+                state = State.Rejected;
+                error = o;
+                Promise.this.processThens(o, false);
+                return error;
+            }
         };
         if (executor != null) {
             executor.call(resolve, reject);
@@ -107,15 +145,19 @@ public class Promise<T> {
 
     /**
      * Called when the promise is rejected or resolved to process all handler functions
-     * that were registered via {@link #then(com.codename1.webrtc.Functor, com.codename1.webrtc.Functor) },
-     * {@link #except(com.codename1.webrtc.Functor) }, or {@link #always(com.codename1.webrtc.Functor) }
+     * that were registered via {@link #then(Functor, Functor) },
+     * {@link #except(Functor) }, or {@link #always(Functor) }
      * @param o The value to pipe into the handler functors as an argument.
      * @param resolved Whether the promise was resolved.  If {@literal true}, it will call the resolve
      * handler.  If {@literal false}, it will call the reject handler.
      */
-    private void processThens(Object o, boolean resolved) {
+    private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {
-            CN.callSerially(()->processThens(o, resolved));
+            CN.callSerially(new Runnable() {
+                public void run() {
+                    Promise.this.processThens(o, resolved);
+                }
+            });
             return;
         }
         while (!then.isEmpty()) {
@@ -148,25 +190,29 @@ public class Promise<T> {
     }
 
     /**
-     * A wrapper for {@link #then(com.codename1.webrtc.Functor, com.codename1.webrtc.Functor) } that uses {@link SuccessCallback}
+     * A wrapper for {@link #then(Functor, Functor) } that uses {@link SuccessCallback}
      * instead of {@link Functor}.
      *
-     * @param resolutionFunc
-     * @param rejectionFunc
+     * @param resolutionFunc Callback to run on resolution of promise.
+     * @param rejectionFunc Callback to run on rejection of promise.
      * @return
      */
-    public Promise ready(SuccessCallback<T> resolutionFunc, SuccessCallback<Throwable> rejectionFunc) {
-        return then(resolutionFunc == null ? null : o->{
-            resolutionFunc.onSucess((T)o);
-            return null;
-        }, rejectionFunc == null ? null : o->{
-            rejectionFunc.onSucess((Throwable)o);
-            return null;
+    public Promise ready(final SuccessCallback<T> resolutionFunc, final SuccessCallback<Throwable> rejectionFunc) {
+        return then(resolutionFunc == null ? null : new Functor<T, Object>() {
+            public Object call(T o) {
+                resolutionFunc.onSucess(o);
+                return null;
+            }
+        }, rejectionFunc == null ? null : new Functor<Throwable, Object>() {
+            public Object call(Throwable o) {
+                rejectionFunc.onSucess(o);
+                return null;
+            }
         });
     }
 
     /**
-     * A wrapper for {@link #then(com.codename1.webrtc.Functor) } that uses {@link SuccessCallback} instead
+     * A wrapper for {@link #then(Functor) } that uses {@link SuccessCallback} instead
      * of {@link Functor}.
      * @param resolutionFunc Callback called when project is fulfilled.
      * @return
@@ -177,7 +223,7 @@ public class Promise<T> {
 
 
     /**
-     * A wrapper for {@link #except(com.codename1.webrtc.Functor) } that uses {@link SuccessCallback} instead
+     * A wrapper for {@link #except(Functor) } that uses {@link SuccessCallback} instead
      * of {@link Functor}.
      * @param rejectionFunc
      * @return
@@ -187,7 +233,7 @@ public class Promise<T> {
     }
 
     /**
-     * A wrapper for {@link #always(com.codename1.webrtc.Functor) } that uses {@link SuccessCallback} instead
+     * A wrapper for {@link #always(Functor) } that uses {@link SuccessCallback} instead
      * of {@link Functor}.
      * @param handlerFunc
      * @return
@@ -230,15 +276,21 @@ public class Promise<T> {
      * the resolved value of the promise returned by the handler.</dd>
      * </dl>
      *
-     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then">See MDN documentation for then()</a>
      */
     public Promise then(Functor<T,?> resolutionFunc, Functor<Throwable,?> rejectionFunc) {
         if (resolutionFunc == null) {
-            resolutionFunc = o -> { return o; };
+            resolutionFunc = new Functor<T, Object>() {
+                public Object call(T o) {
+                    return o;
+                }
+            };
         }
         if (rejectionFunc == null) {
-            rejectionFunc = o -> {
-                throw (RuntimeException)o;
+            rejectionFunc = new Functor<Throwable, Object>() {
+                public Object call(Throwable o) {
+                    throw (RuntimeException) o;
+                }
             };
         }
 
@@ -262,7 +314,7 @@ public class Promise<T> {
      * Implementation of Promise.catch(). Named "except" because of Java reserved word..
      * @param rejectionFunc Function called if promise is rejected.
      * @return
-     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch">See MDN documentation for catch()</a>
      */
     public Promise except(Functor<Throwable,?> rejectionFunc) {
         return then(null, rejectionFunc);
@@ -272,7 +324,7 @@ public class Promise<T> {
      * Implementation of Promise.finally().  Named "always" because of Java reserved word.
      * @param handlerFunc
      * @return
-     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally">See MDN documentation for finally()</a>
      */
     public Promise always(Functor handlerFunc) {
         return then(handlerFunc, handlerFunc);
@@ -298,35 +350,41 @@ public class Promise<T> {
      * The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error, and will reject with this first rejection message / error.
      * @param promises
      * @return
-     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all">See MDN documentation for all()</a>
      */
-    public static Promise all(Promise... promises) {
+    public static Promise all(final Promise... promises) {
 
-        return new Promise((final Functor resolve, final Functor reject) -> {
-            final int[] complete = new int[1];
-            int len = promises.length;
-            final Object[] results = new Object[len];
-            if (len > 0) {
-                for (int i=0; i<len; i++) {
-                    final int index = i;
-                    final Promise p = promises[i];
-                    p.then(res -> {
+        return new Promise(new ExecutorFunction() {
+            public void call(final Functor resolve, final Functor reject) {
+                final int[] complete = new int[1];
+                final int len = promises.length;
+                final Object[] results = new Object[len];
+                if (len > 0) {
+                    for (int i = 0; i < len; i++) {
+                        final int index = i;
+                        final Promise p = promises[i];
+                        p.then(new Functor() {
+                            public Object call(Object res) {
 
-                        results[index] = res;
-                        complete[0]++;
-                        if (complete[0] == len) {
-                            resolve.call(results);
-                        }
-                        return null;
-                    }).except(error-> {
-                        reject.call(error);
-                        return null;
-                    });
+                                results[index] = res;
+                                complete[0]++;
+                                if (complete[0] == len) {
+                                    resolve.call(results);
+                                }
+                                return null;
+                            }
+                        }).except(new Functor() {
+                            public Object call(Object error) {
+                                reject.call(error);
+                                return null;
+                            }
+                        });
+                    }
+                } else {
+                    resolve.call(results);
                 }
-            } else {
-                resolve.call(results);
-            }
 
+            }
         });
     }
 
@@ -349,27 +407,31 @@ public class Promise<T> {
      * @param promises
      * @return
      * @see
-     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+     * <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled">See MDN documentation for allSettled()</a>
      *
      */
-    public static Promise allSettled(Promise... promises) {
-        return new Promise((resolve, reject) -> {
-            final int[] complete = new int[1];
-            int len = promises.length;
-            if (len > 0) {
-                for (int i=0; i<len; i++) {
-                    Promise p = promises[i];
-                    p.always(res->{
-                        complete[0]++;
-                        if (complete[0] == len) {
-                            resolve.call(promises);
-                        }
+    public static Promise allSettled(final Promise... promises) {
+        return new Promise(new ExecutorFunction() {
+            public void call(final Functor resolve, Functor reject) {
+                final int[] complete = new int[1];
+                final int len = promises.length;
+                if (len > 0) {
+                    for (int i = 0; i < len; i++) {
+                        Promise p = promises[i];
+                        p.always(new Functor() {
+                            public Object call(Object res) {
+                                complete[0]++;
+                                if (complete[0] == len) {
+                                    resolve.call(promises);
+                                }
 
-                        return null;
-                    });
+                                return null;
+                            }
+                        });
+                    }
+                } else {
+                    resolve.call(promises);
                 }
-            } else {
-                resolve.call(promises);
             }
         });
     }
@@ -381,28 +443,34 @@ public class Promise<T> {
      * @return
      */
     public T await() {
-        boolean[] complete = new boolean[1];
-        Object[] out = new Object[1];
-        Throwable[] ex = new Throwable[1];
-        this.onSuccess(res->{
-            synchronized(complete) {
-                out[0] = res;
-                complete[0] = true;
-                complete.notifyAll();
+        final boolean[] complete = new boolean[1];
+        final Object[] out = new Object[1];
+        final Throwable[] ex = new Throwable[1];
+        this.onSuccess(new SuccessCallback<T>() {
+            public void onSucess(T res) {
+                synchronized (complete) {
+                    out[0] = res;
+                    complete[0] = true;
+                    complete.notifyAll();
+                }
             }
-        }).onFail(res->{
-            synchronized(complete) {
-                ex[0] = (Throwable)res;
-                complete[0] = true;
-                complete.notifyAll();
+        }).onFail(new SuccessCallback() {
+            public void onSucess(Object res) {
+                synchronized (complete) {
+                    ex[0] = (Throwable) res;
+                    complete[0] = true;
+                    complete.notifyAll();
 
+                }
             }
         });
 
         while (!complete[0]) {
-            invokeAndBlock(()->{
-                synchronized(complete) {
-                    Util.wait(complete, 500);
+            invokeAndBlock(new Runnable() {
+                public void run() {
+                    synchronized (complete) {
+                        Util.wait(complete, 500);
+                    }
                 }
             });
         }
@@ -412,37 +480,49 @@ public class Promise<T> {
         return (T)out[0];
     }
 
-    public static <V> Promise<V> resolve(V value) {
-        return new Promise<>((resolutionFunc, rejectionFunc) -> {
-            resolutionFunc.call(value);
+    public static <V> Promise<V> resolve(final V value) {
+        return new Promise<V>(new ExecutorFunction() {
+            public void call(Functor resolutionFunc, Functor rejectionFunc) {
+                resolutionFunc.call(value);
+            }
         });
     }
 
-    public static Promise reject(Throwable err) {
-        return new Promise((resolve, reject) -> {
-            reject(err);
+    public static Promise reject(final Throwable err) {
+        return new Promise(new ExecutorFunction() {
+            public void call(Functor resolve, Functor reject) {
+                reject(err);
+            }
         });
     }
 
-    public static <V> Promise<V> promisify(AsyncResource<V> res) {
-        return new Promise<V>((resolutionFunc, rejectionFunc) -> {
-            res.onResult((r, err) -> {
-                if (err != null) {
-                    rejectionFunc.call(err);
-                } else {
-                    resolutionFunc.call(r);
-                }
-            });
+    public static <V> Promise<V> promisify(final AsyncResource<V> res) {
+        return new Promise<V>(new ExecutorFunction() {
+            public void call(final Functor resolutionFunc, final Functor rejectionFunc) {
+                res.onResult(new AsyncResult<V>() {
+                    public void onReady(V r, Throwable err) {
+                        if (err != null) {
+                            rejectionFunc.call(err);
+                        } else {
+                            resolutionFunc.call(r);
+                        }
+                    }
+                });
+            }
         });
     }
 
     public AsyncResource<T> asAsyncResource() {
-        AsyncResource<T> out = new AsyncResource<T>();
-        this.onSuccess(res->{
-            out.complete(res);
+        final AsyncResource<T> out = new AsyncResource<T>();
+        this.onSuccess(new SuccessCallback<T>() {
+            public void onSucess(T res) {
+                out.complete(res);
+            }
         });
-        this.onFail(err->{
-            out.error(err);
+        this.onFail(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable err) {
+                out.error(err);
+            }
         });
         return out;
     }

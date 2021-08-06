@@ -25,6 +25,8 @@ package com.codename1.util;
 
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
+import com.codename1.util.promise.Promise;
+
 import static com.codename1.ui.CN.invokeAndBlock;
 import static com.codename1.ui.CN.isEdt;
 import java.io.PrintStream;
@@ -628,6 +630,15 @@ public class AsyncResource<V> extends Observable  {
                 onResult.onReady(null, value);
             }
         });
+    }
+
+    /**
+     * Wraps this AsyncResource object as a {@link Promise}
+     * @return A Promise wrapping this AsyncResource.
+     * @since 8.0
+     */
+    public Promise<V> asPromise() {
+        return Promise.promisify(this);
     }
     
     
