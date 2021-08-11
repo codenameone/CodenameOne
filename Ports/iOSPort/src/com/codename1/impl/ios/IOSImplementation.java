@@ -2836,6 +2836,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             geofenceListeners().put(gf.getId(), GeofenceListenerClass.getCanonicalName());
             synchronizeGeofenceListeners();
+            long p = getLocation();
+            if (p <= 0) {
+                throw new RuntimeException("Failed to load location manager.  Check that you have included all applicable location permissions.");
+            }
             nativeInstance.addGeofencing(peer, gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius(), gf.getExpiration(), gf.getId());
             super.addGeoFencing(GeofenceListenerClass, gf); //To change body of generated methods, choose Tools | Templates.
         }
@@ -2846,6 +2850,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             geofenceExpirations().remove(id);
             synchronizeGeofenceListeners();
             synchronizeGeofenceExpirations();
+            long p = getLocation();
+            if (p <= 0) {
+                throw new RuntimeException("Failed to load location manager.  Check that you have included all applicable location permissions.");
+            }
             nativeInstance.removeGeofencing(peer, id);
         }
 
