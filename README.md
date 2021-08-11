@@ -1,5 +1,5 @@
 <h1 align=center>
- <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/06/CN1-Main-Illustration-Dark.jpg" />
+ <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/08/CN1-Banner-Dark-Blue.jpg" />
 </h1>
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=plastic)
