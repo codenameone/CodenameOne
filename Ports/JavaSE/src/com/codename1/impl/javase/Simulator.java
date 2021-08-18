@@ -267,6 +267,7 @@ public class Simulator {
         ((ClassPathLoader)ldr).addExclude("org.cef.");
         
         final ClassLoader fLdr = ldr;
+        Thread.currentThread().setContextClassLoader(fLdr);
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});

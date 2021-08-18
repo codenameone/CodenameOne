@@ -1611,6 +1611,8 @@ public abstract class CodenameOneImplementation {
      */
     public abstract void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
+
+
     /**
      * Fills a rounded rectangle in the same way as drawRoundRect
      * 
@@ -1718,6 +1720,61 @@ public abstract class CodenameOneImplementation {
      * @see drawShape To learn what x, y, w, and h do.
      */
     public void fillShape(Object graphics, Shape shape){}
+
+    /**
+     * Draws a drop shadow for an image onto the given graphics context.
+     *
+     * <p>This is used for the elevation feature.</p>
+     *
+     * <p>Note: This operation is expensive on most platforms as it is not hardware accelerated.  Codename One's elevation functionality
+     * uses this method to generate shadow images which it reuses as much as possible for maximum performance.</p>
+     *
+     * <p>Note: Currently this is not supported on all platforms.  Use {@link #isDrawShadowSupported()} to check for platform support at
+     * runtime.  Use {@link #isDrawShadowFast()} to check for hardware acceleration.</p>
+     *
+     * <p>Note: On iOS, this is only supported for drawing to mutable images - not the global graphics context.</p>
+     *
+     * @param graphics The graphics context.
+     * @param image The image whose raster should be used to generate the shadow.  The alpha channel of this image is used as the
+     *              bases for the shadow projection.
+     * @param x x-coordinate of the graphics context where shadow should be painted.
+     * @param y y-coordinate of the graphics context where shadow should be painted.
+     * @param offsetX The shadow offset X in pixels.
+     * @param offsetY The shadow offset Y in pixels.
+     * @param blurRadius The blur radius in pixels.
+     * @param spreadRadius The shadow spread in pixels.
+     * @param color The shadow color.
+     * @param opacity The shadow opacity.
+     * @since 8.0
+     *
+     * @see Component#paintShadows(Graphics, int, int)
+     * @see Container#paintSurfaceShadows(Graphics)
+     * @see #isDrawShadowSupported()
+     * @see #isDrawShadowFast()
+     */
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+    }
+
+    /**
+     * Checks to see if drawing shadows is supported on this platform.
+     * @return True if the platform supports drawing shadows.
+     * @see #drawShadow(Object, Object, int, int, int, int, int, int, int, float)
+     * @since 8.0
+     */
+    public boolean isDrawShadowSupported() {
+        return false;
+    }
+
+    /**
+     * Checks to see if drawing shadows on this platform is hardware accelerated.
+     * @return True if drawing shadows is hardware accelerated.
+     * @since 8.0
+     *
+     */
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     
     /**
      * Sets the transformation matrix to be applied to all drawing operations. If 

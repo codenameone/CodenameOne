@@ -9914,7 +9914,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
 
+        ag.drawShadow(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 

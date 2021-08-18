@@ -123,6 +123,12 @@ public class Style {
      */
     public static final String OPACITY = "opacity";
 
+
+    /**
+     * Elevation attribute name for the theme hashtable.
+     */
+    public static final String ELEVATION = "elevation";
+
     /**
      * Margin attribute name for the theme hashtable 
      */
@@ -426,6 +432,7 @@ public class Style {
     private byte transparency = (byte) 0xFF; //no transparency
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
+    private int elevation; // the elevation.
 
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
     private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;
@@ -440,7 +447,7 @@ public class Style {
      * The modified flag indicates which portions of the style have changed using
      * bitmask values
      */
-    private int modifiedFlag;
+    private long modifiedFlag;
     /**
      * Used for modified flag
      */
@@ -458,7 +465,7 @@ public class Style {
      * Used for modified flag
      */
     private static final int BG_IMAGE_MODIFIED = 32;
-
+    private static final int TEXT_DECORATION_MODIFIED = 64;
     /**
      * Used for modified flag
      */
@@ -485,7 +492,8 @@ public class Style {
 
     private static final int ALIGNMENT_MODIFIED = 16384;
     private static final int OPACITY_MODIFIED = 32768;
-    private static final int TEXT_DECORATION_MODIFIED = 64;
+    private static final int ELEVATION_MODIFIED = 65536;
+
 
 
     private EventDispatcher listeners;
@@ -550,6 +558,7 @@ public class Style {
         setPaddingUnit(style.paddingUnit);
         setMarginUnit(style.marginUnit);
         setBorder(style.getBorder());
+        elevation = style.elevation;
         opacity = style.opacity;
         modifiedFlag = 0;
         align = style.align;
@@ -624,7 +633,7 @@ public class Style {
      * @param style new values of styles from the current theme
      */
     public void merge(Style style) {
-        int tmp = modifiedFlag;
+        long tmp = modifiedFlag;
 
         if ((modifiedFlag & FG_COLOR_MODIFIED) == 0) {
             setFgColor(style.getFgColor());
@@ -688,8 +697,21 @@ public class Style {
             setAlignment(style.getAlignment());
         }
 
+        if ((modifiedFlag & ELEVATION_MODIFIED) == 0) {
+            setElevation(style.getElevation());
+        }
+
         this.bgPainter = style.bgPainter;
         modifiedFlag = tmp;
+    }
+
+    /**
+     * Gets the elevation value of this style.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @return The elevation value.  Default is 0.
+     * @since 8.0
+     */
+    public int getElevation() {
+        return elevation;
     }
 
     /**
@@ -823,6 +845,34 @@ public class Style {
      */
     public Font getFont() {
         return font;
+    }
+
+    /**
+     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @param elevation The elevation value.
+     * @param override If set to true allows the look and feel/theme to override
+     *      * the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setElevation(int elevation, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setElevation(elevation, override);
+            }
+            return;
+        }
+        if (this.elevation != elevation) {
+            this.elevation = elevation;
+            if (!override) {
+                modifiedFlag |= ELEVATION_MODIFIED;
+            }
+            firePropertyChanged(ELEVATION);
+        }
+
+    }
+
+    public void setElevation(int elevation) {
+        setElevation(elevation, false);
     }
 
     /**

@@ -161,6 +161,12 @@ public class JavaCEFSEPort extends JavaSEPort {
         private int duration;
         private int volume;
         private String lastErrorMessage;
+
+        private final Runnable deinitializeCallback = new Runnable() {
+            public void run() {
+                cleanup();
+            }
+        };
         
         
         /**
@@ -229,7 +235,7 @@ public class JavaCEFSEPort extends JavaSEPort {
             init(uri, isVideo, f, onCompletion, callback);
         }
         public void init(String uri, boolean isVideo, JFrame f,  final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
-            
+            instance.addDeinitializeHook(deinitializeCallback);
             _callback = callback;
             final JSONParser parser = new JSONParser();
             String mediaTag = isVideo ? "video" : "audio";
@@ -417,6 +423,7 @@ public class JavaCEFSEPort extends JavaSEPort {
         }
         
         public void cleanup() {
+            instance.removeDeinitializeHook(deinitializeCallback);
             pause();
             if (bc != null) {
                 bc.cleanup();

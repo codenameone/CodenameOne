@@ -873,6 +873,8 @@ public class CSSTheme {
         int screenWidth=640;
         int screenHeight=960;
         CN1Gradient gradient;
+
+        LexicalUnit next, prev, param;
         
         
         ScaledUnit(LexicalUnit src, double dpi, int screenWidth, int screenHeight) {
@@ -881,6 +883,28 @@ public class CSSTheme {
             this.screenWidth = screenWidth;
             this.screenHeight = screenHeight;
             
+        }
+
+
+
+
+
+        public void setParameters(LexicalUnit params) {
+            this.param = params;
+        }
+
+        private boolean nextLexicalUnitNull;
+        public void setNextLexicalUnit(LexicalUnit next) {
+            this.next = next;
+            nextLexicalUnitNull = (next == null);
+        }
+
+        private boolean prevLexicalUnitNull;
+        public void setPrevLexicalUnit(LexicalUnit prev) {
+
+            this.prev = prev;
+            prevLexicalUnitNull = (prev == null);
+
         }
 
         /**
@@ -918,9 +942,20 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getNextLexicalUnit() {
+            if (next != null || nextLexicalUnitNull) return next;
             LexicalUnit nex = src.getNextLexicalUnit();
-            
-            return nex == null ? null : new ScaledUnit(nex, dpi, screenWidth, screenHeight);
+
+            LexicalUnit out = nex == null ? null : new ScaledUnit(nex, dpi, screenWidth, screenHeight);
+            if (out != null) next = out;
+            return out;
+        }
+
+        private static boolean hasCycle(LexicalUnit lu, ScaledUnit su) {
+            if (lu == su) return true;
+            if (su.src instanceof ScaledUnit) {
+                return hasCycle(lu, (ScaledUnit)su.src);
+            }
+            return false;
         }
         
         public ScaledUnit getNextNumericUnit() {
@@ -938,8 +973,11 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getPreviousLexicalUnit() {
+            if (this.prev != null || prevLexicalUnitNull) return this.prev;
             LexicalUnit prev = src.getPreviousLexicalUnit();
-            return prev == null ? null : new ScaledUnit(prev, dpi, screenWidth, screenHeight);
+            LexicalUnit out =  prev == null ? null : new ScaledUnit(prev, dpi, screenWidth, screenHeight);
+            if (out != null) this.prev = out;
+            return out;
         }
 
         @Override
@@ -973,8 +1011,12 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getParameters() {
+            if (this.param != null) return this.param;
             LexicalUnit param = src.getParameters();
-            return param == null ? null :  new ScaledUnit(param, dpi, screenWidth, screenHeight);
+
+            LexicalUnit out =  param == null ? null :  new ScaledUnit(param, dpi, screenWidth, screenHeight);
+            if (out != null) this.param = out;
+            return out;
         }
 
         String renderAsCSSValue(double targetDpi, int targetScreenWidth, int targetScreenHeight) {
@@ -997,7 +1039,13 @@ public class CSSTheme {
 
                 case LexicalUnit.SAC_FUNCTION: {
                     StringBuilder sb = new StringBuilder();
-                    sb.append(lu.getFunctionName()).append("(");
+                    String fname = lu.getFunctionName();
+                    if ("cn1rgb".equals(fname)) {
+                        fname = "rgb";
+                    } else if ("cn1rgba".equals(fname)) {
+                        fname = "rgba";
+                    }
+                    sb.append(fname).append("(");
                     ScaledUnit val = (ScaledUnit)lu.getParameters();
                     //sb.append(String.valueOf(val));
                     boolean empty = true;
@@ -1121,6 +1169,7 @@ public class CSSTheme {
 
         @Override
         public String toString() {
+
             return src.toString();
         }
         
@@ -1616,6 +1665,16 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, disabledId+"#margin", el.getThemeMargin(disabledStyles));
                 currToken = "disabled marUnit";
                 res.setThemeProperty(themeName, disabledId+"#marUnit", el.getThemeMarginUnit(disabledStyles));
+
+                currToken = "elevation";
+                res.setThemeProperty(themeName, unselId+".elevation", el.getThemeElevation(unselectedStyles));
+                currToken = "selected elevation";
+                res.setThemeProperty(themeName, selId+"#elevation", el.getThemeElevation(selectedStyles));
+                currToken = "pressed elevation";
+                res.setThemeProperty(themeName, pressedId+"#elevation", el.getThemeElevation(pressedStyles));
+                currToken = "disabled elegation";
+                res.setThemeProperty(themeName, disabledId+"#elevation", el.getThemeElevation(disabledStyles));
+
 
                 currToken = "fgColor";
                 res.setThemeProperty(themeName, unselId+".fgColor", el.getThemeFgColor(unselectedStyles));
@@ -4086,6 +4145,13 @@ public class CSSTheme {
             Insets i = getInsets("margin", style);
             return i.top + ","+i.bottom+","+i.left+","+i.right;
         }
+
+        public int getThemeElevation(Map<String, LexicalUnit> style) {
+            if (style.containsKey("elevation")) {
+                return ((ScaledUnit)style.get("elevation")).getIntegerValue();
+            }
+            return 0;
+        }
         
         public byte[] getThemeMarginUnit(Map<String,LexicalUnit> style) {
             if (!style.containsKey("margin-left") && !style.containsKey("margin-top") && !style.containsKey("margin-bottom") && !style.containsKey("margin-right")) {
@@ -4422,7 +4488,9 @@ public class CSSTheme {
             if ("transparent".equals(bgColor.getStringValue())) {
                 return "0";
             }
-            if ("rgba".equals(bgColor.getFunctionName())) {
+            if ("rgb".equals(bgColor.getFunctionName()) || "cn1rgb".equals(bgColor.getFunctionName())) {
+                return "255";
+            } if ("rgba".equals(bgColor.getFunctionName()) || "cn1rgba".equals(bgColor.getFunctionName())) {
                 ScaledUnit r = (ScaledUnit)bgColor.getParameters();
                 ScaledUnit g = r.getNextNumericUnit();
                 ScaledUnit b = g.getNextNumericUnit();
@@ -5214,6 +5282,11 @@ public class CSSTheme {
                 
             case "opacity" : {
                 style.put("opacity", value);
+                break;
+            }
+
+            case "elevation" : {
+                style.put("elevation", value);
                 break;
             }
                 
@@ -6101,7 +6174,7 @@ public class CSSTheme {
                             colorSet = true;
                             break;
                         case LexicalUnit.SAC_FUNCTION:
-                            if ("rgba".equals(value.getFunctionName())) {
+                            if ("rgba".equals(value.getFunctionName()) || "cn1rgba".equals(value.getFunctionName()) || "cn1rgb".equals(value.getFunctionName())) {
                                 apply(style, "cn1-box-shadow-color", value);
                             } else {
                                 throw new RuntimeException("Unrecognized function when parsing box-shadow "+value.getFunctionName());
@@ -6385,7 +6458,10 @@ public class CSSTheme {
             if ("transparent".equals(bgColor.getStringValue())) {
                 return 0;
             }
-            if ("rgba".equals(bgColor.getFunctionName())) {
+            if ("rgb".equals(bgColor.getFunctionName()) || "cn1rgb".equals(bgColor.getFunctionName())) {
+                return 255;
+            }
+            if ("rgba".equals(bgColor.getFunctionName()) || "cn1rgba".equals(bgColor.getFunctionName())) {
                 ScaledUnit r = (ScaledUnit)bgColor.getParameters();
                 ScaledUnit g = r.getNextNumericUnit();
                 ScaledUnit b = g.getNextNumericUnit();
@@ -6411,8 +6487,78 @@ public class CSSTheme {
     static String getARGBHexString(LexicalUnit color) {
         return "#" + leftPad(Integer.toHexString(getColorInt(color)), 6) + leftPad(Integer.toHexString(getColorAlphaInt(color)), 2);
     }
-    
+
     static String getColorString(LexicalUnit color) {
+        if (color == null) return null;
+        switch (color.getLexicalUnitType()) {
+            case LexicalUnit.SAC_IDENT:
+            case LexicalUnit.SAC_STRING_VALUE:
+                String colorStr = color.getStringValue();
+                if ("none".equals(colorStr)) {
+                    return null;
+                }
+                if (colorStr.startsWith("attr(")) {
+                    colorStr = colorStr.substring(colorStr.indexOf("(")+1, colorStr.lastIndexOf(")"));
+                }
+                if (colorStr.startsWith("color")) {
+                    colorStr = colorStr.replace("color", "rgb");
+                }
+                Color c = Color.web(colorStr);
+                return String.format( "%02X%02X%02X",
+                        (int)( c.getRed() * 255 ),
+                        (int)( c.getGreen() * 255 ),
+                        (int)( c.getBlue() * 255 ) );
+
+            case LexicalUnit.SAC_RGBCOLOR: {
+                ScaledUnit red = (ScaledUnit)color.getParameters();
+                ScaledUnit green = (ScaledUnit)red.getNextLexicalUnit();
+                if (green.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA)
+                    green = (ScaledUnit)green.getNextLexicalUnit();
+                ScaledUnit blue = (ScaledUnit)green.getNextLexicalUnit();
+                if (blue.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    blue = (ScaledUnit)blue.getNextLexicalUnit();
+                }
+                return String.format( "%02X%02X%02X",
+                        red.getIntegerValue(),
+                        green.getIntegerValue(),
+                        blue.getIntegerValue());
+
+            }
+            case LexicalUnit.SAC_FUNCTION: {
+                if ("cn1rgb".equals(color.getFunctionName()) || "rgb".equals(color.getFunctionName()) || "cn1rgba".equals(color.getFunctionName()) || "rgba".equals(color.getFunctionName())) {
+                    ScaledUnit red = (ScaledUnit)color.getParameters();
+                    ScaledUnit green = (ScaledUnit)red.getNextLexicalUnit();
+                    if (green == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for green parameter: "+color);
+                    }
+                    if (green.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                        green = (ScaledUnit) green.getNextLexicalUnit();
+                    }
+                    if (green == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for green parameter: "+color);
+                    }
+                    ScaledUnit blue = (ScaledUnit)green.getNextLexicalUnit();
+                    if (blue == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for blue parameter: "+color);
+                    }
+                    if (blue.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                        blue = (ScaledUnit)blue.getNextLexicalUnit();
+                    }
+                    if (blue == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for blue parameter: "+color);
+                    }
+                    return String.format( "%02X%02X%02X",
+                            red.getIntegerValue(),
+                            green.getIntegerValue(),
+                            blue.getIntegerValue());
+                }
+            }
+            default:
+                throw new RuntimeException("Unsupported color type "+color.getLexicalUnitType());
+        }
+    }
+
+    static String getColorString_old(LexicalUnit color) {
         
         if (color == null) {
                 return null;
@@ -6443,7 +6589,7 @@ public class CSSTheme {
                     
                 }
                 case LexicalUnit.SAC_FUNCTION: {
-                    if ("rgba".equals(color.getFunctionName())) {
+                    if ("rgba".equals(color.getFunctionName()) || "cn1rgba".equals(color.getFunctionName()) || "cn1rgb".equals(color.getFunctionName())) {
                        
                         Color c = Color.web(color+"");
                         return String.format( "%02X%02X%02X",
@@ -6529,8 +6675,16 @@ public class CSSTheme {
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
             String stringContents = Util.readToString(stream);
-            
+
+            // The flute parser chokes on properties beginning with -- so we need to replace these with cn1 prefix
+            // for CSS variable support.
             stringContents = stringContents.replaceAll("([\\(\\W])(--[a-zA-Z0-9\\-]+)", "$1cn1$2");
+
+            // Flute chokes on embedded var() functions inside an rgb or rgba function.  Hoping to support it by changing the
+            // function name to cn1rgb() and cn1rgba() respectively.
+            stringContents = stringContents.replaceAll("\\brgb\\(", "cn1rgb(");
+            stringContents = stringContents.replaceAll("\\brgba\\(", "cn1rgba(");
+
             
             source.setCharacterStream(new CharArrayReader(stringContents.toCharArray()));
             source.setURI(uri.toString());
@@ -6659,51 +6813,96 @@ public class CSSTheme {
                         }
                     }
                 }
-                private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
-                    if (string.startsWith("cn1--")) {
-                        
-                        variables.put(string, lu);
-                        return;
+
+                private ScaledUnit last(LexicalUnit lu) {
+
+                    while (lu.getNextLexicalUnit() != null) {
+                        lu = lu.getNextLexicalUnit();
                     }
+                    return (lu instanceof ScaledUnit) ? (ScaledUnit)lu : new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+                }
+
+                /**
+                 * Evaluates a LexicalUnit in the current parser position.  This will expand any variables.  It will
+                 * continue to evaluate the next lexical unit, until it reaches the end of the current lexical unit chain.
+                 * @param lu The lexical unit to evaluate.
+                 * @return
+                 * @throws CSSException
+                 */
+                private ScaledUnit evaluate(LexicalUnit lu) throws CSSException {
                     if (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "var".equals(lu.getFunctionName())) {
-                        
                         LexicalUnit parameters = lu.getParameters();
                         String varname = parameters.getStringValue();
-                        if (variables.containsKey(varname)) {
-                            property(string, variables.get(varname), bln);
-                            return;
+
+                        LexicalUnit varVal = variables.get(varname);
+                        ScaledUnit su;
+                        if (varVal == null && parameters.getNextLexicalUnit() != null) {
+                            varVal = parameters.getNextLexicalUnit();
+                            su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
+
+                        } else if (varVal == null) {
+                            su = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
                         } else {
-                            parameters = parameters.getNextLexicalUnit();
-                            if (parameters != null && parameters.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
-                                parameters = parameters.getNextLexicalUnit();
-                            }
-                            if (parameters != null) {
-                                property(string, parameters, bln);
-                                return;
-                            } else {
-                                System.err.println("Reference to variable "+string+" not found.  Skipping property");
-                                return;
-                            }
+                            su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
                         }
-                        
+                        // Evaluate the variable value in case it also includes other variables that need to be evaluated.
+                        //ScaledUnit su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
+                        LexicalUnit toAppend = lu.getNextLexicalUnit();
+                        ScaledUnit last = last(su);
+                        if (toAppend != null) {
+                            toAppend = evaluate(toAppend);
+                            last.setNextLexicalUnit(toAppend);
+                            ((ScaledUnit) toAppend).setPrevLexicalUnit(last);
+                        } else {
+                            last.setNextLexicalUnit(null);
+                        }
+                        return su;
+                    } else {
+
+                        ScaledUnit su = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+                        LexicalUnit nex = su.getNextLexicalUnit();
+                        if (su.getParameters() != null) {
+                            su.setParameters(evaluate(su.getParameters()));
+                        }
+                        if (nex != null) {
+
+
+                            ScaledUnit snex = evaluate(nex);
+                            su.setNextLexicalUnit(snex);
+                            snex.setPrevLexicalUnit(su);
+
+                        }
+                        return su;
+
                     }
-                    lu = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+
+
+                }
+
+                private void property_(String string, LexicalUnit _lu, boolean bln) throws CSSException {
+                    if (string.startsWith("cn1--")) {
+                        
+                        variables.put(string, _lu);
+                        return;
+                    }
+
+                    ScaledUnit su = evaluate(_lu);
                     if (currFontFace != null) {
                         switch (string) {
                             case "font-family" :
-                                currFontFace.fontFamily = lu;
+                                currFontFace.fontFamily = su;
                                 break;
                             case "font-style" :
-                                currFontFace.fontStyle = lu;
+                                currFontFace.fontStyle = su;
                                 break;
                             case "font-stretch" :
-                                currFontFace.fontStretch = lu;
+                                currFontFace.fontStretch = su;
                                 break;
                             case "src" :
-                                currFontFace.src = lu;
+                                currFontFace.src = su;
                                 break;
                             case "font-weight" :
-                                currFontFace.fontWeight = lu;
+                                currFontFace.fontWeight = su;
                                 break;
                         }
                     } else {
@@ -6713,10 +6912,10 @@ public class CSSTheme {
                             Selector sel = currSelectors.item(i);
                             if (currMediaList != null) {
                                 for (String mediaPrefix : getMediaPrefixes(currMediaList)) {
-                                    theme.apply(mediaPrefix, sel, string, lu);
+                                    theme.apply(mediaPrefix, sel, string, su);
                                 }
                             } else {
-                                theme.apply(null, sel, string, lu);
+                                theme.apply(null, sel, string, su);
                             }
 
                         }

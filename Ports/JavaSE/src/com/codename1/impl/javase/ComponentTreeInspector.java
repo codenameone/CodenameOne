@@ -35,6 +35,8 @@ import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.awt.Desktop;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -45,7 +47,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JPopupMenu;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -148,6 +152,37 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
             }
         });
         
+        JPopupMenu contextMenu = new JPopupMenu();
+        JMenuItem printComponent = new JMenuItem("Print to Console");
+        printComponent.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                com.codename1.ui.CN.callSerially(new Runnable() {
+                    public void run() {
+                        if (currentComponent != null) {
+                            JavaSEPort.dumpComponentProperties(currentComponent);
+                        }
+                    }
+                });
+                
+            }
+            
+        });
+        contextMenu.add(printComponent);
+        
+        componentTree.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+
+                    int row = componentTree.getClosestRowForLocation(e.getX(), e.getY());
+                    componentTree.setSelectionRow(row);
+                    contextMenu.show(e.getComponent(), e.getX(), e.getY());
+                }
+            }
+            
+        });
+        
         componentTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
             @Override
@@ -164,6 +199,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
             }
             
         });
+        
         componentTree.getSelectionModel().addTreeSelectionListener(new TreeSelectionListener() {
             public void valueChanged(TreeSelectionEvent e) {
                 if(e.getPath() != null) {

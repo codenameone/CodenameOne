@@ -112,7 +112,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 11;
+    private static final short MINOR_VERSION = 12;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -2074,6 +2074,10 @@ public class EditableResources extends Resources implements TreeModel {
 
             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                 output.writeByte(((Number)theme.get(key)).intValue());
+                continue;
+            }
+            if (key.endsWith(Style.ELEVATION)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
                 continue;
             }
 

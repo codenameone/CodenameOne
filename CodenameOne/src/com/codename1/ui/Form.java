@@ -2693,6 +2693,17 @@ public class Form extends Container {
             super.repaint(cmp);
             return;
         }
+
+
+        if (cmp.hasElevation()) {
+            Container surface = cmp.findSurface();
+            if (surface != null) {
+                surface.repaint(cmp.getAbsoluteX() + cmp.calculateShadowOffsetX(24), cmp.getAbsoluteY() + cmp.calculateShadowOffsetY(24), cmp.calculateShadowWidth(24), cmp.calculateShadowHeight(24));
+                return;
+            }
+        }
+
+
         if (isVisible() && CN.getCurrentForm() == this) {
             Display.getInstance().repaint(cmp);
         }

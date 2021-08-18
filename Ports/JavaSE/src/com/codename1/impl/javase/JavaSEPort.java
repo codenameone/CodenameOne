@@ -82,6 +82,7 @@ import java.io.EOFException;
 import java.io.FilenameFilter;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -197,6 +198,8 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
+import com.jhlabs.image.ShadowFilter;
 import org.sqlite.SQLiteConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
@@ -1185,6 +1188,51 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         
+    }
+
+    public static void dumpComponentProperties(Component cmp) {
+        dumpComponentProperties(cmp, "");
+    }
+
+
+    private static String methodPropertyName_(String name) {
+        return name.startsWith("get") ? name.substring(3) : name.startsWith("is") ? name.substring(2) : name;
+    }
+
+    /**
+     * Prints an object's properties to the console using reflection.  This is used by the component inspector.
+     * Right click on a node in the component tree and select "Print to Console".
+     *
+     * @param cmp The component to print.
+     * @param indent Indent string printed at start of each line.
+     * @since 8.0
+     */
+    public static void dumpComponentProperties(Object cmp, String indent) {
+        Class cls = cmp.getClass();
+        Method[] methods = cls.getMethods();
+        Arrays.sort(methods, new Comparator<Method>() {
+
+            @Override
+            public int compare(Method o1, Method o2) {
+                return methodPropertyName_(o1.getName()).toLowerCase().compareTo(methodPropertyName_(o2.getName()).toLowerCase());
+            }
+        });
+        System.out.println(indent + cmp.getClass().getName() + "{");
+        for (int i=0; i<methods.length; i++) {
+            Method method = methods[i];
+            method.setAccessible(true);
+            String name = method.getName();
+            String propertyName = methodPropertyName_(name);
+            if ((name.startsWith("get") || name.startsWith("is") || name.equalsIgnoreCase("scrollableYFlag") || name.equalsIgnoreCase("scrollableXFlag")) && method.getParameterCount() == 0 && method.getReturnType() != Void.class) {
+                try {
+                    System.out.println(indent + "  " + propertyName + ": " + method.invoke(cmp, new Object[0]));
+                    if (propertyName.equalsIgnoreCase("style")) {
+                        dumpComponentProperties(method.invoke(cmp, new Object[0]), indent + "  ");
+                    }
+                } catch (Exception ex){}
+            }
+        }
+        System.out.println(indent + "}");
     }
     
     public int getCanvasX() {
@@ -3896,7 +3944,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
                             pref.put("skin", current);
-                            deinitializeSync();
                             frm.dispose();
                             System.setProperty("reload.simulator", "true");
                         } else {
@@ -4320,6 +4367,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+
+
     private void showNetworkMonitor() {
         if (netMonitor == null) {
             netMonitor = new NetworkMonitor();
@@ -4396,15 +4445,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+
+    private ArrayList<Runnable> deinitializeHooks = new ArrayList<>();
+    public void addDeinitializeHook(Runnable r) {
+        deinitializeHooks.add(r);
+    }
+
+    public void removeDeinitializeHook(Runnable r) {
+        deinitializeHooks.remove(r);
+    }
+
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
 
             @Override
             public void run() {
+
                 t[0] = Thread.currentThread();
+
+                Form currForm = CN.getCurrentForm();
+                if (currForm != null) {
+                    // Change to a dummy form to allow the current form to run its shutdown hooks.
+                    Form dummy = new Form();
+                    dummy.setTransitionInAnimator(null);
+                    dummy.setTransitionOutAnimator(null);
+                    currForm.setTransitionInAnimator(null);
+                    currForm.setTransitionOutAnimator(null);
+                    dummy.show();
+                }
+
+                ArrayList<Runnable> toDeinitialize = new ArrayList<Runnable>(deinitializeHooks);
+                deinitializeHooks.clear();
+                for (Runnable r : toDeinitialize) {
+                    r.run();
+                }
+
+
             }
         }, 250);
+
         Display.deinitialize();
         if (netMonitor != null) {
             netMonitor.dispose();
@@ -7483,6 +7563,74 @@ public class JavaSEPort extends CodenameOneImplementation {
         Shape s = cn1ShapeToAwtShape(shape);
         nativeGraphics.fill(s);
         
+    }
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        /*
+        Shape s = cn1ShapeToAwtShape(shape);
+        Rectangle shapeBounds = s.getBounds();
+        BufferedImage buf = new BufferedImage(shapeBounds.width + Math.abs(offsetX) + 2*(blurRadius + spreadRadius),
+                shapeBounds.height + Math.abs(offsetY) + 2*(blurRadius + spreadRadius), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D bufGraphics = (Graphics2D)buf.createGraphics();
+        bufGraphics.translate(-shapeBounds.x + blurRadius + spreadRadius + Math.abs(offsetX), -shapeBounds.y + blurRadius + spreadRadius + Math.abs(offsetY));
+        bufGraphics.setColor(Color.black);
+        bufGraphics.fill(s);
+        bufGraphics.dispose();
+        */
+
+        //BufferedImage buf = (BufferedImage) image;
+
+        ShadowFilter filter = new ShadowFilter();
+        filter.setAddMargins(false);
+        filter.setAngle((float)Math.atan(-offsetY/(double)offsetX));
+        filter.setDistance((float)Math.sqrt(offsetX*offsetX+offsetY*offsetY));
+        // There is a bug in ShadowFilter opacity setting that applies opacity twice, so we'll do this in two ways.
+        filter.setOpacity(1f);
+        //filter.setOpacity(opacity);
+        filter.setRadius(blurRadius);
+        filter.setShadowOnly(true);
+        //BufferedImage dst = new BufferedImage(buf.getWidth(), buf.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        //filter.filter(buf, dst);
+        //int tx = x - blurRadius - spreadRadius - Math.abs(offsetX);
+        //int ty = y - blurRadius - spreadRadius - Math.abs(offsetY);
+        //nativeGraphics.translate(tx, ty);
+        BufferedImage buf = (BufferedImage)image;
+
+        if (spreadRadius != 0) {
+            int scaledWidth = buf.getWidth() + 2 * spreadRadius;
+            int scaledHeight = buf.getHeight() + 2 * spreadRadius;
+            if (scaledWidth < 1 || scaledHeight < 1) return;
+            java.awt.Image scaledImage = buf.getScaledInstance(scaledWidth, scaledHeight, BufferedImage.SCALE_FAST);
+            BufferedImage scaledBuf = new BufferedImage(buf.getWidth(), buf.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D bufG = (Graphics2D) scaledBuf.createGraphics();
+            bufG.drawImage(scaledImage, -spreadRadius, -spreadRadius, null);
+            bufG.dispose();
+            buf = scaledBuf;
+
+        }
+        Composite prevComposite = nativeGraphics.getComposite();
+        nativeGraphics.setComposite( AlphaComposite.getInstance( AlphaComposite.SRC_OVER, opacity ) );
+        nativeGraphics.drawImage(buf, filter, x, y);
+        nativeGraphics.setComposite(prevComposite);
+
+        //nativeGraphics.translate(-tx, -ty);
+
+
+
+    }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
     }
 
     @Override

@@ -513,7 +513,7 @@ public final class Color  {
                     "The color components or name must be specified");
         }
         if (colorString.isEmpty()) {
-            throw new IllegalArgumentException("Invalid color specification");
+            throw new IllegalArgumentException("Invalid color specification.  Color string is empty");
         }
 
         String color = colorString.toLowerCase(Locale.ROOT);
@@ -522,6 +522,13 @@ public final class Color  {
             color = color.substring(1);
         } else if (color.startsWith("0x")) {
             color = color.substring(2);
+        } else if (color.startsWith("cn1rgb")) {
+            if (color.startsWith("(", 6)) {
+                return parseRGBColor(color, 7, false, opacity);
+            } else if (color.startsWith("a(", 6)) {
+                return parseRGBColor(color, 8, true, opacity);
+            }
+
         } else if (color.startsWith("rgb")) {
             if (color.startsWith("(", 3)) {
                 return parseRGBColor(color, 4, false, opacity);
@@ -579,7 +586,7 @@ public final class Color  {
             }
         } catch (NumberFormatException nfe) {}
 
-        throw new IllegalArgumentException("Invalid color specification");
+        throw new IllegalArgumentException("Invalid color specification: Color string was "+colorString);
     }
 
     private static Color parseRGBColor(String color, int roff,
@@ -601,7 +608,7 @@ public final class Color  {
             }
         } catch (NumberFormatException nfe) {}
 
-        throw new IllegalArgumentException("Invalid color specification");
+        throw new IllegalArgumentException("Invalid color specification: "+color);
     }
 
     private static Color parseHSLColor(String color, int hoff,

@@ -1701,7 +1701,9 @@ public class UIManager {
             Object[] backgroundGradient = (Object[]) themeProps.get(id + Style.BACKGROUND_GRADIENT);
             byte[] paddingUnit = (byte[])themeProps.get(id + Style.PADDING_UNIT);
             byte[] marginUnit = (byte[])themeProps.get(id + Style.MARGIN_UNIT);
-
+            if (themeProps.containsKey(id + Style.ELEVATION)) {
+                style.setElevation((Integer)themeProps.get(id + Style.ELEVATION));
+            }
             if (bgColor != null) {
                 style.setBgColor(Integer.valueOf(bgColor, 16).intValue());
             }

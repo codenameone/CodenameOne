@@ -2113,6 +2113,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
     }
+
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        NativeImage ni = (NativeImage)image;
+        if (ng.isDrawShadowSupported()) {
+            ng.checkControl();
+            ng.applyTransform();
+            ng.applyClip();
+            ng.nativeDrawShadow(ni.peer, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+        }
+
+    }
+
     private void drawPath(NativePathRenderer r, int color, int alpha){
         this.nativeInstance.nativeDrawPath(color, alpha, r.ptr);
     }
@@ -4796,6 +4811,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
             }
         }
+
+        boolean isDrawShadowSupported() {
+            return true;
+        }
+
+        void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+            nativeInstance.nativeDrawShadowMutable(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+        }
         
         boolean isTransformSupported(){
             return true;
@@ -4947,6 +4970,18 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Currently global graphics doesn't support antialiasing.
             return false;
         }
+
+        @Override
+        boolean isDrawShadowSupported() {
+            return false;
+        }
+
+        @Override
+        void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+        }
+
+
 
         @Override
         void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {

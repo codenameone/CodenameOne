@@ -108,6 +108,7 @@ public class Container extends Component implements Iterable<Component>{
     private boolean blockFocus = false;
     private boolean dontRecurseContainer;
     private UIManager uiManager;
+    private boolean surface;
     
     /**
      * Encapsulates a change to the container's children.  Used to keep track of 
@@ -353,7 +354,31 @@ public class Container extends Component implements Iterable<Component>{
         }
         
     }
-    
+
+    /**
+     * Checks if this container acts as a Material Design surface.  "Surface" containers render drop-shadows for their
+     * elevated descendents.
+     * 
+     * @return True if this container is a surface.
+     * @since 8.0
+     */
+    public boolean isSurface() {
+        return surface;
+    }
+
+    /**
+     * Enables or disables "surface" features for this container.  If {@literal surface} is true, then the container
+     * will act as a surface.  As such, it will paint the drop-shadows for elevated descendents.
+     * 
+     * @param surface True to set this container as a surface.
+     * @since 8.0
+     * @see Style#getElevation()
+     * @see #paintSurfaceShadows(Graphics)  
+     * @see Component#paintShadows(Graphics, int, int) 
+     */
+    public void setSurface(boolean surface) {
+        this.surface = surface;
+    }
     
     /**
      * Simpler version of addComponent that allows chaining the calls for shorter syntax
@@ -1803,7 +1828,79 @@ public class Container extends Component implements Iterable<Component>{
     void setAllowEnableLayoutOnPaint(boolean allow) {
         allowEnableLayoutOnPaint = allow;
     }
-    
+
+    private void findElevatedChildrenToPaint(int clipX1, int clipY1, int clipX2, int clipY2, Set<Component> out) {
+        int size = components.size();
+        int startIter = 0;
+        if (size >= 30) {
+
+            startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
+            if (startIter < 0) {
+                // There was no efficient way to calculate the offset
+                startIter = 0;
+            } else if (startIter < size){
+                // There was an efficient way to calculate the offset so we
+                // will continue this approach
+                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
+            }
+        }
+
+        for(int iter = startIter ; iter < size ; iter++) {
+            Component cmp = components.get(iter);
+            if (!cmp.isVisible() || cmp.isHidden()) continue;
+            Style s = cmp.getStyle();
+            if (s.getElevation() > 0) {
+                out.add(cmp);
+                continue;
+            }
+            if (((s.getOpacity() & 0xff) == 0xff && (s.getBgTransparency() & 0xff) == 0xff)) continue;
+            if (cmp.getX()+cmp.getWidth()-cmp.getScrollX() < clipX1) continue;
+            if (cmp.getX() - cmp.getScrollX() > clipX2) continue;
+            if (cmp.getY() + cmp.getHeight() - cmp.getScrollY() < clipY1) continue;
+            if (cmp.getY() - cmp.getScrollY() > clipY2) continue;
+            if (cmp instanceof Container) {
+                Container cnt = (Container)cmp;
+                if (cnt.isSurface()) {
+                    continue;
+                }
+                int subClipX1 = Math.max(clipX1 + cmp.getX() - cmp.getScrollX(), clipX1);
+                int subClipY1 = Math.max(clipY1 + cmp.getY() - cmp.getScrollY(), clipY1);
+                int subClipX2 = Math.min(subClipX1 + cmp.getWidth(), clipX2);
+                int subClipY2 = Math.min(subClipY1 + cmp.getHeight(), clipY2);
+                if (subClipX1 >= subClipX2 || subClipY1 >= subClipY2) continue;
+                cnt.findElevatedChildrenToPaint(subClipX1, subClipY1, subClipX2, subClipY2, out);
+            }
+
+        }
+
+    }
+
+    /**
+     * A set used in {@link #paintSurfaceShadows(Graphics)} to gather all of the elevated descendent components
+     * of this container.
+     */
+    private Set<Component> _tempElevatedChildrenSet;
+
+    /**
+     * Paints the shadows for elevated descendent components.  This is only run if {@link #isSurface()} is true.
+     * @param g The graphics context.
+     */
+    private void paintSurfaceShadows(Graphics g) {
+        int clipX1 = g.getClipX();
+        int clipX2 = g.getClipX() + g.getClipWidth();
+        int clipY1 = g.getClipY();
+        int clipY2 = g.getClipY() + g.getClipHeight();
+        if (_tempElevatedChildrenSet == null) {
+            _tempElevatedChildrenSet = new HashSet<Component>();
+        }
+        _tempElevatedChildrenSet.clear();
+        findElevatedChildrenToPaint(clipX1, clipY1, clipX2, clipY2, _tempElevatedChildrenSet);
+        for (Component child : _tempElevatedChildrenSet) {
+            child.paintShadows(g, child.getRelativeX(this), child.getRelativeY(this));
+        }
+
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -1819,6 +1916,7 @@ public class Container extends Component implements Iterable<Component>{
             layoutContainer();
         }
         g.translate(getX(), getY());
+
         int size = components.size();
         int startIter = 0;
         if (size >= 30) {
@@ -3206,6 +3304,22 @@ public class Container extends Component implements Iterable<Component>{
         if(shouldPaintContainerBackground()) {
             super.paintComponentBackground(g);
         } 
+    }
+
+    @Override
+    protected void paintBackground(Graphics g) {
+        super.paintBackground(g);
+        if (isSurface()) {
+            paintSurfaceShadows(g);
+        }
+    }
+
+    @Override
+    protected void paintBorderBackground(Graphics g) {
+        super.paintBorderBackground(g);
+        if (isSurface()) {
+            paintSurfaceShadows(g);
+        }
     }
 
     /**

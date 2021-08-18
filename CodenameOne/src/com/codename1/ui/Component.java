@@ -2150,6 +2150,326 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+
+    /**
+     * Convenience method used by {@link #drawShadow(Graphics, Image, int, int, int, int, int, int, int, float)} to convert device independent
+     * pixels (1/96th of an inch) into pixels.
+     * @param dp Value in device independent pixels (1/96th of an inch).
+     * @return Value converted to pixels.
+     *
+     */
+    private int dp2px(int dp) {
+        return CN.convertToPixels(dp / 96f * 25.4f);
+    }
+
+    /**
+     * Wrapper for {@link Graphics#drawShadow(Image, int, int, int, int, int, int, int, float)} that takes coordinates in device-independent
+     * pixels (1/96th of an inch).  These are converted to pixels and passed to {@link Graphics#drawShadow(Image, int, int, int, int, int, int, int, float)}
+     * @param g
+     * @param img
+     * @param relativeX
+     * @param relativeY
+     * @param offsetX
+     * @param offsetY
+     * @param blurRadius
+     * @param spreadRadius
+     * @param color
+     * @param opacity
+     */
+    private void drawShadow(Graphics g, Image img, int relativeX, int relativeY, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        g.drawShadow(img, relativeX, relativeY, dp2px(offsetX), dp2px(offsetY), dp2px(blurRadius), dp2px(spreadRadius), color, opacity);
+    }
+
+
+    /**
+     * A cached image that is used for rendering drop-shadows.  This is only updated when the component elevation, width, or height
+     * is changed.  Otherwise it is reused for painting shadows.
+     *
+     * @see #paintShadows(Graphics, int, int)
+     */
+    private Image cachedShadowImage;
+
+    /**
+     * The elevation of the component when the {@link #cachedShadowImage} was created.
+     */
+    private int cachedShadowElevation;
+
+    /**
+     * The width of the component when the {@link #cachedShadowImage} was created.
+     */
+    private int cachedShadowWidth,
+
+    /**
+     * The height of the component when the  {@link #cachedShadowImage} was created.
+     */
+    cachedShadowHeight;
+
+    /**
+     * Checks if the shadow image is dirty and requires a repaint.
+     * @return True if the shadow image is dirty and requires a repaint - or if the shadow needs to be created.
+     *
+     * @see #paintShadows(Graphics, int, int)
+     * @see Container#paintSurfaceShadows(Graphics)
+     */
+    boolean isShadowImageDirty() {
+        Style s = getStyle();
+        int elevation = s.getElevation();
+        if (elevation == 0 && cachedShadowImage == null) return false;
+        if (elevation == 0 && cachedShadowImage != null) return true;
+        return (cachedShadowImage == null || elevation != cachedShadowElevation) || (getWidth() != cachedShadowWidth) || (getHeight() != cachedShadowHeight);
+    }
+
+    /**
+     * Flag to indicate whether the component has elevation.
+     */
+    private boolean _hasElevation;
+
+    /**
+     * Checks to see if the component has elevation.  A component is considered to have elevation if either the current style
+     * has a non-zero elevation value, or the component has *ever* had elevation in the past.  Once this is switched "on", it
+     * doesn't switch off.
+     *
+     * <p>This is used by Container to efficiently paint shadows of its children.  It helps it to know if the child component
+     * has ever had elevation as it may need to "erase" the previous shadow.</p>
+     * @return
+     */
+    boolean hasElevation() {
+        if (_hasElevation) return true;
+        Style s = getStyle();
+        if (s.getElevation() > 0) {
+            _hasElevation = true;
+        }
+        return _hasElevation;
+    }
+
+    /**
+     * Finds the nearest ancestor surface of this component.  This is the surface onto which drop-shadows will be
+     * painted and projected.
+     * @return The surface if one is found.  Null if this component has no elevation, or no surface is found.  It is possible that
+     * this will return a non-null value even if the component currently has zero elevation.  This occurs if the component has *ever* been
+     * styled to have elevation.
+     */
+    Container findSurface() {
+        return _findSurface();
+    }
+
+    /**
+     * Calculates the shadow's X-offset at the given elevation.
+     * @param elevation THe elevation.
+     * @return
+     */
+    int calculateShadowOffsetX(int elevation) {
+
+        if (elevation <= 0) {
+            return 0;
+        }
+        switch (elevation) {
+            case 1: return dp2px(-4);
+            case 2: return dp2px(-4);
+            case 3: return dp2px(-9);
+            case 4: return dp2px(-10);
+            case 6: return dp2px(-19);
+            case 8: return dp2px(-19);
+            case 9: return dp2px(-22);
+            case 12: return dp2px(-31);
+            case 16: return dp2px(-42);
+            case 24: return dp2px(-65);
+
+        }
+        return 0;
+    }
+
+    /**
+     * Caldulates the shadow X-offset in pixels at the componentl's current elevation.
+     *
+     * @return The x-offset in pixels.
+     */
+    int calculateShadowOffsetX() {
+        return calculateShadowOffsetX(getStyle().getElevation());
+    }
+
+    /**
+     * Calculates the shadow Y offset in pixels at the component's current elevation.
+     * @return The y-offset in pixels.
+     * @see Style#getElevation()
+     */
+    int calculateShadowOffsetY() {
+        return calculateShadowOffsetY(getStyle().getElevation());
+    }
+
+    /**
+     * Calculates the shadow Y offset in pixels at the given elevation.
+     * @param elevation The elevation.
+     * @return The y-offset.
+     */
+    int calculateShadowOffsetY(int elevation) {
+        return calculateShadowOffsetX(elevation);
+    }
+
+    /**
+     * Calculates the width of the shadow that this component would project against at its current elevation.
+     * @return The width in pixels.
+     * @see Style#getElevation()
+     */
+    int calculateShadowWidth() {
+        return calculateShadowWidth(getStyle().getElevation());
+    }
+
+    /**
+     * Calculates the width of the shadow that this component would project against a surface at the given
+     * elevation.
+     * @param elevation The elvation.
+     * @return The width in pixels.
+     */
+    int calculateShadowWidth(int elevation) {
+        return getWidth() - 2 * calculateShadowOffsetX(elevation);
+    }
+
+    /**
+     * Calculates the height of the shadow that this component would project against at its current elevation.
+     * @return The height in pixels.
+     * @see Style#getElevation()
+     */
+    int calculateShadowHeight() {
+        return calculateShadowHeight(getStyle().getElevation());
+    }
+
+    /**
+     * Calculates the height of the shadow that this component would project against a surface at the given
+     * elevation.
+     * @param elevation The elvation.
+     * @return The width in pixels.
+     */
+    int calculateShadowHeight(int elevation) {
+        return getHeight() - 2 * calculateShadowOffsetY(elevation);
+    }
+
+    /**
+     * Paints the drop-shadow projections for this component based on its elevation value.
+     *
+     * <p>This is called by the ancestor "surface" container of the component, after it paints its background, but
+     * before painting its children.  If the {@link Style#getElevation()} of the component is {@literal 0}, then no shadow
+     * will be painted.  Similarly, if the component has no ancestor container which is a surface (i.e. {@link Container#isSurface()} is true,
+     * the shadow will not be painted.</p>
+     *
+     * <p>NOTE: It is also possible that the shadow will not be visible if other opaque components are painted in front of
+     * the ancestor surface container.  This is one of the limitations of this approach for simulating elevation.</p>
+     *
+     * <p>Note: Not all platforms support drawing shadows.  Use {@link CodenameOneImplementation#isDrawShadowSupported()} to check
+     * for support at runtime.</p>
+     *
+     * @param g The graphics context onto which the shadow should be painted.
+     * @param relativeX The relative X coordinate onto which the shadow should be drawn.
+     * @param relativeY The relative Y coordinate onto which the shadow should be drawn.
+     * @since 8.0
+     * @see Container#paintSurfaceShadows(Graphics)
+     * @see Container#isSurface()
+     * @see Style#getElevation()
+     */
+    public void paintShadows(Graphics g, int relativeX, int relativeY) {
+        int elevation = getStyle().getElevation();
+        if (elevation <= 0) {
+            return;
+        }
+
+        if (cachedShadowImage != null) {
+            if (cachedShadowWidth != getWidth() || cachedShadowHeight != getHeight() || cachedShadowElevation != elevation) {
+                cachedShadowImage = null;
+            } else {
+                g.drawImage(cachedShadowImage, relativeX + calculateShadowOffsetX(), relativeY + calculateShadowOffsetY());
+                return;
+            }
+        }
+
+        Image img = this.toImage();
+        if (img == null) return;
+        Image paddedImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
+        Graphics paddedImageG = paddedImage.getGraphics();
+        paddedImageG.drawImage(img, -calculateShadowOffsetX(), -calculateShadowOffsetY());
+        img = paddedImage;
+
+
+        Image shadowImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
+        Graphics origG = g;
+        g = shadowImage.getGraphics();
+        int origRelativeX = relativeX;
+        int origRelativeY = relativeY;
+        relativeX = 0;
+        relativeY = 0;
+        g.translate(-relativeX, -relativeY);
+
+
+        switch (elevation) {
+            case 1:
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
+                break;
+
+            case 2:
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
+                break;
+            case 3:
+                drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 0, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 3, 3, -2, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 8, 0, 0, 0.2f);
+                break;
+
+            case 4:
+                drawShadow(g, img, relativeX, relativeY, 0, 4, 5, 0, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 10, 0, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 2, 4, -1, 0, 0.2f);
+                break;
+
+            case 6:
+                drawShadow(g, img, relativeX, relativeY, 0, 6, 10, 0, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 1, 18, 0, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 3, 5, -1, 0, 0.2f);
+                break;
+
+            case 8:
+                drawShadow(g, img, relativeX, relativeY, 0, 8, 10, 1, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 2, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 5, 5, -3, 0, 0.2f);
+                break;
+            case 9:
+                drawShadow(g, img, relativeX, relativeY, 0, 9, 12, 1, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 3, 16, 2, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 5, 6, -3, 0, 0.2f);
+                break;
+
+            case 12:
+                drawShadow(g, img, relativeX, relativeY, 0, 12, 17, 2, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 5, 22, 4, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 7, 8, -4, 0, 0.2f);
+                break;
+
+            case 16:
+                drawShadow(g, img, relativeX, relativeY, 0, 16, 24, 2, 0, 0.14f);
+                drawShadow(g, img, relativeX, relativeY, 0, 6, 30, 5, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 8, 10, -5, 0, 0.2f);
+                break;
+
+            case 24:
+                drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 0.14f);
+                //drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 1f);
+                drawShadow(g, img, relativeX, relativeY, 0, 9, 46, 8, 0, 0.12f);
+                drawShadow(g, img, relativeX, relativeY, 0, 11, 15, -7, 0, 0.2f);
+                break;
+
+        }
+        cachedShadowImage = shadowImage;
+        cachedShadowHeight = getHeight();
+        cachedShadowWidth = getWidth();
+        cachedShadowElevation = elevation;
+        origG.drawImage(cachedShadowImage, origRelativeX + calculateShadowOffsetX(), origRelativeY + calculateShadowOffsetY());
+
+
+
+    }
+
     /**
      * Returns the absolute X location based on the component hierarchy, this method
      * calculates a location on the screen for the component rather than a relative
@@ -2180,6 +2500,24 @@ public class Component implements Animation, StyleListener, Editable {
         Container parent = getParent();
         if (parent != null) {
             y += parent.getAbsoluteY();
+        }
+        return y;
+    }
+
+    int getRelativeX(Container relativeTo) {
+        int x = getX() - getScrollX();
+        Container parent = getParent();
+        if (parent != relativeTo && parent != null) {
+            x += ((Component)parent).getRelativeX(relativeTo);
+        }
+        return x;
+    }
+
+    int getRelativeY(Container relativeTo) {
+        int y = getY() - getScrollY();
+        Container parent = getParent();
+        if (parent != relativeTo && parent != null) {
+            y += ((Component)parent).getRelativeY(relativeTo);
         }
         return y;
     }
@@ -3365,11 +3703,22 @@ public class Component implements Animation, StyleListener, Editable {
      * @see Display
      */
     public void repaint() {
+
         repaintPending = true;
         if (dirtyRegion != null) {
             setDirtyRegion(null);
         }
+
         repaint(this);
+    }
+
+    private Container _findSurface() {
+        Container parent = getParent();
+        if (parent == null) return null;
+        if (parent.isSurface()) {
+            return parent;
+        }
+        return ((Component)parent)._findSurface();
     }
 
     /**

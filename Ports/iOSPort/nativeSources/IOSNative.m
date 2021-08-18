@@ -903,7 +903,17 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
 }
 
 
+//native void nativeDrawShadowMutable(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity);
+extern void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity);
 
+void com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable___long_int_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+    JAVA_LONG image, JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_PASS_ARG image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    POOL_END();
+
+}
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
 

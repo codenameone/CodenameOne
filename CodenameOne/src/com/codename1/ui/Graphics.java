@@ -366,6 +366,10 @@ public final class Graphics {
     public void fillRect(int x, int y, int width, int height) {
         impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
+
+    public void drawShadow(Image img, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        impl.drawShadow(nativeGraphics, img.getImage(), xTranslate + x, yTranslate + y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    }
     
     /**
      * Clears rectangular area of the graphics context.  This will remove any color
