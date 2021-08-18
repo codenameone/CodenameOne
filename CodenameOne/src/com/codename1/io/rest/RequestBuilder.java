@@ -85,6 +85,7 @@ public class RequestBuilder {
     private ConnectionRequest.CachingMode cache;
     private boolean fetched;
     private Boolean postParameters;
+    private Byte priority;
     
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -125,6 +126,19 @@ public class RequestBuilder {
     public RequestBuilder contentType(String s) {
         checkFetched();
         contentType = s;
+        return this;
+    }
+
+    /**
+     * Sets the priority of the request.
+     * @param priority The priority.
+     * @return RequestBuilder instance.
+     * @see ConnectionRequest#setPriority(byte)
+     * @since 8.0
+     */
+    public RequestBuilder priority(byte priority) {
+        checkFetched();
+        this.priority = priority;
         return this;
     }
 
@@ -911,6 +925,9 @@ public class RequestBuilder {
         }
         if (cookiesEnabled != null) {
             req.setCookiesEnabled(cookiesEnabled);
+        }
+        if (priority != null) {
+            req.setPriority(priority);
         }
         
         return req;
