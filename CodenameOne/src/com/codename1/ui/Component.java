@@ -34,6 +34,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.*;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.*;
 import com.codename1.ui.util.EventDispatcher;
@@ -230,6 +231,27 @@ public class Component implements Animation, StyleListener, Editable {
     private Component nextFocusLeft;
     private String name;
     boolean hasLead;
+
+    /**
+     * The elevation at which this component was rendered in its last rendering.
+     * @since 8.0
+     */
+    int renderedElevation;
+
+    /**
+     * The index at which this component was rendered in its last rendering.  This acts as a z-index within
+     * an elevation layer.
+     * @since 8.0
+     */
+    int renderedElevationComponentIndex;
+
+    /**
+     * A flag to toggle between lightweight elevation shadow generation and heavyweight generation.  The lightweight
+     * does the work entirely in CN1 and it cuts corners.  In simulator, it turns out that the heavyweight implementation
+     * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
+     * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
+     */
+    private boolean useLightweightElevationShadow = true;
     
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
@@ -883,6 +905,9 @@ public class Component implements Animation, StyleListener, Editable {
         }
         lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
+            if (initialized && unSelectedStyle.getElevation()>0) {
+                registerElevatedInternal(this);
+            }
             unSelectedStyle.addStyleListener(this);
             if (unSelectedStyle.getBgPainter() == null) {
                 unSelectedStyle.setBgPainter(new BGPainter());
@@ -892,6 +917,9 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         if(disabledStyle != null) {
+            if (initialized && disabledStyle.getElevation()>0) {
+                registerElevatedInternal(this);
+            }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
@@ -2162,6 +2190,8 @@ public class Component implements Animation, StyleListener, Editable {
         return CN.convertToPixels(dp / 96f * 25.4f);
     }
 
+
+
     /**
      * Wrapper for {@link Graphics#drawShadow(Image, int, int, int, int, int, int, int, float)} that takes coordinates in device-independent
      * pixels (1/96th of an inch).  These are converted to pixels and passed to {@link Graphics#drawShadow(Image, int, int, int, int, int, int, int, float)}
@@ -2177,7 +2207,61 @@ public class Component implements Animation, StyleListener, Editable {
      * @param opacity
      */
     private void drawShadow(Graphics g, Image img, int relativeX, int relativeY, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
-        g.drawShadow(img, relativeX, relativeY, dp2px(offsetX), dp2px(offsetY), dp2px(blurRadius), dp2px(spreadRadius), color, opacity);
+
+        if (useLightweightElevationShadow) {
+            int[] rgb = img.getRGBCached();
+            int[] mask = new int[rgb.length];
+            System.arraycopy(rgb, 0, mask, 0, rgb.length);
+            int len = mask.length;
+            color = (color & 0x00ffffff);
+            int blurRadiusPixels = dp2px(blurRadius);
+            int spreadRadiusPixels = dp2px(spreadRadius);
+            int offsetXPixels = dp2px(offsetX);
+            int offsetYPixels = dp2px(offsetY);
+            int imageWidth = img.getWidth();
+            int imageHeight = img.getHeight();
+            for (int i=0; i<len; i++) {
+                int pixel = mask[i];
+                int alphaMask = (pixel & 0xff000000);
+                int alpha = alphaMask >> 24;
+
+                if (alpha != 0) {
+                    //int adjustedAlpha = (int)(alpha * (float)opacity);
+                    mask[i] = (alphaMask | color);
+                }
+            }
+
+            int origAlpha = g.getAlpha();
+
+            Image maskImage = Image.createImage(mask, img.getWidth(), img.getHeight());
+
+            float step = 1;
+            for (int rad = blurRadiusPixels; rad > 0; rad--) {
+
+                g.setAlpha((int)(255/(float)step * opacity * (1-rad/(1+(float)blurRadiusPixels))));
+                //System.out.println("rad="+rad+";alpha="+g.getAlpha());
+                g.drawImage(maskImage,
+                        relativeX + offsetXPixels - rad - spreadRadiusPixels,
+                        relativeY + offsetYPixels - rad - spreadRadiusPixels,
+                        img.getWidth() + 2*(spreadRadiusPixels+rad),
+                        img.getHeight() + 2*(spreadRadiusPixels+rad));
+                step += 0.5;
+            }
+            g.setAlpha((int)(opacity * 255/(float)step));
+
+            //System.out.println("drawing;alpha="+g.getAlpha());
+
+
+
+            g.drawImage(maskImage, relativeX + offsetXPixels - spreadRadiusPixels, relativeY + offsetYPixels - spreadRadiusPixels, img.getWidth() + 2*spreadRadiusPixels, img.getHeight() + 2*spreadRadiusPixels);
+            //g.drawImage(maskImage, relativeX + offsetXPixels, relativeY + offsetYPixels);
+
+            g.setAlpha(origAlpha);
+
+
+        } else {
+            g.drawShadow(img, relativeX, relativeY, dp2px(offsetX), dp2px(offsetY), dp2px(blurRadius), dp2px(spreadRadius), color, opacity);
+        }
     }
 
 
@@ -2204,21 +2288,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     cachedShadowHeight;
 
-    /**
-     * Checks if the shadow image is dirty and requires a repaint.
-     * @return True if the shadow image is dirty and requires a repaint - or if the shadow needs to be created.
-     *
-     * @see #paintShadows(Graphics, int, int)
-     * @see Container#paintSurfaceShadows(Graphics)
-     */
-    boolean isShadowImageDirty() {
-        Style s = getStyle();
-        int elevation = s.getElevation();
-        if (elevation == 0 && cachedShadowImage == null) return false;
-        if (elevation == 0 && cachedShadowImage != null) return true;
-        return (cachedShadowImage == null || elevation != cachedShadowElevation) || (getWidth() != cachedShadowWidth) || (getHeight() != cachedShadowHeight);
-    }
-
+    
     /**
      * Flag to indicate whether the component has elevation.
      */
@@ -2345,6 +2415,11 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /**
+     * A flag to prevent reentry into painting the shadow.
+     */
+    private boolean paintinShadowInBackground_ = false;
+
+    /**
      * Paints the drop-shadow projections for this component based on its elevation value.
      *
      * <p>This is called by the ancestor "surface" container of the component, after it paints its background, but
@@ -2362,109 +2437,164 @@ public class Component implements Animation, StyleListener, Editable {
      * @param relativeX The relative X coordinate onto which the shadow should be drawn.
      * @param relativeY The relative Y coordinate onto which the shadow should be drawn.
      * @since 8.0
-     * @see Container#paintSurfaceShadows(Graphics)
+     * @see Container#paintElevatedPane(Graphics)
      * @see Container#isSurface()
      * @see Style#getElevation()
      */
-    public void paintShadows(Graphics g, int relativeX, int relativeY) {
-        int elevation = getStyle().getElevation();
+
+    public void paintShadows(Graphics g, final int relativeX, final int relativeY) {
+        final int elevation = getStyle().getElevation();
         if (elevation <= 0) {
             return;
         }
+        if (getWidth() == 0 || getHeight() == 0) return;
+        synchronized (this) {
+            if (cachedShadowImage != null) {
+                if (cachedShadowWidth != getWidth() || cachedShadowHeight != getHeight() || cachedShadowElevation != elevation) {
 
-        if (cachedShadowImage != null) {
-            if (cachedShadowWidth != getWidth() || cachedShadowHeight != getHeight() || cachedShadowElevation != elevation) {
-                cachedShadowImage = null;
-            } else {
+                    if (cachedShadowElevation == elevation && cachedShadowWidth / (float) getWidth() > 0.5f && cachedShadowWidth / (float) getWidth() < 2f && cachedShadowHeight / (float) getHeight() > 0.5f && cachedShadowHeight / (float) getHeight() < 2f) {
+                        // If the size change isn't too drastic, we can salvage the existing shadow image for performance reasons.
+                        cachedShadowImage = cachedShadowImage.scaled(calculateShadowWidth(), calculateShadowHeight());
+                        cachedShadowWidth = getWidth();
+                        cachedShadowHeight = getHeight();
+                    } else {
+                        cachedShadowImage = null;
+                    }
+                }
+            }
+            if (cachedShadowImage != null) {
                 g.drawImage(cachedShadowImage, relativeX + calculateShadowOffsetX(), relativeY + calculateShadowOffsetY());
                 return;
             }
         }
 
-        Image img = this.toImage();
-        if (img == null) return;
-        Image paddedImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
-        Graphics paddedImageG = paddedImage.getGraphics();
-        paddedImageG.drawImage(img, -calculateShadowOffsetX(), -calculateShadowOffsetY());
-        img = paddedImage;
-
-
-        Image shadowImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
-        Graphics origG = g;
-        g = shadowImage.getGraphics();
-        int origRelativeX = relativeX;
-        int origRelativeY = relativeY;
-        relativeX = 0;
-        relativeY = 0;
-        g.translate(-relativeX, -relativeY);
-
-
-        switch (elevation) {
-            case 1:
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
-                break;
-
-            case 2:
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
-                break;
-            case 3:
-                drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 0, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 3, 3, -2, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 8, 0, 0, 0.2f);
-                break;
-
-            case 4:
-                drawShadow(g, img, relativeX, relativeY, 0, 4, 5, 0, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 10, 0, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 2, 4, -1, 0, 0.2f);
-                break;
-
-            case 6:
-                drawShadow(g, img, relativeX, relativeY, 0, 6, 10, 0, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 1, 18, 0, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 3, 5, -1, 0, 0.2f);
-                break;
-
-            case 8:
-                drawShadow(g, img, relativeX, relativeY, 0, 8, 10, 1, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 2, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 5, 5, -3, 0, 0.2f);
-                break;
-            case 9:
-                drawShadow(g, img, relativeX, relativeY, 0, 9, 12, 1, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 3, 16, 2, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 5, 6, -3, 0, 0.2f);
-                break;
-
-            case 12:
-                drawShadow(g, img, relativeX, relativeY, 0, 12, 17, 2, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 5, 22, 4, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 7, 8, -4, 0, 0.2f);
-                break;
-
-            case 16:
-                drawShadow(g, img, relativeX, relativeY, 0, 16, 24, 2, 0, 0.14f);
-                drawShadow(g, img, relativeX, relativeY, 0, 6, 30, 5, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 8, 10, -5, 0, 0.2f);
-                break;
-
-            case 24:
-                drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 0.14f);
-                //drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 1f);
-                drawShadow(g, img, relativeX, relativeY, 0, 9, 46, 8, 0, 0.12f);
-                drawShadow(g, img, relativeX, relativeY, 0, 11, 15, -7, 0, 0.2f);
-                break;
-
+        final Image fimg = this.toImage();
+        if (fimg == null) return;
+        if (paintinShadowInBackground_) {
+            // We are already painting the shadow in a background thread, so don't do it twice.
+            // Just be patient.
+            return;
         }
-        cachedShadowImage = shadowImage;
-        cachedShadowHeight = getHeight();
-        cachedShadowWidth = getWidth();
-        cachedShadowElevation = elevation;
-        origG.drawImage(cachedShadowImage, origRelativeX + calculateShadowOffsetX(), origRelativeY + calculateShadowOffsetY());
+        paintinShadowInBackground_ = true;
+
+        CN.scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                // We paint shadow in a background thread to avoid jank on the EDT.  It is possible that this
+                // will cause problems on some platforms.  If that is the case, we can hedge and move it onto
+                // the EDT in certain cases.
+
+
+                CN.setProperty("platformHint.showEDTWarnings", "false"); // Yes we know it's an EDT violation... Don't show me the error in simulator.
+                try {
+                    Image paddedImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
+                    Graphics paddedImageG = paddedImage.getGraphics();
+                    paddedImageG.drawImage(fimg, -calculateShadowOffsetX(), -calculateShadowOffsetY());
+                    Image img = paddedImage;
+
+
+                    final Image shadowImage = Image.createImage(calculateShadowWidth(), calculateShadowHeight(), 0x0);
+
+                    Graphics g = shadowImage.getGraphics();
+
+                    int relativeX = 0;
+                    int relativeY = 0;
+
+
+                    long startTime = System.currentTimeMillis();
+
+                    switch (elevation) {
+                        case 1:
+                            //drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
+                            drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
+                            break;
+
+                        case 2:
+                            //drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
+                            drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
+                            break;
+                        case 3:
+                            //drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 0, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 3, 3, -2, 0, 0.12f);
+                            drawShadow(g, img, relativeX, relativeY, 0, 1, 8, 0, 0, 0.2f);
+                            break;
+
+                        case 4:
+
+                            //drawShadow(g, img, relativeX, relativeY, 0, 4, 5, 0, 0, 0.14f);
+                            //System.out.println("Shadow 1 took "+(System.currentTimeMillis()-startTime)+"ms");
+                            //long shadow2Start = System.currentTimeMillis();
+                            //drawShadow(g, img, relativeX, relativeY, 0, 1, 10, 0, 0, 0.12f);
+                            //System.out.println("Shadow 2 took "+(System.currentTimeMillis()-shadow2Start)+"ms");
+                            //shadow2Start = System.currentTimeMillis();
+                            drawShadow(g, img, relativeX, relativeY, 0, 2, 4, -1, 0, 0.2f);
+                            //System.out.println("Shadow 3 took "+(System.currentTimeMillis()-shadow2Start)+"ms");
+                            break;
+
+                        case 6:
+                            //drawShadow(g, img, relativeX, relativeY, 0, 6, 10, 0, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 1, 18, 0, 0, 0.12f);
+                            drawShadow(g, img, relativeX, relativeY, 0, 3, 5, -1, 0, 0.2f);
+                            break;
+
+                        case 8:
+                            drawShadow(g, img, relativeX, relativeY, 0, 8, 10, 1, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 3, 4, 2, 0, 0.12f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 5, 5, -3, 0, 0.2f);
+                            break;
+                        case 9:
+                            drawShadow(g, img, relativeX, relativeY, 0, 9, 12, 1, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 3, 16, 2, 0, 0.12f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 5, 6, -3, 0, 0.2f);
+                            break;
+
+                        case 12:
+                            drawShadow(g, img, relativeX, relativeY, 0, 12, 17, 2, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 5, 22, 4, 0, 0.12f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 7, 8, -4, 0, 0.2f);
+                            break;
+
+                        case 16:
+                            drawShadow(g, img, relativeX, relativeY, 0, 16, 24, 2, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 6, 30, 5, 0, 0.12f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 8, 10, -5, 0, 0.2f);
+                            break;
+
+                        case 24:
+                            drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 0.14f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 24, 38, 3, 0, 1f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 9, 46, 8, 0, 0.12f);
+                            //drawShadow(g, img, relativeX, relativeY, 0, 11, 15, -7, 0, 0.2f);
+                            break;
+
+                    }
+                    synchronized (this) {
+                        cachedShadowImage = shadowImage;
+                        cachedShadowHeight = getHeight();
+                        cachedShadowWidth = getWidth();
+                        cachedShadowElevation = elevation;
+                        paintinShadowInBackground_ = false;
+                    }
+
+                    CN.callSerially(new Runnable() {
+                        public void run() {
+                            Container surface = findSurface();
+                            if (surface != null) {
+                                surface.repaint();
+                            }
+                        }
+                    });
+                } finally {
+                    CN.setProperty("platformHint.showEDTWarnings", "true"); // Reinstate EDT violation warnings now that we're done.
+
+                    paintinShadowInBackground_ = false; // release the lock so that painting can resume.
+                }
+
+            }
+        });
+
+        //origG.drawImage(cachedShadowImage, origRelativeX + calculateShadowOffsetX(), origRelativeY + calculateShadowOffsetY());
 
 
 
@@ -2533,10 +2663,16 @@ public class Component implements Animation, StyleListener, Editable {
         paintInternal(g, true);
     }
 
+    /**
+     * A flag used by {@link Container#paintElevatedPane(Graphics)} to turn off rendering of elevated components
+     * when rendering the non-elevated pane.
+     */
+    boolean doNotPaint;
+
     final void paintInternal(Graphics g, boolean paintIntersects) {
         Display d = Display.getInstance();
         CodenameOneImplementation impl = d.getImplementation();
-        if (!isVisible()) {
+        if (!isVisible() || doNotPaint) {
             return;
         }
 
@@ -2643,11 +2779,18 @@ public class Component implements Animation, StyleListener, Editable {
         int y1 = getAbsoluteY() + getScrollY();
         int w = getWidth();
         int h = getHeight();
+
         while (parent != null) {
             int ptx = parent.getAbsoluteX() + parent.getScrollX();
             int pty = parent.getAbsoluteY() + parent.getScrollY();
             g.translate(ptx, pty);
-            parent.paintIntersecting(g, component, x1, y1, w, h, true);
+            parent.paintIntersecting(g, component, x1, y1, w, h, true, 0);
+
+
+            if (parent.isSurface()) {
+                // If this is a surface, then we need to render the elevated pane
+                parent.paintElevatedPane(g, true, x1, y1, w, h, this.renderedElevation, this.renderedElevationComponentIndex, true);
+            }
             g.translate(-ptx, -pty);
             component = parent;
             parent = parent.getParent();
@@ -2954,7 +3097,7 @@ public class Component implements Animation, StyleListener, Editable {
             p.paint(g, rect);
         }
         par.paintBackground(g);
-        ((Container) par).paintIntersecting(g, c, x, y, w, h, false);
+        ((Container) par).paintIntersecting(g, c, x, y, w, h, false, 0);
         g.translate(-transX, -transY);
     }
 
@@ -5673,6 +5816,9 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
             }
+            if (initialized && pressedStyle.getElevation()>0) {
+                registerElevatedInternal(this);
+            }
             pressedStyle.addStyleListener(this);
             if(pressedStyle.getBgPainter() == null){
                 pressedStyle.setBgPainter(new BGPainter());
@@ -5692,6 +5838,9 @@ public class Component implements Animation, StyleListener, Editable {
             pressedStyle.removeStyleListener(this);
         }
         pressedStyle = style;
+        if (initialized && pressedStyle.getElevation()>0) {
+            registerElevatedInternal(this);
+        }
         pressedStyle.addStyleListener(this);
         if (pressedStyle.getBgPainter() == null) {
             pressedStyle.setBgPainter(new BGPainter());
@@ -5726,6 +5875,9 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
             }
+            if (initialized && selectedStyle.getElevation()>0) {
+                registerElevatedInternal(this);
+            }
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
@@ -5750,6 +5902,9 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
             }
+            if (initialized && disabledStyle.getElevation()>0) {
+                registerElevatedInternal(this);
+            }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
@@ -5769,6 +5924,9 @@ public class Component implements Animation, StyleListener, Editable {
             this.unSelectedStyle.removeStyleListener(this);
         }
         this.unSelectedStyle = style;
+        if (initialized && unSelectedStyle.getElevation()>0) {
+            registerElevatedInternal(this);
+        }
         this.unSelectedStyle.addStyleListener(this);
         if (this.unSelectedStyle.getBgPainter() == null) {
             this.unSelectedStyle.setBgPainter(new BGPainter());
@@ -5787,6 +5945,9 @@ public class Component implements Animation, StyleListener, Editable {
             this.selectedStyle.removeStyleListener(this);
         }
         this.selectedStyle = style;
+        if (initialized && selectedStyle.getElevation()>0) {
+            registerElevatedInternal(this);
+        }
         this.selectedStyle.addStyleListener(this);
         if (this.selectedStyle.getBgPainter() == null) {
             this.selectedStyle.setBgPainter(new BGPainter());
@@ -5805,6 +5966,9 @@ public class Component implements Animation, StyleListener, Editable {
             this.disabledStyle.removeStyleListener(this);
         }
         this.disabledStyle = style;
+        if (initialized && disabledStyle.getElevation()>0) {
+            registerElevatedInternal(this);
+        }
         this.disabledStyle.addStyleListener(this);
         if (this.disabledStyle.getBgPainter() == null) {
             this.disabledStyle.setBgPainter(new BGPainter());
@@ -6417,6 +6581,44 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
     }
+
+    /**
+     * Holds a reference to the current surface this this component is registered with.  
+     * @see #registerElevatedInternal(Component) 
+     * @see Container#addElevatedComponent(Component) 
+     * @see Container#removeElevatedComponent(Component)
+     * @since 8.0
+     */
+    private Container _parentSurface;
+
+    /**
+     * Registers the given component with the nearest surface.  This will attempt to register
+     * it with the parent container of "this", if it is a surface.  If not, it will walk up
+     * the component hierarchy until it finds a surface to add it to.
+     *
+     * @param cmp The component to register with the neares surface.
+     * @see Container#addElevatedComponent(Component)
+     * @see Container#removeElevatedComponent(Component)
+     * @since 8.0
+     */
+    void registerElevatedInternal(Component cmp) {
+        if (cmp._parentSurface != null) {
+            // It was already registered with a surface
+            cmp._parentSurface.removeElevatedComponent(cmp);
+            cmp._parentSurface = null;
+        }
+        Container parent = getParent();
+        if (parent == null) return;
+        if (parent.isSurface()) {
+            // Let's keep a reference to the surface so that we can remove it later.
+            parent.addElevatedComponent(cmp);
+            cmp._parentSurface = parent;
+        } else {
+            ((Component)parent).registerElevatedInternal(cmp);
+        }
+    }
+
+
     
     /**
      * Invoked internally to initialize and bind the component
@@ -6432,7 +6634,13 @@ public class Component implements Animation, StyleListener, Editable {
             if(isRTL() && isScrollableX()){
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
+
             initComponent();
+            if (stl.getElevation() > 0) {
+                // This component is elevated, so we need to register it with the surface so that it can
+                // render its shadows.
+                registerElevatedInternal(this);
+            }
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, true));
             }
@@ -6489,6 +6697,10 @@ public class Component implements Animation, StyleListener, Editable {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
             }
             deregisterAnimatedInternal();
+            if (_parentSurface != null) {
+                _parentSurface.removeElevatedComponent(this);
+                _parentSurface = null;
+            }
             deinitialize();
             if(refreshTaskDragListener != null) {
                 Form f = getComponentForm();
@@ -6660,6 +6872,11 @@ public class Component implements Animation, StyleListener, Editable {
                     parent.revalidateLater();
                 }
             }
+        } else if (propertyName.equals(Style.ELEVATION) && source.getElevation() > 0) {
+            Container surface = findSurface();
+            if (surface != null) {
+                surface.addElevatedComponent(this);
+            }
         }
     }
 
@@ -6805,6 +7022,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @param s style to initialize
      */
     protected void initCustomStyle(Style s) {
+        if (initialized && s.getElevation()>0) {
+            registerElevatedInternal(this);
+        }
         s.addStyleListener(this);
         if (s.getBgPainter() == null) {
             s.setBgPainter(new BGPainter());
