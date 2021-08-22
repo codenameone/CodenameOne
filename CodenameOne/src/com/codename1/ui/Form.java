@@ -3309,7 +3309,8 @@ public class Form extends Container {
             parent = parent.getParent();
         }
     }
-    
+
+    private boolean pointerPressedAgainDuringDrag;
     /**
      * This method fixes <a href="https://github.com/codenameone/CodenameOne/issues/2352">this tensile drag issue</a>. 
      * However, this might be undesireable in some cases and so this method
@@ -3370,6 +3371,7 @@ public class Form extends Container {
         currentPointerPress = new Object();
         // See https://github.com/codenameone/CodenameOne/issues/2352
         if (resumeDragAfterScrolling(x, y)) {
+            pointerPressedAgainDuringDrag = true;
             return;
         }
         
@@ -3560,8 +3562,11 @@ public class Form extends Container {
             pointerPressed(x, y);
         }
         autoRelease(x, y);
+        boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
+        pointerPressedAgainDuringDrag = false;
         if (pointerDraggedListeners != null) {
             ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            av.setPointerPressedDuringDrag(localPointerPressedAgainDuringDrag);
             pointerDraggedListeners.fireActionEvent(av);
             if(av.isConsumed()) {
                 return;
@@ -3630,8 +3635,10 @@ public class Form extends Container {
             pointerPressed(x, y);
         }
         autoRelease(x[0], y[0]);
+        boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]);
+            av.setPointerPressedDuringDrag(localPointerPressedAgainDuringDrag);
             pointerDraggedListeners.fireActionEvent(av);
             if(av.isConsumed()) {
                 return;

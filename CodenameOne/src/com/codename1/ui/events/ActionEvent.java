@@ -182,6 +182,15 @@ public class ActionEvent {
     private int keyEvent = -1;
     private int y = -1;
     private boolean longEvent = false;
+
+    /**
+     * A flag to ease the pain caused by fix for https://github.com/codenameone/CodenameOne/issues/2352 which prevents
+     * us from receiving new pointer pressed events while a drag is in progress.  This flag may be added to a pointer dragged
+     * event to indicate that the pointer was pressed again - in case your listener wants to monitor for this.
+     *
+     * @since 8.0
+     */
+    private boolean pointerPressedDuringDrag;
     
     /**
      * Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
@@ -506,5 +515,29 @@ public class ActionEvent {
      */
     public Component getDropTarget() {
         return (Component)sourceComponent;
+    }
+
+    /**
+     * Only used for pointer dragged events.  This flag is set to true if a pointer press event
+     * was silently swallowed by a drag in progress.  While dragging and scrolling is in progress,
+     * pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
+     * during a scroll or drag.
+     *
+     * @since 8.0
+     */
+    public boolean isPointerPressedDuringDrag() {
+        return pointerPressedDuringDrag;
+    }
+
+    /**
+     * Only used for pointer dragged events.  This flag is set to true if a pointer press event
+     * was silently swallowed by a drag in progress.  While dragging and scrolling is in progress,
+     * pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
+     * during a scroll or drag.
+     *
+     * @since 8.0
+     */
+    public void setPointerPressedDuringDrag(boolean pressed) {
+        this.pointerPressedDuringDrag = pressed;
     }
 }
