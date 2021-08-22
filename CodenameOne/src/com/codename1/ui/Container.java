@@ -1916,8 +1916,11 @@ public class Container extends Component implements Iterable<Component>{
      *                                         z-index of components in the same elevation level.
      * @param above Indicate whether to render components above or below the thresholds specified by elevationThreshold and elevationComponentIndexThreshold.  Only used if useIntersection is true.
      */
-    void paintElevatedPane(Graphics g, boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
+    void paintElevatedPane(Graphics g, final boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
         CodenameOneImplementation impl = Display.impl;
+
+        g.translate(-getAbsoluteX(), -getAbsoluteY());
+
         if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
             if (_tmpRenderingElevatedComponents == null) _tmpRenderingElevatedComponents = new ArrayList<Component>(elevatedComponents);
             else {
@@ -1937,8 +1940,8 @@ public class Container extends Component implements Iterable<Component>{
                 }
             });
             for (Component child : _tmpRenderingElevatedComponents) {
-                int relativeX = child.getRelativeX(this) + getX();
-                int relativeY = child.getRelativeY(this) + getY();
+                int relativeX = child.getRelativeX(this) + child.getScrollX();
+                int relativeY = child.getRelativeY(this) + child.getScrollY();
                 int clipX = g.getClipX();
                 int clipW = g.getClipWidth();
                 int shadowX = relativeX + child.calculateShadowOffsetX();
@@ -1965,10 +1968,11 @@ public class Container extends Component implements Iterable<Component>{
                     if (!useIntersection || elevationThreshold < 0 ||
                             (above && (elevationThreshold < child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold < child.renderedElevationComponentIndex)) ||
                             (!above && (elevationThreshold > child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold > child.renderedElevationComponentIndex))) {
-                        child.paintShadows(impl.getComponentScreenGraphics(this, g), relativeX, relativeY);
-                        int tx = child.getParent().getRelativeX(this) + getX();
-                        int ty = child.getParent().getRelativeY(this) + getY();
+                        child.paintShadows(impl.getComponentScreenGraphics(this, g), child.getRelativeX(this), child.getRelativeY(this));
+                        int tx = child.getParent().getRelativeX(this) + child.getScrollX();
+                        int ty = child.getParent().getRelativeY(this) + child.getScrollY();
                         g.translate(tx, ty);
+
                         child.paintInternal(impl.getComponentScreenGraphics(this, g), false);
                         g.translate(-tx, -ty);
                     }
@@ -2006,10 +2010,12 @@ public class Container extends Component implements Iterable<Component>{
                                     if (!useIntersection || elevationThreshold < 0 ||
                                             (above && (elevationThreshold < cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold < cntChild.renderedElevationComponentIndex)) ||
                                             (!above && (elevationThreshold > cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold > cntChild.renderedElevationComponentIndex))) {
-                                        int tx = cntChild.getParent().getRelativeX(this) + getX();
-                                        int ty = cntChild.getParent().getRelativeY(this) + getY();
+                                        int tx = cntChild.getParent().getRelativeX(this) + cntChild.getParent().getScrollX();
+                                        int ty = cntChild.getParent().getRelativeY(this) + cntChild.getParent().getScrollY();
                                         g.translate(tx, ty);
-                                        child.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+
+                                        cntChild.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+
                                         g.translate(-tx, -ty);
                                     }
                                 }
@@ -2019,10 +2025,13 @@ public class Container extends Component implements Iterable<Component>{
                     currCmp = cnt;
                     cnt = cnt.getParent();
 
+
                 }
 
             }
         }
+        g.translate(getAbsoluteX(), getAbsoluteY());
+
     }
 
     /**
