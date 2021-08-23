@@ -1704,6 +1704,9 @@ public class UIManager {
             if (themeProps.containsKey(id + Style.ELEVATION)) {
                 style.setElevation((Integer)themeProps.get(id + Style.ELEVATION));
             }
+            if (themeProps.containsKey(id + Style.SURFACE)) {
+                style.setSurface((Boolean)themeProps.get(id + Style.SURFACE));
+            }
             if (bgColor != null) {
                 style.setBgColor(Integer.valueOf(bgColor, 16).intValue());
             }

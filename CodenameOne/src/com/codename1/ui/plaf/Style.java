@@ -130,6 +130,11 @@ public class Style {
     public static final String ELEVATION = "elevation";
 
     /**
+     * Surface attribute name for the theme hashtable.
+     */
+    public static final String SURFACE = "surface";
+
+    /**
      * Margin attribute name for the theme hashtable 
      */
     public static final String MARGIN = "margin";
@@ -433,6 +438,7 @@ public class Style {
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
     private int elevation; // the elevation.
+    private boolean surface; // whether this should be treated as a surface
 
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
     private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;
@@ -493,7 +499,7 @@ public class Style {
     private static final int ALIGNMENT_MODIFIED = 16384;
     private static final int OPACITY_MODIFIED = 32768;
     private static final int ELEVATION_MODIFIED = 65536;
-
+    private static final int SURFACE_MODIFIED = 131072;
 
 
     private EventDispatcher listeners;
@@ -559,6 +565,7 @@ public class Style {
         setMarginUnit(style.marginUnit);
         setBorder(style.getBorder());
         elevation = style.elevation;
+        surface = style.surface;
         opacity = style.opacity;
         modifiedFlag = 0;
         align = style.align;
@@ -700,6 +707,9 @@ public class Style {
         if ((modifiedFlag & ELEVATION_MODIFIED) == 0) {
             setElevation(style.getElevation());
         }
+        if ((modifiedFlag & SURFACE_MODIFIED) == 0) {
+            setSurface(style.isSurface());
+        }
 
         this.bgPainter = style.bgPainter;
         modifiedFlag = tmp;
@@ -713,6 +723,14 @@ public class Style {
     public int getElevation() {
         return elevation;
     }
+
+    /**
+     * Checks whether the component is a surface.  Surface containers support a sort of z-index of descendants
+     * via the elevation attribute.  Surfaces will render the shadows of elevated descendants to convey depth.
+     * @return True if container should be rendered as a surface.
+     * @since 8.0
+     */
+    public boolean isSurface() { return surface; }
 
     /**
      * Returns true if the style was modified manually after it was created by the
@@ -871,8 +889,51 @@ public class Style {
 
     }
 
+    /**
+     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @param elevation The elevation value.
+     * @since 8.0
+     */
     public void setElevation(int elevation) {
         setElevation(elevation, false);
+    }
+
+    /**
+     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+     * z-indexing of its descendants via their elevation properties.  The surface will render
+     * the shadows of elevated descendants to convey depth.
+     *
+     * @param surface True to enable surface rendering mode.
+     * @param override  If set to true allows the look and feel/theme to override
+     *     the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setSurface(boolean surface, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setSurface(surface, override);
+            }
+            return;
+        }
+        if (this.surface != surface) {
+            this.surface = surface;
+            if (!override) {
+                modifiedFlag |= SURFACE_MODIFIED;
+            }
+            firePropertyChanged(SURFACE);
+        }
+    }
+
+    /**
+     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+     * z-indexing of its descendants via their elevation properties.  The surface will render
+     * the shadows of elevated descendants to convey depth.
+     *
+     * @param surface True to enable surface rendering mode.
+     * @since 8.0
+     */
+    public void setSurface(boolean surface) {
+        setSurface(surface, false);
     }
 
     /**

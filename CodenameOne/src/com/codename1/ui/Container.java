@@ -369,7 +369,7 @@ public class Container extends Component implements Iterable<Component>{
      * @see Style#getElevation()
      * @see Component#paintShadows(Graphics, int, int) 
      */
-    public void setSurface(boolean surface) {
+    void setSurface(boolean surface) {
         if (surface != this.surface) {
             this.surface = surface;
             if (!surface) {

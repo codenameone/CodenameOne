@@ -1456,6 +1456,11 @@ public class Resources {
 
             }
 
+            if (key.endsWith("surface")) {
+                theme.put(key, (input.readBoolean()));
+                continue;
+            }
+
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {
                 if(minorVersion > 7) {

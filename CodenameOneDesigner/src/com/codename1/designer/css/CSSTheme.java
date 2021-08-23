@@ -1672,8 +1672,17 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, selId+"#elevation", el.getThemeElevation(selectedStyles));
                 currToken = "pressed elevation";
                 res.setThemeProperty(themeName, pressedId+"#elevation", el.getThemeElevation(pressedStyles));
-                currToken = "disabled elegation";
+                currToken = "disabled elevation";
                 res.setThemeProperty(themeName, disabledId+"#elevation", el.getThemeElevation(disabledStyles));
+
+                currToken = "surface";
+                res.setThemeProperty(themeName, unselId+".surface", el.getThemeSurface(unselectedStyles));
+                currToken = "selected surface";
+                res.setThemeProperty(themeName, selId+"#surface", el.getThemeSurface(selectedStyles));
+                currToken = "pressed surface";
+                res.setThemeProperty(themeName, pressedId+"#surface", el.getThemeSurface(pressedStyles));
+                currToken = "disabled surface";
+                res.setThemeProperty(themeName, disabledId+"#surface", el.getThemeSurface(disabledStyles));
 
 
                 currToken = "fgColor";
@@ -4152,6 +4161,15 @@ public class CSSTheme {
             }
             return 0;
         }
+
+        public boolean getThemeSurface(Map<String, LexicalUnit> style) {
+            if (style.containsKey("surface")) {
+                ScaledUnit su = (ScaledUnit)style.get("surface");
+                if ("true".equalsIgnoreCase(su.getStringValue())) return true;
+                if (su.getIntegerValue() != 0) return true;
+            }
+            return false;
+        }
         
         public byte[] getThemeMarginUnit(Map<String,LexicalUnit> style) {
             if (!style.containsKey("margin-left") && !style.containsKey("margin-top") && !style.containsKey("margin-bottom") && !style.containsKey("margin-right")) {
@@ -5287,6 +5305,11 @@ public class CSSTheme {
 
             case "elevation" : {
                 style.put("elevation", value);
+                break;
+            }
+
+            case "surface" : {
+                style.put("surface", value);
                 break;
             }
                 

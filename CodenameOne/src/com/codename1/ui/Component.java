@@ -895,7 +895,10 @@ public class Component implements Animation, StyleListener, Editable {
                     
         }
     }
-    
+
+    void setSurface(boolean surface) {
+
+    }
     
     private void initStyle() {
         if (hasInlineUnselectedStyle()) {
@@ -908,6 +911,9 @@ public class Component implements Animation, StyleListener, Editable {
             if (initialized && unSelectedStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
+            if (initialized) {
+                setSurface(unSelectedStyle.isSurface());
+            }
             unSelectedStyle.addStyleListener(this);
             if (unSelectedStyle.getBgPainter() == null) {
                 unSelectedStyle.setBgPainter(new BGPainter());
@@ -919,6 +925,9 @@ public class Component implements Animation, StyleListener, Editable {
         if(disabledStyle != null) {
             if (initialized && disabledStyle.getElevation()>0) {
                 registerElevatedInternal(this);
+            }
+            if (initialized) {
+                setSurface(disabledStyle.isSurface());
             }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
@@ -5852,6 +5861,9 @@ public class Component implements Animation, StyleListener, Editable {
             if (initialized && pressedStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
+            if (initialized) {
+                setSurface(pressedStyle.isSurface());
+            }
             pressedStyle.addStyleListener(this);
             if(pressedStyle.getBgPainter() == null){
                 pressedStyle.setBgPainter(new BGPainter());
@@ -5873,6 +5885,9 @@ public class Component implements Animation, StyleListener, Editable {
         pressedStyle = style;
         if (initialized && pressedStyle.getElevation()>0) {
             registerElevatedInternal(this);
+        }
+        if (initialized) {
+            setSurface(pressedStyle.isSurface());
         }
         pressedStyle.addStyleListener(this);
         if (pressedStyle.getBgPainter() == null) {
@@ -5911,6 +5926,9 @@ public class Component implements Animation, StyleListener, Editable {
             if (initialized && selectedStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
+            if (initialized) {
+                setSurface(selectedStyle.isSurface());
+            }
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
@@ -5938,6 +5956,9 @@ public class Component implements Animation, StyleListener, Editable {
             if (initialized && disabledStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
+            if (initialized) {
+                setSurface(disabledStyle.isSurface());
+            }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
@@ -5960,6 +5981,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (initialized && unSelectedStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }
+        if (initialized) {
+            setSurface(unSelectedStyle.isSurface());
+        }
         this.unSelectedStyle.addStyleListener(this);
         if (this.unSelectedStyle.getBgPainter() == null) {
             this.unSelectedStyle.setBgPainter(new BGPainter());
@@ -5981,6 +6005,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (initialized && selectedStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }
+        if (initialized) {
+            setSurface(selectedStyle.isSurface());
+        }
         this.selectedStyle.addStyleListener(this);
         if (this.selectedStyle.getBgPainter() == null) {
             this.selectedStyle.setBgPainter(new BGPainter());
@@ -6001,6 +6028,9 @@ public class Component implements Animation, StyleListener, Editable {
         this.disabledStyle = style;
         if (initialized && disabledStyle.getElevation()>0) {
             registerElevatedInternal(this);
+        }
+        if (initialized) {
+            setSurface(disabledStyle.isSurface());
         }
         this.disabledStyle.addStyleListener(this);
         if (this.disabledStyle.getBgPainter() == null) {
@@ -6674,6 +6704,7 @@ public class Component implements Animation, StyleListener, Editable {
                 // render its shadows.
                 registerElevatedInternal(this);
             }
+            setSurface(stl.isSurface());
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, true));
             }
@@ -6910,6 +6941,8 @@ public class Component implements Animation, StyleListener, Editable {
             if (surface != null) {
                 surface.addElevatedComponent(this);
             }
+        } else if (propertyName.equals(Style.SURFACE)) {
+            setSurface(source.isSurface());
         }
     }
 
@@ -7057,6 +7090,9 @@ public class Component implements Animation, StyleListener, Editable {
     protected void initCustomStyle(Style s) {
         if (initialized && s.getElevation()>0) {
             registerElevatedInternal(this);
+        }
+        if (initialized) {
+            setSurface(s.isSurface());
         }
         s.addStyleListener(this);
         if (s.getBgPainter() == null) {
