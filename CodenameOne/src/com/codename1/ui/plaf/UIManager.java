@@ -1695,8 +1695,8 @@ public class UIManager {
             String padding = (String) themeProps.get(id + Style.PADDING);
             Object font = themeProps.get(id + Style.FONT);
             Integer alignment = (Integer) themeProps.get(id + Style.ALIGNMENT);
-            Integer textDecoration = (Integer) themeProps.get(id + Style.TEXT_DECORATION);
 
+            Integer textDecoration = (Integer) themeProps.get(id + Style.TEXT_DECORATION);
             Byte backgroundType = (Byte) themeProps.get(id + Style.BACKGROUND_TYPE);
             Object[] backgroundGradient = (Object[]) themeProps.get(id + Style.BACKGROUND_GRADIENT);
             byte[] paddingUnit = (byte[])themeProps.get(id + Style.PADDING_UNIT);

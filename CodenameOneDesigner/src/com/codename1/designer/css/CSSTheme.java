@@ -3778,7 +3778,7 @@ public class CSSTheme {
         
         public String getThemeFgColor(Map<String,LexicalUnit> style) {
             LexicalUnit color = style.get("color");
-            return getColorString(color);
+            return getColorString(color, true);
         }
         
         public String getThemeBgColor(Map<String,LexicalUnit> style) {
@@ -6512,6 +6512,9 @@ public class CSSTheme {
     }
 
     static String getColorString(LexicalUnit color) {
+        return getColorString(color, false);
+    }
+    static String getColorString(LexicalUnit color, boolean premultiplied) {
         if (color == null) return null;
         switch (color.getLexicalUnitType()) {
             case LexicalUnit.SAC_IDENT:
@@ -6549,6 +6552,8 @@ public class CSSTheme {
             }
             case LexicalUnit.SAC_FUNCTION: {
                 if ("cn1rgb".equals(color.getFunctionName()) || "rgb".equals(color.getFunctionName()) || "cn1rgba".equals(color.getFunctionName()) || "rgba".equals(color.getFunctionName())) {
+                    // If the value didn't have alpha, then we don't premultiply
+                    if ("cn1rgb".equals(color.getFunctionName()) || "rgb".equals(color.getFunctionName())) premultiplied = false;
                     ScaledUnit red = (ScaledUnit)color.getParameters();
                     ScaledUnit green = (ScaledUnit)red.getNextLexicalUnit();
                     if (green == null) {
@@ -6570,10 +6575,32 @@ public class CSSTheme {
                     if (blue == null) {
                         throw new RuntimeException("Failed to parse color "+color+".  Received null value for blue parameter: "+color);
                     }
+
+
+                    ScaledUnit alpha = null;
+                    if (premultiplied) {
+
+
+                        alpha = (ScaledUnit) blue.getNextLexicalUnit();
+                        if (alpha == null) {
+                            throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
+                        }
+                        if (alpha.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                            alpha = (ScaledUnit) alpha.getNextLexicalUnit();
+                        }
+                        if (alpha == null) {
+                            throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
+                        }
+                    }
+                    int r = (int)(red.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
+                    int g = (int)(green.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
+                    int b = (int)(blue.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
+
+
                     return String.format( "%02X%02X%02X",
-                            red.getIntegerValue(),
-                            green.getIntegerValue(),
-                            blue.getIntegerValue());
+                            r,
+                            g,
+                            b);
                 }
             }
             default:
