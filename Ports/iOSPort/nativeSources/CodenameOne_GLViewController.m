@@ -1233,7 +1233,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    [i drawInRect:CGRectMake(x, y, width, height)];
+    if (alpha == 255) {
+        [i drawInRect:CGRectMake(x, y, width, height)];
+    } else {
+        [i drawInRect:CGRectMake(x, y, width, height) blendMode:kCGBlendModeNormal alpha:alpha/(CGFloat)255];
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
