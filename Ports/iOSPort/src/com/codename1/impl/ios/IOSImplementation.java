@@ -2114,6 +2114,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
 
     @Override
     public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {

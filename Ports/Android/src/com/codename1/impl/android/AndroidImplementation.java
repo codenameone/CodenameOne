@@ -9926,6 +9926,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
 

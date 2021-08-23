@@ -7625,6 +7625,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean isDrawShadowSupported() {
+        /**
+         * Return true here as the platform does support drawing shadows.  However implementation is very slow.
+         */
         return true;
     }
 

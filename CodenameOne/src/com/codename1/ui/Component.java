@@ -2191,6 +2191,23 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
 
+    /**
+     * Initial implementation used separate shadow rendering on each platform's native layer via the
+     * platform's drawShadow() method.  However, performance in the simulator was terrible, so I implemented
+     * a cross-platform fallback solution in {@link #drawShadow(Graphics, Image, int, int, int, int, int, int, int, float)} that
+     * was reasonably fast.  After some experimentation it seems that using this cross-platform solution is good enough
+     * to use on all platforms, however, it is an approximation and doesn't include any blur.
+     *
+     * This method acts as a switch to allow us to enable native shadow rendering if it is supported, and it has
+     * been explicitly enabled either with a display property or a component client property.
+     * @return True if native shadow rendering should be used for elevation.
+     */
+    private boolean useNativeShadowRendering() {
+        if (!Display.impl.isDrawShadowSupported()) return false;
+        if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) return true;
+        if ("true".equals(CN.getProperty("Component.nativeShadowRendering", "false"))) return true;
+        return false;
+    }
 
     /**
      * Wrapper for {@link Graphics#drawShadow(Image, int, int, int, int, int, int, int, float)} that takes coordinates in device-independent
@@ -2208,7 +2225,10 @@ public class Component implements Animation, StyleListener, Editable {
      */
     private void drawShadow(Graphics g, Image img, int relativeX, int relativeY, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
 
-        if (useLightweightElevationShadow) {
+
+        if (!useNativeShadowRendering()) {
+            // Cross-platform "fast" shadow implementation.
+            // No blur.
             int[] rgb = img.getRGBCached();
             int[] mask = new int[rgb.length];
             System.arraycopy(rgb, 0, mask, 0, rgb.length);
@@ -2260,6 +2280,7 @@ public class Component implements Animation, StyleListener, Editable {
 
 
         } else {
+            // Use native shadow support.
             g.drawShadow(img, relativeX, relativeY, dp2px(offsetX), dp2px(offsetY), dp2px(blurRadius), dp2px(spreadRadius), color, opacity);
         }
     }
@@ -2419,6 +2440,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     private boolean paintinShadowInBackground_ = false;
 
+
     /**
      * Paints the drop-shadow projections for this component based on its elevation value.
      *
@@ -2477,7 +2499,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         paintinShadowInBackground_ = true;
 
-        CN.scheduleBackgroundTask(new Runnable() {
+        Runnable createImageTask = new Runnable() {
             public void run() {
                 // We paint shadow in a background thread to avoid jank on the EDT.  It is possible that this
                 // will cause problems on some platforms.  If that is the case, we can hedge and move it onto
@@ -2592,12 +2614,23 @@ public class Component implements Animation, StyleListener, Editable {
                 }
 
             }
-        });
+        };
+        if (canCreateImageOffEdt()) {
+            CN.scheduleBackgroundTask(createImageTask);
+        } else {
+            createImageTask.run();
+        }
 
         //origG.drawImage(cachedShadowImage, origRelativeX + calculateShadowOffsetX(), origRelativeY + calculateShadowOffsetY());
 
 
 
+    }
+
+    private boolean canCreateImageOffEdt() {
+        String platform = CN.getPlatformName();
+        if ("ios".equals(platform) && !CN.isSimulator()) return false;
+        return true;
     }
 
     /**
