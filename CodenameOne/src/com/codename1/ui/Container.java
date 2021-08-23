@@ -1918,8 +1918,10 @@ public class Container extends Component implements Iterable<Component>{
      */
     void paintElevatedPane(Graphics g, final boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
         CodenameOneImplementation impl = Display.impl;
+        int absX = getAbsoluteX();
+        int absY = getAbsoluteY();
 
-        g.translate(-getAbsoluteX(), -getAbsoluteY());
+        g.translate(-absX, -absY);
 
         if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
             if (_tmpRenderingElevatedComponents == null) _tmpRenderingElevatedComponents = new ArrayList<Component>(elevatedComponents);
@@ -1968,7 +1970,9 @@ public class Container extends Component implements Iterable<Component>{
                     if (!useIntersection || elevationThreshold < 0 ||
                             (above && (elevationThreshold < child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold < child.renderedElevationComponentIndex)) ||
                             (!above && (elevationThreshold > child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold > child.renderedElevationComponentIndex))) {
+                        g.translate(absX, absY);
                         child.paintShadows(impl.getComponentScreenGraphics(this, g), child.getRelativeX(this), child.getRelativeY(this));
+                        g.translate(-absX, -absY);
                         int tx = child.getParent().getRelativeX(this) + child.getScrollX();
                         int ty = child.getParent().getRelativeY(this) + child.getScrollY();
                         g.translate(tx, ty);
@@ -2030,7 +2034,7 @@ public class Container extends Component implements Iterable<Component>{
 
             }
         }
-        g.translate(getAbsoluteX(), getAbsoluteY());
+        g.translate(absX, absY);
 
     }
 
