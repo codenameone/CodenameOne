@@ -546,7 +546,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             */
             Container contentPane = form.getContentPane();
+            if (!contentPane.contains(cmp)) {
+                contentPane = form;
+            }
             Style contentPaneStyle = contentPane.getStyle();
+
             int minY = contentPane.getAbsoluteY() + contentPane.getScrollY() + contentPaneStyle.getPaddingTop();
             int maxH = Display.getInstance().getDisplayHeight() - minY - nativeInstance.getVKBHeight();
             
@@ -1024,7 +1028,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.updateNativeEditorText(text);
         }
     }
-    
+
+    @Override
+    public boolean nativeEditorPaintsHint() {
+        return true;
+    }
+
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
