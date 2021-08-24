@@ -87,6 +87,11 @@ public class Style {
     public static final String FG_COLOR = "fgColor";
 
     /**
+     * Foreground alpha attribute name for the theme hashtable
+     */
+    public static final String FG_ALPHA = "fgAlpha";
+
+    /**
      * Background image attribute name for the theme hashtable 
      */
     public static final String BG_IMAGE = "bgImage";
@@ -414,6 +419,7 @@ public class Style {
 
 
     private int fgColor = 0x000000;
+    private int fgAlpha = 0xff;
     private int bgColor = 0xFFFFFF;
     private Font font = Font.getDefaultFont();
     private Image bgImage;
@@ -500,6 +506,7 @@ public class Style {
     private static final int OPACITY_MODIFIED = 32768;
     private static final int ELEVATION_MODIFIED = 65536;
     private static final int SURFACE_MODIFIED = 131072;
+    private static final int FG_ALPHA_MODIFIED = 262144 ;
 
 
     private EventDispatcher listeners;
@@ -564,6 +571,7 @@ public class Style {
         setPaddingUnit(style.paddingUnit);
         setMarginUnit(style.marginUnit);
         setBorder(style.getBorder());
+        fgAlpha = style.fgAlpha;
         elevation = style.elevation;
         surface = style.surface;
         opacity = style.opacity;
@@ -644,6 +652,9 @@ public class Style {
 
         if ((modifiedFlag & FG_COLOR_MODIFIED) == 0) {
             setFgColor(style.getFgColor());
+        }
+        if ((modifiedFlag & FG_ALPHA_MODIFIED) == 0) {
+            setFgAlpha(style.getFgAlpha());
         }
         if ((modifiedFlag & BG_COLOR_MODIFIED) == 0) {
             setBgColor(style.getBgColor());
@@ -854,6 +865,16 @@ public class Style {
      */
     public int getFgColor() {
         return fgColor;
+    }
+
+    /**
+     * Foreground alpha for the component
+     *
+     * @return the foreground alpha for the component
+     * @since 8.0
+     */
+    public int getFgAlpha() {
+        return fgAlpha;
     }
 
     /**
@@ -1085,6 +1106,15 @@ public class Style {
      */
     public void setFgColor(int fgColor) {
         setFgColor(fgColor, false);
+    }
+
+    /**
+     * Sets the foreground alpha for the component
+     *
+     * @param fgAlpha foreground alpha
+     */
+    public void setFgAlpha(int fgAlpha) {
+        setFgAlpha(fgAlpha, false);
     }
 
     /**
@@ -2431,6 +2461,29 @@ public class Style {
     }
 
     /**
+     * Sets the foreground alpha for the component
+     *
+     * @param fgAlpha foreground alpha
+     * @param override If set to true allows the look and feel/theme to override
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setFgAlpha(int fgAlpha, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setFgAlpha(fgAlpha, override);
+            }
+            return;
+        }
+        if (this.fgAlpha != fgAlpha) {
+            this.fgAlpha = fgAlpha;
+            if (!override) {
+                modifiedFlag |= FG_ALPHA_MODIFIED;
+            }
+            firePropertyChanged(FG_ALPHA);
+        }
+    }
+
+    /**
      * Sets the font for the component
      * 
      * @param font the font
@@ -2863,6 +2916,9 @@ public class Style {
         if(this.fgColor != other.fgColor) {
             return false;
         }
+        if(this.fgAlpha != other.fgAlpha) {
+            return false;
+        }
         if(this.bgColor != other.bgColor) {
             return false;
         }
@@ -2910,6 +2966,12 @@ public class Style {
             return false;
         }
         if(this.textDecoration != other.textDecoration) {
+            return false;
+        }
+        if (this.elevation != other.elevation) {
+            return false;
+        }
+        if (this.surface != other.surface) {
             return false;
         }
         return true;

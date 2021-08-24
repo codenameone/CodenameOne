@@ -264,6 +264,7 @@ public class Table extends Container {
                 rows++;
             }
             g.setColor(getStyle().getFgColor());
+            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
             TableLayout t = (TableLayout)getLayout();
             int actualWidth = Math.max(getWidth(), getScrollDimension().getWidth());
             int actualHeight = Math.max(getHeight(), getScrollDimension().getHeight());
@@ -388,6 +389,7 @@ public class Table extends Container {
             }
 
             g.translate(-xPos, -yPos);
+            g.setAlpha(alpha);
         }
     }
 

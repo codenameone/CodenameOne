@@ -129,7 +129,9 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T>{
             i = ImageFactory.createImage(this, w, h, 0);
             g = i.getGraphics();
             UIManager.getInstance().getLookAndFeel().setFG(g, this);
+            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
             g.drawChar(c, 0, 0);
+            g.setAlpha(alpha);
             i = Effects.verticalPerspective(i, TOP_SCALE[perspective], BOTTOM_SCALE[perspective], VERTICAL_SHRINK[perspective]);
             imageCache[perspective].put(chr, i);
         }

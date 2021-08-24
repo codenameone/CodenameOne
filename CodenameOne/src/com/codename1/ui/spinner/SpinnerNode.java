@@ -127,10 +127,12 @@ class SpinnerNode extends Node {
                 g.setColor(style.getBgColor());
                 g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
                 g.setColor(style.getFgColor());
+                int alpha = g.concatenateAlpha(style.getFgAlpha());
                 g.drawLine(bounds.getX(), bounds.getY(), bounds.getWidth() + bounds.getX(), bounds.getY());
                 g.drawLine(bounds.getX(), bounds.getY()+bounds.getHeight(), 
                         bounds.getX() + bounds.getWidth(), bounds.getY() + bounds.getHeight()
                 );
+                g.setAlpha(alpha);
             }
         });
         

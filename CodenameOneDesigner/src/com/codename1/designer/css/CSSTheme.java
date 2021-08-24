@@ -1693,6 +1693,16 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, pressedId+"#fgColor", el.getThemeFgColor(pressedStyles));
                 currToken = "disabled fgColor";
                 res.setThemeProperty(themeName, disabledId+"#fgColor", el.getThemeFgColor(disabledStyles));
+
+                currToken = "fgAlpha";
+                res.setThemeProperty(themeName, unselId+".fgAlpha", el.getThemeFgAlpha(unselectedStyles));
+                currToken = "selected fgAlpha";
+                res.setThemeProperty(themeName, selId+"#fgAlpha", el.getThemeFgAlpha(selectedStyles));
+                currToken = "pressed fgAlpha";
+                res.setThemeProperty(themeName, pressedId+"#fgAlpha", el.getThemeFgAlpha(pressedStyles));
+                currToken = "disabled fgAlpha";
+                res.setThemeProperty(themeName, disabledId+"#fgAlpha", el.getThemeFgAlpha(disabledStyles));
+
                 currToken = "bgColor";
                 res.setThemeProperty(themeName, unselId+".bgColor", el.getThemeBgColor(unselectedStyles));
                 currToken = "selected bgColor";
@@ -3778,7 +3788,7 @@ public class CSSTheme {
         
         public String getThemeFgColor(Map<String,LexicalUnit> style) {
             LexicalUnit color = style.get("color");
-            return getColorString(color, true);
+            return getColorString(color, false);
         }
         
         public String getThemeBgColor(Map<String,LexicalUnit> style) {
@@ -4480,7 +4490,33 @@ public class CSSTheme {
             }
             return null;
         }
-        
+
+        public Integer getThemeFgAlpha(Map<String,LexicalUnit> styles) {
+            LexicalUnit fgColor = styles.get("color");
+            if (fgColor == null) {
+                return null;
+            }
+            while (fgColor != null) {
+                if ("transparent".equals(fgColor.getStringValue())) {
+                    return 0;
+                }
+                if ("rgb".equals(fgColor.getFunctionName()) || "cn1rgb".equals(fgColor.getFunctionName())) {
+                    return 0;
+                } if ("rgba".equals(fgColor.getFunctionName()) || "cn1rgba".equals(fgColor.getFunctionName())) {
+                    ScaledUnit r = (ScaledUnit)fgColor.getParameters();
+                    ScaledUnit g = r.getNextNumericUnit();
+                    ScaledUnit b = g.getNextNumericUnit();
+                    ScaledUnit a = b.getNextNumericUnit();
+
+                    return (int)(a.getNumericValue()*255.0);
+                } else {
+                    return 255;
+                }
+                //bgColor = bgColor.getNextLexicalUnit();
+            }
+            return null;
+        }
+
         public String getThemeTransparency(Map<String,LexicalUnit> styles) {
             
             ScaledUnit background = (ScaledUnit)styles.get("background");
@@ -6592,9 +6628,9 @@ public class CSSTheme {
                             throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
                         }
                     }
-                    int r = (int)(red.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
-                    int g = (int)(green.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
-                    int b = (int)(blue.getIntegerValue() * (premultiplied?alpha.getNumericValue():1));
+                    int r = (int)(red.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int g = (int)(green.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int b = (int)(blue.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
 
 
                     return String.format( "%02X%02X%02X",

@@ -316,6 +316,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
             int gradientColor;
             g.setColor(style.getFgColor());
+
             gradientColor = style.getBgColor();
 
             int width = height;
@@ -338,8 +339,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             int destColor = findDestColor(gradientColor);
 
             g.fillLinearGradient(gradientColor, destColor, x + 1, y + 1, rectWidth - 2, rectHeight - 1, false);
+            int alpha = g.concatenateAlpha(style.getFgAlpha());
             g.drawRoundRect(x, y, rectWidth, rectHeight, 5, 5);
-
+            g.setAlpha(alpha);
             if (cb.isSelected()) {
                 int color = g.getColor();
                 g.setColor(0x111111);
@@ -670,8 +672,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
             // center the RadioButton
             y += Math.max(0, rb.getHeight() / 2 - height / 2);
-
+            int alpha = g.concatenateAlpha(style.getFgAlpha());
             g.drawArc(x, y, height, height, 0, 360);
+            g.setAlpha(alpha);
             if (rb.isSelected()) {
                 int color = g.getColor();
                 int destColor = findDestColor(color);
@@ -737,8 +740,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
             g.fillLinearGradient(g.getColor(), destColor, x, y, width, height, false);
             g.setColor(color);
+            int alpha = g.concatenateAlpha(style.getFgAlpha());
             g.drawRect(x, y, width, height - 1);
-
+            g.setAlpha(alpha);
             width--;
             height--;
 
@@ -910,6 +914,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public void drawTextArea(Graphics g, TextArea ta) {
         setFG(g, ta);
+        int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());
+
         int line = ta.getLines();
         int oX = g.getClipX();
         int oY = g.getClipY();
@@ -977,6 +983,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
         }
+        g.setAlpha(alpha);
     }
 
     private static final Image[] threeImageCache = new Image[3];
@@ -1312,7 +1319,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     private void drawComponent(Graphics g, Label l, Image icon, Image stateIcon, int preserveSpaceForState) {
         setFG(g, l);
-
+        int alpha = g.concatenateAlpha(l.getStyle().getFgAlpha());
         int gap = l.getGap();
         int stateIconSize = 0;
         int stateIconYPosition = 0;
@@ -1602,13 +1609,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             g.fillShape(path);
             if (bgColor != strokeColor) {
                 g.setColor(strokeColor);
+                int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
                 g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+                g.setAlpha(alpha2);
             }
             
             
             g.setColor(fgColor);
             g.setFont(badgeFont);
+            int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
             g.drawString(badgeText, rect.getX() + rect.getWidth()/2 - badgeTextWidth/2, rect.getY() + badgePaddingTop);
+            g.setAlpha(alpha2);
             
             
             g.setColor(col);
@@ -1619,6 +1630,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             
             
         }
+        g.setAlpha(alpha);
     }
 
     private void drawLabelImageValign(Graphics g, Label l, Image icon, int x, int y, int fontHeight, int iconHeight) {
@@ -1992,7 +2004,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public void drawTextField(Graphics g, TextArea ta) {
         setFG(g, ta);
-
+        int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());
         // display ******** if it is a password field
         String displayText = getTextFieldString(ta);
 
@@ -2099,7 +2111,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 g.drawString(inputMode, drawXPos, inputIndicatorY);
             }
         }
+        g.setAlpha(alpha);
     }
+
 
     /**
      * Returns true if the given character is an RTL character or a space
@@ -2216,6 +2230,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
 
         int oldColor = g.getColor();
+        int alpha = g.concatenateAlpha(style.getFgAlpha());
         if(getTextFieldCursorColor() == 0) {
             g.setColor(style.getFgColor());
          } else {
@@ -2223,6 +2238,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
          }
         g.drawLine(cursorX + x, cursorY, cursorX + x, cursorY + f.getHeight());
         g.setColor(oldColor);
+        g.setAlpha(alpha);
     }
      
      private FontImage getDefaultRefreshIcon() {

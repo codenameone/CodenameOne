@@ -299,8 +299,9 @@ public class InfiniteProgress extends Component {
         if(materialDesignMode) {
             int size = getMaterialDesignSize();
             int strokeWidth = Display.getInstance().convertToPixels(0.635f);
-            g.setColor(materialDesignColor);
-            g.setAlpha(255);
+            int oldColor = g.concatenateAlpha(materialDesignColor);
+            int oldAlpha = g.setAndGetAlpha(255);
+
             Style s = getStyle();
             GeneralPath gp = new GeneralPath();
             if(materialLengthAngle == null || materialLengthAngle.isFinished()) {
@@ -324,6 +325,8 @@ public class InfiniteProgress extends Component {
             Stroke st = new Stroke(strokeWidth, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1);
             g.setAntiAliased(true);
             g.drawShape(gp, st);
+            g.setColor(oldColor);
+            g.setColor(oldAlpha);
             return;
         }
         if(animation == null) {

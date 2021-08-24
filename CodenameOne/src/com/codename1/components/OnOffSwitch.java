@@ -243,19 +243,23 @@ public class OnOffSwitch extends Container implements ActionSource {
                 int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;
                 g.setFont(s.getFont());
                 g.setColor(0xffffff);
+                int alpha = g.concatenateAlpha(s.getFgAlpha());
                 if (!noTextMode) {
                     g.drawString(on, sX, sY, Style.TEXT_DECORATION_3D);
                 }
+
                 strWidth = s.getFont().stringWidth(off);
                 g.setColor(0x333333);
                 sX = offX + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;
                 if(!noTextMode) {
                     g.drawString(off, sX, sY);
                 }
+                g.setAlpha(alpha);
                 g.setClip(oldClipX, oldClipY, oldClipW, oldClipH);
             } else {
                 String str;
                 switchButtonPadInt /= 2;
+                int alpha = g.concatenateAlpha(s.getFgAlpha());
                 if(value) {
                     g.drawImage(switchOnImage, x, y);
                     str = on;
@@ -273,6 +277,7 @@ public class OnOffSwitch extends Container implements ActionSource {
                 if(!noTextMode) {
                     g.drawString(str, sX, sY);
                 }
+                g.setAlpha(alpha);
             }
             
             g.drawImage(switchMaskImage, x, y);

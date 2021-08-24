@@ -5588,7 +5588,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void paintRippleOverlay(Graphics g, int x, int y, int position) {
         int a = g.getAlpha();
         int c = g.getColor();
-        g.setAlpha(20);
+        g.concatenateAlpha(20);
         g.setColor(0);
         if(position == 1000) {
             g.fillRect(getX(), getY(), getWidth(), getHeight());
@@ -6563,7 +6563,9 @@ public class Component implements Animation, StyleListener, Editable {
         Border b = getBorder();
         if (b != null) {
             g.setColor(getStyle().getFgColor());
+            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
             b.paint(g, this);
+            g.setAlpha(alpha);
         }
     }
 

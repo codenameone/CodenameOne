@@ -1444,7 +1444,11 @@ public class Resources {
                 theme.put(key, "" + (input.readByte() & 0xff));
                 continue;
             } 
-            
+
+            if (key.endsWith("fgAlpha")) {
+                theme.put(key, (input.readInt() & 0xff));
+                continue;
+            }
             if(key.endsWith("opacity")) {
                 theme.put(key, "" + (input.readInt() & 0xff));
                 continue;

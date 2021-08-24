@@ -2080,6 +2080,10 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeInt(((Number)theme.get(key)).intValue());
                 continue;
             }
+            if (key.endsWith(Style.FG_ALPHA)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
+                continue;
+            }
             if (key.endsWith(Style.SURFACE)) {
                 output.writeBoolean((Boolean)theme.get(key));
                 continue;
