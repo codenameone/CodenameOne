@@ -1296,6 +1296,19 @@ public abstract class CodenameOneImplementation {
     public abstract void setAlpha(Object graphics, int alpha);
 
     /**
+     * Concatenates alpha value to current alpha.
+     * @param graphics The graphics context
+     * @param alpha The alpha to concatenate.
+     * @return The previous alpha value.
+     */
+    public final int concatenateAlpha(Object graphics, int alpha) {
+        if (alpha == 255) return getAlpha(graphics);
+        int oldAlpha = getAlpha(graphics);
+        setAlpha(graphics, (int)(oldAlpha * (alpha/255f)));
+        return oldAlpha;
+    }
+
+    /**
      * Alpha value from 0-255 can be ignored for some operations
      * 
      * @param graphics the graphics context
@@ -7988,6 +8001,8 @@ public abstract class CodenameOneImplementation {
         setNativeFont(nativeGraphics, nativeFont);
         setColor(nativeGraphics, style.getFgColor());
 
+        int alpha = concatenateAlpha(nativeGraphics, style.getFgAlpha());
+
         int iconWidth = 0;
         int iconHeight = 0;
         if(icon != null) {
@@ -8203,6 +8218,7 @@ public abstract class CodenameOneImplementation {
                     break;
             }
         }
+        setAlpha(nativeGraphics, alpha);
     }
         
     /**
@@ -8356,9 +8372,7 @@ public abstract class CodenameOneImplementation {
                     offset = 2;
                 }
                 setColor(nativeGraphics, newColor);
-                if (a == 0xff) {
-                    setAlpha(nativeGraphics, 140);
-                }
+                concatenateAlpha(nativeGraphics, 140);
                 drawString(nativeGraphics, nativeFont, str, x, y + offset, textDecoration, fontHeight);
                 setAlpha(nativeGraphics, a);
                 setColor(nativeGraphics, c);

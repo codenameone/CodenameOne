@@ -1088,6 +1088,31 @@ public class CSSTheme {
                     return String.valueOf(lu.getIntegerValue());
                 case LexicalUnit.SAC_REAL:
                     return String.valueOf(lu.getFloatValue());
+                default:
+                    String unitText = null;
+                    try {
+                        unitText = lu.getDimensionUnitText();
+
+                    } catch (Exception ex) {
+                        break;
+                    }
+                    if (unitText != null) {
+                        if ("rem".equals(unitText)) {
+                            return lu.getFloatValue()+"rem";
+                        } else if ("vw".equals(unitText)) {
+                            return lu.getFloatValue()+"vw";
+
+                        } else if ("vh".equals(unitText)) {
+                            return lu.getFloatValue()+"vh";
+
+                        } else if ("vmin".equals(unitText)) {
+                            return lu.getFloatValue()+"vmin";
+
+                        } else if ("vmax".equals(unitText)) {
+                            return lu.getFloatValue()+"vmax";
+
+                        }
+                    }
 
 
 
@@ -2476,196 +2501,199 @@ public class CSSTheme {
         
         List<Runnable> onComplete = new ArrayList<Runnable>();
         for (String id : elements.keySet()) {
-            if (!isModified(id)) {
-                continue;
-            }
-            Element e = (Element)elements.get(id);
-            
-            Element unselected = e.getUnselected();
-            Map<String,LexicalUnit> unselectedStyles = (Map<String,LexicalUnit>)unselected.getFlattenedStyle();
-            Border b = unselected.createBorder(unselectedStyles);
-            Border unselectedBorder = b;
-            currentId = id;
-            if (e.requiresImageBorder(unselectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id, (img) -> {
-                        
-                        Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
-                        resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        resm.put(id+".border", border);
-                        unselectedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".border", borders.get(borders.indexOf(unselectedBorder)).border);
-                    });
-                    
+            try {
+                if (!isModified(id)) {
+                    continue;
                 }
-            } else if (e.requiresBackgroundImageGeneration(unselectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id, (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        unselectedBorder.image = im;
-                        resm.put(id+".bgImage", im);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".bgImage", unselectedBorder.image);
-                    });
-                }
-            }
-            
-            Element selected = e.getSelected();
-            Map<String,LexicalUnit> selectedStyles = (Map<String,LexicalUnit>)selected.getFlattenedStyle();
-            b = selected.createBorder(selectedStyles);
-            Border selectedBorder = b;
-            if (e.requiresImageBorder(selectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".sel", (img) -> {
-                        Insets insets = selected.getImageBorderInsets(selectedStyles, img.getWidth(), img.getHeight());
-                        resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        resm.put(id+".sel#border", border);
-                        selectedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".sel#border", borders.get(borders.indexOf(selectedBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(selectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".sel", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
+                Element e = (Element) elements.get(id);
 
-                        resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        selectedBorder.image = im;
-                        resm.put(id+".sel#bgImage", im);
-                        //resm.put(id+".press#bgType", Style.B)
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".sel#bgImage", selectedBorder.image);
-                    });
+                Element unselected = e.getUnselected();
+                Map<String, LexicalUnit> unselectedStyles = (Map<String, LexicalUnit>) unselected.getFlattenedStyle();
+                Border b = unselected.createBorder(unselectedStyles);
+                Border unselectedBorder = b;
+                currentId = id;
+                if (e.requiresImageBorder(unselectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id, (img) -> {
+
+                            Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
+                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+                            resm.put(id + ".border", border);
+                            unselectedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".border", borders.get(borders.indexOf(unselectedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(unselectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id, (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            unselectedBorder.image = im;
+                            resm.put(id + ".bgImage", im);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".bgImage", unselectedBorder.image);
+                        });
+                    }
                 }
+
+                Element selected = e.getSelected();
+                Map<String, LexicalUnit> selectedStyles = (Map<String, LexicalUnit>) selected.getFlattenedStyle();
+                b = selected.createBorder(selectedStyles);
+                Border selectedBorder = b;
+                if (e.requiresImageBorder(selectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".sel", (img) -> {
+                            Insets insets = selected.getImageBorderInsets(selectedStyles, img.getWidth(), img.getHeight());
+                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+                            resm.put(id + ".sel#border", border);
+                            selectedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".sel#border", borders.get(borders.indexOf(selectedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(selectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".sel", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+
+                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            selectedBorder.image = im;
+                            resm.put(id + ".sel#bgImage", im);
+                            //resm.put(id+".press#bgType", Style.B)
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".sel#bgImage", selectedBorder.image);
+                        });
+                    }
+                }
+
+                Element pressed = e.getPressed();
+                Map<String, LexicalUnit> pressedStyles = (Map<String, LexicalUnit>) pressed.getFlattenedStyle();
+
+                b = pressed.createBorder(pressedStyles);
+                Border pressedBorder = b;
+                if (e.requiresImageBorder(pressedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".press", (img) -> {
+                            Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
+
+                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+
+                            resm.put(id + ".press#border", border);
+                            pressedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".press#border", borders.get(borders.indexOf(pressedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(pressedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".press", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            pressedBorder.imageId = prefix;
+                            resm.put(id + ".press#bgImage", im/*res.findId(im, true)*/);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".press#bgImage", res.findId(pressedBorder.imageId, true));
+                        });
+                    }
+                }
+
+                Element disabled = e.getDisabled();
+                Map<String, LexicalUnit> disabledStyles = (Map<String, LexicalUnit>) disabled.getFlattenedStyle();
+
+                b = disabled.createBorder(disabledStyles);
+                Border disabledBorder = b;
+                if (e.requiresImageBorder(disabledStyles)) {
+                    if (!borders.contains(b)) {
+
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".dis", (img) -> {
+                            Insets disabledInsets = disabled.getImageBorderInsets(disabledStyles, img.getWidth(), img.getHeight());
+
+                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) disabledInsets.top, (int) disabledInsets.right, (int) disabledInsets.bottom, (int) disabledInsets.left);
+                            disabledBorder.border = border;
+                            resm.put(id + ".dis#border", border);
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".dis#border", borders.get(borders.indexOf(disabledBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(disabledStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".dis", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            disabledBorder.image = im;
+                            resm.put(id + ".dis#bgImage", im);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".dis#bgImage", disabledBorder.image);
+                        });
+                    }
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException("An exception occurred while processing the image border for element "+id, ex);
             }
-            
-            Element pressed = e.getPressed();
-            Map<String,LexicalUnit> pressedStyles = (Map<String,LexicalUnit>)pressed.getFlattenedStyle();
-            
-            b = pressed.createBorder(pressedStyles);
-            Border pressedBorder = b;
-            if (e.requiresImageBorder(pressedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".press", (img) -> {
-                        Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
-                        
-                        resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        
-                        resm.put(id+".press#border", border);
-                        pressedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".press#border", borders.get(borders.indexOf(pressedBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(pressedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".press", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        pressedBorder.imageId = prefix;
-                        resm.put(id+".press#bgImage", im/*res.findId(im, true)*/);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".press#bgImage", res.findId(pressedBorder.imageId, true));
-                    });
-                }
-            }
-            
-            Element disabled = e.getDisabled();
-            Map<String,LexicalUnit> disabledStyles = (Map<String,LexicalUnit>)disabled.getFlattenedStyle();
-            
-            b = disabled.createBorder(disabledStyles);
-            Border disabledBorder = b;
-            if (e.requiresImageBorder(disabledStyles)) {
-                if (!borders.contains(b)) {
-                    
-                    borders.add(b);
-                    resm.addImageProcessor(id+".dis", (img) -> {
-                        Insets disabledInsets = disabled.getImageBorderInsets(disabledStyles, img.getWidth(), img.getHeight());
-            
-                        resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)disabledInsets.top, (int)disabledInsets.right, (int)disabledInsets.bottom, (int)disabledInsets.left);
-                        disabledBorder.border = border;
-                        resm.put(id+".dis#border", border);
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".dis#border", borders.get(borders.indexOf(disabledBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(disabledStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".dis", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        disabledBorder.image = im;
-                        resm.put(id+".dis#bgImage", im);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".dis#bgImage", disabledBorder.image);
-                    });
-                }
-            }
-            
         }
         
         if (requiresCaptureHtml()) {
@@ -3099,50 +3127,56 @@ public class CSSTheme {
         }
         
         String generateStyleCSS() {
-            StringBuilder sb = new StringBuilder();
             Map styles = new LinkedHashMap();
             styles.putAll(getFlattenedStyle());
-            
-            if (this.requiresImageBorder(styles)) {
-                if (styles.get("min-height") != null) {
-                    styles.put("height", styles.get("min-height"));
+            try {
+                StringBuilder sb = new StringBuilder();
+
+
+                if (this.requiresImageBorder(styles)) {
+                    if (styles.get("min-height") != null) {
+                        styles.put("height", styles.get("min-height"));
+                    }
+                    if (styles.get("min-width") != null) {
+                        styles.put("width", styles.get("min-width"));
+                    }
                 }
-                if (styles.get("min-width") != null) {
-                    styles.put("width", styles.get("min-width"));
+
+                if (styles.get("height") == null) {
+                    styles.put("height", new ScaledUnit(new PixelUnit(100), 320, 640, 960));
                 }
-            }
-            
-            if (styles.get("height") == null) {
-                styles.put("height", new ScaledUnit(new PixelUnit(100), 320, 640, 960));
-            }
-            //styles.put("margin", new ScaledUnit(new PixelUnit(1), 144, 640, 960));
-            
-            for (Object key : styles.keySet()) {
-                String property = (String)key;
-                LexicalUnit value = (LexicalUnit)styles.get(key);
-                String prop = renderCSSProperty(property, styles);
-                if (!prop.isEmpty()) {
-                    sb.append(prop).append(";");
+                //styles.put("margin", new ScaledUnit(new PixelUnit(1), 144, 640, 960));
+
+                for (Object key : styles.keySet()) {
+                    String property = (String) key;
+                    LexicalUnit value = (LexicalUnit) styles.get(key);
+                    String prop = renderCSSProperty(property, styles);
+                    if (!prop.isEmpty()) {
+                        sb.append(prop).append(";");
+                    }
+
                 }
-                
+
+                Insets shadowInset = getBoxShadowPadding(styles);
+                if (shadowInset.top > 0) {
+                    sb.append("margin-top: ").append(shadowInset.top).append("px !important;");
+                }
+                if (shadowInset.left > 0) {
+                    sb.append("margin-left: ").append(shadowInset.left).append("px !important;");
+                }
+                if (shadowInset.right > 0) {
+                    sb.append("margin-right: ").append(shadowInset.right).append("px !important;");
+                }
+                if (shadowInset.bottom > 0) {
+                    sb.append("margin-bottom: ").append(shadowInset.bottom).append("px !important;");
+                }
+
+                //sb.append("border-top-right-radius: 10px / 20px;");
+                return sb.toString();
+            } catch (Exception ex) {
+                System.err.println("Failed to generate style CSS for style: " + styles + ".  Message was "+ex.getMessage());
+                throw ex;
             }
-            
-            Insets shadowInset = getBoxShadowPadding(styles);
-            if (shadowInset.top > 0) {
-                sb.append("margin-top: ").append(shadowInset.top).append("px !important;");
-            }
-            if (shadowInset.left > 0) {
-                sb.append("margin-left: ").append(shadowInset.left).append("px !important;");
-            }
-            if (shadowInset.right > 0) {
-                sb.append("margin-right: ").append(shadowInset.right).append("px !important;");
-            }
-            if (shadowInset.bottom > 0) {
-                sb.append("margin-bottom: ").append(shadowInset.bottom).append("px !important;");
-            }
-            
-            //sb.append("border-top-right-radius: 10px / 20px;");
-            return sb.toString();
         }
         
         void setParent(String name) {
@@ -3164,7 +3198,7 @@ public class CSSTheme {
         public String getEmptyHtmlWithId(String id, Map<String,LexicalUnit> style) {
             StringBuilder sb = new StringBuilder();
             String generateImage = (this.requiresBackgroundImageGeneration(style) || this.requiresImageBorder(style)) ? "true" : "false";
-            
+
             sb.append("<div id=\""+id+"\" class=\"element\" style=\"").append(generateStyleCSS())
                     .append("\" data-box-shadow-padding=\"").append(generateBoxShadowPaddingString()).append("\"")
                     .append(" data-generate-image=\"").append(generateImage).append("\"")
@@ -4501,7 +4535,7 @@ public class CSSTheme {
                     return 0;
                 }
                 if ("rgb".equals(fgColor.getFunctionName()) || "cn1rgb".equals(fgColor.getFunctionName())) {
-                    return 0;
+                    return null;
                 } if ("rgba".equals(fgColor.getFunctionName()) || "cn1rgba".equals(fgColor.getFunctionName())) {
                     ScaledUnit r = (ScaledUnit)fgColor.getParameters();
                     ScaledUnit g = r.getNextNumericUnit();
@@ -4510,7 +4544,7 @@ public class CSSTheme {
 
                     return (int)(a.getNumericValue()*255.0);
                 } else {
-                    return 255;
+                    return null;
                 }
                 //bgColor = bgColor.getNextLexicalUnit();
             }

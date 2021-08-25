@@ -897,6 +897,13 @@ class AndroidGraphics {
         
     }
 
+    public int concatenateAlpha(int alpha) {
+        int oldAlpha = getAlpha();
+        if (alpha == 255) return oldAlpha;
+        setAlpha((int)(oldAlpha * (alpha/255f)));
+        return oldAlpha;
+    }
+
     public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
             Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide,
             int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
@@ -910,6 +917,7 @@ class AndroidGraphics {
         impl.setNativeFont(this, nativeFont);
         setColor(style.getFgColor());
         canvas.save();
+        concatenateAlpha(style.getFgAlpha());
         applyTransform();
 
         int iconWidth = 0;
