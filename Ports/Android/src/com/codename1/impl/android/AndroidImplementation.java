@@ -254,6 +254,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public static void setActivity(CodenameOneActivity aActivity) {
         activity = aActivity;
+        if (activity != null) {
+            activityComponentName = activity.getComponentName();
+        }
+        
     }
     CodenameOneSurface myView = null;
     CodenameOneTextPaint defaultFont;
@@ -265,6 +269,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayWidth;
     private int displayHeight;
     static CodenameOneActivity activity;
+    static ComponentName activityComponentName;
+    
     private static Context context;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
@@ -7060,7 +7066,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
 
         Intent notificationIntent = new Intent();
-        notificationIntent.setComponent(getActivity().getComponentName());
+        notificationIntent.setComponent(activityComponentName);
         PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
 
 
@@ -10364,8 +10370,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
 
         Intent contentIntent = new Intent();
-        if (getActivity() != null) {
-            contentIntent.setComponent(getActivity().getComponentName());
+        if (activityComponentName != null) {
+            contentIntent.setComponent(activityComponentName);
+        } else {
+            try {
+                contentIntent.setComponent(getContext().getPackageManager().getLaunchIntentForPackage(getContext().getApplicationInfo().packageName).getComponent());
+            } catch (Exception ex) {
+                System.err.println("Failed to get the component name for local notification.  Local notification may not work.");
+                ex.printStackTrace();
+            }
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
 
