@@ -738,7 +738,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             // brighten or darken the color slightly
             int destColor = findDestColor(color);
 
-            g.fillLinearGradient(g.getColor(), destColor, x, y, width, height, false);
+            if (style.getBgTransparency() > 0) {
+                g.fillLinearGradient(g.getColor(), destColor, x, y, width, height, false);
+            }
             g.setColor(color);
             int alpha = g.concatenateAlpha(style.getFgAlpha());
             g.drawRect(x, y, width, height - 1);
@@ -758,7 +760,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             g.fillTriangle(x1, y1, x2, y2, x3, y3);
             g.translate(-1, -1);
             g.setColor(style.getFgColor());
+            alpha = g.concatenateAlpha(style.getFgAlpha());
             g.fillTriangle(x1, y1, x2, y2, x3, y3);
+            g.setAlpha(alpha);
             g.translate(-x, -y);
         }
 

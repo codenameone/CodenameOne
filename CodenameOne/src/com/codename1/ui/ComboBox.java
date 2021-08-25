@@ -33,6 +33,8 @@ import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.UIManager;
+
 import java.util.Vector;
 
 /**
@@ -151,6 +153,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         super(model);
         super.setUIID("ComboBox");
         ((DefaultListCellRenderer) super.getRenderer()).setShowNumbers(false);
+
         setInputOnFocus(false);
         setIsScrollVisible(false);
         setFixedSelection(FIXED_NONE_CYCLIC);
@@ -163,6 +166,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         if(c != null){
             c.setUIID("ComboBoxFocus");
         }
+
+        if (UIManager.getInstance().isThemeConstant("comboBoxUseMaterialArrowDropDownBool", false)) {
+            Style comboImageStyle = new Style(getStyle());
+            comboImageStyle.setBgTransparency(0);
+            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));
+        }
+
     }
 
     /**
@@ -198,6 +208,11 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         Component c = getRenderer().getListFocusComponent(this);
         if(c != null){
             c.setUIID(uiid + "Focus");
+        }
+        if (UIManager.getInstance().isThemeConstant("comboBoxUseMaterialArrowDropDownBool", false)) {
+            Style comboImageStyle = new Style(getStyle());
+            comboImageStyle.setBgTransparency(0);
+            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));
         }
     }
 
