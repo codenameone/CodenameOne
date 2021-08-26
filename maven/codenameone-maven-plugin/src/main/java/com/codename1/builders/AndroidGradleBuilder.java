@@ -268,7 +268,7 @@ public class AndroidGradleBuilder extends Executor {
 
     private static final boolean isMac;
 
-    private String playServicesVersion = "12.0.0";
+    private String playServicesVersion = "12.0.1";
 
     private boolean playServicesPlus;
     private boolean playServicesAuth;
@@ -906,7 +906,7 @@ public class AndroidGradleBuilder extends Executor {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
                             debug("Adding location playservice");
-                            request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
+                            request.putArgument("android.location.minPlayServicesVersion", "12.0.1");
                             playServicesLocation = true;
                             playFlag = "false";
                             if (targetSDKVersionInt >= 29) {
@@ -955,7 +955,7 @@ public class AndroidGradleBuilder extends Executor {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
                             debug("Adding location playservice");
-                            request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
+                            request.putArgument("android.location.minPlayServicesVersion", "12.0.1");
                             playServicesLocation = true;
                             playFlag = "false";
                         }
@@ -1008,7 +1008,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
         if (useFCM) {
-            request.putArgument("android.fcm.minPlayServicesVersion", "12.0.0");
+            request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");
         }
         debug("Starting playServicesVersion "+playServicesVersion);
 
@@ -3741,7 +3741,7 @@ public class AndroidGradleBuilder extends Executor {
      * of play services, so we delete all PlayServices_X_X_X classes that we aren't using
      * at build time.  We use the highest version available.
      * @param srcDir The src dir
-     * @param playServicesVersion The target play services version .  E.g. 12.0.0
+     * @param playServicesVersion The target play services version .  E.g. 12.0.1
      * @return The Source file for the class with maximum version less than or equal to playServicesVersion.  Never null
      */
     private File getPlayServicesJavaSourceFile(File srcDir, String playServicesVersion) {
