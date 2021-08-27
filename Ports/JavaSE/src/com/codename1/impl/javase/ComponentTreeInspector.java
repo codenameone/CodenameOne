@@ -152,7 +152,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
             }
         });
         
-        JPopupMenu contextMenu = new JPopupMenu();
+        final JPopupMenu contextMenu = new JPopupMenu();
         JMenuItem printComponent = new JMenuItem("Print to Console");
         printComponent.addActionListener(new java.awt.event.ActionListener() {
             @Override
