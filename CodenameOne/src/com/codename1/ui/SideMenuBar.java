@@ -998,6 +998,13 @@ public class SideMenuBar extends MenuBar {
     Container constructSideNavigationPanel(){
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         menu.setUIID("SideNavigationPanel");
+        Rectangle safeRect = new Rectangle();
+        Display.getInstance().getDisplaySafeArea(safeRect);
+        int paddingTop = menu.getStyle().getPaddingTop();
+        if (paddingTop < safeRect.getY()) {
+            menu.getStyle().setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+            menu.getStyle().setPaddingTop(safeRect.getY() + paddingTop);
+        }
         menu.setScrollableY(true);
         menu.setScrollVisible(getUIManager().isThemeConstant("sideMenuScrollVisibleBool", false));
         return menu;

@@ -1990,7 +1990,7 @@ public class Container extends Component implements Iterable<Component>{
 
                 // We need to paint all components that should be "on top" of the elevated component
                 // also.
-                paintOnTopLoop: while (cnt != this) {
+                paintOnTopLoop: while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
                     if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
                     if (foundOverlap) {
@@ -2056,7 +2056,7 @@ public class Container extends Component implements Iterable<Component>{
 
                 // We need to paint all components that should be "on top" of the elevated component
                 // also.
-                paintOnTopLoop: while (cnt != this) {
+                paintOnTopLoop: while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
                     if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
                     if (foundOverlap) {
