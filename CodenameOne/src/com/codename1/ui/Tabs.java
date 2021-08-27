@@ -443,12 +443,8 @@ public class Tabs extends Container {
      * @see #removeTabAt
      */
     public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
-        int index = tabsContainer.getComponentCount();
-        FontImage i = FontImage.createMaterial(materialIcon, "Tab", iconSize);
-        insertTab(title, i, component, index);
-        Style sel = getUIManager().getComponentCustomStyle("Tab", "press");
-        i = FontImage.createMaterial(materialIcon, sel, iconSize);
-        setTabSelectedIcon(index, i);
+        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,
+                tabsContainer.getComponentCount());
         return this;
     }
     
