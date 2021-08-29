@@ -58,6 +58,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
@@ -1045,13 +1046,59 @@ public class JavaSEPort extends CodenameOneImplementation {
                     clipboard.setContents(strSel, null);
                 }
             });
+        } else {
+            final String text = "cn1lightweightclipboard://"+obj.toString();
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    Toolkit toolkit = Toolkit.getDefaultToolkit();
+                    Clipboard clipboard = toolkit.getSystemClipboard();
+                    StringSelection strSel = new StringSelection(text.trim());
+                    clipboard.setContents(strSel, null);
+                }
+            });
         }
         super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
     }
 
-    
-    
-    public void setCurrentForm(Form f) {        
+    @Override
+    public Object getPasteDataFromClipboard() {
+        Toolkit toolkit = Toolkit.getDefaultToolkit();
+        Clipboard clipboard = toolkit.getSystemClipboard();
+
+        for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
+            try {
+
+                Object out = clipboard.getData(flavor);
+                String str = null;
+                if (out != null) {
+                    str = out.toString();
+                }
+                if (str != null && str.startsWith("cn1lightweightclipboard://")) {
+                    return super.getPasteDataFromClipboard();
+                }
+            } catch (Exception ex) {
+
+            }
+
+        }
+
+        for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
+            try {
+                Object out = clipboard.getData(flavor);
+                if (out != null) {
+                    String str = out.toString();
+                    if (str != null) return str;
+                }
+            } catch (Exception ex) {
+
+            }
+
+        }
+
+        return super.getPasteDataFromClipboard();
+    }
+
+    public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
