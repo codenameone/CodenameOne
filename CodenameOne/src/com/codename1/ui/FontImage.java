@@ -9508,14 +9508,14 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverIcon(FontImage.create("" + icon, sel));
             } else {
                 b.setRolloverIcon(null);
             }
-            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icon, pre));
@@ -9523,7 +9523,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icon, dis));
@@ -9565,7 +9565,7 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
@@ -9573,7 +9573,7 @@ public class FontImage extends Image {
                 b.setRolloverPressedIcon(null);
             }
             
-            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
@@ -9581,7 +9581,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icons[Math.min(4, icons.length-1)], dis));
@@ -9670,17 +9670,17 @@ public class FontImage extends Image {
         Style sel = uim.getComponentSelectedStyle(uiid);
         Style pre = uim.getComponentCustomStyle(uiid, "press");
         Style dis = uim.getComponentCustomStyle(uiid, "dis");;
-        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
             sel = new Style(sel);
             sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
             c.setRolloverIcon(FontImage.create("" + icon, sel));
         }
-        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
             pre = new Style(pre);
             pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
             c.setPressedIcon(FontImage.create("" + icon, pre));
         }
-        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
             dis = new Style(dis);
             dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
             c.setDisabledIcon(FontImage.create("" + icon, dis));

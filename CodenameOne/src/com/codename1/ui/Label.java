@@ -134,6 +134,10 @@ public class Label extends Component implements IconHolder, TextHolder {
         this.text = text;
         localize();
         setFocusable(false);
+        int iconGap = getStyle().getIconGap();
+        if (iconGap >= 0) {
+            setGap(iconGap);
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
@@ -148,8 +152,11 @@ public class Label extends Component implements IconHolder, TextHolder {
         this.text = text;
         localize();
         setFocusable(false);
-
         setUIID(uiid);
+        int iconGap = getStyle().getIconGap();
+        if (iconGap >= 0) {
+            setGap(iconGap);
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
@@ -308,8 +315,11 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @since 7.0
      */
     public void setIconUIID(String uiid) {
-        iconStyleComponent = new Component(){};
-        iconStyleComponent.setUIID(uiid);
+        if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {
+            iconStyleComponent = new Component() {
+            };
+            iconStyleComponent.setUIID(uiid);
+        }
     }
     
     /**
@@ -464,6 +474,11 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
+        String iconUIID = getUIManager().getIconUIIDFor(id);
+        if (iconUIID != null) {
+            setIconUIID(iconUIID);
+        }
+
         if(materialIcon != 0) {
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
         } else if(fontIcon != 0) {
@@ -504,7 +519,24 @@ public class Label extends Component implements IconHolder, TextHolder {
             this.text =  getUIManager().localize(text, text);
         }
     }
-    
+
+    @Override
+    protected void initLaf(UIManager uim) {
+        super.initLaf(uim);
+        String uiid = getUIID();
+        if (uiid != null && uiid.length() > 0) {
+            String iconUiid = uim.getIconUIIDFor(uiid);
+            if (iconUiid != null) {
+                setIconUIID(iconUiid);
+                if(materialIcon != 0) {
+                    FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
+                } else if(fontIcon != 0) {
+                    FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
+                }
+            }
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -833,7 +865,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     public float getMinAutoSize() {
         return minAutoSize;
     }
-    
+
     void initAutoResize() {
         if(autoSizeMode) {
             Style s = getUnselectedStyle();
@@ -1373,6 +1405,17 @@ public class Label extends Component implements IconHolder, TextHolder {
         // If we're using a custom font, we need to use the legacy renderer.
         if (Style.FONT.equals(propertyName) && source.getFont() instanceof CustomFont) {
             setLegacyRenderer(true);
+        }
+        if (Style.ICON_GAP.equals(propertyName) && source.getIconGap() > 0) {
+            setGap(source.getIconGap());
+        }
+    }
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        if (unselectedStyle.getIconGap() > 0) {
+            setGap(unselectedStyle.getIconGap());
         }
     }
 

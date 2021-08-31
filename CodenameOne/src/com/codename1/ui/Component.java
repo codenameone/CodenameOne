@@ -746,7 +746,7 @@ public class Component implements Animation, StyleListener, Editable {
             tensileLength = 3;
         } else {
             tensileLength = -1;
-        }        
+        }
     }
 
     /**
@@ -906,6 +906,7 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             unSelectedStyle = getUIManager().getComponentStyle(getUIID());
         }
+        initUnselectedStyle(unSelectedStyle);
         lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
             if (initialized && unSelectedStyle.getElevation()>0) {
@@ -5858,6 +5859,7 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
             }
+            initPressedStyle(pressedStyle);
             if (initialized && pressedStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
@@ -5872,6 +5874,44 @@ public class Component implements Animation, StyleListener, Editable {
         return pressedStyle;
     }
 
+
+    /**
+     * Can be overridden by subclasses to perform initialization when the unselected style is set to a new value.
+     * @param unselectedStyle The unselected style.
+     * @since 8.0
+     */
+    protected void initUnselectedStyle(Style unselectedStyle) {
+
+    }
+
+    /**
+     * Can be overridden by subclasses to perform initialization when the pressed style is set to a new value.
+     * @param unselectedStyle The pressed style.
+     * @since 8.0
+     */
+    protected void initPressedStyle(Style pressedStyle) {
+
+    }
+
+    /**
+     * Can be overridden by subclasses to perform initialization when the disabled style is set to a new value.
+     * @param unselectedStyle The disabled style.
+     * @since 8.0
+     */
+    protected void initDisabledStyle(Style disabledStyle) {
+
+    }
+
+    /**
+     * Can be overridden by subclasses to perform initialization when the selected style is set to a new value.
+     * @param unselectedStyle The selected style.
+     * @since 8.0
+     */
+    protected void initSelectedStyle(Style selectedStyle) {
+
+    }
+
+
     /**
      * Sets the Component Style for the pressed state allowing us to manipulate
      * the look of the component when it is pressed
@@ -5883,6 +5923,7 @@ public class Component implements Animation, StyleListener, Editable {
             pressedStyle.removeStyleListener(this);
         }
         pressedStyle = style;
+        initPressedStyle(style);
         if (initialized && pressedStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }
@@ -5923,6 +5964,7 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
             }
+            initSelectedStyle(selectedStyle);
             if (initialized && selectedStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
@@ -5953,6 +5995,7 @@ public class Component implements Animation, StyleListener, Editable {
             } else {
                 disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
             }
+            initDisabledStyle(disabledStyle);
             if (initialized && disabledStyle.getElevation()>0) {
                 registerElevatedInternal(this);
             }
@@ -5978,6 +6021,7 @@ public class Component implements Animation, StyleListener, Editable {
             this.unSelectedStyle.removeStyleListener(this);
         }
         this.unSelectedStyle = style;
+        initUnselectedStyle(style);
         if (initialized && unSelectedStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }
@@ -6002,6 +6046,7 @@ public class Component implements Animation, StyleListener, Editable {
             this.selectedStyle.removeStyleListener(this);
         }
         this.selectedStyle = style;
+        initSelectedStyle(style);
         if (initialized && selectedStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }
@@ -6026,6 +6071,7 @@ public class Component implements Animation, StyleListener, Editable {
             this.disabledStyle.removeStyleListener(this);
         }
         this.disabledStyle = style;
+        initDisabledStyle(style);
         if (initialized && disabledStyle.getElevation()>0) {
             registerElevatedInternal(this);
         }

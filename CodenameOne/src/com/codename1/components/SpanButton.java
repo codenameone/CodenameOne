@@ -40,6 +40,7 @@ import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>
@@ -102,9 +103,37 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
         center.getStyle().setPadding(0, 0, 0, 0);
         addComponent(BorderLayout.CENTER, center);
         setLeadComponent(actualButton);
+        int gap = getStyle().getIconGap();
+        if (gap >= 0) {
+            setGap(gap);
+        }
         updateGap();
     }
-    
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        if (Style.ICON_GAP.equals(propertyName)) {
+            int gap = source.getIconGap();
+            if (gap >= 0 && gap != getGap()) {
+                setGap(gap);
+                updateGap();
+            }
+        }
+    }
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        if (unselectedStyle.getIconGap() > 0) {
+            int gap = unselectedStyle.getIconGap();
+            if (gap != getGap()) {
+                setGap(unselectedStyle.getIconGap());
+                updateGap();
+            }
+        }
+    }
+
     private void updateGap() {
         if (getIcon() == null) {
             $(actualButton).setMargin(0);
@@ -144,7 +173,29 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public String getTextUIID() {
         return text.getUIID();
     }
-    
+
+
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        String iconUIID = getUIManager().getIconUIIDFor(id);
+        if (iconUIID != null) {
+            setIconUIID(iconUIID);
+        }
+    }
+
+    @Override
+    protected void initLaf(UIManager uim) {
+        super.initLaf(uim);
+        String uiid = getUIID();
+        if (uiid != null && uiid.length() >0) {
+            String iconUiid = uim.getIconUIIDFor(uiid);
+            if (iconUiid != null) {
+                setIconUIID(iconUiid);
+            }
+        }
+    }
+
     /**
      * Gets the component used for styling font icons on this SpanLabel.
      * @return The component used for styling font icons on this SpanLabel.

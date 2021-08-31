@@ -1457,7 +1457,16 @@ public class Resources {
             if (key.endsWith("elevation")) {
                 theme.put(key, (input.readInt() & 0xff));
                 continue;
+            }
 
+            if (key.endsWith("iconGap")) {
+                theme.put(key, input.readFloat());
+                continue;
+            }
+
+            if (key.endsWith("iconGapUnit")) {
+                theme.put(key, input.readByte());
+                continue;
             }
 
             if (key.endsWith("surface")) {

@@ -1700,6 +1700,46 @@ public class CSSTheme {
                 currToken = "disabled elevation";
                 res.setThemeProperty(themeName, disabledId+"#elevation", el.getThemeElevation(disabledStyles));
 
+                currToken = "iconGap";
+                float gap = el.getThemeIconGap(unselectedStyles);
+                if (gap < 0) {
+                    res.setThemeProperty(themeName, unselId+".iconGap", null);
+                    currToken = "selected iconGap";
+                    res.setThemeProperty(themeName, selId+"#iconGap", null);
+                    currToken = "pressed iconGap";
+                    res.setThemeProperty(themeName, pressedId+"#iconGap", null);
+                    currToken = "disabled iconGap";
+                    res.setThemeProperty(themeName, disabledId+"#iconGap", null);
+
+                    currToken = "iconGapUnit";
+                    res.setThemeProperty(themeName, unselId+".iconGapUnit", null);
+                    currToken = "selected iconGapUnit";
+                    res.setThemeProperty(themeName, selId+"#iconGapUnit", null);
+                    currToken = "pressed iconGapUnit";
+                    res.setThemeProperty(themeName, pressedId+"#iconGapUnit", null);
+                    currToken = "disabled iconGapUnit";
+                    res.setThemeProperty(themeName, disabledId+"#iconGapUnit", null);
+                } else {
+                    res.setThemeProperty(themeName, unselId+".iconGap", gap);
+                    currToken = "selected iconGap";
+                    res.setThemeProperty(themeName, selId+"#iconGap", gap);
+                    currToken = "pressed iconGap";
+                    res.setThemeProperty(themeName, pressedId+"#iconGap", gap);
+                    currToken = "disabled iconGap";
+                    res.setThemeProperty(themeName, disabledId+"#iconGap", gap);
+
+                    currToken = "iconGapUnit";
+                    byte gapUnit = el.getThemeIconGapUnit(unselectedStyles);
+                    res.setThemeProperty(themeName, unselId+".iconGapUnit", gapUnit);
+                    currToken = "selected iconGapUnit";
+                    res.setThemeProperty(themeName, selId+"#iconGapUnit", gapUnit);
+                    currToken = "pressed iconGapUnit";
+                    res.setThemeProperty(themeName, pressedId+"#iconGapUnit", gapUnit);
+                    currToken = "disabled iconGapUnit";
+                    res.setThemeProperty(themeName, disabledId+"#iconGapUnit", gapUnit);
+                }
+
+
                 currToken = "surface";
                 res.setThemeProperty(themeName, unselId+".surface", el.getThemeSurface(unselectedStyles));
                 currToken = "selected surface";
@@ -4206,6 +4246,21 @@ public class CSSTheme {
             return 0;
         }
 
+        public float getThemeIconGap(Map<String, LexicalUnit> style) {
+            if (style.containsKey("icon-gap")) {
+                return ((ScaledUnit)style.get("icon-gap")).getFloatValue();
+            }
+            return -1;
+        }
+
+        public byte getThemeIconGapUnit(Map<String, LexicalUnit> style) {
+            if (style.containsKey("icon-gap")) {
+                FloatValue value = getFloatValue(style.get("icon-gap"));
+                return value.unit;
+            }
+            return -1;
+        }
+
         public boolean getThemeSurface(Map<String, LexicalUnit> style) {
             if (style.containsKey("surface")) {
                 ScaledUnit su = (ScaledUnit)style.get("surface");
@@ -5375,6 +5430,11 @@ public class CSSTheme {
 
             case "elevation" : {
                 style.put("elevation", value);
+                break;
+            }
+
+            case "icon-gap" : {
+                style.put("icon-gap", value);
                 break;
             }
 

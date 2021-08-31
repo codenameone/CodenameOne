@@ -135,6 +135,18 @@ public class Style {
     public static final String ELEVATION = "elevation";
 
     /**
+     * Icon gap attribute name for the theme hashtable.
+     * @since 8.0
+     */
+    public static final String ICON_GAP = "iconGap";
+
+    /**
+     * Icon gap unit attribute.
+     * @since 8.0
+     */
+    public static final String ICON_GAP_UNIT = "iconGapUnit";
+
+    /**
      * Surface attribute name for the theme hashtable.
      */
     public static final String SURFACE = "surface";
@@ -444,6 +456,8 @@ public class Style {
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
     private int elevation; // the elevation.
+    private float iconGap = -1;
+    private byte iconGapUnit;
     private boolean surface; // whether this should be treated as a surface
 
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
@@ -506,8 +520,8 @@ public class Style {
     private static final int OPACITY_MODIFIED = 32768;
     private static final int ELEVATION_MODIFIED = 65536;
     private static final int SURFACE_MODIFIED = 131072;
-    private static final int FG_ALPHA_MODIFIED = 262144 ;
-
+    private static final int FG_ALPHA_MODIFIED = 262144;
+    private static final int ICON_GAP_MODIFIED = 524288;
 
     private EventDispatcher listeners;
 
@@ -573,6 +587,8 @@ public class Style {
         setBorder(style.getBorder());
         fgAlpha = style.fgAlpha;
         elevation = style.elevation;
+        iconGap = style.iconGap;
+        iconGapUnit = style.iconGapUnit;
         surface = style.surface;
         opacity = style.opacity;
         modifiedFlag = 0;
@@ -718,6 +734,9 @@ public class Style {
         if ((modifiedFlag & ELEVATION_MODIFIED) == 0) {
             setElevation(style.getElevation());
         }
+        if ((modifiedFlag & ICON_GAP_MODIFIED) == 0) {
+            setIconGap(style.iconGap, style.iconGapUnit);
+        }
         if ((modifiedFlag & SURFACE_MODIFIED) == 0) {
             setSurface(style.isSurface());
         }
@@ -733,6 +752,27 @@ public class Style {
      */
     public int getElevation() {
         return elevation;
+    }
+
+    /**
+     * Returns the icon gap in pixels.
+     * @return
+     * @since 8.0
+     */
+    public int getIconGap() {
+        if (iconGap < 0) return -1;
+        return CN.convertToPixels(iconGap, iconGapUnit);
+    }
+
+    /**
+     * Returns the icon gap unit.  One of {@link #UNIT_TYPE_REM}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_VMIN},
+     * {@link #UNIT_TYPE_VH}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_DIPS},
+     * {@link #UNIT_TYPE_PIXELS}
+     * @return The icon gap unit
+     * @since 8.0
+     */
+    public int getIconGapUnit() {
+        return iconGapUnit;
     }
 
     /**
@@ -890,7 +930,7 @@ public class Style {
      * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
      * @param elevation The elevation value.
      * @param override If set to true allows the look and feel/theme to override
-     *      * the value in this attribute when changing a theme/look and feel
+     *      the value in this attribute when changing a theme/look and feel
      * @since 8.0
      */
     public void setElevation(int elevation, boolean override) {
@@ -917,6 +957,97 @@ public class Style {
      */
     public void setElevation(int elevation) {
         setElevation(elevation, false);
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap The gap.
+     * @param units The units of the gap.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     * @see #setIconGapUnit(byte, boolean)
+     */
+    public void setIconGap(float gap, byte units, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setIconGap(gap, units, override);
+            }
+            return;
+        }
+        if (units != iconGapUnit || Math.abs(gap - iconGap) > 0.0001) {
+            iconGap = gap;
+            iconGapUnit = units;
+            if (!override) {
+                modifiedFlag |= ICON_GAP_MODIFIED;
+            }
+            firePropertyChanged(ICON_GAP);
+        }
+
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap the icon gap.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     * @see #setIconGapUnit(byte, boolean)
+     */
+    public void setIconGap(float gap, boolean override) {
+        setIconGap(gap, iconGapUnit, override);
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap The icon gap.
+     * @param unit The unit. One of the standard style units of measurement.
+     * @since 8.0
+     */
+    public void setIconGap(float gap, byte unit) {
+        setIconGap(gap, unit, false);
+    }
+
+    /**
+     * Sets the icon gap in the current units.
+     * @param gap The icon gap.
+     * @since 8.0
+     * @see #getIconGapUnit()
+     */
+    public void setIconGap(float gap) {
+        setIconGap(gap, false);
+    }
+
+    /**
+     * Sets the icon gap unit.
+     * @param unit The icon gap unit.  One of the standard style units of measurement.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setIconGapUnit(byte unit, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setIconGapUnit(unit);
+            }
+            return;
+        }
+        if (unit != iconGapUnit) {
+            this.iconGapUnit = unit;
+            if (!override) {
+                modifiedFlag |= ICON_GAP_MODIFIED;
+            }
+            firePropertyChanged(ICON_GAP);
+        }
+    }
+
+    /**
+     * Sets the icon gap unit.
+     * @param unit The icon gap unit.  One of the standard style units of measurement.
+     * @since 8.0
+     */
+    public void setIconGapUnit(byte unit) {
+        setIconGapUnit(unit, false);
     }
 
     /**
@@ -1659,7 +1790,8 @@ public class Style {
     
     /**
      * Sets left padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitLeft(byte unit) {
@@ -1669,7 +1801,8 @@ public class Style {
     
     /**
      * Sets right padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitRight(byte unit) {
@@ -1679,7 +1812,8 @@ public class Style {
     
     /**
      * Sets top padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *    {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitTop(byte unit) {
@@ -1689,7 +1823,8 @@ public class Style {
     
     /**
      * Sets bottom padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitBottom(byte unit) {
@@ -2862,8 +2997,8 @@ public class Style {
     
     /**
      * Sets left margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitLeft(byte unit) {
@@ -2873,8 +3008,8 @@ public class Style {
     
     /**
      * Sets right margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitRight(byte unit) {
@@ -2884,8 +3019,8 @@ public class Style {
     
     /**
      * Sets top margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitTop(byte unit) {
@@ -2895,8 +3030,8 @@ public class Style {
     
     /**
      * Sets bottom margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitBottom(byte unit) {

@@ -561,12 +561,20 @@ public class EditableResources extends Resources implements TreeModel {
                                     for(Val v : d.getVal()) {
                                         String key = v.getKey();
                                     
-                                        if(key.endsWith("align") || key.endsWith("textDecoration")) {
+                                        if(key.endsWith("align") || key.endsWith("textDecoration") || key.endsWith(Style.ELEVATION)) {
                                             theme.put(key, Integer.valueOf(v.getValue()));
                                             continue;
                                         }
-                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
+                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT) || key.endsWith(Style.ICON_GAP_UNIT)) {
                                             theme.put(key, Byte.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.SURFACE)) {
+                                            theme.put(key, Boolean.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.ICON_GAP)) {
+                                            theme.put(key, Float.valueOf(v.getValue()));
                                             continue;
                                         }
                                         // padding and or margin type
@@ -1984,6 +1992,16 @@ public class EditableResources extends Resources implements TreeModel {
                 continue;
             }
 
+            if (key.endsWith(Style.ICON_GAP)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.ICON_GAP_UNIT)) {
+                output.writeByte(((Number)theme.get(key)).byteValue());
+                continue;
+            }
+
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("padding") || key.endsWith("margin")) {
                 String[] arr = ((String)theme.get(key)).split(",");
@@ -2080,6 +2098,7 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeInt(((Number)theme.get(key)).intValue());
                 continue;
             }
+
             if (key.endsWith(Style.FG_ALPHA)) {
                 output.writeInt(((Number)theme.get(key)).intValue());
                 continue;

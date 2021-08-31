@@ -229,6 +229,27 @@ public class UIManager {
     public Style getComponentStyle(String id) {
         return getComponentStyleImpl(id, false, "");
     }
+
+    /**
+     * Gets the IconUIID for the given UIID.  If the theme defines a style that is named ${id}Icon (i.e. the id with "Icon" suffix)
+     * such that it derives from id, then this style is deemed to be the icon style corresponding with id.
+     * @param id The UIID to check for a companion UIID.
+     * @return The IconUIID corresponding to the given ID - or null if none is defined in the theme.
+     * @since 8.0
+     */
+    public String getIconUIIDFor(String id) {
+        if (id == null || id.length() == 0) {
+            throw new IllegalArgumentException("id must be non-null and non-empty");
+        }
+        if (themeProps == null) return null;
+        String iconUIID = id + "Icon";
+        // Check the derive property of this icon style to make sure it points to id.
+        // (The icon style must derive the main style).
+        String baseStyle = (String) themeProps.get(iconUIID+".derive");
+        if (baseStyle == null || !id.equals(baseStyle)) return null;
+        return iconUIID;
+
+    }
     
     /**
      * Returns the style of the component with the given baseStyle or a <b>new instance</b> of the default
@@ -1703,6 +1724,14 @@ public class UIManager {
             byte[] marginUnit = (byte[])themeProps.get(id + Style.MARGIN_UNIT);
             if (themeProps.containsKey(id + Style.ELEVATION)) {
                 style.setElevation((Integer)themeProps.get(id + Style.ELEVATION));
+            }
+            if (themeProps.containsKey(id + Style.ICON_GAP)) {
+                if (themeProps.containsKey(id + Style.ICON_GAP_UNIT)) {
+                    style.setIconGapUnit((Byte) themeProps.get(id + Style.ICON_GAP_UNIT));
+                } else {
+                    style.setIconGapUnit((Byte) Style.UNIT_TYPE_PIXELS);
+                }
+                style.setIconGap((Float)themeProps.get(id + Style.ICON_GAP));
             }
             if (themeProps.containsKey(id + Style.FG_ALPHA)) {
                 style.setFgAlpha((Integer)themeProps.get(id + Style.FG_ALPHA));
