@@ -299,7 +299,8 @@ public class InfiniteProgress extends Component {
         if(materialDesignMode) {
             int size = getMaterialDesignSize();
             int strokeWidth = Display.getInstance().convertToPixels(0.635f);
-            int oldColor = g.concatenateAlpha(materialDesignColor);
+            int oldColor = g.getColor();
+            g.setColor(materialDesignColor);
             int oldAlpha = g.setAndGetAlpha(255);
 
             Style s = getStyle();
