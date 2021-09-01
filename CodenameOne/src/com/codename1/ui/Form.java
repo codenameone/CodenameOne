@@ -906,7 +906,7 @@ public class Form extends Container {
         }
         
         repaint();
-        revalidateLater();
+        revalidate();
     }
 
     /**

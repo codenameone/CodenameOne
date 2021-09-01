@@ -1568,7 +1568,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidateWithAnimationSafety();
+            current.revalidate();
             current.repaint();
             current.onShowCompletedImpl();
             return;
