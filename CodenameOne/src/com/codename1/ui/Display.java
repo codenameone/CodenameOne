@@ -1616,11 +1616,11 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
             
         }
 
