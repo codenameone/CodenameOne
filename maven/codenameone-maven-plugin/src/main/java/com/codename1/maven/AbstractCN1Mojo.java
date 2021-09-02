@@ -832,7 +832,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      protected String getCefPlatform() {
         if (isMac) return "mac";
         if (isWindows) return is64Bit ? "win64" : "win32";
-        if (isUnix && is64Bit) return "linux64";
+        if (isUnix && is64Bit && "amd64".equals(ARCH)) return "linux64";
         return null;
     }
 
