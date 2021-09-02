@@ -327,7 +327,7 @@ public class InfiniteProgress extends Component {
             g.setAntiAliased(true);
             g.drawShape(gp, st);
             g.setColor(oldColor);
-            g.setColor(oldAlpha);
+            g.setAlpha(oldAlpha);
             return;
         }
         if(animation == null) {
