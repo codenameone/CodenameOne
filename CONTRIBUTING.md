@@ -28,7 +28,7 @@ The wiki uses the asciidoc format to generate HTML & PDF versions. There are ple
 
 ## Working with the Source
 
-We have a blog post that covers forking, running the simulator and submitting a pull request [here](http://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html). While it's pretty exhaustive it doesn't cover more esoteric features like ParparVM or the iKVM fork. For those our only reference is the source.
+We have a blog post that covers forking, running the simulator and submitting a pull request [here](http://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html).  We have recently transitioned to Maven as our build tool.  There are instructions on building from source using Maven [here](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html). While it's pretty exhaustive it doesn't cover more esoteric features like ParparVM or the iKVM fork. For those our only reference is the source.
 
 ## Ownership
 
