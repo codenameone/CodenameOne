@@ -103,10 +103,6 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
         center.getStyle().setPadding(0, 0, 0, 0);
         addComponent(BorderLayout.CENTER, center);
         setLeadComponent(actualButton);
-        int gap = getStyle().getIconGap();
-        if (gap >= 0) {
-            setGap(gap);
-        }
         updateGap();
     }
 
@@ -178,9 +174,11 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
-        String iconUIID = getUIManager().getIconUIIDFor(id);
-        if (iconUIID != null) {
-            setIconUIID(iconUIID);
+        if (id != null && id.length() > 0) {
+            String iconUIID = getUIManager().getIconUIIDFor(id);
+            if (iconUIID != null) {
+                setIconUIID(iconUIID);
+            }
         }
     }
 

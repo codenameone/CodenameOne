@@ -466,9 +466,11 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
-        String iconUIID = getUIManager().getIconUIIDFor(id);
-        if (iconUIID != null) {
-            setIconUIID(iconUIID);
+        if (id != null && id.length() > 0) {
+            String iconUIID = getUIManager().getIconUIIDFor(id);
+            if (iconUIID != null) {
+                setIconUIID(iconUIID);
+            }
         }
 
         if(materialIcon != 0) {

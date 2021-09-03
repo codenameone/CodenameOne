@@ -239,7 +239,7 @@ public class UIManager {
      */
     public String getIconUIIDFor(String id) {
         if (id == null || id.length() == 0) {
-            throw new IllegalArgumentException("id must be non-null and non-empty");
+            return null;
         }
         if (themeProps == null) return null;
         String iconUIID = id + "Icon";

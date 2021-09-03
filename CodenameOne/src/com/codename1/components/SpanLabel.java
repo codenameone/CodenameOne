@@ -93,10 +93,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         iconWrapper.add(icon);
         addComponent(BorderLayout.WEST, iconWrapper);
         addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
-        int iconGap = getStyle().getIconGap();
-        if (iconGap >= 0) {
-            setGap(iconGap);
-        }
         updateGap();
     }
 
@@ -185,9 +181,11 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
-        String iconUIID = getUIManager().getIconUIIDFor(id);
-        if (iconUIID != null) {
-            setIconUIID(iconUIID);
+        if (id != null && id.length() > 0) {
+            String iconUIID = getUIManager().getIconUIIDFor(id);
+            if (iconUIID != null) {
+                setIconUIID(iconUIID);
+            }
         }
     }
 
