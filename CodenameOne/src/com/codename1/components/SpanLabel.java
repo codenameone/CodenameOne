@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -53,14 +53,14 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     private Container iconWrapper;
     private TextArea text;
     private boolean shouldLocalize = true;
-    
+
     /**
      * Default constructor will be useful when adding this to the GUI builder
      */
     public SpanLabel() {
         this("");
     }
-    
+
     /**
      * Constructor accepting default text and uiid for the text
      * @param txt the text
@@ -72,7 +72,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
         updateGap();
     }
-    
+
     /**
      * Constructor accepting default text
      */
@@ -126,6 +126,9 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     @Override
     protected void initLaf(UIManager uim) {
+        if(uim == getUIManager() && isInitialized()){
+            return;
+        }
         super.initLaf(uim);
         String uiid = getUIID();
         if (uiid != null && uiid.length() > 0) {
@@ -138,7 +141,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     }
 
     private int preferredW=-1;
-    
+
     /**
      * {@inheritDoc }
      */
@@ -151,7 +154,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     }
 
     /**
-     * 
+     *
      * {@inheritDoc }
      */
     @Override
@@ -161,7 +164,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
         return super.getPreferredW();
     }
-    
+
     /**
      * Gets the component used for styling font icons on this SpanLabel.
      * @return The component used for styling font icons on this SpanLabel.
@@ -170,7 +173,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Component getIconStyleComponent() {
         return icon.getIconStyleComponent();
     }
-    
+
     /**
      * Returns the TextArea holding the actual text
      * @return the component
@@ -195,7 +198,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setTextUIID(String uiid) {
         text.setUIID(uiid);
     }
-    
+
     /**
      * Returns the uiid of the actual text
      * @return the uiid
@@ -203,7 +206,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public String getTextUIID() {
         return text.getUIID();
     }
-    
+
     /**
      * Returns the Style proxy object for the text of this span button.
      * @return The Style object for the text of this span button.
@@ -211,7 +214,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Style getTextAllStyles() {
         return text.getAllStyles();
     }
-    
+
     /**
      * Returns the text elements style object
      * @return the style object
@@ -219,7 +222,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Style getTextUnselectedStyle() {
         return text.getUnselectedStyle();
     }
-    
+
     /**
      * The text elements style object
      * @param t the style object
@@ -227,7 +230,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setTextUnselectedStyle(Style t) {
         text.setUnselectedStyle(t);
     }
-    
+
     /**
      * Returns the text elements style object
      * @return the style object
@@ -235,7 +238,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Style getTextSelectedStyle() {
         return text.getSelectedStyle();
     }
-    
+
     /**
      * The text elements style object
      * @param t the style object
@@ -243,7 +246,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setTextSelectedStyle(Style t) {
         text.setSelectedStyle(t);
     }
-    
+
     /**
      * Sets the uiid for the icon if present
      * @param uiid the uiid for the icon
@@ -252,7 +255,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         icon.setUIID(uiid);
         updateGap();
     }
-    
+
     /**
      * Returns the UIID for the icon
      * @return the uiid
@@ -260,7 +263,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public String getIconUIID() {
         return icon.getUIID();
     }
-    
+
     /**
      * Set the text of the label
      * @param t text of the label
@@ -268,7 +271,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setText(String t) {
         t = shouldLocalize ? getUIManager().localize(t, t) : t;
         text.setText(t);
-        
+
         // We need to update the columns for rendering, otherwise it will still wrap at the old number of columns.
         text.setColumns(text.getText().length() + 1);
     }
@@ -281,7 +284,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         icon.setIcon(i);
         updateGap();
     }
-    
+
     /**
      * Sets the vertical alignment of the icon with respect to the text of the span label.  Default value is {@link #CENTER}
      * @param align One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
@@ -290,7 +293,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setIconValign(int align) {
         ((FlowLayout)iconWrapper.getLayout()).setValign(align);
     }
-    
+
     /**
      * Gets the vertical alignment of the icon with respect to the text of the span label.
      * @return The alignment.  One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
@@ -299,7 +302,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public int getIconValign() {
         return ((FlowLayout)iconWrapper.getLayout()).getValign();
     }
-    
+
     /**
      * Returns the text of the label
      * @return the text
@@ -307,7 +310,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public String getText() {
         return text.getText();
     }
-    
+
     /**
      * Indicates the alignment of the whole text block, this is different from setting the alignment of the text within
      * the block since the UIID might have a border or other design element that won't be affected by such alignment.
@@ -330,10 +333,10 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
                 }
         }
     }
-    
+
     /**
      * Returns the alignment of the whole text block and not the text within it!
-     * 
+     *
      * @return -1 for unaligned otherwise one of Component.LEFT/RIGHT/CENTER
      */
     public int getTextBlockAlign() {
@@ -342,7 +345,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
         return ((FlowLayout)text.getParent().getLayout()).getAlign();
     }
-    
+
     private void wrapText(int alignment) {
         Container parent = text.getParent();
         if(parent == this) {
@@ -362,7 +365,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
             ((FlowLayout)parent.getLayout()).setAlign(alignment);
         }
     }
-    
+
     /**
      * Returns the image of the icon
      * @return the icon
@@ -370,10 +373,10 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Image getIcon() {
         return icon.getIcon();
     }
-    
+
     /**
      * Sets the icon position based on border layout constraints
-     * 
+     *
      * @param t position either North/South/East/West
      */
     public void setIconPosition(String t) {
@@ -381,25 +384,25 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         addComponent(t, iconWrapper);
         updateGap();
         revalidateLater();
-        
+
     }
-    
+
     /**
      * Returns the icon position based on border layout constraints
-     * 
+     *
      * @return position either North/South/East/West
      */
     public String getIconPosition() {
         return (String)getLayout().getComponentConstraint(iconWrapper);
     }
-    
+
 
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
-            "text", "icon", "iconPosition", "textUiid", "iconUiid"
+                "text", "icon", "iconPosition", "textUiid", "iconUiid"
         };
     }
 
@@ -407,13 +410,13 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {
-           String.class, // text
-           Image.class, // icon
-           String.class, // iconPosition
-           String.class,
-           String.class
-       };
+        return new Class[] {
+                String.class, // text
+                Image.class, // icon
+                String.class, // iconPosition
+                String.class,
+                String.class
+        };
     }
 
     /**
@@ -474,7 +477,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /**
      * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for 
+     * all text is localized so this allows disabling automatic localization for
      * a specific component.
      * @return the shouldLocalize value
      */
@@ -484,14 +487,14 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /**
      * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for 
+     * all text is localized so this allows disabling automatic localization for
      * a specific component.
      * @param shouldLocalize the shouldLocalize to set
      */
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
-    
+
     /**
      * Enables or disables text selection on this span label.  Default is off.
      * @param enabled True to enable text selection on this label.
@@ -500,7 +503,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setTextSelectionEnabled(boolean enabled) {
         text.setTextSelectionEnabled(enabled);
     }
-    
+
     /**
      * Checks if text selection is enabled on this SpanLabel.  Note that the Form must also have text selection enabled
      * for text selection to work.
@@ -513,18 +516,18 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         return text.isTextSelectionEnabled();
     }
 
-    
-    
-   
+
+
+
     /**
      * {@inheritDoc }
-     * 
+     *
      */
     @Override
     public void setWidth(int width) {
         int w = getWidth();
         if (w != width) {
-            
+
             // We need to update the textarea width whenever we set the width
             // so that preferred height will be calculated correctly.
             int newTextW = width;
@@ -539,13 +542,13 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
             super.setWidth(width);
             setShouldCalcPreferredSize(true);
         }
-        
+
     }
 
     /**
      * {@inheritDoc }
      * @since 7.0
-     * 
+     *
      */
     @Override
     public void setGap(int gap) {
@@ -586,7 +589,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
             default:
                 setIconPosition(BorderLayout.EAST);
         }
-        
+
     }
 
     /**
@@ -609,10 +612,10 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
             return Component.RIGHT;
         }
         return Component.LEFT;
-        
+
     }
-    
-    
+
+
     private void updateGap() {
         if (getIcon() == null) {
             $(icon).setMargin(0);
@@ -626,7 +629,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
             $(icon).selectAllStyles().setMargin(0, gap, 0, 0);
         }
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
@@ -634,15 +637,15 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setMaterialIcon(char c) {
         icon.setMaterialIcon(c);
     }
-    
-     /**
+
+    /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
      * @param c one of the constants from the font
      */
     public void setFontIcon(Font font, char c) {
         icon.setFontIcon(font, c);
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
@@ -651,7 +654,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
      * @param c one of the constants from the font
@@ -660,7 +663,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
     }
-    
+
     /**
      * Returns the material icon assigned to this component or 0 if not applicable
      * @return the material icon
@@ -668,7 +671,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public char getMaterialIcon() {
         return icon.getMaterialIcon();
     }
-    
+
     /**
      * Returns the font icon assigned to this component or 0 if not applicable
      * @return the material icon
@@ -676,25 +679,25 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public char getFontIcon() {
         return icon.getFontIcon();
     }
-    
+
     /**
-     * Returns the material icon size assigned to this component or 0/-1 if 
+     * Returns the material icon size assigned to this component or 0/-1 if
      * not applicable
      * @return the material icon size
      */
     public float getMaterialIconSize() {
         return icon.getMaterialIconSize();
     }
-    
+
     /**
-     * Returns the icon size assigned to this component or 0/-1 if 
+     * Returns the icon size assigned to this component or 0/-1 if
      * not applicable
      * @return the icon size
      */
     public float getFontIconSize() {
         return icon.getFontIconSize();
     }
-    
+
     /**
      * Returns the font for the icon font or null if not font set
      * @return the material icon size
@@ -702,5 +705,5 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public Font getIconFont() {
         return icon.getIconFont();
     }
-    
+
 }

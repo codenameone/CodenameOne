@@ -760,7 +760,6 @@ public class Style {
      * @since 8.0
      */
     public int getIconGap() {
-        if (true) return -1;
         if (iconGap < 0) return -1;
         return CN.convertToPixels(iconGap, iconGapUnit);
     }
