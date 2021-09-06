@@ -56,9 +56,6 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class CloudStorage {
-    static final String SERVER_URL = "https://codename-one.appspot.com"; 
-    //static final String SERVER_URL = "http://127.0.0.1:8888"; 
-            
     /**
      * Return code for methods in this class indicating a successful operation
      */
@@ -105,17 +102,8 @@ public class CloudStorage {
 
     private static CloudStorage INSTANCE;
     
-    private Vector storageQueue;
-    
-    static {
-        Util.register("CloudObject", CloudObject.class);
-    }
-    
+
     private CloudStorage() {
-        storageQueue = (Vector)Storage.getInstance().readObject("CN1StorageQueue");
-        if(storageQueue == null) {
-            storageQueue = new Vector();
-        }
     }
     
     /**
@@ -138,12 +126,6 @@ public class CloudStorage {
      * objects are updated
      */
     public synchronized void save(CloudObject object) {
-        if(storageQueue.contains(object)) {
-            storageQueue.remove(object);
-        }
-        storageQueue.addElement(object);
-        Storage.getInstance().writeObject("CN1StorageQueue", storageQueue);
-        object.setStatus(CloudObject.STATUS_COMMIT_IN_PROGRESS);
     }
     
     /**
@@ -151,9 +133,6 @@ public class CloudStorage {
      * @param cl the cloud object to delete
      */
     public synchronized void delete(CloudObject cl) {
-        storageQueue.addElement(cl.getCloudId());
-        Storage.getInstance().writeObject("CN1StorageQueue", storageQueue);
-        cl.setStatus(CloudObject.STATUS_DELETE_IN_PROGRESS);
     }
     
     /**
@@ -165,7 +144,6 @@ public class CloudStorage {
      * @param response object for the response
      */
     public void refresh(CloudObject[] objects, CloudResponse<Integer> response) {
-        refreshImpl(objects, response);
     }
     
     private Vector<CloudObject> pendingRefreshes;
@@ -176,85 +154,6 @@ public class CloudStorage {
      * @param obj the object to refresh
      */
     public void refreshAsync(CloudObject obj) {
-        if(pendingRefreshes == null) {
-            pendingRefreshes = new Vector<CloudObject>();
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    CloudObject[] arr = new CloudObject[pendingRefreshes.size()];
-                    pendingRefreshes.toArray(arr);
-                    pendingRefreshes = null;
-                    refresh(arr);
-                }
-            });
-        }
-        pendingRefreshes.addElement(obj);
-        obj.setStatus(CloudObject.STATUS_REFRESH_IN_PROGRESS);
-    }
-    
-    class RefreshConnection extends ConnectionRequest {
-        int returnValue;
-        CloudObject[] objects;
-        CloudResponse<Integer> response;
-        
-        protected void postResponse() {
-            if(response != null) {
-                if(returnValue != RETURN_CODE_SUCCESS) {
-                    response.onError(new CloudException(returnValue));
-                } else {
-                    response.onSuccess(new Integer(returnValue));
-                }
-            }
-        }
-    
-        protected void handleErrorResponseCode(int code, String message) {
-            returnValue = RETURN_CODE_FAIL_SERVER_ERROR;
-        }
-        
-        protected void readResponse(InputStream input) throws IOException  {
-            DataInputStream di = new DataInputStream(input);
-
-            for(int iter = 0 ; iter  < objects.length ; iter++) {
-                try {
-                    if(di.readBoolean()) {
-                        objects[iter].setLastModified(di.readLong());
-                        objects[iter].setValues((Hashtable)Util.readObject(di));
-                    }
-                    objects[iter].setStatus(CloudObject.STATUS_COMMITTED);
-                } catch (IOException ex) {
-                    Log.e(ex);
-                }
-            }
-
-            Util.cleanup(di);
-
-            returnValue = RETURN_CODE_SUCCESS;
-        }
-    }
-    
-    private int refreshImpl(CloudObject[] objects, CloudResponse<Integer> response) {
-        RefreshConnection refreshRequest = new RefreshConnection();
-        refreshRequest.objects = objects;
-        refreshRequest.response = response;
-        refreshRequest.setPost(true);
-        refreshRequest.setUrl(SERVER_URL + "/objStoreRefresh");
-        for(int iter = 0 ; iter  < objects.length ; iter++) {
-            objects[iter].setStatus(CloudObject.STATUS_REFRESH_IN_PROGRESS);
-            refreshRequest.addArgument("i" + iter, objects[iter].getCloudId());
-            refreshRequest.addArgument("m" + iter, "" + objects[iter].getLastModified());
-        }
-        refreshRequest.addArgument("t", CloudPersona.getCurrentPersona().getToken());
-        refreshRequest.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        refreshRequest.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
-        
-        // async code
-        if(response != null) {
-            NetworkManager.getInstance().addToQueue(refreshRequest);
-            return -1;
-        } 
-        
-        NetworkManager.getInstance().addToQueueAndWait(refreshRequest);
-        
-        return refreshRequest.returnValue;
     }
     
     /**
@@ -264,31 +163,22 @@ public class CloudStorage {
      * @param objects objects to refresh
      * @return status code matching the situation, one of: RETURN_CODE_SUCCESS, 
      * RETURN_CODE_FAIL_SERVER_ERROR
+     * @deprecated this feature is no longer supported
      */
     public int refresh(CloudObject[] objects) {
-        return refreshImpl(objects, null);
+        return -1;
     }
     
     /**
      * Fetches the objects from the server.
-     * This operation executes immeditely without waiting for commit.
+     * This operation executes immediately without waiting for commit.
      * 
      * @param cloudIds the object id's to fetch
      * @return the cloud objects or null if a server error occurred
      * @throws CloudException thrown for a server side/connection error
      */
     public CloudObject[] fetch(String[] cloudIds) throws CloudException {
-        CloudObject[] objs = new CloudObject[cloudIds.length];
-        for(int iter = 0 ; iter < objs.length ; iter++) {
-            objs[iter] = new CloudObject();
-            objs[iter].setCloudId(cloudIds[iter]);
-        }
-        int err = refresh(objs);
-        if(err == RETURN_CODE_SUCCESS) {
-            return objs;
-        }
-        
-        throw new CloudException(err);
+        throw new CloudException(-1);
     }
 
     /**
@@ -300,22 +190,8 @@ public class CloudStorage {
      * @return the cloud objects or null if a server error occurred
      */
     public void fetch(String[] cloudIds, final CloudResponse<CloudObject[]> response) {
-        final CloudObject[] objs = new CloudObject[cloudIds.length];
-        for(int iter = 0 ; iter < objs.length ; iter++) {
-            objs[iter] = new CloudObject();
-            objs[iter].setCloudId(cloudIds[iter]);
-        }
-        refresh(objs, new CloudResponse<Integer>() {
-            public void onSuccess(Integer returnValue) {
-                response.onSuccess(objs);
-            }
-
-            public void onError(CloudException err) {
-                response.onError(err);
-            }
-        });
     }
-    
+
     /**
      * Performs a query to the server finding the objects where the key
      * value is equal to the given value. 
@@ -332,7 +208,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public CloudObject[] queryEquals(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
-        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, false, null);
+        return null;
     }
     
     /**
@@ -350,7 +226,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public CloudObject[] querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
-        return (CloudObject[])queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, false, null);
+        return null;
     }
 
     /**
@@ -369,7 +245,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public String[] querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
-        return (String[])queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, true, null);
+        return null;
     }
     
     /**
@@ -385,7 +261,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public String[] queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
-        return (String[])queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, true, null);
+        return null;
     }
 
     /**
@@ -399,7 +275,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public int queryEqualsCount(String type, int index, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 1, 0, false, true, false, null)).intValue();
+        return -1;
     }
 
     /**
@@ -413,7 +289,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public int queryGreaterThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 2, 0, false, true, false, null)).intValue();
+        return -1;
     }
 
     /**
@@ -427,7 +303,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public int queryLessThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
-        return ((Integer)queryImpl(type, value, index, 0, 0, visibilityScope, 3, 0, false, true, false, null)).intValue();
+        return -1;
     }
 
     /**
@@ -445,7 +321,7 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public CloudObject[] queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
-        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 2, 0, false, false, false, null);
+        return null;
     }
 
     /**
@@ -463,123 +339,10 @@ public class CloudStorage {
      * @throws CloudException thrown for a server side/connection error
      */
     public CloudObject[] queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
-        return (CloudObject[])queryImpl(type, value, index, page, limit, visibilityScope, 3, 0, false, false, false, null);
+        return null;
     }
     
-    class QueryRequest extends ConnectionRequest {
-        int returnValue = RETURN_CODE_FAIL_SERVER_ERROR;
-        CloudResponse response;
-        boolean countQuery;
-        boolean keyQuery;
-        Object returnObject;
-        
-        protected void postResponse() {
-            if(response != null) {
-                if(returnValue != RETURN_CODE_SUCCESS) {
-                    response.onError(new CloudException(returnValue));
-                } else {
-                    response.onSuccess(returnObject);
-                }
-            }
-        }
 
-        protected void handleErrorResponseCode(int code, String message) {
-            returnValue = RETURN_CODE_FAIL_SERVER_ERROR;
-        }
-        
-        protected void readResponse(InputStream input) throws IOException  {        
-            DataInputStream di = new DataInputStream(input);
-            CloudObject[] objects = null;
-            try {
-                int count = di.readInt();
-                if(countQuery) {
-                    di.close();
-                    returnObject = new Integer(count);
-                    returnValue = RETURN_CODE_SUCCESS;
-                    return;
-                }
-                if(keyQuery) {
-                    String[] result = new String[count];
-                    for(int iter = 0 ; iter  < result.length ; iter++) {
-                        result[iter] = di.readUTF();
-                    }
-                    returnValue = RETURN_CODE_SUCCESS;
-                    returnObject = result;
-                    return;
-                }
-
-                objects = new CloudObject[count];
-                for(int iter = 0 ; iter  < objects.length ; iter++) {
-                    objects[iter] = new CloudObject(di.readInt());
-                    objects[iter].setCloudId(di.readUTF());
-                    objects[iter].setLastModified(di.readLong());
-                    objects[iter].setValues((Hashtable)Util.readObject(di));
-                    objects[iter].setStatus(CloudObject.STATUS_COMMITTED);
-                }
-                returnValue = RETURN_CODE_SUCCESS;
-                returnObject = objects;
-            } catch (IOException ex) {
-                Log.e(ex);
-                returnValue = RETURN_CODE_FAIL_SERVER_ERROR;
-            } finally {
-                Util.cleanup(di);
-            }
-        }
-    }
-    
-    private Object queryImpl(String type, String value, int index, int page, int limit, int visibilityScope, int operator, int sort, boolean asc, boolean countQuery, boolean keyQuery, CloudResponse response) throws CloudException {
-        if(CloudPersona.getCurrentPersona().getToken() == null) {
-            CloudPersona.createAnonymous();
-        }
-        QueryRequest queryRequest = new QueryRequest();
-        queryRequest.response = response;
-        queryRequest.countQuery = countQuery;
-        queryRequest.keyQuery = keyQuery;
-        queryRequest.setPost(true);
-        queryRequest.setUrl(SERVER_URL + "/objStoreQuery");
-        
-        queryRequest.addArgument("t", CloudPersona.getCurrentPersona().getToken());
-        queryRequest.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        queryRequest.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));        
-        queryRequest.addArgument("ty", type);
-        if(value != null && index > 0) {
-            queryRequest.addArgument("k", INDEX_FIELD + index);
-            queryRequest.addArgument("v", value);
-        }
-        queryRequest.addArgument("p", "" + page);
-        queryRequest.addArgument("l", "" + limit);
-        queryRequest.addArgument("sc", "" + visibilityScope);
-        if(sort != 0) {
-            queryRequest.addArgument("s", INDEX_FIELD + sort);
-            if(asc) {
-                queryRequest.addArgument("sd", "0");
-            } else {
-                queryRequest.addArgument("sd", "1");
-            }
-        }
-        if(countQuery) {
-            queryRequest.addArgument("c", "1");
-        } else {
-            if(keyQuery) {
-                queryRequest.addArgument("c", "2");
-            }
-        }
-        
-        queryRequest.addArgument("o", "" + operator);
-        
-        if(response != null) {
-            NetworkManager.getInstance().addToQueue(queryRequest);
-            return null;
-            
-        } 
-        NetworkManager.getInstance().addToQueueAndWait(queryRequest);
-        if(queryRequest.returnValue != RETURN_CODE_SUCCESS) {
-            throw new CloudException(queryRequest.returnValue);
-        }
-        
-        return queryRequest.returnObject;
-    }
-    
     /**
      * Performs a query to the server finding the objects where the sort is equal to the given value. 
      * This operation executes immeditely without waiting for commit.
@@ -593,12 +356,6 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
-        try {
-            queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
     }
 
     /**
@@ -615,12 +372,7 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void queryEquals(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
-        try {
-            queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
+
     }
     
     /**
@@ -632,12 +384,6 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void queryEqualsCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
-        try {
-            queryImpl(type, value, index, 0, 0, visibilityScope, 1, 0, false, true, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
     }
 
     /**
@@ -650,12 +396,7 @@ public class CloudStorage {
      * @return the number of elements
      */
     public void queryGreaterThanCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
-        try {
-            queryImpl(type, value, index, 0, 0, visibilityScope, 2, 0, false, true, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
+
     }
     
     /**
@@ -672,12 +413,7 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse<String[]> response) {
-        try {
-            queryImpl(type, null, 0, page, limit, visibilityScope, 1, index, ascending, false, true, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
+
     }
     
     /**
@@ -691,12 +427,7 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<String[]> response) {
-        try {
-            queryImpl(type, value, index, page, limit, visibilityScope, 1, 0, false, false, true, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
+
     }
 
     /**
@@ -708,12 +439,7 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void queryLessThanCount(String type, int index, String value, int visibilityScope, CloudResponse<Integer> response) {
-        try {
-            queryImpl(type, value, index, 0, 0, visibilityScope, 3, 0, false, true, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
+
     }
 
     /**
@@ -729,12 +455,6 @@ public class CloudStorage {
      * CloudObject constants ACCESS_*
      */
     public void queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
-        try {
-            queryImpl(type, value, index, page, limit, visibilityScope, 2, 0, false, false, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
     }
 
     /**
@@ -751,12 +471,6 @@ public class CloudStorage {
      * @param response array of objects matching the query
      */
     public void queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse<CloudObject[]> response) {
-        try {
-            queryImpl(type, value, index, page, limit, visibilityScope, 3, 0, false, false, false, response);
-        } catch(CloudException e) {
-            // won't happen
-            response.onError(e);
-        }
     }    
     
     /**
@@ -770,7 +484,7 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String uploadCloudFile(String mimeType, String file) throws CloudException, IOException {
-        return uploadCloudFileImpl(mimeType, file, null, -1);
+        return null;
     }
     
     /**
@@ -786,59 +500,10 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String uploadCloudFile(String mimeType, String filename, InputStream data, int dataSize) throws CloudException, IOException {
-        return uploadCloudFileImpl(mimeType, filename, data, dataSize);
+        return null;
     }
     
-    private String uploadCloudFileImpl(String mimeType, String file, InputStream data, int dataSize) throws CloudException, IOException {
-        String token = CloudPersona.getCurrentPersona().getToken();
-        if(token == null || token.length() == 0) {
-            if(!CloudPersona.createAnonymous()) {
-                throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR, "Error creating anonymous login");
-            }
-            token = CloudPersona.getCurrentPersona().getToken();
-        }
-        ConnectionRequest req = new ConnectionRequest();
-        req.setPost(false);
-        req.setUrl(SERVER_URL + "/fileStoreURLRequest");
-        //req.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
 
-        NetworkManager.getInstance().addToQueueAndWait(req);
-        int rc = req.getResponseCode();
-        if(rc != 200) {
-            if(rc == 420) {
-                throw new CloudException(RETURN_CODE_FAIL_QUOTA_EXCEEDED);
-            }
-            throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
-        }
-
-        String d = new String(req.getResponseData());
-        MultipartRequest uploadReq = new MultipartRequest();
-        uploadReq.setUrl(d);
-        uploadReq.setManualRedirect(false);
-        uploadReq.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
-        uploadReq.addArgument("t", CloudPersona.getCurrentPersona().getToken());
-        uploadReq.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        if(data == null) {
-            int pos = file.lastIndexOf('/');
-            String shortName = file;
-            if(pos > -1) {
-                shortName = file.substring(pos);
-            }
-            uploadReq.addData(shortName, file, mimeType);
-        } else {
-            uploadReq.addData(file, data, dataSize, mimeType);
-        }
-        NetworkManager.getInstance().addToQueueAndWait(uploadReq);
-        if(uploadReq.getResponseCode() != 200) {
-            throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
-        }
-        String r = new String(uploadReq.getResponseData());
-        if("ERROR".equals(r)) {
-            throw new CloudException(RETURN_CODE_FAIL_SERVER_ERROR);
-        }
-        return r;
-    }
-    
     /**
      * Deletes a file from the cloud storage
      * 
@@ -847,19 +512,6 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public boolean deleteCloudFile(String fileId) {
-        if(CloudPersona.getCurrentPersona().getToken() == null) {
-            CloudPersona.createAnonymous();
-        }
-        ConnectionRequest req = new ConnectionRequest();
-        req.setPost(false);
-        req.setFailSilently(true);
-        req.setUrl(SERVER_URL + "/fileStoreDelete");
-        req.addArgument("i", fileId);
-        req.addArgument("t", CloudPersona.getCurrentPersona().getToken());
-        NetworkManager.getInstance().addToQueueAndWait(req);
-        if(req.getResponseCode() == 200) {
-            return new String(req.getResponseData()).equals("OK");
-        }
         return false;
     }
 
@@ -869,16 +521,6 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public void deleteAllCloudFilesForUser() {
-        if(CloudPersona.getCurrentPersona().getToken() == null) {
-            return;
-        }
-        ConnectionRequest req = new ConnectionRequest();
-        req.setPost(false);
-        req.setFailSilently(true);
-        req.setUrl(SERVER_URL + "/purgeCloudFiles");
-        req.addArgument("own", CloudPersona.getCurrentPersona().getToken());
-        req.addArgument("u", Display.getInstance().getProperty("built_by_user", ""));
-        NetworkManager.getInstance().addToQueue(req);
     }
     
     /**
@@ -892,17 +534,6 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public void deleteAllCloudFilesBefore(long timestamp, String developerAccount, String developerPassword) {
-        if(CloudPersona.getCurrentPersona().getToken() == null) {
-            return;
-        }
-        ConnectionRequest req = new ConnectionRequest();
-        req.setPost(false);
-        req.setFailSilently(true);
-        req.setUrl(SERVER_URL + "/purgeCloudFiles");
-        req.addArgument("d", "" + timestamp);
-        req.addArgument("u", developerAccount);
-        req.addArgument("p", developerPassword);
-        NetworkManager.getInstance().addToQueue(req);
     }
 
     /**
@@ -914,7 +545,7 @@ public class CloudStorage {
      * @deprecated this API is currently deprecated due to Googles cloud storage deprection
      */
     public String getUrlForCloudFileId(String fileId) {
-        return SERVER_URL + "/fileStoreDownload?i=" + fileId;
+        return null;
     }
     
     /**
@@ -923,23 +554,6 @@ public class CloudStorage {
      * @return status code from the constants in this class
      */
     public synchronized int commit() {
-        if(storageQueue.size() > 0) { 
-            if(CloudPersona.getCurrentPersona().getToken() == null) {
-                CloudPersona.createAnonymous();
-            }
-            StorageRequest req = new StorageRequest();
-            req.setContentType("multipart/form-data");
-            req.setUrl(SERVER_URL + "/objStoreCommit");
-            req.setPost(true);
-            NetworkManager.getInstance().addToQueueAndWait(req);
-
-            int i = req.getReturnCode();
-            if(i == RETURN_CODE_SUCCESS) {
-                storageQueue.clear();
-                Storage.getInstance().deleteStorageFile("CN1StorageQueue");
-            }
-            return i;
-        }
         return RETURN_CODE_EMPTY_QUEUE;
     }
 
@@ -949,94 +563,11 @@ public class CloudStorage {
      * @param response response code with status code from the constants in this class
      */
     public void commit(CloudResponse<Integer> response) {
-        if(storageQueue.size() > 0) { 
-            if(CloudPersona.getCurrentPersona().getToken() == null) {
-                CloudPersona.createAnonymous();
-            }
-            StorageRequest req = new StorageRequest();
-            req.response = response;
-            req.setContentType("multipart/form-data");
-            req.setUrl(SERVER_URL + "/objStoreCommit");
-            req.setPost(true);
-            NetworkManager.getInstance().addToQueue(req);
-        }
     }
     
     /**
      * Cancels current pending changes
      */
     public synchronized void rollback() {        
-        storageQueue.clear();
-        Storage.getInstance().deleteStorageFile("CN1StorageQueue");
-    }
-    
-
-    class StorageRequest extends ConnectionRequest {
-        CloudResponse<Integer> response;
-        private int returnCode = RETURN_CODE_FAIL_SERVER_ERROR;
-        protected void buildRequestBody(OutputStream os) throws IOException {
-            DataOutputStream d = new DataOutputStream(os);
-            d.writeInt(storageQueue.size());
-            d.writeUTF(CloudPersona.getCurrentPersona().getToken());
-            d.writeUTF(Display.getInstance().getProperty("package_name", null));
-            d.writeUTF(Display.getInstance().getProperty("built_by_user", null));
-            for(int iter = 0 ; iter < storageQueue.size() ; iter++) {
-                Object e = storageQueue.elementAt(iter);
-                if(e instanceof String) {
-                    // delete operation
-                    d.writeByte(1);
-                    d.writeUTF((String)e);
-                } else {
-                    CloudObject cl = (CloudObject)e;
-                    if(cl.getCloudId() == null) {
-                        // insert operation
-                        d.writeByte(2);
-                        d.writeInt(cl.getAccessPermissions());
-                        Util.writeObject(cl.getValues(), d);
-                    } else {
-                        // update operation
-                        d.writeByte(3);
-                        d.writeUTF(cl.getCloudId());
-                        d.writeLong(cl.getLastModified());
-                        Util.writeObject(cl.getValues(), d);
-                    }
-                }
-            }
-            d.writeInt(1);
-        }
-        
-        protected void readResponse(InputStream input) throws IOException  {
-            DataInputStream di = new DataInputStream(input);
-            returnCode = di.readInt();
-            if(returnCode == RETURN_CODE_SUCCESS) {
-                long timeStamp = di.readLong();
-                for(int iter = 0 ; iter < storageQueue.size() ; iter++) {
-                    Object o = storageQueue.elementAt(iter);
-                    if(o instanceof CloudObject) {
-                        CloudObject c = (CloudObject)o;
-                        if(c.getCloudId() == null) {
-                            c.setCloudId(di.readUTF());
-                        }
-                        c.setLastModified(timeStamp);
-                        c.setStatus(CloudObject.STATUS_COMMITTED);
-                    }
-                }
-            }
-        }
-
-        protected void postResponse() {
-            if(response != null) {
-                if(returnCode == RETURN_CODE_SUCCESS) {
-                    storageQueue.clear();
-                    Storage.getInstance().deleteStorageFile("CN1StorageQueue");
-                }
-                response.onSuccess(new Integer(returnCode));                
-            }
-        }
-       
-        public int getReturnCode() {
-            return returnCode;
-        }
-        
     }
 }

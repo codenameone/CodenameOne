@@ -2820,7 +2820,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
         }
 
-        if ("cellId".equals(key)) {
+        /*if ("cellId".equals(key)) {
             try {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the cellId")){
                     return defaultValue;
@@ -2832,7 +2832,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (Throwable t) {
                 return defaultValue;
             }
-        }
+        }*/
         if ("AppName".equals(key)) {
 
             final PackageManager pm = getContext().getPackageManager();
@@ -2877,7 +2877,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
-        try {
+        /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
                     return "";
@@ -2906,7 +2906,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch(Throwable t) {
             // will be caused by no permissions.
             return defaultValue;
-        }
+        }*/
 
         if (getActivity() != null) {
             android.content.Intent intent = getActivity().getIntent();
