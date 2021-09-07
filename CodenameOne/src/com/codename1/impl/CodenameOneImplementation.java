@@ -7116,52 +7116,9 @@ public abstract class CodenameOneImplementation {
     
     /**
      * Registers a polling thread to simulate push notification
+     * @deprecated this functionality is no longer supported
      */
     protected static void registerPollingFallback() {
-        if(pollingThreadRunning || callback == null) {
-            return;
-        }
-        pollingThreadRunning = true;
-        final long pushId = Preferences.get("push_id", (long)-1);
-        if(pushId > -1) {
-            new CodenameOneThread(new Runnable() {
-                public void run() {
-                    String lastReq = Preferences.get("last_push_req", "0");
-                    while(pollingThreadRunning) {
-                        try {
-                            ConnectionRequest cr = new ConnectionRequest();
-                            cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "pollManualPush");
-                            cr.setPost(false);
-                            cr.setFailSilently(true);
-                            cr.addArgument("i", "" + pushId);
-                            cr.addArgument("last", lastReq);
-                            NetworkManager.getInstance().addToQueueAndWait(cr);
-                            if(cr.getResponseCode() != 200) {
-                                callback.pushRegistrationError("Server registration error", 1);
-                            } else {
-                                DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));
-                                if(di.readBoolean()) {
-                                    byte type = di.readByte();
-                                    String message = di.readUTF();
-                                    lastReq = "" + di.readLong();
-                                    Preferences.set("last_push_req", lastReq);
-                                    callback.push(message);
-                                }
-                            }
-                        } catch (IOException ex) {
-                            Log.e(ex);
-                        }
-                        try {
-                            synchronized(callback) {
-                                callback.wait(pollingMillis);
-                            }
-                        } catch(Throwable t) {
-                            Log.e(t);
-                        }
-                    }
-                }
-            }, "Polling Thread").start();
-        }
     }
 
     /**
