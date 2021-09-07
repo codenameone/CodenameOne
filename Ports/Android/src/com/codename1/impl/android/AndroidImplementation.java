@@ -2709,6 +2709,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
             String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
             if (u == null && intent.getExtras() != null) {
