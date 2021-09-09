@@ -2747,8 +2747,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 }
                                 tmp.close();
                                 attachment.close();
-                                setAppArg(filePath);
-                                return filePath;
+                                setAppArg(addFile(filePath));
+                                return addFile(filePath);
                             }
                         }
                     } catch (FileNotFoundException e) {
