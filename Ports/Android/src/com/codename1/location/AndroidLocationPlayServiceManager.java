@@ -508,7 +508,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
         //Display.getInstance().scheduleBackgroundTask(new Runnable() {
-        boolean fineLocationAllowed = ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean fineLocationAllowed = AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get location");
         if (fineLocationAllowed && android.os.Build.VERSION.SDK_INT >= 29) {
 
             if (!checkBackgroundLocationPermission()) {
@@ -556,7 +556,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
                         builder.addGeofences(geofences);
 
-                        if (ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        if (!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "Fine location permission required")) {
                             // TODO: Consider calling
                             //    ActivityCompat#requestPermissions
                             // here to request the missing permissions, and then overriding
