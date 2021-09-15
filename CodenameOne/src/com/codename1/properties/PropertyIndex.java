@@ -29,6 +29,7 @@ import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
+import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.util.Base64;
@@ -42,6 +43,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Collection;
 import java.util.Date;
@@ -599,7 +601,28 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             } 
         }
     }
-    
+
+    /**
+     * This method works similarly to a constructor, it accepts the values for the properties in the order
+     * they appear within the index
+     * @param values values of properties in the order they appear in the index
+     */
+    public void init(Object... values) {
+        int offset = 0;
+        for(PropertyBase pb : properties) {
+            if(pb instanceof CollectionProperty) {
+                if(values[offset] instanceof Object[]) {
+                    ((CollectionProperty) pb).addAll(Arrays.asList((Object[])values[offset]));
+                } else {
+                    ((CollectionProperty) pb).addAll((Collection) values[offset]);
+                }
+            } else {
+                pb.setImpl(values[offset]);
+            }
+            offset++;
+        }
+    }
+
     /**
      * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
      * @param name the name of the storage file
@@ -659,25 +682,38 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public <X extends PropertyBusinessObject> List<X> loadJSONList(String name) {
         try {
-            InputStream is = Storage.getInstance().createInputStream(name);
-            JSONParser jp = new JSONParser();
-            JSONParser.setUseBoolean(true);
-            JSONParser.setUseLongs(true);
-            List<X> response = new ArrayList<X>();
-            Map<String, Object> result = jp.parseJSON(new InputStreamReader(is, "UTF-8"));
-            List<Map> entries = (List<Map>)result.get("root");
-            for(Map m : entries) {
-                X pb = (X)newInstance();
-                pb.getPropertyIndex().populateFromMap(m, parent.getClass());
-                response.add(pb);
+            if(Storage.getInstance().exists(name)) {
+                return loadJSONList(Storage.getInstance().createInputStream(name));
             }
-            return response;
+            InputStream is = CN.getResourceAsStream("/" + name);
+            return loadJSONList(is);
         } catch(IOException err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
     }
-    
+
+    /**
+     * Loads JSON containing a list of property objects of this type
+     * @param stream the input stream
+     * @return list of property objects matching this type
+     */
+    public <X extends PropertyBusinessObject> List<X> loadJSONList(InputStream stream)
+        throws IOException {
+        JSONParser jp = new JSONParser();
+        JSONParser.setUseBoolean(true);
+        JSONParser.setUseLongs(true);
+        List<X> response = new ArrayList<X>();
+        Map<String, Object> result = jp.parseJSON(new InputStreamReader(stream, "UTF-8"));
+        List<Map> entries = (List<Map>)result.get("root");
+        for(Map m : entries) {
+            X pb = (X)newInstance();
+            pb.getPropertyIndex().populateFromMap(m, parent.getClass());
+            response.add(pb);
+        }
+        return response;
+    }
+
     /**
      * Creates a new instance of the parent class
      * @return an instance of the parent class or null if this failed
@@ -709,22 +745,40 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     }
     
     /**
-     * Loads JSON for the object from storage with the given name
+     * Loads JSON for the object from storage with the given name if it exists. If the storage
+     * file doesn't exist getResources() will be used to find a default JSON file in the root
+     * of the package
      * @param name the name of the storage
      */
     public void loadJSON(String name) {
         try {
-            InputStream is = Storage.getInstance().createInputStream(name);
-            JSONParser jp = new JSONParser();
-            JSONParser.setUseBoolean(true);
-            JSONParser.setUseLongs(true);
-            populateFromMap(jp.parseJSON(new InputStreamReader(is, "UTF-8")), parent.getClass());
+            if(Storage.getInstance().exists(name)) {
+                loadJSON(Storage.getInstance().createInputStream(name));
+            } else {
+                InputStream is = CN.getResourceAsStream("/" + name);
+                if(is != null) {
+                    loadJSON(is);
+                } else {
+                    throw new IOException("Storage file not found: " + name);
+                }
+            }
         } catch(IOException err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
     }
-    
+
+    /**
+     * Loads JSON for the object from the given input stream
+     * @param stream the input stream containing the JSON file
+     */
+    public void loadJSON(InputStream stream) throws IOException {
+        JSONParser jp = new JSONParser();
+        JSONParser.setUseBoolean(true);
+        JSONParser.setUseLongs(true);
+        populateFromMap(jp.parseJSON(new InputStreamReader(stream, "UTF-8")), parent.getClass());
+    }
+
     /**
      * Returns true if the given object equals the property index
      * @param o the object

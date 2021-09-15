@@ -93,7 +93,6 @@ public class ProjectTemplate {
         codenameOneSettings = new File(projectRoot, path("common", "codenameone_settings.properties"));
         if (codenameOneSettings.exists()) {
             // This is a maven project.
-            // This is an ant project
             try (FileInputStream fis = new FileInputStream(codenameOneSettings)) {
                 settingsProps.load(fis);
             }
@@ -103,7 +102,7 @@ public class ProjectTemplate {
             try (FileOutputStream fos = new FileOutputStream(codenameOneSettings)) {
                 settingsProps.store(fos, "Updated packageName and mainName");
             }
-            for (String lang : new String[]{"java", "kotlin", "mirah", "resources"}) {
+            for (String lang : new String[]{"java", "kotlin", "mirah", "resources", "rad" + File.separator + "views"}) {
                 File srcDir = new File(codenameOneSettings.getParentFile(), path("src", "main", lang));
                 if (srcDir.exists()) {
                     convertToTemplate(packageName, mainName, srcDir);
@@ -136,21 +135,40 @@ public class ProjectTemplate {
         if (file.isFile()) {
             String contents = FileUtils.readFileToString(file, "UTF-8");
             String origContents = contents;
-            if (file.getName().endsWith(".java") || file.getName().endsWith(".kt") || file.getName().endsWith(".mirah"));
-            {
-                String pattern = "package " + packageName + "";
-                String replacement = "package ${packageName}";
-                contents = contents.replace(pattern, replacement);
-            }
-            {
-                String pattern = "import " + packageName + ".";
-                String replacement = "import ${packageName}.";
-                contents = contents.replace(pattern, replacement);
-            }
-            {
-                String pattern = "class " + mainName + " ";
-                String replacement = "class ${mainName} ";
-                contents = contents.replace(pattern, replacement);
+            if (file.getName().endsWith(".java") || file.getName().endsWith(".kt") || file.getName().endsWith(".mirah")) {
+                {
+                    String pattern = "package " + packageName + "";
+                    String replacement = "package ${packageName}";
+                    contents = contents.replace(pattern, replacement);
+                }
+                {
+                    String pattern = "import " + packageName + ".";
+                    String replacement = "import ${packageName}.";
+                    contents = contents.replace(pattern, replacement);
+                }
+                {
+                    String pattern = "class " + mainName + " ";
+                    String replacement = "class ${mainName} ";
+                    contents = contents.replace(pattern, replacement);
+                }
+            } else if (file.getAbsolutePath().replace('\\', '.').replace('/', '.').contains("rad.views") && file.getName().endsWith(".xml")) {
+                // This is a rad view
+                {
+                    String pattern = "import " + packageName + ".";
+                    String replacement = "import ${packageName}.";
+                    contents = contents.replace(pattern, replacement);
+                }
+                {
+                    String pattern = "=\"" + packageName + "." + mainName;
+                    String replacement = "=\"${packageName}.${mainName}";
+                    contents = contents.replace(pattern, replacement);
+                }
+                {
+                    String pattern = "=\"" + packageName + ".";
+                    String replacement = "=\"${packageName}.";
+                    contents = contents.replace(pattern, replacement);
+                }
+
             }
             if (!contents.equals(origContents)) {
 

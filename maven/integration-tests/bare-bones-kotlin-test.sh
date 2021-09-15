@@ -1,11 +1,8 @@
 #!/bin/bash
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
-cd $SCRIPTPATH
-if [ ! -d build ]; then
-  mkdir build
-fi
-cd build
+source $SCRIPTPATH/inc/env.sh
+cd $SCRIPTPATH/build
 if [ -d myapp2 ]; then
   rm -rf myapp2
 fi
@@ -13,7 +10,7 @@ curl -L https://github.com/shannah/cn1app-archetype-kotlin-template/archive/mast
 unzip master.zip
 rm master.zip
 mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \
-  -DarchetypeGroupId=com.codename1 \
+  -DarchetypeGroupId=com.codenameone \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeVersion=${CN1_VERSION} \
   -DartifactId=myapp2 \

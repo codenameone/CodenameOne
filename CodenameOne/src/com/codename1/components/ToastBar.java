@@ -561,6 +561,7 @@ public class ToastBar {
                     public void actionPerformed(ActionEvent evt) {
                         if (c.currentlyShowing != null && !c.currentlyShowing.showProgressIndicator) {
                             c.currentlyShowing.clear();
+                            evt.consume();
                         }
                         ToastBar.this.setVisible(false);
                     }

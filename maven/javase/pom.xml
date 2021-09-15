@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.11-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-javase</artifactId>
-    <version>7.0.11-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <dependencies>
@@ -50,11 +50,12 @@
             <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
             <optional>true</optional>
         </dependency>
+
     </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>6</maven.compiler.source>
-        <maven.compiler.target>6</maven.compiler.target>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
         <src.dir>../../Ports/JavaSE/src</src.dir>
 
     </properties>
@@ -122,24 +123,6 @@
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>cef-dependency</id>
-            <activation>
-                <property>
-                    <name>codename1.platform</name>
-                    <value>javase</value>
-                </property>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>com.codenameone</groupId>
-                    <artifactId>codenameone-cef</artifactId>
-                    <version>84.4.1-M2</version>
-                    <type>pom</type>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
+
 
 </project>

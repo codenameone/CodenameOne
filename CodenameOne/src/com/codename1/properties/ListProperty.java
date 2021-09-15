@@ -75,6 +75,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * @return the property value
      */
     public T get(int offset) {
+        internalGet();
         return value.get(offset);
     }
     
@@ -83,6 +84,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * @return the number of elements
      */
     public int size() {
+        internalGet();
         return value.size();
     }
     
@@ -95,6 +97,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K set(int offset, T v) {
         value.set(offset, v);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
 
@@ -107,6 +110,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         value.clear();
         value.addAll(t);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
     
@@ -128,6 +132,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K add(int offset, T v) {
         value.add(offset, v);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
 
@@ -138,6 +143,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K add(T v) {
         value.add(v);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
     
@@ -147,7 +153,8 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      */
     public K addAll(Collection<? extends T> v) {
         if (value.addAll(v)) {
-                firePropertyChanged();
+            firePropertyChanged();
+            internalSet();
         }
         return (K)parent.parent;
     }
@@ -159,6 +166,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K remove(int offset) {
         value.remove(offset);
         firePropertyChanged();
+        internalSet();
         return (K)parent.parent;
     }
     
@@ -169,6 +177,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K remove(T v) {
     	if (value.remove(v)) {
     		firePropertyChanged();
+            internalSet();
     	}
         return (K)parent.parent;
     }
@@ -180,6 +189,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K removeAll(Collection<? extends T>  v) {
         if (value.removeAll(v)) {
         	firePropertyChanged();
+            internalSet();
         }
         return (K)parent.parent;
     }
@@ -212,6 +222,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * @return an iterator
      */
     public Iterator<T> iterator() {
+        internalGet();
         return value.iterator();
     }
     
@@ -220,6 +231,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * @return a list
      */
     public List<T> asList() {
+        internalGet();
         return new ArrayList<T>(value);
     }
     
@@ -229,15 +241,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * @return a list
      */
     public List<Object> asExplodedList() {
-        ArrayList<Object> aa = new ArrayList<Object>();
-        for(T t : value) {
-            if(t instanceof PropertyBusinessObject) {
-                aa.add(((PropertyBusinessObject)t).getPropertyIndex().toMapRepresentation());
-            } else {
-                aa.add(t);
-            }
-        }
-        return aa;
+        return asExplodedList(value);
     }
 
     /**
@@ -247,6 +251,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         if(value.size() > 0) {
             value.clear();
             firePropertyChanged();
+            internalSet();
         }
     }
 

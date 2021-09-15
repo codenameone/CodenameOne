@@ -366,7 +366,7 @@ public class Cn1libInstaller {
         }
         if (requiredProps.exists()) {
             try {
-                FileUtils.copyFile(appendedProps, new File(metaDir, requiredProps.getName()));
+                FileUtils.copyFile(requiredProps, new File(metaDir, requiredProps.getName()));
             } catch (IOException ex) {
                 throw new MojoExecutionException("Failed to copy "+requiredProps, ex);
             }
@@ -600,7 +600,14 @@ public class Cn1libInstaller {
                     "    <file><exists>${basedir}/"+libName+"/pom.xml</exists></file>\n" +
                     "  </activation>" +
                     "  <modules><module>"+libName+"</module></modules>\n" +
-                    "</profile>\n";
+                    "</profile>\n" +
+                    "<profile>\n" +
+                    "  <id>"+file.getName()+"-cn1lib-fromroot</id>\n" +
+                    "  <activation>\n" +
+                    "    <file><exists>${basedir}/cn1libs/"+libName+"/pom.xml</exists></file>\n" +
+                    "  </activation>" +
+                    "  <modules><module>"+libName+"</module></modules>\n" +
+                    "</profile>\n";;
 
             String parentPomContents;
             if (parentPomFile.exists()) {

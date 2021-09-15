@@ -903,7 +903,17 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
 }
 
 
+//native void nativeDrawShadowMutable(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity);
+extern void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity);
 
+void com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable___long_int_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+    JAVA_LONG image, JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_PASS_ARG image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    POOL_END();
+
+}
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
 
@@ -9535,8 +9545,10 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
     JAVA_OBJECT nativeFont = com_codename1_ui_Font_getNativeFont___R_java_lang_Object(threadStateData, font);
     com_codename1_impl_ios_IOSImplementation_setNativeFont___java_lang_Object_java_lang_Object(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont);
     JAVA_INT fgColor = com_codename1_ui_plaf_Style_getFgColor___R_int(threadStateData, style);
+    JAVA_INT fgAlpha = com_codename1_ui_plaf_Style_getFgAlpha___R_int(threadStateData, style);
     com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, fgColor);
-    
+    JAVA_INT alpha = com_codename1_impl_ios_IOSImplementation_concatenateAlpha___java_lang_Object_int_R_int(threadStateData, __cn1ThisObject, nativeGraphics, fgAlpha);
+
     JAVA_INT iconWidth = 0;
     JAVA_INT iconHeight = 0;
     if(icon != JAVA_NULL) {
@@ -9749,6 +9761,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 break;
         }
     }
+    com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, alpha);
 }
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)

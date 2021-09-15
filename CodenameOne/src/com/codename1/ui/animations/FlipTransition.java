@@ -141,6 +141,9 @@ public class FlipTransition extends Transition {
 
     @Override
     public boolean animate() {
+        if (motion == null) {
+            return false;
+        }
         int val = motion.getValue();
         switch (transitionState){
             case STATE_MOVE_AWAY: {

@@ -159,7 +159,7 @@ public class List<T> extends Component implements ActionSource {
         defaultFireOnClick = aDefaultFireOnClick;
     }
     /**
-     * @see setRenderingPrototype
+     * @see #setRenderingPrototype
      */
     private T renderingPrototype;
     /**
@@ -1558,7 +1558,7 @@ public class List<T> extends Component implements ActionSource {
     
     /**
      * Triggers the event to the listeners
-     * @param evt the event to fire
+     * @param a the event to fire
      */ 
     protected void fireActionEvent(ActionEvent a) {
         if(isEnabled() && !Display.getInstance().hasDragOccured()){

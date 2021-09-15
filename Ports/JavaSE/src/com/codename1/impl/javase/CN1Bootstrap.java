@@ -101,7 +101,7 @@ public class CN1Bootstrap {
      * This is useful for ensuring that the main class is loaded using the bootstrapped classloader.
      * @param mainClass THe name of the main class
      * @param argv Args to be passed to the main() method
-     * @return
+     * @return false if CN1 was already bootstrapped.  true if CN1 was not yet bootstrapped, and this bootstrapped it.
      * @throws Exception 
      */
     public static boolean run(String mainClass, String[] argv) throws Exception {
@@ -155,7 +155,7 @@ public class CN1Bootstrap {
                 
             
                 cefSupported = true;
-                System.out.println("Adding CEF to classpath");
+                System.out.println("Adding CEF to classpath " + cef);
                 String cn1LibPath = System.getProperty("cn1.library.path", ".");
                 String bitSuffix = is64Bit ? "64" : "32";
                 String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("lib" + File.separator + "linux"+bitSuffix);

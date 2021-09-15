@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.11-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-javase-svg</artifactId>
-    <version>7.0.11-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -32,8 +32,8 @@
     </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>6</maven.compiler.source>
-        <maven.compiler.target>6</maven.compiler.target>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
         <src.dir>../../Ports/JavaSEWithSVGSupport/src</src.dir>
 		
     </properties>

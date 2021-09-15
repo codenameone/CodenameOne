@@ -112,7 +112,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 11;
+    private static final short MINOR_VERSION = 12;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -561,12 +561,20 @@ public class EditableResources extends Resources implements TreeModel {
                                     for(Val v : d.getVal()) {
                                         String key = v.getKey();
                                     
-                                        if(key.endsWith("align") || key.endsWith("textDecoration")) {
+                                        if(key.endsWith("align") || key.endsWith("textDecoration") || key.endsWith(Style.ELEVATION)) {
                                             theme.put(key, Integer.valueOf(v.getValue()));
                                             continue;
                                         }
-                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
+                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT) || key.endsWith(Style.ICON_GAP_UNIT)) {
                                             theme.put(key, Byte.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.SURFACE)) {
+                                            theme.put(key, Boolean.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.ICON_GAP)) {
+                                            theme.put(key, Float.valueOf(v.getValue()));
                                             continue;
                                         }
                                         // padding and or margin type
@@ -1947,7 +1955,9 @@ public class EditableResources extends Resources implements TreeModel {
         theme.remove("name");
         
         output.writeShort(theme.size());
-        for(Object currentKey : theme.keySet()) {
+        ArrayList<String> setOfKeys = new ArrayList<String>(theme.keySet());
+        Collections.sort(setOfKeys);
+        for(Object currentKey : setOfKeys) {
             String key = (String)currentKey;
             output.writeUTF(key);
 
@@ -1979,6 +1989,16 @@ public class EditableResources extends Resources implements TreeModel {
             
             if (key.endsWith("opacity")) {
                 output.writeInt(Integer.parseInt((String)theme.get(key)));
+                continue;
+            }
+
+            if (key.endsWith(Style.ICON_GAP)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.ICON_GAP_UNIT)) {
+                output.writeByte(((Number)theme.get(key)).byteValue());
                 continue;
             }
 
@@ -2072,6 +2092,19 @@ public class EditableResources extends Resources implements TreeModel {
 
             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                 output.writeByte(((Number)theme.get(key)).intValue());
+                continue;
+            }
+            if (key.endsWith(Style.ELEVATION)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.FG_ALPHA)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
+                continue;
+            }
+            if (key.endsWith(Style.SURFACE)) {
+                output.writeBoolean((Boolean)theme.get(key));
                 continue;
             }
 

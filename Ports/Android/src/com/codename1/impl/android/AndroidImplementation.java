@@ -254,6 +254,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public static void setActivity(CodenameOneActivity aActivity) {
         activity = aActivity;
+        if (activity != null) {
+            activityComponentName = activity.getComponentName();
+        }
+        
     }
     CodenameOneSurface myView = null;
     CodenameOneTextPaint defaultFont;
@@ -265,6 +269,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayWidth;
     private int displayHeight;
     static CodenameOneActivity activity;
+    static ComponentName activityComponentName;
+    
     private static Context context;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
@@ -2702,6 +2708,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
             if (u == null && intent.getExtras() != null) {
@@ -2727,6 +2735,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 String filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
+                                if(filePath.startsWith("file:")) {
+                                    filePath = filePath.substring(5);
+                                }
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
@@ -2736,8 +2747,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 }
                                 tmp.close();
                                 attachment.close();
-                                setAppArg(filePath);
-                                return filePath;
+                                setAppArg(addFile(filePath));
+                                return addFile(filePath);
                             }
                         }
                     } catch (FileNotFoundException e) {
@@ -2769,9 +2780,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return encodedPath;
                     }
                     */
-                    setAppArg(u.toString());
-                    return u.toString();
+                    if (sharedText != null) {
+                        setAppArg(sharedText);
+                        return sharedText;
+                    } else {
+                        setAppArg(u.toString());
+                        return u.toString();
+                    }
+
                 }
+            } else if (sharedText != null) {
+                setAppArg(sharedText);
+                return sharedText;
             }
         }
         return null;
@@ -2801,7 +2821,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
         }
 
-        if ("cellId".equals(key)) {
+        /*if ("cellId".equals(key)) {
             try {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the cellId")){
                     return defaultValue;
@@ -2813,7 +2833,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (Throwable t) {
                 return defaultValue;
             }
-        }
+        }*/
         if ("AppName".equals(key)) {
 
             final PackageManager pm = getContext().getPackageManager();
@@ -2858,7 +2878,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
-        try {
+        /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
                     return "";
@@ -2887,7 +2907,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch(Throwable t) {
             // will be caused by no permissions.
             return defaultValue;
-        }
+        }*/
 
         if (getActivity() != null) {
             android.content.Intent intent = getActivity().getIntent();
@@ -5131,6 +5151,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
+    /**
+     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only Android and iOS ports support this.
+     * @return
+     */
+    @Override
+    public boolean isNativeCookieSharingSupported() {
+        return true;
+    }
+
     @Override
     public void clearNativeCookies() {
         CookieManager mgr = getCookieManager();
@@ -5899,12 +5929,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 conn.connect();
                 java.security.cert.Certificate[] certs = conn.getServerCertificates();
-                String[] out = new String[certs.length];
+                String[] out = new String[certs.length * 2];
                 int i=0;
                 for (java.security.cert.Certificate cert : certs) {
-                    MessageDigest md = MessageDigest.getInstance("SHA1");
-                    md.update(cert.getEncoded());
-                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA-256");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA-256:" + dumpHex(md.digest());
+                    }
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA1");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA1:" + dumpHex(md.digest());
+                    }
+
                 }
                 return out;
             } catch (Exception ex) {
@@ -6565,9 +6603,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        if(!checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")){
+        boolean permissionGranted = false;
+        if (Build.VERSION.SDK_INT >= 29  && "true".equals(Display.getInstance().getProperty("android.requiresBackgroundLocationPermissionForAPI29", "false"))) {
+
+            if (checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION", "This is required to get the location")) {
+                permissionGranted = true;
+            }
+
+        }
+        if (!permissionGranted && !checkForPermission( Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")) {
             return null;
         }
+
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
         if (includesPlayServices && hasAndroidMarket()) {
@@ -6829,7 +6876,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             InputStream i = null;
             try {
                 serviceProperties = new HashMap<String,String>();
-                i = a.openFileInput("CN1$AndroidServiceProperties");
+                try {
+                    i = a.openFileInput("CN1$AndroidServiceProperties");
+                } catch (FileNotFoundException notFoundEx){}
                 if(i == null) {
                     return serviceProperties;
                 }
@@ -7018,7 +7067,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
 
         Intent notificationIntent = new Intent();
-        notificationIntent.setComponent(getActivity().getComponentName());
+        notificationIntent.setComponent(activityComponentName);
         PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
 
 
@@ -7928,8 +7977,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {
@@ -7975,8 +8029,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {
@@ -9862,8 +9921,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
 
+        ag.drawShadow(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    }
 
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
 
@@ -10298,8 +10371,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
 
         Intent contentIntent = new Intent();
-        if (getActivity() != null) {
-            contentIntent.setComponent(getActivity().getComponentName());
+        if (activityComponentName != null) {
+            contentIntent.setComponent(activityComponentName);
+        } else {
+            try {
+                contentIntent.setComponent(getContext().getPackageManager().getLaunchIntentForPackage(getContext().getApplicationInfo().packageName).getComponent());
+            } catch (Exception ex) {
+                System.err.println("Failed to get the component name for local notification.  Local notification may not work.");
+                ex.printStackTrace();
+            }
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
 

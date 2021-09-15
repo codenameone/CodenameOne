@@ -376,7 +376,8 @@ public class InteractionDialog extends Container {
             }
             getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         } else {
-            getLayeredPane(f).revalidate();
+            //getLayeredPane(f).revalidate();
+            f.revalidateWithAnimationSafety();
         }
         /*
         Form f = Display.getInstance().getCurrent();

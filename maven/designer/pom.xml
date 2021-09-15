@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.11-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-designer</artifactId>
-    <version>7.0.11-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -32,7 +32,7 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>9.3.27.v20190418</version>
+            <version>9.4.41.v20210516</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.swinglabs/swing-layout -->
         <dependency>

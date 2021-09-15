@@ -2108,7 +2108,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
         jLabel13.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!"); // NOI18N
         jLabel13.setName("jLabel13"); // NOI18N
 
-        trueTypeFontSizeOption.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Small", "Medium", "Large", "Millimeters", "Pixels" }));
+        trueTypeFontSizeOption.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Small", "Medium", "Large", "Millimeters", "Pixels", "rem", "vw", "vh", "vmin", "vmax" }));
         trueTypeFontSizeOption.setSelectedIndex(1);
         trueTypeFontSizeOption.setToolTipText("<html><body>\nTruetype fonts are only supported on some platforms (iOS/Android)<br>\nto use them you need to place the file in the src directory next to the<br>\nresource file and make sure the name of the font is correct in the<br>\ntext field (for iOS). When unavailable the standard fonts will be used.<br>\n<b>Important</b> the file name must have a .ttf extension!");
         trueTypeFontSizeOption.setEnabled(false);

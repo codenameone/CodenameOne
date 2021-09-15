@@ -37,6 +37,18 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
     private File complianceOutputFile;
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if ("true".equals(System.getProperty("skipComplianceCheck", "false"))) {
+            return;
+        }
+        if ("true".equals(project.getProperties().getProperty("skipComplianceCheck", "false"))) {
+            return;
+        }
+        if ("true".equals(System.getProperty("reloadClasses", "false"))) {
+            return;
+        }
+        if ("true".equals(project.getProperties().getProperty("reloadClasses", "false"))) {
+            return;
+        }
         if (!isCN1ProjectDir()) {
             return;
         }
@@ -146,6 +158,12 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         File complianceCheckJar =  new File(project.getBuild().getDirectory() + File.separator + "compliance-check.jar");
         java.createArg().setValue("-keepattributes");
         java.createArg().setValue("Signature");
+
+        // We need these options so that we are able to reference package-private stuff from user-space source.
+        // This happens when testing (e.g. creating class in the com.codename1.ui package so that it can
+        // access package-private stuff
+        java.createArg().setValue("-dontskipnonpubliclibraryclasses");
+        java.createArg().setValue("-dontskipnonpubliclibraryclassmembers");
         if (passNum == 0) {
             // The -injars parameter of proguard is the list of jars/directories that
             // we want to operate on.  We will operate on all dependencies, stripping out unused

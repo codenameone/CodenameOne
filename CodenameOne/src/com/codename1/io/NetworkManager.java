@@ -150,6 +150,7 @@ public class NetworkManager {
                 continue;
             }
             if (nt.currentRequest.getId() == connectionId) {
+
                 return nt.currentRequest.checkCertificatesNativeCallback();
             }
         }

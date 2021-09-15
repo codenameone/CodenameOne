@@ -40,7 +40,7 @@ public class TestExecuter {
             if(quiteMode) {
                 Display.init(new java.awt.Container());
             } else {
-                Simulator.loadFXRuntime();
+                //Simulator.loadFXRuntime();
                 System.setProperty("dskin", "/iphone3gs.skin");
                 Display.init(null);
             }

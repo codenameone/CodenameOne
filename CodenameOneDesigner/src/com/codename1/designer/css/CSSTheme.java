@@ -33,7 +33,6 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.plaf.Accessor;
-import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
@@ -807,14 +806,12 @@ public class CSSTheme {
         }
         
         File getFontFile() {
-            
             if (fontFile == null) {
                 try {
                     URL url = getURL();
                     if (url == null) {
                         return null;
                     }
-                    //File cssFile = new File(url.toURI());
                     File parentDir = cssFile.getParentFile();
                     if (url.getProtocol().startsWith("http")) {
                         // If it is remote, check so see if we've already downloaded
@@ -876,6 +873,8 @@ public class CSSTheme {
         int screenWidth=640;
         int screenHeight=960;
         CN1Gradient gradient;
+
+        LexicalUnit next, prev, param;
         
         
         ScaledUnit(LexicalUnit src, double dpi, int screenWidth, int screenHeight) {
@@ -884,6 +883,28 @@ public class CSSTheme {
             this.screenWidth = screenWidth;
             this.screenHeight = screenHeight;
             
+        }
+
+
+
+
+
+        public void setParameters(LexicalUnit params) {
+            this.param = params;
+        }
+
+        private boolean nextLexicalUnitNull;
+        public void setNextLexicalUnit(LexicalUnit next) {
+            this.next = next;
+            nextLexicalUnitNull = (next == null);
+        }
+
+        private boolean prevLexicalUnitNull;
+        public void setPrevLexicalUnit(LexicalUnit prev) {
+
+            this.prev = prev;
+            prevLexicalUnitNull = (prev == null);
+
         }
 
         /**
@@ -921,9 +942,20 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getNextLexicalUnit() {
+            if (next != null || nextLexicalUnitNull) return next;
             LexicalUnit nex = src.getNextLexicalUnit();
-            
-            return nex == null ? null : new ScaledUnit(nex, dpi, screenWidth, screenHeight);
+
+            LexicalUnit out = nex == null ? null : new ScaledUnit(nex, dpi, screenWidth, screenHeight);
+            if (out != null) next = out;
+            return out;
+        }
+
+        private static boolean hasCycle(LexicalUnit lu, ScaledUnit su) {
+            if (lu == su) return true;
+            if (su.src instanceof ScaledUnit) {
+                return hasCycle(lu, (ScaledUnit)su.src);
+            }
+            return false;
         }
         
         public ScaledUnit getNextNumericUnit() {
@@ -941,8 +973,11 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getPreviousLexicalUnit() {
+            if (this.prev != null || prevLexicalUnitNull) return this.prev;
             LexicalUnit prev = src.getPreviousLexicalUnit();
-            return prev == null ? null : new ScaledUnit(prev, dpi, screenWidth, screenHeight);
+            LexicalUnit out =  prev == null ? null : new ScaledUnit(prev, dpi, screenWidth, screenHeight);
+            if (out != null) this.prev = out;
+            return out;
         }
 
         @Override
@@ -976,8 +1011,12 @@ public class CSSTheme {
 
         @Override
         public LexicalUnit getParameters() {
+            if (this.param != null) return this.param;
             LexicalUnit param = src.getParameters();
-            return param == null ? null :  new ScaledUnit(param, dpi, screenWidth, screenHeight);
+
+            LexicalUnit out =  param == null ? null :  new ScaledUnit(param, dpi, screenWidth, screenHeight);
+            if (out != null) this.param = out;
+            return out;
         }
 
         String renderAsCSSValue(double targetDpi, int targetScreenWidth, int targetScreenHeight) {
@@ -1000,7 +1039,13 @@ public class CSSTheme {
 
                 case LexicalUnit.SAC_FUNCTION: {
                     StringBuilder sb = new StringBuilder();
-                    sb.append(lu.getFunctionName()).append("(");
+                    String fname = lu.getFunctionName();
+                    if ("cn1rgb".equals(fname)) {
+                        fname = "rgb";
+                    } else if ("cn1rgba".equals(fname)) {
+                        fname = "rgba";
+                    }
+                    sb.append(fname).append("(");
                     ScaledUnit val = (ScaledUnit)lu.getParameters();
                     //sb.append(String.valueOf(val));
                     boolean empty = true;
@@ -1043,6 +1088,31 @@ public class CSSTheme {
                     return String.valueOf(lu.getIntegerValue());
                 case LexicalUnit.SAC_REAL:
                     return String.valueOf(lu.getFloatValue());
+                default:
+                    String unitText = null;
+                    try {
+                        unitText = lu.getDimensionUnitText();
+
+                    } catch (Exception ex) {
+                        break;
+                    }
+                    if (unitText != null) {
+                        if ("rem".equals(unitText)) {
+                            return lu.getFloatValue()+"rem";
+                        } else if ("vw".equals(unitText)) {
+                            return lu.getFloatValue()+"vw";
+
+                        } else if ("vh".equals(unitText)) {
+                            return lu.getFloatValue()+"vh";
+
+                        } else if ("vmin".equals(unitText)) {
+                            return lu.getFloatValue()+"vmin";
+
+                        } else if ("vmax".equals(unitText)) {
+                            return lu.getFloatValue()+"vmax";
+
+                        }
+                    }
 
 
 
@@ -1124,6 +1194,7 @@ public class CSSTheme {
 
         @Override
         public String toString() {
+
             return src.toString();
         }
         
@@ -1491,9 +1562,7 @@ public class CSSTheme {
         return out;
     }
     
-    private static String str(LexicalUnit lu) {
-        return str(lu, null);
-    }
+
     
     private static String str(LexicalUnit lu, String defaultVal) {
         if (lu == null) {
@@ -1505,28 +1574,32 @@ public class CSSTheme {
         if (Math.ceil(numVal) == Math.floor(numVal)) {
             num = ((int)numVal)+"";
         }
+        String unitText = "";
+        try {
+            unitText = lu.getDimensionUnitText();
+        } catch (Exception ex){} // This might throw an exception if there was no unit given, but we don't care.
         switch (lu.getLexicalUnitType()) {
-                case LexicalUnit.SAC_MILLIMETER:
-                    return num+"mm";
+            case LexicalUnit.SAC_MILLIMETER:
+                return num+"mm";
 
-                case LexicalUnit.SAC_INTEGER:
-                case LexicalUnit.SAC_REAL:
-                    return num+"";
-                case LexicalUnit.SAC_POINT:
-                    return num+"pt";
+            case LexicalUnit.SAC_INTEGER:
+            case LexicalUnit.SAC_REAL:
+                return num+"";
+            case LexicalUnit.SAC_POINT:
+                return num+"pt";
 
-                case LexicalUnit.SAC_PIXEL:
-                    return ((int)Math.round(su.getNumericValue()))+"px";
-
-
-                case LexicalUnit.SAC_INCH:
-                    return num+"in";
-                case LexicalUnit.SAC_EM:
-                    return num+"em";
+            case LexicalUnit.SAC_PIXEL:
+                return ((int)Math.round(su.getNumericValue()))+"px";
 
 
-            }
-        return "0";
+            case LexicalUnit.SAC_INCH:
+                return num+"in";
+            case LexicalUnit.SAC_EM:
+                return num+"em";
+
+
+        }
+        return num+unitText;
     }
     
     public Map<String, CacheStatus> calculateSelectorCacheStatus(File cachedFile) throws IOException {
@@ -1618,6 +1691,65 @@ public class CSSTheme {
                 currToken = "disabled marUnit";
                 res.setThemeProperty(themeName, disabledId+"#marUnit", el.getThemeMarginUnit(disabledStyles));
 
+                currToken = "elevation";
+                res.setThemeProperty(themeName, unselId+".elevation", el.getThemeElevation(unselectedStyles));
+                currToken = "selected elevation";
+                res.setThemeProperty(themeName, selId+"#elevation", el.getThemeElevation(selectedStyles));
+                currToken = "pressed elevation";
+                res.setThemeProperty(themeName, pressedId+"#elevation", el.getThemeElevation(pressedStyles));
+                currToken = "disabled elevation";
+                res.setThemeProperty(themeName, disabledId+"#elevation", el.getThemeElevation(disabledStyles));
+
+                currToken = "iconGap";
+                float gap = el.getThemeIconGap(unselectedStyles);
+                if (gap < 0) {
+                    res.setThemeProperty(themeName, unselId+".iconGap", null);
+                    currToken = "selected iconGap";
+                    res.setThemeProperty(themeName, selId+"#iconGap", null);
+                    currToken = "pressed iconGap";
+                    res.setThemeProperty(themeName, pressedId+"#iconGap", null);
+                    currToken = "disabled iconGap";
+                    res.setThemeProperty(themeName, disabledId+"#iconGap", null);
+
+                    currToken = "iconGapUnit";
+                    res.setThemeProperty(themeName, unselId+".iconGapUnit", null);
+                    currToken = "selected iconGapUnit";
+                    res.setThemeProperty(themeName, selId+"#iconGapUnit", null);
+                    currToken = "pressed iconGapUnit";
+                    res.setThemeProperty(themeName, pressedId+"#iconGapUnit", null);
+                    currToken = "disabled iconGapUnit";
+                    res.setThemeProperty(themeName, disabledId+"#iconGapUnit", null);
+                } else {
+                    res.setThemeProperty(themeName, unselId+".iconGap", gap);
+                    currToken = "selected iconGap";
+                    res.setThemeProperty(themeName, selId+"#iconGap", gap);
+                    currToken = "pressed iconGap";
+                    res.setThemeProperty(themeName, pressedId+"#iconGap", gap);
+                    currToken = "disabled iconGap";
+                    res.setThemeProperty(themeName, disabledId+"#iconGap", gap);
+
+                    currToken = "iconGapUnit";
+                    byte gapUnit = el.getThemeIconGapUnit(unselectedStyles);
+                    res.setThemeProperty(themeName, unselId+".iconGapUnit", gapUnit);
+                    currToken = "selected iconGapUnit";
+                    res.setThemeProperty(themeName, selId+"#iconGapUnit", gapUnit);
+                    currToken = "pressed iconGapUnit";
+                    res.setThemeProperty(themeName, pressedId+"#iconGapUnit", gapUnit);
+                    currToken = "disabled iconGapUnit";
+                    res.setThemeProperty(themeName, disabledId+"#iconGapUnit", gapUnit);
+                }
+
+
+                currToken = "surface";
+                res.setThemeProperty(themeName, unselId+".surface", el.getThemeSurface(unselectedStyles));
+                currToken = "selected surface";
+                res.setThemeProperty(themeName, selId+"#surface", el.getThemeSurface(selectedStyles));
+                currToken = "pressed surface";
+                res.setThemeProperty(themeName, pressedId+"#surface", el.getThemeSurface(pressedStyles));
+                currToken = "disabled surface";
+                res.setThemeProperty(themeName, disabledId+"#surface", el.getThemeSurface(disabledStyles));
+
+
                 currToken = "fgColor";
                 res.setThemeProperty(themeName, unselId+".fgColor", el.getThemeFgColor(unselectedStyles));
                 currToken = "selected fgColor";
@@ -1626,6 +1758,16 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, pressedId+"#fgColor", el.getThemeFgColor(pressedStyles));
                 currToken = "disabled fgColor";
                 res.setThemeProperty(themeName, disabledId+"#fgColor", el.getThemeFgColor(disabledStyles));
+
+                currToken = "fgAlpha";
+                res.setThemeProperty(themeName, unselId+".fgAlpha", el.getThemeFgAlpha(unselectedStyles));
+                currToken = "selected fgAlpha";
+                res.setThemeProperty(themeName, selId+"#fgAlpha", el.getThemeFgAlpha(selectedStyles));
+                currToken = "pressed fgAlpha";
+                res.setThemeProperty(themeName, pressedId+"#fgAlpha", el.getThemeFgAlpha(pressedStyles));
+                currToken = "disabled fgAlpha";
+                res.setThemeProperty(themeName, disabledId+"#fgAlpha", el.getThemeFgAlpha(disabledStyles));
+
                 currToken = "bgColor";
                 res.setThemeProperty(themeName, unselId+".bgColor", el.getThemeBgColor(unselectedStyles));
                 currToken = "selected bgColor";
@@ -1764,11 +1906,10 @@ public class CSSTheme {
             }
             
         }
-        
+
         for (String constantKey : constants.keySet()) {
             try {
                 LexicalUnit lu = constants.get(constantKey);
-
                 if (lu.getLexicalUnitType() == LexicalUnit.SAC_STRING_VALUE || lu.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
                     if (constantKey.endsWith("Image")) {
                         // We have an image
@@ -2232,9 +2373,29 @@ public class CSSTheme {
                 */
             }
             Image resimg = res.getImage(imageIdStr);
+            Integer defaultSourceDpi = null;
+            if (constants.containsKey("defaultSourceDPIInt")) {
+                Object v = constants.get("defaultSourceDPIInt");
+                if (v instanceof String) {
+                    defaultSourceDpi = Integer.parseInt((String)v);
+
+                } else if (v instanceof Number) {
+                    defaultSourceDpi = ((Number) v).intValue();
+                } else if (v instanceof ScaledUnit) {
+                    ScaledUnit su = (ScaledUnit)v;
+                    defaultSourceDpi = su.getIntegerValue();
+
+                } else {
+                    throw new IllegalArgumentException("defaultSourceDPIInt constant should be a String or a number but found "+v.getClass());
+                }
+            }
             if (resimg != null) {
                 ImageMetadata md = imagesMetadata.get(imageIdStr);
                 int srcDpi = (int)currentDpi;
+                if (defaultSourceDpi != null) {
+                    srcDpi = defaultSourceDpi;
+                }
+
                 if (styles.containsKey("cn1-source-dpi")) {
                 
                     srcDpi  = (int)((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
@@ -2293,12 +2454,19 @@ public class CSSTheme {
             
             
             if (styles.containsKey("cn1-source-dpi")) {
-                double densityVal = ((ScaledUnit)styles.get("cn1-source-dpi")).getNumericValue();
-                sourceDpi = (int)Math.round(densityVal);
+                double densityVal = ((ScaledUnit) styles.get("cn1-source-dpi")).getNumericValue();
+                sourceDpi = (int) Math.round(densityVal);
                 if (Math.abs(densityVal) < 0.5) {
                     resm.targetDensity = 0;
                 } else {
                     resm.targetDensity = getDensityForDpi(densityVal);
+                }
+            } else if (defaultSourceDpi != null) {
+                sourceDpi = defaultSourceDpi;
+                if (Math.abs(sourceDpi) < 0.5) {
+                    resm.targetDensity = 0;
+                } else {
+                    resm.targetDensity = getDensityForDpi(sourceDpi);
                 }
             } else if (dpis[0] > 0) {
                 resm.targetDensity = getImageDensity(encImg);
@@ -2314,6 +2482,8 @@ public class CSSTheme {
                     resm.setMultiImage(false);
                     
                 }
+            } else if (sourceDpi == 0) {
+                resm.setMultiImage(false);
             }
             
             
@@ -2345,7 +2515,12 @@ public class CSSTheme {
             if (res == null) {
                 res = new EditableResourcesForCSS(resourceFile);
             }
-            res.openFile(new FileInputStream(resourceFile));
+            try {
+                res.openFile(new FileInputStream(resourceFile));
+            } catch (IOException ex) {
+                System.err.println("Failed to load resource file from "+resourceFile);
+                throw ex;
+            }
             imagesMetadata.load(res);
         }
     }
@@ -2366,196 +2541,199 @@ public class CSSTheme {
         
         List<Runnable> onComplete = new ArrayList<Runnable>();
         for (String id : elements.keySet()) {
-            if (!isModified(id)) {
-                continue;
-            }
-            Element e = (Element)elements.get(id);
-            
-            Element unselected = e.getUnselected();
-            Map<String,LexicalUnit> unselectedStyles = (Map<String,LexicalUnit>)unselected.getFlattenedStyle();
-            Border b = unselected.createBorder(unselectedStyles);
-            Border unselectedBorder = b;
-            currentId = id;
-            if (e.requiresImageBorder(unselectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id, (img) -> {
-                        
-                        Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
-                        resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        resm.put(id+".border", border);
-                        unselectedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".border", borders.get(borders.indexOf(unselectedBorder)).border);
-                    });
-                    
+            try {
+                if (!isModified(id)) {
+                    continue;
                 }
-            } else if (e.requiresBackgroundImageGeneration(unselectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id, (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        unselectedBorder.image = im;
-                        resm.put(id+".bgImage", im);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".bgImage", unselectedBorder.image);
-                    });
-                }
-            }
-            
-            Element selected = e.getSelected();
-            Map<String,LexicalUnit> selectedStyles = (Map<String,LexicalUnit>)selected.getFlattenedStyle();
-            b = selected.createBorder(selectedStyles);
-            Border selectedBorder = b;
-            if (e.requiresImageBorder(selectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".sel", (img) -> {
-                        Insets insets = selected.getImageBorderInsets(selectedStyles, img.getWidth(), img.getHeight());
-                        resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        resm.put(id+".sel#border", border);
-                        selectedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".sel#border", borders.get(borders.indexOf(selectedBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(selectedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".sel", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
+                Element e = (Element) elements.get(id);
 
-                        resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        selectedBorder.image = im;
-                        resm.put(id+".sel#bgImage", im);
-                        //resm.put(id+".press#bgType", Style.B)
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".sel#bgImage", selectedBorder.image);
-                    });
+                Element unselected = e.getUnselected();
+                Map<String, LexicalUnit> unselectedStyles = (Map<String, LexicalUnit>) unselected.getFlattenedStyle();
+                Border b = unselected.createBorder(unselectedStyles);
+                Border unselectedBorder = b;
+                currentId = id;
+                if (e.requiresImageBorder(unselectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id, (img) -> {
+
+                            Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
+                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+                            resm.put(id + ".border", border);
+                            unselectedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".border", borders.get(borders.indexOf(unselectedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(unselectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id, (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            unselectedBorder.image = im;
+                            resm.put(id + ".bgImage", im);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".bgImage", unselectedBorder.image);
+                        });
+                    }
                 }
+
+                Element selected = e.getSelected();
+                Map<String, LexicalUnit> selectedStyles = (Map<String, LexicalUnit>) selected.getFlattenedStyle();
+                b = selected.createBorder(selectedStyles);
+                Border selectedBorder = b;
+                if (e.requiresImageBorder(selectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".sel", (img) -> {
+                            Insets insets = selected.getImageBorderInsets(selectedStyles, img.getWidth(), img.getHeight());
+                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+                            resm.put(id + ".sel#border", border);
+                            selectedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".sel#border", borders.get(borders.indexOf(selectedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(selectedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".sel", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+
+                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            selectedBorder.image = im;
+                            resm.put(id + ".sel#bgImage", im);
+                            //resm.put(id+".press#bgType", Style.B)
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".sel#bgImage", selectedBorder.image);
+                        });
+                    }
+                }
+
+                Element pressed = e.getPressed();
+                Map<String, LexicalUnit> pressedStyles = (Map<String, LexicalUnit>) pressed.getFlattenedStyle();
+
+                b = pressed.createBorder(pressedStyles);
+                Border pressedBorder = b;
+                if (e.requiresImageBorder(pressedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".press", (img) -> {
+                            Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
+
+                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+
+                            resm.put(id + ".press#border", border);
+                            pressedBorder.border = border;
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".press#border", borders.get(borders.indexOf(pressedBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(pressedStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".press", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            pressedBorder.imageId = prefix;
+                            resm.put(id + ".press#bgImage", im/*res.findId(im, true)*/);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".press#bgImage", res.findId(pressedBorder.imageId, true));
+                        });
+                    }
+                }
+
+                Element disabled = e.getDisabled();
+                Map<String, LexicalUnit> disabledStyles = (Map<String, LexicalUnit>) disabled.getFlattenedStyle();
+
+                b = disabled.createBorder(disabledStyles);
+                Border disabledBorder = b;
+                if (e.requiresImageBorder(disabledStyles)) {
+                    if (!borders.contains(b)) {
+
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".dis", (img) -> {
+                            Insets disabledInsets = disabled.getImageBorderInsets(disabledStyles, img.getWidth(), img.getHeight());
+
+                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
+                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) disabledInsets.top, (int) disabledInsets.right, (int) disabledInsets.bottom, (int) disabledInsets.left);
+                            disabledBorder.border = border;
+                            resm.put(id + ".dis#border", border);
+                            resm.targetDensity = targetDensity;
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".dis#border", borders.get(borders.indexOf(disabledBorder)).border);
+                        });
+
+                    }
+                } else if (e.requiresBackgroundImageGeneration(disabledStyles)) {
+                    if (!borders.contains(b)) {
+                        borders.add(b);
+                        resm.addImageProcessor(id + ".dis", (img) -> {
+                            int i = 1;
+                            while (res.containsResource(id + "_" + i + ".png")) {
+                                i++;
+                            }
+                            String prefix = id + "_" + i + ".png";
+                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
+                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
+                            disabledBorder.image = im;
+                            resm.put(id + ".dis#bgImage", im);
+                            resm.targetDensity = targetDensity;
+                            //resm.put(id+".press#bgType", Style.B)
+                        });
+                    } else {
+                        onComplete.add(() -> {
+                            resm.put(id + ".dis#bgImage", disabledBorder.image);
+                        });
+                    }
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException("An exception occurred while processing the image border for element "+id, ex);
             }
-            
-            Element pressed = e.getPressed();
-            Map<String,LexicalUnit> pressedStyles = (Map<String,LexicalUnit>)pressed.getFlattenedStyle();
-            
-            b = pressed.createBorder(pressedStyles);
-            Border pressedBorder = b;
-            if (e.requiresImageBorder(pressedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".press", (img) -> {
-                        Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
-                        
-                        resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)insets.top, (int)insets.right, (int)insets.bottom, (int)insets.left);
-                        
-                        resm.put(id+".press#border", border);
-                        pressedBorder.border = border;
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".press#border", borders.get(borders.indexOf(pressedBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(pressedStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".press", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        pressedBorder.imageId = prefix;
-                        resm.put(id+".press#bgImage", im/*res.findId(im, true)*/);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".press#bgImage", res.findId(pressedBorder.imageId, true));
-                    });
-                }
-            }
-            
-            Element disabled = e.getDisabled();
-            Map<String,LexicalUnit> disabledStyles = (Map<String,LexicalUnit>)disabled.getFlattenedStyle();
-            
-            b = disabled.createBorder(disabledStyles);
-            Border disabledBorder = b;
-            if (e.requiresImageBorder(disabledStyles)) {
-                if (!borders.contains(b)) {
-                    
-                    borders.add(b);
-                    resm.addImageProcessor(id+".dis", (img) -> {
-                        Insets disabledInsets = disabled.getImageBorderInsets(disabledStyles, img.getWidth(), img.getHeight());
-            
-                        resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                        com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int)disabledInsets.top, (int)disabledInsets.right, (int)disabledInsets.bottom, (int)disabledInsets.left);
-                        disabledBorder.border = border;
-                        resm.put(id+".dis#border", border);
-                        resm.targetDensity = targetDensity;
-                    });
-                } else {
-                    onComplete.add(()-> {
-                        resm.put(id+".dis#border", borders.get(borders.indexOf(disabledBorder)).border);
-                    });
-                    
-                }
-            } else if (e.requiresBackgroundImageGeneration(disabledStyles)) {
-                if (!borders.contains(b)) {
-                    borders.add(b);
-                    resm.addImageProcessor(id+".dis", (img) -> {
-                        int i = 1;
-                        while(res.containsResource(id + "_" + i + ".png")) {
-                            i++;
-                        }
-                        String prefix = id + "_" + i + ".png";
-                        resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                        Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                        disabledBorder.image = im;
-                        resm.put(id+".dis#bgImage", im);
-                        resm.targetDensity = targetDensity;
-                        //resm.put(id+".press#bgType", Style.B)
-                    });
-                } else {
-                    onComplete.add(()->{
-                        resm.put(id+".dis#bgImage", disabledBorder.image);
-                    });
-                }
-            }
-            
         }
         
         if (requiresCaptureHtml()) {
@@ -2989,50 +3167,56 @@ public class CSSTheme {
         }
         
         String generateStyleCSS() {
-            StringBuilder sb = new StringBuilder();
             Map styles = new LinkedHashMap();
             styles.putAll(getFlattenedStyle());
-            
-            if (this.requiresImageBorder(styles)) {
-                if (styles.get("min-height") != null) {
-                    styles.put("height", styles.get("min-height"));
+            try {
+                StringBuilder sb = new StringBuilder();
+
+
+                if (this.requiresImageBorder(styles)) {
+                    if (styles.get("min-height") != null) {
+                        styles.put("height", styles.get("min-height"));
+                    }
+                    if (styles.get("min-width") != null) {
+                        styles.put("width", styles.get("min-width"));
+                    }
                 }
-                if (styles.get("min-width") != null) {
-                    styles.put("width", styles.get("min-width"));
+
+                if (styles.get("height") == null) {
+                    styles.put("height", new ScaledUnit(new PixelUnit(100), 320, 640, 960));
                 }
-            }
-            
-            if (styles.get("height") == null) {
-                styles.put("height", new ScaledUnit(new PixelUnit(100), 320, 640, 960));
-            }
-            //styles.put("margin", new ScaledUnit(new PixelUnit(1), 144, 640, 960));
-            
-            for (Object key : styles.keySet()) {
-                String property = (String)key;
-                LexicalUnit value = (LexicalUnit)styles.get(key);
-                String prop = renderCSSProperty(property, styles);
-                if (!prop.isEmpty()) {
-                    sb.append(prop).append(";");
+                //styles.put("margin", new ScaledUnit(new PixelUnit(1), 144, 640, 960));
+
+                for (Object key : styles.keySet()) {
+                    String property = (String) key;
+                    LexicalUnit value = (LexicalUnit) styles.get(key);
+                    String prop = renderCSSProperty(property, styles);
+                    if (!prop.isEmpty()) {
+                        sb.append(prop).append(";");
+                    }
+
                 }
-                
+
+                Insets shadowInset = getBoxShadowPadding(styles);
+                if (shadowInset.top > 0) {
+                    sb.append("margin-top: ").append(shadowInset.top).append("px !important;");
+                }
+                if (shadowInset.left > 0) {
+                    sb.append("margin-left: ").append(shadowInset.left).append("px !important;");
+                }
+                if (shadowInset.right > 0) {
+                    sb.append("margin-right: ").append(shadowInset.right).append("px !important;");
+                }
+                if (shadowInset.bottom > 0) {
+                    sb.append("margin-bottom: ").append(shadowInset.bottom).append("px !important;");
+                }
+
+                //sb.append("border-top-right-radius: 10px / 20px;");
+                return sb.toString();
+            } catch (Exception ex) {
+                System.err.println("Failed to generate style CSS for style: " + styles + ".  Message was "+ex.getMessage());
+                throw ex;
             }
-            
-            Insets shadowInset = getBoxShadowPadding(styles);
-            if (shadowInset.top > 0) {
-                sb.append("margin-top: ").append(shadowInset.top).append("px !important;");
-            }
-            if (shadowInset.left > 0) {
-                sb.append("margin-left: ").append(shadowInset.left).append("px !important;");
-            }
-            if (shadowInset.right > 0) {
-                sb.append("margin-right: ").append(shadowInset.right).append("px !important;");
-            }
-            if (shadowInset.bottom > 0) {
-                sb.append("margin-bottom: ").append(shadowInset.bottom).append("px !important;");
-            }
-            
-            //sb.append("border-top-right-radius: 10px / 20px;");
-            return sb.toString();
         }
         
         void setParent(String name) {
@@ -3054,7 +3238,7 @@ public class CSSTheme {
         public String getEmptyHtmlWithId(String id, Map<String,LexicalUnit> style) {
             StringBuilder sb = new StringBuilder();
             String generateImage = (this.requiresBackgroundImageGeneration(style) || this.requiresImageBorder(style)) ? "true" : "false";
-            
+
             sb.append("<div id=\""+id+"\" class=\"element\" style=\"").append(generateStyleCSS())
                     .append("\" data-box-shadow-padding=\"").append(generateBoxShadowPaddingString()).append("\"")
                     .append(" data-generate-image=\"").append(generateImage).append("\"")
@@ -3678,7 +3862,7 @@ public class CSSTheme {
         
         public String getThemeFgColor(Map<String,LexicalUnit> style) {
             LexicalUnit color = style.get("color");
-            return getColorString(color);
+            return getColorString(color, false);
         }
         
         public String getThemeBgColor(Map<String,LexicalUnit> style) {
@@ -4054,6 +4238,37 @@ public class CSSTheme {
             Insets i = getInsets("margin", style);
             return i.top + ","+i.bottom+","+i.left+","+i.right;
         }
+
+        public int getThemeElevation(Map<String, LexicalUnit> style) {
+            if (style.containsKey("elevation")) {
+                return ((ScaledUnit)style.get("elevation")).getIntegerValue();
+            }
+            return 0;
+        }
+
+        public float getThemeIconGap(Map<String, LexicalUnit> style) {
+            if (style.containsKey("icon-gap")) {
+                return ((ScaledUnit)style.get("icon-gap")).getFloatValue();
+            }
+            return -1;
+        }
+
+        public byte getThemeIconGapUnit(Map<String, LexicalUnit> style) {
+            if (style.containsKey("icon-gap")) {
+                FloatValue value = getFloatValue(style.get("icon-gap"));
+                return value.unit;
+            }
+            return -1;
+        }
+
+        public boolean getThemeSurface(Map<String, LexicalUnit> style) {
+            if (style.containsKey("surface")) {
+                ScaledUnit su = (ScaledUnit)style.get("surface");
+                if ("true".equalsIgnoreCase(su.getStringValue())) return true;
+                if (su.getIntegerValue() != 0) return true;
+            }
+            return false;
+        }
         
         public byte[] getThemeMarginUnit(Map<String,LexicalUnit> style) {
             if (!style.containsKey("margin-left") && !style.containsKey("margin-top") && !style.containsKey("margin-bottom") && !style.containsKey("margin-right")) {
@@ -4104,6 +4319,11 @@ public class CSSTheme {
         private static final int TTF_SIZE_TYPE_MEDIUM=1;
         private static final int TTF_SIZE_TYPE_LARGE=2;
         private static final int TTF_SIZE_TYPE_MM=3;
+        private static final int TTF_SIZE_TYPE_REM=5;
+        private static final int TTF_SIZE_TYPE_VW=6;
+        private static final int TTF_SIZE_TYPE_VH=7;
+        private static final int TTF_SIZE_TYPE_VMIN=8;
+        private static final int TTF_SIZE_TYPE_VMAX=9;
         
         public com.codename1.ui.Font getThemeFont(Map<String,LexicalUnit> styles) {
             LexicalUnit fontFamily = styles.get("font-family");
@@ -4129,7 +4349,6 @@ public class CSSTheme {
             int iFontSizeType = Font.SIZE_MEDIUM;
             
             EditorTTFFont ttfFont = null;
-            
             
             loop : while (fontSize != null) {
                 outer: switch (fontSize.getLexicalUnitType()) {
@@ -4195,6 +4414,37 @@ public class CSSTheme {
                             ttfSize = 4f * (float)fontSize.getNumericValue() / 100f;
                         }
                         break;
+                    default:
+                        String unitText = null;
+                        try {
+                            unitText = fontSize.getDimensionUnitText();
+
+                        } catch (Exception ex) {
+                            System.err.println("Warning: No dimension unit supplied for fontSize "+fontSize);
+                            ex.printStackTrace();
+                        }
+                        if (unitText != null) {
+                            if ("rem".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_REM;
+                                ttfSize = (float) fontSize.getNumericValue();
+                            } else if ("vw".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VW;
+                                ttfSize = (float) fontSize.getNumericValue();
+
+                            } else if ("vh".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VH;
+                                ttfSize = (float) fontSize.getNumericValue();
+
+                            } else if ("vmin".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VMIN;
+                                ttfSize = (float) fontSize.getNumericValue();
+
+                            } else if ("vmax".equals(unitText)) {
+                                ttfSizeType = TTF_SIZE_TYPE_VMAX;
+                                ttfSize = (float) fontSize.getNumericValue();
+
+                            }
+                        }
                         
                         
                 }
@@ -4252,69 +4502,16 @@ public class CSSTheme {
                             iFontFace = Font.FACE_MONOSPACE;
                             break loop;
                         default : {
-                            /*
-                            int ttfFontSize = 1; // medium
-                            float actualSize = 14f;
-                            switch (iFontSizeType) {
-                                case Font.SIZE_SMALL:
-                                    ttfFontSize = 0;
-                                    actualSize = 11f;
-                                    break;
-                                case Font.SIZE_LARGE:
-                                    ttfFontSize = 2;
-                                    actualSize = 20f;
-                                    break;
-                            }
-                            // Check for a more specific font size
-                            if (fontSize != null) {
-                                switch (fontSize.getLexicalUnitType()) {
-                                    case LexicalUnit.SAC_MILLIMETER:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue();
-                                        break;
-                                    case LexicalUnit.SAC_PIXEL:
-                                    case LexicalUnit.SAC_POINT:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue();
-                                        break;
-
-                                    case LexicalUnit.SAC_CENTIMETER:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue()*10f;
-                                        break;
-                                    case LexicalUnit.SAC_INCH:
-                                        ttfFontSize = 3;
-                                        actualSize = fontSize.getFloatValue()*25f;
-                                        break;
-                                    case LexicalUnit.SAC_EM:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue()* 14f;
-                                        break;
-                                    case LexicalUnit.SAC_PERCENTAGE:
-                                        ttfFontSize = 4;
-                                        actualSize = fontSize.getFloatValue() /100f * 14f;
-                                        break;
-
-                                }
-                            }*/
+                            
                             FontFace face = findFontFace(fontFamily.getStringValue());
                             if (face != null) {
                                 ttfFontFile = face.getFontFile();
-                                /*
-                                if (fontFile != null) {
-                                    Font sys = Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-                                    
-                                    ttfFont = new EditorTTFFont(fontFile, ttfFontSize, actualSize, sys);
-                                    break loop;
-                                }
-                                */
+                                
                             } else {
                                 
                                 if(fontFamily.getStringValue().startsWith("native:")) {
                                     ttfFontName = fontFamily.getStringValue();
-                                    //Font sys = Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-                                    //ttfFont = new EditorTTFFont(fontFamily.getStringValue(), ttfFontSize, actualSize, sys);
-                                    //break loop;
+                                    
                                 }
                             }
                         }   
@@ -4332,12 +4529,7 @@ public class CSSTheme {
                     return new EditorTTFFont(ttfFontName, ttfSizeType, ttfSize, Font.createSystemFont(sysFace, sysStyle, sysSize));
                 }
             }
-            /*
-            if (ttfFont != null) {
-                return ttfFont;
-            } else {
-                return Font.createSystemFont(iFontFace,iFontStyle, iFontSizeType);
-            }*/
+            
             
         }
         
@@ -4387,7 +4579,33 @@ public class CSSTheme {
             }
             return null;
         }
-        
+
+        public Integer getThemeFgAlpha(Map<String,LexicalUnit> styles) {
+            LexicalUnit fgColor = styles.get("color");
+            if (fgColor == null) {
+                return null;
+            }
+            while (fgColor != null) {
+                if ("transparent".equals(fgColor.getStringValue())) {
+                    return 0;
+                }
+                if ("rgb".equals(fgColor.getFunctionName()) || "cn1rgb".equals(fgColor.getFunctionName())) {
+                    return null;
+                } if ("rgba".equals(fgColor.getFunctionName()) || "cn1rgba".equals(fgColor.getFunctionName())) {
+                    ScaledUnit r = (ScaledUnit)fgColor.getParameters();
+                    ScaledUnit g = r.getNextNumericUnit();
+                    ScaledUnit b = g.getNextNumericUnit();
+                    ScaledUnit a = b.getNextNumericUnit();
+
+                    return (int)(a.getNumericValue()*255.0);
+                } else {
+                    return null;
+                }
+                //bgColor = bgColor.getNextLexicalUnit();
+            }
+            return null;
+        }
+
         public String getThemeTransparency(Map<String,LexicalUnit> styles) {
             
             ScaledUnit background = (ScaledUnit)styles.get("background");
@@ -4413,7 +4631,9 @@ public class CSSTheme {
             if ("transparent".equals(bgColor.getStringValue())) {
                 return "0";
             }
-            if ("rgba".equals(bgColor.getFunctionName())) {
+            if ("rgb".equals(bgColor.getFunctionName()) || "cn1rgb".equals(bgColor.getFunctionName())) {
+                return "255";
+            } if ("rgba".equals(bgColor.getFunctionName()) || "cn1rgba".equals(bgColor.getFunctionName())) {
                 ScaledUnit r = (ScaledUnit)bgColor.getParameters();
                 ScaledUnit g = r.getNextNumericUnit();
                 ScaledUnit b = g.getNextNumericUnit();
@@ -5205,6 +5425,21 @@ public class CSSTheme {
                 
             case "opacity" : {
                 style.put("opacity", value);
+                break;
+            }
+
+            case "elevation" : {
+                style.put("elevation", value);
+                break;
+            }
+
+            case "icon-gap" : {
+                style.put("icon-gap", value);
+                break;
+            }
+
+            case "surface" : {
+                style.put("surface", value);
                 break;
             }
                 
@@ -6092,7 +6327,7 @@ public class CSSTheme {
                             colorSet = true;
                             break;
                         case LexicalUnit.SAC_FUNCTION:
-                            if ("rgba".equals(value.getFunctionName())) {
+                            if ("rgba".equals(value.getFunctionName()) || "cn1rgba".equals(value.getFunctionName()) || "cn1rgb".equals(value.getFunctionName())) {
                                 apply(style, "cn1-box-shadow-color", value);
                             } else {
                                 throw new RuntimeException("Unrecognized function when parsing box-shadow "+value.getFunctionName());
@@ -6276,40 +6511,7 @@ public class CSSTheme {
         byte unit;
     }
     
-    private IntValue getIntValue(LexicalUnit value) {
-        
-        IntValue out = new IntValue();
-        
-        if (value == null) {
-            return out;
-        }
-        
-        int pixelValue = 0;
-        byte unit = 0;
-        switch (value.getLexicalUnitType()) {
-            case LexicalUnit.SAC_PIXEL :
-            case LexicalUnit.SAC_POINT :
-            case LexicalUnit.SAC_INTEGER:
-                unit = (byte)0;
-                pixelValue = Math.round(value.getFloatValue());
-                break;
-            case LexicalUnit.SAC_MILLIMETER :
-                unit = (byte)2;
-                pixelValue = Math.round(value.getFloatValue());
-                break;
-            case LexicalUnit.SAC_CENTIMETER :
-                unit = (byte) 2;
-                pixelValue = Math.round(value.getFloatValue() * 10);
-                break;
-            default :
-                throw new RuntimeException("Unsupported unit for inset "+value.getDimensionUnitText());
-        }
-        
-        out.value = pixelValue;
-        out.unit = unit;
-        return out;
-            
-    }
+
     private FloatValue getFloatValue(LexicalUnit value) {
         
         FloatValue out = new FloatValue();
@@ -6336,7 +6538,35 @@ public class CSSTheme {
                 fvalue = value.getFloatValue() * 10;
                 break;
             default :
-                throw new RuntimeException("Unsupported unit for inset "+value.getDimensionUnitText());
+                String unitText = null;
+                try {
+                    unitText = value.getDimensionUnitText();
+
+                } catch (Exception ex) {
+
+                    ex.printStackTrace();
+                    throw new RuntimeException("No unit provided for "+value+" when parsing inset.", ex);
+                }
+
+                if ("rem".equals(unitText)) {
+                    unit = (byte) Style.UNIT_TYPE_REM;
+                    fvalue = value.getFloatValue();
+                } else if ("vw".equals(unitText)) {
+                    unit = Style.UNIT_TYPE_VW;
+                    fvalue = value.getFloatValue();
+                } else if ("vh".equals(unitText)) {
+                    unit = Style.UNIT_TYPE_VH;
+                    fvalue = value.getFloatValue();
+                } else if ("vmin".equals(unitText)) {
+                    unit = Style.UNIT_TYPE_VMIN;
+                    fvalue = value.getFloatValue();
+                } else if ("vmax".equals(unitText)) {
+                    unit = Style.UNIT_TYPE_VMAX;
+                    fvalue = value.getFloatValue();
+                } else {
+                    throw new RuntimeException("Unsupported unit for inset " + unitText);
+                }
+
         }
         
         out.value = fvalue;
@@ -6366,75 +6596,8 @@ public class CSSTheme {
             
     }
     
-    private Insets getInsets(LexicalUnit value) {
-        Insets i = new Insets();
-        int index = Insets.TOP;
-        while (value != null) {
-            int pixelValue = 0;
-            byte unit = 0;
-            switch (value.getLexicalUnitType()) {
-                case LexicalUnit.SAC_PIXEL :
-                case LexicalUnit.SAC_POINT :
-                    unit = (byte)0;
-                    pixelValue = Math.round(value.getFloatValue());
-                    break;
-                case LexicalUnit.SAC_MILLIMETER :
-                    unit = (byte)2;
-                    pixelValue = Math.round(value.getFloatValue());
-                    break;
-                case LexicalUnit.SAC_CENTIMETER :
-                    unit = (byte) 2;
-                    pixelValue = Math.round(value.getFloatValue() * 10);
-                    break;
-                default :
-                    throw new RuntimeException("Unsupported unit for inset "+value.getDimensionUnitText());
-            }
-            
-            switch (index) {
-                case Insets.TOP :
-                    i.set(Insets.TOP, pixelValue, unit);
-                    i.set(Insets.RIGHT, pixelValue, unit);
-                    i.set(Insets.BOTTOM, pixelValue, unit);
-                    i.set(Insets.LEFT, pixelValue, unit);
-                    break;
-                    
-                case Insets.RIGHT :
-                    i.set(Insets.LEFT, pixelValue, unit);
-                    i.set(Insets.RIGHT, pixelValue, unit);
-                    break;
-                case Insets.BOTTOM :
-                    i.set(Insets.BOTTOM, pixelValue, unit);
-                    break;
-                case Insets.LEFT :
-                    i.set(Insets.LEFT, pixelValue, unit);
-                    
-            }
-            
-            index++;
-            value = value.getNextLexicalUnit();
-        }
-        return i;
-    }
-    
-    /*
-    Border getBorder(LexicalUnit lu) {
-        int width = 1;
-        
-        while (lu != null) {
-            switch (lu.getLexicalUnitType()) {
-                case LexicalUnit.SAC_PIXEL :
-                    
-            }
-        }
-    }
-    */
-    
-    Color getColor(LexicalUnit color) {
-        String str =getColorString(color);
-        return Color.web("#"+str);
-        
-    }
-    
+
+
     static int getColorInt(LexicalUnit color) {
         String str = getColorString(color);
         return Integer.valueOf(str, 16);
@@ -6448,7 +6611,10 @@ public class CSSTheme {
             if ("transparent".equals(bgColor.getStringValue())) {
                 return 0;
             }
-            if ("rgba".equals(bgColor.getFunctionName())) {
+            if ("rgb".equals(bgColor.getFunctionName()) || "cn1rgb".equals(bgColor.getFunctionName())) {
+                return 255;
+            }
+            if ("rgba".equals(bgColor.getFunctionName()) || "cn1rgba".equals(bgColor.getFunctionName())) {
                 ScaledUnit r = (ScaledUnit)bgColor.getParameters();
                 ScaledUnit g = r.getNextNumericUnit();
                 ScaledUnit b = g.getNextNumericUnit();
@@ -6474,8 +6640,105 @@ public class CSSTheme {
     static String getARGBHexString(LexicalUnit color) {
         return "#" + leftPad(Integer.toHexString(getColorInt(color)), 6) + leftPad(Integer.toHexString(getColorAlphaInt(color)), 2);
     }
-    
+
     static String getColorString(LexicalUnit color) {
+        return getColorString(color, false);
+    }
+    static String getColorString(LexicalUnit color, boolean premultiplied) {
+        if (color == null) return null;
+        switch (color.getLexicalUnitType()) {
+            case LexicalUnit.SAC_IDENT:
+            case LexicalUnit.SAC_STRING_VALUE:
+                String colorStr = color.getStringValue();
+                if ("none".equals(colorStr)) {
+                    return null;
+                }
+                if (colorStr.startsWith("attr(")) {
+                    colorStr = colorStr.substring(colorStr.indexOf("(")+1, colorStr.lastIndexOf(")"));
+                }
+                if (colorStr.startsWith("color")) {
+                    colorStr = colorStr.replace("color", "rgb");
+                }
+                Color c = Color.web(colorStr);
+                return String.format( "%02X%02X%02X",
+                        (int)( c.getRed() * 255 ),
+                        (int)( c.getGreen() * 255 ),
+                        (int)( c.getBlue() * 255 ) );
+
+            case LexicalUnit.SAC_RGBCOLOR: {
+                ScaledUnit red = (ScaledUnit)color.getParameters();
+                ScaledUnit green = (ScaledUnit)red.getNextLexicalUnit();
+                if (green.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA)
+                    green = (ScaledUnit)green.getNextLexicalUnit();
+                ScaledUnit blue = (ScaledUnit)green.getNextLexicalUnit();
+                if (blue.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    blue = (ScaledUnit)blue.getNextLexicalUnit();
+                }
+                return String.format( "%02X%02X%02X",
+                        red.getIntegerValue(),
+                        green.getIntegerValue(),
+                        blue.getIntegerValue());
+
+            }
+            case LexicalUnit.SAC_FUNCTION: {
+                if ("cn1rgb".equals(color.getFunctionName()) || "rgb".equals(color.getFunctionName()) || "cn1rgba".equals(color.getFunctionName()) || "rgba".equals(color.getFunctionName())) {
+                    // If the value didn't have alpha, then we don't premultiply
+                    if ("cn1rgb".equals(color.getFunctionName()) || "rgb".equals(color.getFunctionName())) premultiplied = false;
+                    ScaledUnit red = (ScaledUnit)color.getParameters();
+                    ScaledUnit green = (ScaledUnit)red.getNextLexicalUnit();
+                    if (green == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for green parameter: "+color);
+                    }
+                    if (green.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                        green = (ScaledUnit) green.getNextLexicalUnit();
+                    }
+                    if (green == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for green parameter: "+color);
+                    }
+                    ScaledUnit blue = (ScaledUnit)green.getNextLexicalUnit();
+                    if (blue == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for blue parameter: "+color);
+                    }
+                    if (blue.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                        blue = (ScaledUnit)blue.getNextLexicalUnit();
+                    }
+                    if (blue == null) {
+                        throw new RuntimeException("Failed to parse color "+color+".  Received null value for blue parameter: "+color);
+                    }
+
+
+                    ScaledUnit alpha = null;
+                    if (premultiplied) {
+
+
+                        alpha = (ScaledUnit) blue.getNextLexicalUnit();
+                        if (alpha == null) {
+                            throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
+                        }
+                        if (alpha.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                            alpha = (ScaledUnit) alpha.getNextLexicalUnit();
+                        }
+                        if (alpha == null) {
+                            throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
+                        }
+                    }
+                    int r = (int)(red.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int g = (int)(green.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int b = (int)(blue.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+
+
+                    return String.format( "%02X%02X%02X",
+                            r,
+                            g,
+                            b);
+                }
+            }
+            default:
+                throw new RuntimeException("Unsupported color type "+color.getLexicalUnitType());
+        }
+    }
+
+    static String getColorString_old(LexicalUnit color) {
         
         if (color == null) {
                 return null;
@@ -6506,7 +6769,7 @@ public class CSSTheme {
                     
                 }
                 case LexicalUnit.SAC_FUNCTION: {
-                    if ("rgba".equals(color.getFunctionName())) {
+                    if ("rgba".equals(color.getFunctionName()) || "cn1rgba".equals(color.getFunctionName()) || "cn1rgb".equals(color.getFunctionName())) {
                        
                         Color c = Color.web(color+"");
                         return String.format( "%02X%02X%02X",
@@ -6592,8 +6855,16 @@ public class CSSTheme {
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
             String stringContents = Util.readToString(stream);
-            
+
+            // The flute parser chokes on properties beginning with -- so we need to replace these with cn1 prefix
+            // for CSS variable support.
             stringContents = stringContents.replaceAll("([\\(\\W])(--[a-zA-Z0-9\\-]+)", "$1cn1$2");
+
+            // Flute chokes on embedded var() functions inside an rgb or rgba function.  Hoping to support it by changing the
+            // function name to cn1rgb() and cn1rgba() respectively.
+            stringContents = stringContents.replaceAll("\\brgb\\(", "cn1rgb(");
+            stringContents = stringContents.replaceAll("\\brgba\\(", "cn1rgba(");
+
             
             source.setCharacterStream(new CharArrayReader(stringContents.toCharArray()));
             source.setURI(uri.toString());
@@ -6722,51 +6993,96 @@ public class CSSTheme {
                         }
                     }
                 }
-                private void property_(String string, LexicalUnit lu, boolean bln) throws CSSException {
-                    if (string.startsWith("cn1--")) {
-                        
-                        variables.put(string, lu);
-                        return;
+
+                private ScaledUnit last(LexicalUnit lu) {
+
+                    while (lu.getNextLexicalUnit() != null) {
+                        lu = lu.getNextLexicalUnit();
                     }
+                    return (lu instanceof ScaledUnit) ? (ScaledUnit)lu : new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+                }
+
+                /**
+                 * Evaluates a LexicalUnit in the current parser position.  This will expand any variables.  It will
+                 * continue to evaluate the next lexical unit, until it reaches the end of the current lexical unit chain.
+                 * @param lu The lexical unit to evaluate.
+                 * @return
+                 * @throws CSSException
+                 */
+                private ScaledUnit evaluate(LexicalUnit lu) throws CSSException {
                     if (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "var".equals(lu.getFunctionName())) {
-                        
                         LexicalUnit parameters = lu.getParameters();
                         String varname = parameters.getStringValue();
-                        if (variables.containsKey(varname)) {
-                            property(string, variables.get(varname), bln);
-                            return;
+
+                        LexicalUnit varVal = variables.get(varname);
+                        ScaledUnit su;
+                        if (varVal == null && parameters.getNextLexicalUnit() != null) {
+                            varVal = parameters.getNextLexicalUnit();
+                            su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
+
+                        } else if (varVal == null) {
+                            su = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
                         } else {
-                            parameters = parameters.getNextLexicalUnit();
-                            if (parameters != null && parameters.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
-                                parameters = parameters.getNextLexicalUnit();
-                            }
-                            if (parameters != null) {
-                                property(string, parameters, bln);
-                                return;
-                            } else {
-                                System.err.println("Reference to variable "+string+" not found.  Skipping property");
-                                return;
-                            }
+                            su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
                         }
-                        
+                        // Evaluate the variable value in case it also includes other variables that need to be evaluated.
+                        //ScaledUnit su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
+                        LexicalUnit toAppend = lu.getNextLexicalUnit();
+                        ScaledUnit last = last(su);
+                        if (toAppend != null) {
+                            toAppend = evaluate(toAppend);
+                            last.setNextLexicalUnit(toAppend);
+                            ((ScaledUnit) toAppend).setPrevLexicalUnit(last);
+                        } else {
+                            last.setNextLexicalUnit(null);
+                        }
+                        return su;
+                    } else {
+
+                        ScaledUnit su = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+                        LexicalUnit nex = su.getNextLexicalUnit();
+                        if (su.getParameters() != null) {
+                            su.setParameters(evaluate(su.getParameters()));
+                        }
+                        if (nex != null) {
+
+
+                            ScaledUnit snex = evaluate(nex);
+                            su.setNextLexicalUnit(snex);
+                            snex.setPrevLexicalUnit(su);
+
+                        }
+                        return su;
+
                     }
-                    lu = new ScaledUnit(lu, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight());
+
+
+                }
+
+                private void property_(String string, LexicalUnit _lu, boolean bln) throws CSSException {
+                    if (string.startsWith("cn1--")) {
+                        
+                        variables.put(string, _lu);
+                        return;
+                    }
+
+                    ScaledUnit su = evaluate(_lu);
                     if (currFontFace != null) {
                         switch (string) {
                             case "font-family" :
-                                currFontFace.fontFamily = lu;
+                                currFontFace.fontFamily = su;
                                 break;
                             case "font-style" :
-                                currFontFace.fontStyle = lu;
+                                currFontFace.fontStyle = su;
                                 break;
                             case "font-stretch" :
-                                currFontFace.fontStretch = lu;
+                                currFontFace.fontStretch = su;
                                 break;
                             case "src" :
-                                currFontFace.src = lu;
+                                currFontFace.src = su;
                                 break;
                             case "font-weight" :
-                                currFontFace.fontWeight = lu;
+                                currFontFace.fontWeight = su;
                                 break;
                         }
                     } else {
@@ -6776,10 +7092,10 @@ public class CSSTheme {
                             Selector sel = currSelectors.item(i);
                             if (currMediaList != null) {
                                 for (String mediaPrefix : getMediaPrefixes(currMediaList)) {
-                                    theme.apply(mediaPrefix, sel, string, lu);
+                                    theme.apply(mediaPrefix, sel, string, su);
                                 }
                             } else {
-                                theme.apply(null, sel, string, lu);
+                                theme.apply(null, sel, string, su);
                             }
 
                         }

@@ -89,13 +89,23 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                 }
                 
                 File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
+                getLog().debug("Checking for extracted CSS bundle "+extracted);
+                if (extracted.exists() && artifact.isSnapshot() && getLastModified(artifact) > extracted.lastModified()) {
+                    try {
+                        FileUtils.deleteDirectory(extracted);
+                    } catch (IOException ex){
+                        getLog().error(ex);
+                    }
+                }
                 if (!extracted.exists()) {
+                    getLog().debug("CSS bundle "+zip+" not extracted yet.  Extracting to "+extracted);
                     // This is a cn1css artifact, which is a zip file.
                     // We extract it so that we can access the files directly.
                     Expand expand = (Expand)antProject.createTask("unzip");
                     expand.setSrc(zip);
                     expand.setDest(extracted);
                     expand.execute();
+
                 }
                 if (extracted.exists()) {
                     File extractedCssDir = new File(extracted, path("META-INF","codenameone", artifact.getGroupId(), artifact.getArtifactId(), "css"));
@@ -111,6 +121,8 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                         }
                     }
 
+                } else {
+                    getLog().debug("CSS bundle extraction must have failed for "+zip+" because after extraction it still doesn't exist at "+extracted);
                 }
             }
         });

@@ -249,46 +249,6 @@ public class Log {
     }
 
     /**
-     * Sends the current log to the cloud regardless of the reporting level
-     */
-    private static void sendLogLegacy() {
-        try {
-            // this can cause a crash
-            if(!Display.isInitialized()) {
-                return;
-            }
-            if(!instance.logDirty) {
-                return;
-            }
-            instance.logDirty = false;
-            long devId = getUniqueDeviceId();
-            if(devId < 0) {
-                Dialog.show("Send Log Error", "Device Not Registered: Sending a log from an unregistered device is impossible", "OK", null);
-                return;
-            }
-            ConnectionRequest r = new ConnectionRequest();
-            r.setPost(false);
-            r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "uploadLogRequest");
-            r.setFailSilently(true);
-            NetworkManager.getInstance().addToQueueAndWait(r);
-            String url = new String(r.getResponseData());
-            
-            MultipartRequest m = new MultipartRequest();
-            m.setUrl(url);
-            byte[] read = Util.readInputStream(Storage.getInstance().createInputStream("CN1Log__$"));
-            m.addArgument("i", "" + devId);
-            m.addArgument("by",Display.getInstance().getProperty("built_by_user", ""));
-            m.addArgument("p", Display.getInstance().getProperty("package_name", ""));
-            m.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
-            m.addData("log", read, "text/plain");
-            m.setFailSilently(true);
-            NetworkManager.getInstance().addToQueueAndWait(m);
-        } catch (Throwable ex) {
-            ex.printStackTrace();
-        }
-    }
-    
-    /**
      * Installs a log subclass that can replace the logging destination/behavior
      * 
      * @param newInstance the new instance for the Log object

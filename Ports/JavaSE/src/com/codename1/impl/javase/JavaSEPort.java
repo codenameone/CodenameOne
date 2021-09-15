@@ -58,6 +58,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
@@ -82,6 +83,7 @@ import java.io.EOFException;
 import java.io.FilenameFilter;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -197,6 +199,8 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
+import com.jhlabs.image.ShadowFilter;
 import org.sqlite.SQLiteConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
@@ -623,6 +627,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         return showEDTWarnings;
     }
 
+    @Override
+    public void setPlatformHint(String key, String value) {
+        if (key.equalsIgnoreCase("platformHint.showEDTWarnings")) {
+            setShowEDTWarnings("true".equalsIgnoreCase(value));
+        }
+        super.setPlatformHint(key, value);
+
+    }
+
     /**
      * @param aShowEDTWarnings the showEDTWarnings to set
      */
@@ -1033,13 +1046,59 @@ public class JavaSEPort extends CodenameOneImplementation {
                     clipboard.setContents(strSel, null);
                 }
             });
+        } else {
+            final String text = "cn1lightweightclipboard://"+obj.toString();
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    Toolkit toolkit = Toolkit.getDefaultToolkit();
+                    Clipboard clipboard = toolkit.getSystemClipboard();
+                    StringSelection strSel = new StringSelection(text.trim());
+                    clipboard.setContents(strSel, null);
+                }
+            });
         }
         super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
     }
 
-    
-    
-    public void setCurrentForm(Form f) {        
+    @Override
+    public Object getPasteDataFromClipboard() {
+        Toolkit toolkit = Toolkit.getDefaultToolkit();
+        Clipboard clipboard = toolkit.getSystemClipboard();
+
+        for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
+            try {
+
+                Object out = clipboard.getData(flavor);
+                String str = null;
+                if (out != null) {
+                    str = out.toString();
+                }
+                if (str != null && str.startsWith("cn1lightweightclipboard://")) {
+                    return super.getPasteDataFromClipboard();
+                }
+            } catch (Exception ex) {
+
+            }
+
+        }
+
+        for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
+            try {
+                Object out = clipboard.getData(flavor);
+                if (out != null) {
+                    String str = out.toString();
+                    if (str != null) return str;
+                }
+            } catch (Exception ex) {
+
+            }
+
+        }
+
+        return super.getPasteDataFromClipboard();
+    }
+
+    public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
@@ -1176,6 +1235,51 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         
+    }
+
+    public static void dumpComponentProperties(Component cmp) {
+        dumpComponentProperties(cmp, "");
+    }
+
+
+    private static String methodPropertyName_(String name) {
+        return name.startsWith("get") ? name.substring(3) : name.startsWith("is") ? name.substring(2) : name;
+    }
+
+    /**
+     * Prints an object's properties to the console using reflection.  This is used by the component inspector.
+     * Right click on a node in the component tree and select "Print to Console".
+     *
+     * @param cmp The component to print.
+     * @param indent Indent string printed at start of each line.
+     * @since 8.0
+     */
+    public static void dumpComponentProperties(Object cmp, String indent) {
+        Class cls = cmp.getClass();
+        Method[] methods = cls.getMethods();
+        Arrays.sort(methods, new Comparator<Method>() {
+
+            @Override
+            public int compare(Method o1, Method o2) {
+                return methodPropertyName_(o1.getName()).toLowerCase().compareTo(methodPropertyName_(o2.getName()).toLowerCase());
+            }
+        });
+        System.out.println(indent + cmp.getClass().getName() + "{");
+        for (int i=0; i<methods.length; i++) {
+            Method method = methods[i];
+            method.setAccessible(true);
+            String name = method.getName();
+            String propertyName = methodPropertyName_(name);
+            if ((name.startsWith("get") || name.startsWith("is") || name.equalsIgnoreCase("scrollableYFlag") || name.equalsIgnoreCase("scrollableXFlag")) && method.getParameterCount() == 0 && method.getReturnType() != Void.class) {
+                try {
+                    System.out.println(indent + "  " + propertyName + ": " + method.invoke(cmp, new Object[0]));
+                    if (propertyName.equalsIgnoreCase("style")) {
+                        dumpComponentProperties(method.invoke(cmp, new Object[0]), indent + "  ");
+                    }
+                } catch (Exception ex){}
+            }
+        }
+        System.out.println(indent + "}");
     }
     
     public int getCanvasX() {
@@ -2475,15 +2579,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
                 landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
                 safeAreaPortrait.setBounds(
-                        Integer.parseInt(props.getProperty("safePortaitX", "0")), 
-                        Integer.parseInt(props.getProperty("safePortraitY", "0")), 
-                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safePortraitX", "0")),
+                        Integer.parseInt(props.getProperty("safePortraitY", "0")),
+                        Integer.parseInt(props.getProperty("safePortraitWidth", ""+portraitScreenCoordinates.width)),
                         Integer.parseInt(props.getProperty("safePortraitHeight", ""+portraitScreenCoordinates.height))
                 );
                 safeAreaLandscape.setBounds(
-                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")), 
-                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")), 
-                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)), 
+                        Integer.parseInt(props.getProperty("safeLandscapeX", "0")),
+                        Integer.parseInt(props.getProperty("safeLandscapeY", "0")),
+                        Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)),
                         Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
                 );
                 roundedSkin = true;
@@ -2491,7 +2595,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
             }
-            
+
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -2573,7 +2677,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             String t = props.getProperty("nativeThemeAttribute", null);
                             if (t != null) {
                                 Properties cnop = new Properties();
-                                File cnopFile = new File("codenameone_settings.properties");
+                                File cnopFile = new File(getCWD(), "codenameone_settings.properties");
                                 if (cnopFile.exists()) {
                                     cnop.load(new FileInputStream(cnopFile));
                                     int themeConst = Integer.parseInt(cnop.getProperty("codename1.j2me.nativeThemeConst", "3"));
@@ -3167,6 +3271,62 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new CN1Console().open((java.awt.Component)e.getSource());
                 }
             });
+
+
+            List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+            //final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+            //final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+            ButtonGroup hotReloadGroup = new ButtonGroup();
+            JRadioButtonMenuItem disableHotReload = new JRadioButtonMenuItem("Disabled");
+            disableHotReload.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 0);
+                    System.setProperty("hotReload", "0");
+                }
+            });
+            JRadioButtonMenuItem reloadSimulator = new JRadioButtonMenuItem("Reload Simulator");
+            reloadSimulator.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 1);
+                    System.setProperty("hotReload", "1");
+                }
+            });
+            JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Requires CodeRAD)");
+
+            reloadCurrentForm.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    pref.putInt("hotReload", 2);
+                    System.setProperty("hotReload", "2");
+                }
+            });
+
+            switch (pref.getInt("hotReload", 0)) {
+                case 0:
+                    disableHotReload.setSelected(true);
+                    System.setProperty("hotReload", "0");
+                    break;
+                case 1:
+                    reloadSimulator.setSelected(true);
+                    System.setProperty("hotReload", "1");
+                    break;
+                case 2:
+                    reloadCurrentForm.setSelected(true);
+                    System.setProperty("hotReload", "2");
+                    break;
+
+            }
+
+            JMenu hotReloadMenu = new JMenu("Hot Reload");
+            hotReloadMenu.add(disableHotReload);
+            hotReloadMenu.add(reloadSimulator);
+            hotReloadMenu.add(reloadCurrentForm);
+            hotReloadGroup.add(disableHotReload);
+            hotReloadGroup.add(reloadSimulator);
+            hotReloadGroup.add(reloadCurrentForm);
+
+            if (System.getProperty("maven.home") != null) {
+                toolsMenu.add(hotReloadMenu);
+            }
             
             
             scriptingConsole.setToolTipText("Open interactive console");
@@ -3262,23 +3422,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             toolsMenu.add(debugWebViews);
             
-            JMenuItem locactionSim = new JMenuItem("Location Simulation");
-            locactionSim.addActionListener(new ActionListener() {
-
+            JMenuItem locationSim = new JMenuItem("Location Simulation");
+            locationSim.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    if(!fxExists){
-                        System.err.println("This simulation requires jdk 7");
-                        return;
-                    }
                     if(locSimulation==null) {
                             locSimulation = new LocationSimulation();
                     }
-                            locSimulation.setVisible(true);
-                    
+                    locSimulation.setVisible(true);
                 }
             });
-            simulateMenu.add(locactionSim);
+            simulateMenu.add(locationSim);
             
             JMenuItem pushSim = new JMenuItem("Push Simulation");
             pushSim.addActionListener(new ActionListener() {
@@ -3542,11 +3696,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             javadocs.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/javadoc/"));
-                    } catch (Exception ex) {
-                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/javadoc/");
                 }
             });
             helpMenu.add(javadocs);
@@ -3555,10 +3705,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             how.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/how-do-i.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/how-do-i.html");
                 }
             });
             helpMenu.add(how);
@@ -3567,10 +3714,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             forum.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/discussion-forum.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://www.codenameone.com/discussion-forum.html");
                 }
             });
             helpMenu.add(forum);
@@ -3579,10 +3723,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bserver.addActionListener(new ActionListener() {
                 
                 public void actionPerformed(ActionEvent e) {
-                    try {
-                        Desktop.getDesktop().browse(new URI("https://cloud.codenameone.com/buildapp/index.html"));
-                    } catch (Exception ex) {                        
-                    }
+                    launchBrowserThatWorks("https://cloud.codenameone.com/secure/index.html");
                 }
             });
             helpMenu.addSeparator();
@@ -3621,10 +3762,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     link.addActionListener(new ActionListener() {
 
                         public void actionPerformed(ActionEvent e) {
-                            try {
-                                Desktop.getDesktop().browse(new URI("https://www.codenameone.com"));
-                            } catch (Exception ex) {                        
-                            }
+                        launchBrowserThatWorks("https://www.codenameone.com");
                         }
                     });
                     linkPanel.add(link);
@@ -3853,7 +3991,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
                             pref.put("skin", current);
-                            deinitializeSync();
                             frm.dispose();
                             System.setProperty("reload.simulator", "true");
                         } else {
@@ -4277,6 +4414,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+
+
     private void showNetworkMonitor() {
         if (netMonitor == null) {
             netMonitor = new NetworkMonitor();
@@ -4353,16 +4492,51 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+
+    private ArrayList<Runnable> deinitializeHooks = new ArrayList<>();
+    public void addDeinitializeHook(Runnable r) {
+        deinitializeHooks.add(r);
+    }
+
+    public void removeDeinitializeHook(Runnable r) {
+        deinitializeHooks.remove(r);
+    }
+
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
 
             @Override
             public void run() {
+
                 t[0] = Thread.currentThread();
+
+                Form currForm = CN.getCurrentForm();
+                if (currForm != null) {
+                    // Change to a dummy form to allow the current form to run its shutdown hooks.
+                    Form dummy = new Form();
+                    dummy.setTransitionInAnimator(null);
+                    dummy.setTransitionOutAnimator(null);
+                    currForm.setTransitionInAnimator(null);
+                    currForm.setTransitionOutAnimator(null);
+                    dummy.show();
+                }
+
+                ArrayList<Runnable> toDeinitialize = new ArrayList<Runnable>(deinitializeHooks);
+                deinitializeHooks.clear();
+                for (Runnable r : toDeinitialize) {
+                    r.run();
+                }
+
+
             }
         }, 250);
+
         Display.deinitialize();
+        if (netMonitor != null) {
+            netMonitor.dispose();
+            netMonitor = null;
+        }
         NetworkManager.getInstance().shutdownSync();
         try {
             if (t[0] != null) {
@@ -5080,6 +5254,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 this.jcmp = jcmp;
             }
             void repaint(long tm, int x, int y, int width, int height) {
+                boolean oldShowEdtWarnings = showEDTWarnings;
+                showEDTWarnings = false;
                 int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
                 int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
                 int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
@@ -5110,7 +5286,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     jcmp.setBorder( BorderFactory.createEmptyBorder(paddingTop, paddingLeft, paddingBottom, paddingRight));
                 }
 
-
+                showEDTWarnings = oldShowEdtWarnings;
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         cmp.repaint();
@@ -5168,14 +5344,35 @@ public class JavaSEPort extends CodenameOneImplementation {
             swingT = t;
             textCmp = swingT;
         } else {
+
+            // Forward references so that we can access the scroll pane and its
+            // repainter from inside the JTextArea.
+            final Repainter[] fRepainter = new Repainter[1];
+            final JScrollPane[] fPane = new JScrollPane[1];
+
             final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
-            JTextArea t = new JTextArea(); 
+            JTextArea t = new JTextArea() {
+                @Override
+
+                public void repaint(long tm, int x, int y, int width, int height) {
+                    // We need to catch JTextArea repaints in addition to the
+                    // JScrollPane repaints because the ScrollPane doesn't seem to repaint
+                    // enough.
+                    if (fRepainter[0] != null && fPane[0] != null) {
+                        Point p = SwingUtilities.convertPoint(this, x, y, fPane[0]);
+                        fRepainter[0].repaint(tm, p.x, p.y, width, height);
+                    }
+                }
+            };
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
             JScrollPane pane = new JScrollPane(swingT){
                 
                 Repainter repainter = new Repainter(this);
+                {
+                    fRepainter[0] = repainter;
+                }
                 
                 @Override
                 public void repaint(long tm, int x, int y, int width, int height) {
@@ -5187,6 +5384,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             };
+            fPane[0] = pane;
+
             if (ta.isGrowByContent()) {
                 pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
             }
@@ -7035,7 +7234,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (baseResourceDir != null) {
                 fontFile = new File(baseResourceDir, fileName);
             } else {
-                fontFile = new File("src", fileName);
+                fontFile = new File(new File(getCWD(),"src"), fileName);
             }
             if (fontFile.exists()) {
                 try {
@@ -7411,6 +7610,77 @@ public class JavaSEPort extends CodenameOneImplementation {
         Shape s = cn1ShapeToAwtShape(shape);
         nativeGraphics.fill(s);
         
+    }
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        /*
+        Shape s = cn1ShapeToAwtShape(shape);
+        Rectangle shapeBounds = s.getBounds();
+        BufferedImage buf = new BufferedImage(shapeBounds.width + Math.abs(offsetX) + 2*(blurRadius + spreadRadius),
+                shapeBounds.height + Math.abs(offsetY) + 2*(blurRadius + spreadRadius), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D bufGraphics = (Graphics2D)buf.createGraphics();
+        bufGraphics.translate(-shapeBounds.x + blurRadius + spreadRadius + Math.abs(offsetX), -shapeBounds.y + blurRadius + spreadRadius + Math.abs(offsetY));
+        bufGraphics.setColor(Color.black);
+        bufGraphics.fill(s);
+        bufGraphics.dispose();
+        */
+
+        //BufferedImage buf = (BufferedImage) image;
+
+        ShadowFilter filter = new ShadowFilter();
+        filter.setAddMargins(false);
+        filter.setAngle((float)Math.atan(-offsetY/(double)offsetX));
+        filter.setDistance((float)Math.sqrt(offsetX*offsetX+offsetY*offsetY));
+        // There is a bug in ShadowFilter opacity setting that applies opacity twice, so we'll do this in two ways.
+        filter.setOpacity(1f);
+        //filter.setOpacity(opacity);
+        filter.setRadius(blurRadius);
+        filter.setShadowOnly(true);
+        //BufferedImage dst = new BufferedImage(buf.getWidth(), buf.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        //filter.filter(buf, dst);
+        //int tx = x - blurRadius - spreadRadius - Math.abs(offsetX);
+        //int ty = y - blurRadius - spreadRadius - Math.abs(offsetY);
+        //nativeGraphics.translate(tx, ty);
+        BufferedImage buf = (BufferedImage)image;
+
+        if (spreadRadius != 0) {
+            int scaledWidth = buf.getWidth() + 2 * spreadRadius;
+            int scaledHeight = buf.getHeight() + 2 * spreadRadius;
+            if (scaledWidth < 1 || scaledHeight < 1) return;
+            java.awt.Image scaledImage = buf.getScaledInstance(scaledWidth, scaledHeight, BufferedImage.SCALE_FAST);
+            BufferedImage scaledBuf = new BufferedImage(buf.getWidth(), buf.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D bufG = (Graphics2D) scaledBuf.createGraphics();
+            bufG.drawImage(scaledImage, -spreadRadius, -spreadRadius, null);
+            bufG.dispose();
+            buf = scaledBuf;
+
+        }
+        Composite prevComposite = nativeGraphics.getComposite();
+        nativeGraphics.setComposite( AlphaComposite.getInstance( AlphaComposite.SRC_OVER, opacity ) );
+        nativeGraphics.drawImage(buf, filter, x, y);
+        nativeGraphics.setComposite(prevComposite);
+
+        //nativeGraphics.translate(-tx, -ty);
+
+
+
+    }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        /**
+         * Return true here as the platform does support drawing shadows.  However implementation is very slow.
+         */
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
     }
 
     @Override
@@ -7949,6 +8219,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
+        if ("platformHint.showEDTWarnings".equals(key)) {
+            return String.valueOf(showEDTWarnings);
+        }
         if ("simulator.skin".equalsIgnoreCase(key)) {
             return getCurrentSkinName();
         }
@@ -7966,7 +8239,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "SE";
         }
         if ("AppName".equals(key)) {
-            File f = new File("codenameone_settings.properties");
+            File f = new File(getCWD(),"codenameone_settings.properties");
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -7979,7 +8252,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return defaultValue;
         }
         if ("AppVersion".equals(key)) {
-            File f = new File("codenameone_settings.properties");
+            File f = new File(getCWD(), "codenameone_settings.properties");
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -8029,6 +8302,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         return s;
     }
 
+    private void launchBrowserThatWorks(String url) {
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        String externalBrowserExe = p.get("externalBrowserExe", null);
+        try {
+            try {
+                if (externalBrowserExe != null && new File(externalBrowserExe).exists()) {
+                    ProcessBuilder pb = new ProcessBuilder(externalBrowserExe, url);
+                    pb.start();
+                    return;
+                }
+            } catch (Exception err) {
+                err.printStackTrace();
+                p.remove("externalBrowserExe");
+            }
+            Desktop.getDesktop().browse(new URI(url));
+        } catch (Exception ex) {
+            try {
+                if (url.startsWith("file:") && new File(new URI(url)).exists()) {
+                    Desktop.getDesktop().open(new File(new URI(url)));
+                } else {
+                    int val = JOptionPane.showConfirmDialog(window, "Error Launching Browser", "Do you want to pick a browser executable manually?", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                    if(val == JOptionPane.YES_OPTION) {
+                        File file = pickFile(new String[] {"*"}, "Browser Executable");
+                        if (file != null && file.exists() && file.canExecute()) {
+                            p.put("externalBrowserExe", file.getAbsolutePath());
+                            launchBrowserThatWorks(url);
+                        }
+                    }
+
+                }
+            } catch (Exception ex2) {
+                ex2.printStackTrace();
+            }
+        }
+
+    }
+
     /**
      * @inheritDoc
      */
@@ -8045,19 +8355,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String fUrl = url;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
-                    try {
-                        
-                        Desktop.getDesktop().browse(new URI(fUrl));
-                    } catch (Exception ex) {
-                        try {
-                            if (fUrl.startsWith("file:") && new File(new URI(fUrl)).exists()) {
-                                Desktop.getDesktop().open(new File(new URI(fUrl)));
-                                
-                            }
-                        } catch (Exception ex2) {
-                            ex2.printStackTrace();
-                        }
-                    }
+                    launchBrowserThatWorks(fUrl);
                 }
             });
             
@@ -8856,12 +9154,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             try {    
                 conn.connect();
                 java.security.cert.Certificate[] certs = conn.getServerCertificates();
-                String[] out = new String[certs.length];
+                String[] out = new String[certs.length*2];
                 int i=0;
                 for (java.security.cert.Certificate cert : certs) {
-                    MessageDigest md = MessageDigest.getInstance("SHA1");
-                    md.update(cert.getEncoded());
-                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA-256");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA-256:" + dumpHex(md.digest());
+                    }
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA1");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA1:" + dumpHex(md.digest());
+                    }
+
                 }
                 return out;
             } catch (Exception ex) {
@@ -10163,7 +10469,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
         if ("/theme.res".equals(resource)) {
-            File srcThemeRes = new File("src" + File.separator + "theme.res");
+            File srcThemeRes = new File(getCWD(), "src" + File.separator + "theme.res");
             if (srcThemeRes.exists()) {
                 try {
                     return new FileInputStream(srcThemeRes);
@@ -10398,11 +10704,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     try {
                         final AudioFormat format = getAudioFormat();
                         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
                         if (!AudioSystem.isLineSupported(info)) {
                             fireMediaStateChange(State.Playing);
                             fireMediaStateChange(State.Paused);
                             
-                            throw new RuntimeException("Audio format not supported on this platform");
+                            throw new RuntimeException("Failed to access microphone. Check that the microphone is connected and that the app has permission to use it.");
                         }
                         line = (TargetDataLine) AudioSystem.getLine(info);
                         line.open(format);
@@ -11184,7 +11491,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public boolean wasPurchased(String sku) {
                 return getPurchases().contains(sku);
-            } 
+            }
+
+            @Override
+            public String getStoreCode() {
+                return Receipt.STORE_CODE_SIMULATOR;
+            }
         };
     }
 
@@ -11741,7 +12053,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void installTar() throws IOException {
-        File f = new File("codenameone_settings.properties");        
+        File f = new File(getCWD(),"codenameone_settings.properties");
         if(!f.exists()) {
             super.installTar();
         }
@@ -11752,7 +12064,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
-        File f = new File("codenameone_settings.properties");        
+        File f = new File(getCWD(), "codenameone_settings.properties");
         if(!f.exists()) {
             super.setBrowserPageInHierarchy(browserPeer, url);
             return;
@@ -11760,7 +12072,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         String sep = File.separator;
         File[] searchPaths = new File[]{
+            new File(f.getParent(), "target" + sep + "classes"+ sep + "html"),
             new File(f.getParent(), "build" + sep + "classes"+ sep + "html"),
+            new File(f.getParent(), "src" + sep + "main"+ sep + "resources" + sep +"html"),
             new File(f.getParent(), "src" + sep + "html"),
             new File(f.getParent(), "lib" + sep + "impl" + sep + "cls" + sep + "html")
         };
@@ -12526,12 +12840,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     
-    
+    public File getCWD() {
+        return new File(System.getProperty("user.dir"));
+    }
     
     
     @Override
     public Map<String, String> getProjectBuildHints() {
-        File cnopFile = new File("codenameone_settings.properties");
+        File cnopFile = new File(getCWD(), "codenameone_settings.properties");
         if(cnopFile.exists()) {
             java.util.Properties cnop = new java.util.Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
@@ -12555,7 +12871,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void setProjectBuildHint(String key, String value) {
-         File cnopFile = new File("codenameone_settings.properties");
+         File cnopFile = new File(getCWD(),"codenameone_settings.properties");
         if(cnopFile.exists()) {
             Properties cnop = new Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
@@ -12693,7 +13009,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Point scaledPoint = new Point((int)(containerPoint.x * retinaScale),
                         (int)(containerPoint.y * retinaScale));
                 
-                if (textCmp != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
+                if (textCmp != null && SwingUtilities.getWindowAncestor(textCmp) != null && textCmp.getX() <= scaledPoint.x && textCmp.getY() <= scaledPoint.y && textCmp.getWidth() + textCmp.getX() > scaledPoint.x && textCmp.getHeight() + textCmp.getY() > scaledPoint.y) {
                     
                     Point componentPoint = SwingUtilities.convertPoint(canvas, scaledPoint, textCmp);
                     java.awt.Component target = SwingUtilities.getDeepestComponentAt(

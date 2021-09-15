@@ -8,6 +8,8 @@ import android.util.Log;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
+import com.google.android.gms.location.GeofenceStatusCodes;
+import com.google.android.gms.location.GeofencingEvent;
 import com.google.android.gms.location.LocationResult;
 
 import java.util.List;
@@ -23,11 +25,12 @@ public class BackgroundLocationBroadcastReceiver extends BroadcastReceiver {
     static final String ACTION_PROCESS_UPDATES =
             "com.codename1.location.backgroundlocationbroadcastreceiver.action" +
                     ".PROCESS_UPDATES";
-
-    static final String INTENT = "com.codename1.location.background.locationbroadcastreceiver.INTENT";
+    static final String ACTION_PROCESS_GEOFENCE_TRANSITIONS = "com.codename1.location.backgroundlocationbroadcastreceiver.action.ACTION_RECEIVE_GEOFENCE";
+    private static final String TAG ="BackgroundLocationBroadcastReceiver";
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent != null) {
+
             final String action = intent.getAction();
             if (ACTION_PROCESS_UPDATES.equals(action)) {
                 LocationResult result = LocationResult.extractResult(intent);
@@ -58,8 +61,8 @@ public class BackgroundLocationBroadcastReceiver extends BroadcastReceiver {
                 } catch (Throwable t) {
                     return;
                 }
-              
-                
+
+
                 boolean shouldStopWhenDone = false;
                 if (!Display.isInitialized()) {
                     shouldStopWhenDone = true;
@@ -76,6 +79,66 @@ public class BackgroundLocationBroadcastReceiver extends BroadcastReceiver {
                     if (shouldStopWhenDone) {
                         AndroidImplementation.stopContext(context);
                     }
+                }
+            }
+            if (ACTION_PROCESS_GEOFENCE_TRANSITIONS.equals(action)) {
+                GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
+                if (geofencingEvent.hasError()) {
+                    String errorMessage = GeofenceStatusCodes
+                            .getStatusCodeString(geofencingEvent.getErrorCode());
+                    Log.e(TAG, errorMessage);
+                    return;
+                }
+
+                // Get the transition type.
+                int geofenceTransition = geofencingEvent.getGeofenceTransition();
+
+                // Test that the reported transition was of interest.
+                if (geofenceTransition == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_ENTER ||
+                        geofenceTransition == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_EXIT) {
+
+                    String dataString = intent.getDataString();
+                    if (dataString == null) {
+                        return;
+                    }
+                    String[] params = dataString.split("[?]");
+                    if (params.length < 2) {
+                        return;
+                    }
+                    Class locationListenerClass;
+                    try {
+                        locationListenerClass = Class.forName(params[1]);
+                    } catch (Throwable t) {
+                        return;
+                    }
+
+
+                    boolean shouldStopWhenDone = false;
+                    if (!Display.isInitialized()) {
+                        shouldStopWhenDone = true;
+                        AndroidImplementation.startContext(context);
+                    }
+
+                    try {
+                        //the 2nd parameter is the class name we need to create
+                        GeofenceListener l = (GeofenceListener) locationListenerClass.newInstance();
+                        List<com.google.android.gms.location.Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
+                        for (com.google.android.gms.location.Geofence gf : triggeringGeofences) {
+                            if (geofenceTransition == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_ENTER) {
+                                l.onEntered(gf.getRequestId());
+                            } else {
+                                l.onExit(gf.getRequestId());
+                            }
+                        }
+
+                    } catch (Throwable e) {
+                        Log.e("Codename One", "background location error", e);
+                    } finally {
+                        if (shouldStopWhenDone) {
+                            AndroidImplementation.stopContext(context);
+                        }
+                    }
+
                 }
             }
         }

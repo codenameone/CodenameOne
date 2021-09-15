@@ -242,4 +242,36 @@ public class StringUtil {
         }
         return tokenized;
     }
+
+    /**
+     * Joins a list or array of objects together using the specified delimiter.
+     * @param strings Objects to be converted to strings.
+     * @param delimiter The delimiter.
+     * @return The joined string.
+     * @since 8.0
+     */
+    public static String join(Iterable strings, String delimiter) {
+        StringBuilder sb = new StringBuilder();
+        for (Object obj : strings) {
+            if (sb.length() > 0) sb.append(delimiter);
+            sb.append(obj);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Joins a list or array of objects together using the specified delimiter.
+     * @param strings Objects to be converted to strings.
+     * @param delimiter The delimiter.
+     * @return The joined string.
+     * @since 8.0
+     */
+    public static String join(Object[] strings, String delimiter) {
+        StringBuilder sb = new StringBuilder();
+        for (Object obj : strings) {
+            if (sb.length() > 0) sb.append(delimiter);
+            sb.append(obj);
+        }
+        return sb.toString();
+    }
 }

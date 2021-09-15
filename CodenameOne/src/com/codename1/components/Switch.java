@@ -396,12 +396,13 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             for (int iter = shadowSpread - 1; iter >= 0; iter--) {
                 g.translate(iter, iter);
                 g.setColor(0);
-                g.setAlpha(shadowOpacity / shadowSpread);
+                int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);
                 g.fillArc(
                         Math.max(1, thumbInset+shadowSpread + shadowSpread / 2 - iter), 
                         Math.max(1, thumbInset + 2 * shadowSpread - iter), 
                         Math.max(1, pxDim - (iter * 2) - 2*thumbInset), 
                         Math.max(1, pxDim - (iter * 2) - 2*thumbInset), 0, 360);
+                g.setAlpha(alpha);
                 g.translate(-iter, -iter);
             }
             if (Display.getInstance().isGaussianBlurSupported()) {
@@ -415,11 +416,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
 
         //g.translate(shadowSpread, shadowSpread);
-        g.setAlpha(255);
+        int alpha = g.concatenateAlpha(255);
         g.setColor(color);
         g.fillArc(shadowSpread+thumbInset, shadowSpread+thumbInset, Math.max(1, pxDim-2*thumbInset), Math.max(1, pxDim-2*thumbInset), 0, 360);
         //g.setColor(outlinecolor);
         //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
+        g.setAlpha(alpha);
         return img;
     }
     
@@ -431,7 +433,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         Image img = ImageFactory.createImage(context, width + 2 * thumbPadding, height, 0x0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
-        g.setAlpha(alpha);
+        int oldAlpha = g.concatenateAlpha(alpha);
         int topPadding=0;
         if (outlineWidth > 0) {
             g.setColor(outlineColor);
@@ -447,6 +449,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         height = Math.max(2, height);
         g.setColor(color);
         g.fillRoundRect(thumbPadding, topPadding, width, height, height, height);
+        g.setAlpha(oldAlpha);
         return img;
     }
     

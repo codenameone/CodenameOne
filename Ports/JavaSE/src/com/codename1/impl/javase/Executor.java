@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.components.ToastBar;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -33,11 +34,12 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.io.InputStream;
+import java.lang.reflect.*;
+import java.util.List;
 import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
@@ -55,8 +57,15 @@ public class Executor {
     private static Class c;
     private static Object app;
     
+    // Watches source code for changes and rebuilds on demand.  This should only be used
+    // when combined with Hotswap Agent.
+    // https://github.com/HotswapProjects/HotswapAgent
+    private static SourceChangeWatcher sourceWatcher;
+    
     private final static boolean IS_MAC;
     private final static boolean isWindows;
+    private final static boolean isDebug;
+    private final static boolean usingHotswapAgent;
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
@@ -67,7 +76,11 @@ public class Executor {
         } else {
             IS_MAC = false;
         }
-        isWindows = File.separatorChar == '\\';        
+        isWindows = File.separatorChar == '\\';  
+        
+        List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+        isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+        usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
     }
     
     /**
@@ -109,7 +122,7 @@ public class Executor {
     }
     
     
-    public static void main(Class launcherClass, final String[] argv) throws Exception {
+    public static void main(final Class launcherClass, final String[] argv) throws Exception {
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
@@ -176,12 +189,30 @@ public class Executor {
         
         setProxySettings();
         if (CSSWatcher.isSupported()) {
-            CSSWatcher cssWatcher = new CSSWatcher();
-            cssWatcher.start();
+            // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
+            Timer t = new Timer();
+            TimerTask tt = new TimerTask() {
+                @Override
+                public void run() {
+                    CSSWatcher cssWatcher = new CSSWatcher();
+                    cssWatcher.start();
+                }
+            };
+            t.schedule(tt, 2000);
+
         }
+        
         final Properties p = new Properties();
         String currentDir = System.getProperty("user.dir");
         File props = new File(currentDir, "codenameone_settings.properties");
+        if (!props.exists()) {
+            if (new File(currentDir, "common" + File.separator + "codenameone_settings.properties").exists()) {
+                System.setProperty("user.dir", currentDir + File.separator + "common");
+                currentDir = System.getProperty("user.dir");
+                props = new File(currentDir, "codenameone_settings.properties");
+            }
+        }
+        
         if(props.exists()) {
             FileInputStream f = null;
             try {
@@ -195,8 +226,16 @@ public class Executor {
                 } catch (IOException ex) {
                 }
             }
+            
+            
+            
+            
+        
+        } else {
+            System.out.println("Cannot find codenameone_settings.properties at "+props);
         }
 
+        final File fProps = props;
             SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -233,6 +272,7 @@ public class Executor {
                                 System.exit(1);
                             }
                             app = c.newInstance();
+                            
                             if(app instanceof PushCallback) {
                                 CodenameOneImplementation.setPushCallback((PushCallback)app);
                             }
@@ -240,6 +280,27 @@ public class Executor {
                                 CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
                             }
                             Display.init(null);
+                            
+                            //if (isDebug && usingHotswapAgent) {
+                            if (System.getProperty("maven.home") != null) {
+                                // In debug mode, when the Hotswap Agent is present, the simulator
+                                // will monitor all the source files for changes, and automatically
+                                // trigger a re-compile - then hotswap the classes.
+                                // The easiest way to enable this is to 
+                                // Use the DCEVM JDK as the JDK for the project, and add -XX:HotswapAgent=core
+                                // to the VM options.
+                                // https://github.com/HotswapProjects/HotswapAgent
+                                // https://github.com/TravaOpenJDK/trava-jdk-11-dcevm/releases
+                                // 
+                                startSourceWatcher(fProps, launcherClass);
+                                if (sourceWatcher != null) {
+                                    sourceWatcher.setApp(app);
+                                }
+                            } else {
+                                System.out.println("Hotswap Agent not detected. To enable enhanced live class reloading feature, run with DCEVM JDK and add -XX:HotswapAgent=core to the VM options");
+
+                            }
+                            
                             Display.getInstance().callSerially(new Runnable() {
                                 @Override
                                 public void run() {
@@ -259,6 +320,46 @@ public class Executor {
                                     } catch (Exception err) {
                                         err.printStackTrace();
                                         System.exit(1);
+                                    }
+
+                                    String reloadForm = System.getProperty("rad.reload.form");
+                                    if (reloadForm != null) {
+                                        System.clearProperty("rad.reload.form");
+                                        try {
+                                            Class formControllerClass = Class.forName(reloadForm);
+                                            Class applicationController = Class.forName("com.codename1.rad.controllers.ApplicationController");
+
+                                            Field applicationControllerInstanceField = applicationController.getField("instance");
+                                            Object applicationControllerInstance = applicationControllerInstanceField.get(null);
+                                            if (applicationControllerInstance != null) {
+                                                Class controllerClass = Class.forName("com.codename1.rad.controllers.Controller");
+                                                Constructor formControllerConstructor = formControllerClass.getConstructor(new Class[]{controllerClass});
+                                                Object formControllerInstance = formControllerConstructor.newInstance(applicationControllerInstance);
+
+                                                Method show = formControllerClass.getMethod("show");
+                                                show.invoke(formControllerInstance);
+
+                                                Timer timer = new Timer();
+                                                TimerTask timerTask = new TimerTask() {
+
+                                                    @Override
+                                                    public void run() {
+                                                        Display.getInstance().callSerially(new Runnable() {
+
+                                                            @Override
+                                                            public void run() {
+                                                                ToastBar.showInfoMessage("Hot Reload 'Reload Current Form' mode is active. Disable this in the Tools > Hot Reload menu.");
+                                                            }
+                                                        });
+                                                    }
+                                                };
+
+                                                timer.schedule(timerTask, 1500);
+
+                                            }
+                                        } catch (Exception ex) {
+                                            ex.printStackTrace();
+                                        }
                                     }
                                 }
                             });
@@ -687,6 +788,89 @@ public class Executor {
             }
         });
         
+    }
+    
+    
+    private static void startSourceWatcher(File codenameOneSettingsFile, Class launcherClass) throws IOException {
+        File props = codenameOneSettingsFile;
+        sourceWatcher = new SourceChangeWatcher();
+            File srcMain = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "java");
+            if (srcMain.exists()) {
+                sourceWatcher.addWatchFolder(srcMain);
+            }
+
+
+            File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
+            if (srcRad.exists()) {
+                sourceWatcher.addWatchFolder(srcRad);
+            }
+            
+            File hotswapPropsFile = new File(props.getParentFile().getParentFile(), "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");
+            
+            InputStream hotswapPropsStream;
+            if (hotswapPropsFile.exists()) {
+                hotswapPropsStream = new FileInputStream(hotswapPropsFile);
+            } else {
+                hotswapPropsStream = launcherClass.getResourceAsStream("/hotswap-agent.properties");
+            }
+            if (hotswapPropsStream != null) {
+                System.out.println("Found hotswap-agent.properties file");
+                Properties hotswapProps = new Properties();
+                hotswapProps.load(hotswapPropsStream);
+                System.out.println("Hotswap Properties:"+hotswapProps);
+                try {
+                    hotswapPropsStream.close();
+                } catch (Exception ex){}
+                
+                //String extraClasspath = new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath();//hotswapProps.getProperty("extraClasspath");
+                String extraClasspath = hotswapProps.getProperty("extraClasspath");
+                extraClasspath = extraClasspath == null ? new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() :
+                        new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() + "; " + extraClasspath;
+                if (extraClasspath != null) {
+                    System.out.println("extraClasspath="+extraClasspath);
+                    String[] extraPaths = extraClasspath.split(";");
+                    for (String extraPath : extraPaths) {
+                        extraPath = extraPath.trim();
+                        if (extraPath.isEmpty()) continue;
+                        File extraPathFile = new File(extraPath);
+                        if (!extraPathFile.exists() || sourceWatcher.hasWatchFolder(extraPathFile)) {
+                            System.out.println(extraPathFile+" not found");
+                            continue;
+                        }
+                        if (extraPathFile.getName().equals("classes")) {
+                            extraPathFile = extraPathFile.getParentFile();
+                        }
+                        if (extraPathFile.getName().equals("target")) {
+                            extraPathFile = extraPathFile.getParentFile();
+                        }
+                        File src = new File(extraPathFile, "src");
+                        if (!src.exists()) {
+                            System.out.println(src+" not found");
+                            continue;
+                        }
+                        File main = new File(src, "main");
+                        if (!main.exists()) {
+                            System.out.println(main+" not found");
+                            continue;
+                        }
+                        File java = new File(main, "java");
+                        if (java.exists()) {
+                            sourceWatcher.addWatchFolder(java);
+                        }
+                        File kotlin = new File(main, "kotlin");
+                        if (kotlin.exists()) {
+                            sourceWatcher.addWatchFolder(kotlin);
+                        }
+                    }
+                }
+                
+                
+            } else {
+                System.out.println("Did not find hotswap-agent.properties file");
+            }
+            Thread sourceWatcherThread = new Thread(sourceWatcher);
+            sourceWatcherThread.setDaemon(true);
+            sourceWatcherThread.start();
     }
     
 }

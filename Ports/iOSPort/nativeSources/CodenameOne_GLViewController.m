@@ -1119,6 +1119,111 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
     return context;
 }
 
+
+static CGContextRef cn1CreateARGBBitmapContext(CGSize size) {
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (colorSpace == NULL) {
+        CN1Log(@"Error allocating color space");
+        return NULL;
+    }
+    void *bitmapData = malloc(size.width * size.height * 4);
+    if (bitmapData == NULL) {
+        CN1Log(@"Error: Memory not allocated!");
+        CGColorSpaceRelease(colorSpace);
+        return NULL;
+    }
+    CGContextRef context = CGBitmapContextCreate(bitmapData, size.width, size.height, 8, size.width * 4, colorSpace, kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(colorSpace);
+    if (context == NULL) {
+        CN1Log(@"Error:  Context not created");
+        free(bitmapData);
+        return NULL;
+    }
+    return context;
+}
+
+static UInt8* cn1CreateBitmap(UIImage* image) {
+    CGContextRef context = cn1CreateARGBBitmapContext(image.size);
+    if (context == NULL) return NULL;
+    CGRect rect = CGRectMake(0.0f, 0.0f, image.size.width, image.size.height);
+    CGContextClearRect(context, rect);
+    CGContextDrawImage(context, rect, image.CGImage);
+    UInt8* data = CGBitmapContextGetData(context);
+    CGContextRelease(context);
+    return data;
+}
+
+static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
+    int len = width * height * 4;
+    
+    for (int i=0; i<len; i+=4) {
+        bits[i+1] = bits[i+2] = bits[i + 3] = 0;
+        
+    }
+}
+
+static UIImage* cn1ImageWithBits(UInt8* bits, int width, int height) {
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (colorSpace == NULL) {
+        CN1Log(@"Error allocating color space");
+        return NULL;
+    }
+    CGContextRef context = CGBitmapContextCreate(bits, width, height, 8, width * 4, colorSpace, kCGImageAlphaPremultipliedFirst);
+    if (context == NULL) {
+        NSLog(@"Error: context not created");
+        CGColorSpaceRelease(colorSpace);
+        return NULL;
+    }
+    CGColorSpaceRelease(colorSpace);
+    CGImageRef imageRef = CGBitmapContextCreateImage(context);
+    free(CGBitmapContextGetData(context));
+    CGContextRelease(context);
+    UIImage* newImage = [UIImage imageWithCGImage:imageRef];
+    CFRelease(imageRef);
+    return newImage;
+    
+    
+}
+void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    
+    UIImage* i = [(BRIDGE_CAST GLUIImage*)image getImage];
+    
+    UInt8 *inbits = cn1CreateBitmap(i);
+    if (inbits == NULL) {
+        CN1Log(@"Error:  Failed to create bitmap for shadow");
+        return;
+    }
+    cn1MaskifyBitmap(inbits, floor(i.size.width), floor(i.size.height));
+    
+    UIImage* mask = cn1ImageWithBits(inbits, floor(i.size.width), floor(i.size.height));
+    //free(inbits);
+    if (mask == NULL) {
+        CN1Log(@"Error: Failed to generate image for shadow from bitmap");
+        return;
+    }
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSaveGState(context);
+    if (currentMutableTransformSet) {
+        
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+
+    int renderWidth = floor(i.size.width) + 2 * spreadRadius;
+    int renderHeight = floor(i.size.height) + 2 * spreadRadius;
+    int renderX = x + offsetX - spreadRadius;
+    int renderY = y + offsetY - spreadRadius;
+
+    CGContextSetShadowWithColor(context, CGSizeMake(0, 0), blurRadius, [UIColorFromRGB(color, 255) CGColor]);
+    [mask drawInRect:CGRectMake(renderX, renderY, renderWidth, renderHeight) blendMode:kCGBlendModeNormal alpha: opacity];
+    
+    CGContextRestoreGState(context);
+    
+    
+
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
@@ -1128,7 +1233,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    [i drawInRect:CGRectMake(x, y, width, height)];
+    if (alpha == 255) {
+        [i drawInRect:CGRectMake(x, y, width, height)];
+    } else {
+        [i drawInRect:CGRectMake(x, y, width, height) blendMode:kCGBlendModeNormal alpha:alpha/(CGFloat)255];
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }

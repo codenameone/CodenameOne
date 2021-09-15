@@ -323,7 +323,15 @@ public class Dialog extends Form {
         setSmoothScrolling(false);
         deregisterAnimated(this);
     }
-    
+
+    /**
+     * When the dialog is disposed this form will show. Notice that this can only be set after show was invoked!
+     * @param previousForm the previous form
+     */
+    public void setPreviousForm(Form previousForm) {
+        super.setPreviousForm(previousForm);
+    }
+
     /**
      * Overriden to disable the toolbar in dialogs <br>
      * {@inheritDoc}

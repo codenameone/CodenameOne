@@ -60,13 +60,16 @@ public class RequestBuilder {
 
     private String url;
 
-    private Map<String, String> queryParams = new HashMap();
+    private Map<String, Object> queryParams = new HashMap();
+
 
     private Map<String, String> headers = new HashMap();
 
     private Map<String, String> pathParams = new HashMap();
     
     private Integer timeout, readTimeout;
+
+    private Boolean cookiesEnabled;
     
     private Data body;
         
@@ -81,6 +84,8 @@ public class RequestBuilder {
     private ArrayList<ActionListener<NetworkEvent>> errorCallbacks = new ArrayList<ActionListener<NetworkEvent>>();
     private ConnectionRequest.CachingMode cache;
     private boolean fetched;
+    private Boolean postParameters;
+    private Byte priority;
     
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -102,7 +107,17 @@ public class RequestBuilder {
         this.cache = cache;
         return this;
     }
-    
+
+    /**
+     * Overrides the default behavior of methods so they can be sent using the post/get method
+     * @param postParameters true to force post, false to use get method. Defaults to true for all methods other than GET
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder postParameters(Boolean postParameters) {
+        this.postParameters = postParameters;
+        return this;
+    }
+
     /**
      * Sets the value of the content type
      * @param s the content type
@@ -112,7 +127,32 @@ public class RequestBuilder {
         checkFetched();
         contentType = s;
         return this;
-    } 
+    }
+
+    /**
+     * Sets the priority of the request.
+     * @param priority The priority.
+     * @return RequestBuilder instance.
+     * @see ConnectionRequest#setPriority(byte)
+     * @since 8.0
+     */
+    public RequestBuilder priority(byte priority) {
+        checkFetched();
+        this.priority = priority;
+        return this;
+    }
+
+    /**
+     * Sets the cookiesEnabled parameter.
+     * @param cookiesEnabled True to enable cookies. False to disable.
+     * @return RequestBuilder instance.
+     * @since 8.0
+     */
+    public RequestBuilder cookiesEnabled(boolean cookiesEnabled) {
+        checkFetched();
+        this.cookiesEnabled = cookiesEnabled;
+        return this;
+    }
     
     /**
      * Add a path param to the request.
@@ -140,6 +180,20 @@ public class RequestBuilder {
     public RequestBuilder queryParam(String key, String value) {
         checkFetched();
         queryParams.put(key, value);
+        return this;
+    }
+
+    /**
+     * Add multiple query parameter values to the request using same key.
+     *
+     * @param key param key
+     * @param values  param values
+     * @return RequestBuilder instance
+     * @since 8.0
+     */
+    public RequestBuilder queryParam(String key, String[] values) {
+        checkFetched();
+        queryParams.put(key, values);
         return this;
     }
 
@@ -840,7 +894,11 @@ public class RequestBuilder {
         req.setDuplicateSupported(true);
         req.setUrl(url);
         req.setHttpMethod(method);
-        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
+        if(postParameters == null) {
+            req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
+        } else {
+            req.setPost(postParameters);
+        }
         if(body != null){
             req.setRequestBody(body);
             req.setWriteRequest(true);
@@ -852,13 +910,24 @@ public class RequestBuilder {
             req.setReadTimeout(readTimeout);
         }
         for (String key : queryParams.keySet()) {
-            req.addArgument(key, queryParams.get(key));
+            Object value = queryParams.get(key);
+            if (value instanceof String[]) {
+                req.addArgument(key, (String[])value);
+            } else {
+                req.addArgument(key, (String)value);
+            }
         }
         for (String key : headers.keySet()) {
             req.addRequestHeader(key, headers.get(key));
         }
         for (ActionListener<NetworkEvent> l : errorCallbacks) {
             req.addExceptionListener(l);
+        }
+        if (cookiesEnabled != null) {
+            req.setCookiesEnabled(cookiesEnabled);
+        }
+        if (priority != null) {
+            req.setPriority(priority);
         }
         
         return req;

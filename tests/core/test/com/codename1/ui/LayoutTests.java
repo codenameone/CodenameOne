@@ -69,88 +69,88 @@ public class LayoutTests extends AbstractTest {
         // NOTE:  We give a relative error grace of 1.0 because of the way that 
         // Layered layout calculates insets.  Since it uses floating point arithmetic
         // internally, it is possible that widths will be off by +- 1.
-        assertEqual(prefH, l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
+        assertRange(prefH, l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
 
-        assertEqual((cntW-prefW)/2, l.getX(), 1.0);
-        assertEqual((cntH-prefH)/2, l.getY(), 1.0);
+        assertRange((cntW-prefW)/2, l.getX(), 1.0);
+        assertRange((cntH-prefH)/2, l.getY(), 1.0);
 
 
         ll.setInsets(l, "auto 0 0 0");
         cnt.revalidate();
-        assertEqual(prefH, l.getHeight(), 1.0);
-        assertEqual(cntW, l.getWidth(), 1.0);
-        assertEqual(cntW-l.getHeight(), l.getY(), 1.0);
-        assertEqual(0, l.getX(), 1.0);
+        assertRange(prefH, l.getHeight(), 1.0);
+        assertRange(cntW, l.getWidth(), 1.0);
+        assertRange(cntW-l.getHeight(), l.getY(), 1.0);
+        assertRange(0, l.getX(), 1.0);
 
         ll.setInsets(l, "0 auto 0 0");
         cnt.revalidate();
-        assertEqual(cntH, l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
-        assertEqual(0, l.getY(), 1.0);
-        assertEqual(0, l.getX(), 1.0);
+        assertRange(cntH, l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
+        assertRange(0, l.getY(), 1.0);
+        assertRange(0, l.getX(), 1.0);
 
         ll.setInsets(l, "0 0 auto 0");
         cnt.revalidate();
-        assertEqual(prefH, l.getHeight(), 1.0);
-        assertEqual(cntW, l.getWidth(), 1.0);
-        assertEqual(0, l.getY(), 1.0);
-        assertEqual(0, l.getX(), 1.0);
+        assertRange(prefH, l.getHeight(), 1.0);
+        assertRange(cntW, l.getWidth(), 1.0);
+        assertRange(0, l.getY(), 1.0);
+        assertRange(0, l.getX(), 1.0);
 
         ll.setInsets(l, "0 0 0 auto");
         cnt.revalidate();
-        assertEqual(cntH, l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
-        assertEqual(0, l.getY(), 1.0);
-        assertEqual(cntW - prefW, l.getX(), 1.0);
+        assertRange(cntH, l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
+        assertRange(0, l.getY(), 1.0);
+        assertRange(cntW - prefW, l.getX(), 1.0);
 
         $(cnt).setPadding(10);
         cnt.revalidate();
-        assertEqual(cntH - cnt.getStyle().getVerticalPadding(), l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
-        assertEqual(cnt.getStyle().getPaddingTop(), l.getY(), 1.0);
-        assertEqual(cntW - prefW - cnt.getStyle().getPaddingRightNoRTL(), l.getX(), 1.0);
+        assertRange(cntH - cnt.getStyle().getVerticalPadding(), l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
+        assertRange(cnt.getStyle().getPaddingTop(), l.getY(), 1.0);
+        assertRange(cntW - prefW - cnt.getStyle().getPaddingRightNoRTL(), l.getX(), 1.0);
 
         ll.setInsets(l, "auto");
         cnt.revalidate();
-        assertEqual(prefH, l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
-        assertEqual((cntW-prefW)/2, l.getX(), 1.0);
-        assertEqual((cntH-prefH)/2, l.getY(), 1.0);
+        assertRange(prefH, l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
+        assertRange((cntW-prefW)/2, l.getX(), 1.0);
+        assertRange((cntH-prefH)/2, l.getY(), 1.0);
 
         $(cnt).setPadding(0, 10, 10, 0);
         cnt.revalidate();
-        assertEqual(prefH, l.getHeight(), 1.0);
-        assertEqual(prefW, l.getWidth(), 1.0);
-        assertEqual((cntW-prefW-10)/2, l.getX(), 1.0);
-        assertEqual((cntH-prefH-10)/2, l.getY(), 1.0);
+        assertRange(prefH, l.getHeight(), 1.0);
+        assertRange(prefW, l.getWidth(), 1.0);
+        assertRange((cntW-prefW-10)/2, l.getX(), 1.0);
+        assertRange((cntH-prefH-10)/2, l.getY(), 1.0);
 
         $(cnt).setPadding(0);
         ll.setInsets(l, "10mm");
         int inset = CN.convertToPixels(10);
         cnt.revalidate();
-        assertEqual(cnt.getHeight() - 2*inset, l.getHeight(), 1.0);
-        assertEqual(cnt.getWidth() - 2*inset, l.getWidth(), 1.0);
-        assertEqual(inset, l.getX(), 1.0);
-        assertEqual(inset, l.getY(), 1.0);
+        assertRange(cnt.getHeight() - 2*inset, l.getHeight(), 1.0);
+        assertRange(cnt.getWidth() - 2*inset, l.getWidth(), 1.0);
+        assertRange(inset, l.getX(), 1.0);
+        assertRange(inset, l.getY(), 1.0);
 
         ll.setInsets(l, "10%");
         int insetH = (int)Math.round(cnt.getWidth() * 0.1);
         int insetV = (int)Math.round(cnt.getHeight() * 0.1);
         cnt.revalidate();
-        assertEqual(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
-        assertEqual(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
-        assertEqual(insetH, l.getX(), 1.0);
-        assertEqual(insetV, l.getY(), 1.0);
+        assertRange(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
+        assertRange(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
+        assertRange(insetH, l.getX(), 1.0);
+        assertRange(insetV, l.getY(), 1.0);
 
         ll.setInsets(l, "10px");
         insetH = 10;
         insetV = 10;
         cnt.revalidate();
-        assertEqual(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
-        assertEqual(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
-        assertEqual(insetH, l.getX(), 1.0);
-        assertEqual(insetV, l.getY(), 1.0);
+        assertRange(cnt.getHeight() - 2*insetV, l.getHeight(), 1.0);
+        assertRange(cnt.getWidth() - 2*insetH, l.getWidth(), 1.0);
+        assertRange(insetH, l.getX(), 1.0);
+        assertRange(insetV, l.getY(), 1.0);
 
         Label l2 = new Label("Label 2");
         Label l3 = new Label("Label 3");

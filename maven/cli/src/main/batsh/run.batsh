@@ -16,6 +16,11 @@ function settings() {
     call(MVNW, "cn:settings");
 }
 
+function update() {
+    global MVNW;
+    call(MVNW, "cn:update");
+}
+
 function help() {
     println("run.sh [COMMAND]");
     println("Commands:");
@@ -23,6 +28,10 @@ function help() {
     println("    Runs app using Codename One Simulator");
     println("  desktop");
     println("    Runs app as a desktop app.");
+    println("  settings");
+    println("    Opens Codename One settings");
+    println("  update");
+    println("    Update Codename One libraries");
 }
 
 

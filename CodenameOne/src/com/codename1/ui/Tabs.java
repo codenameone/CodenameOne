@@ -150,8 +150,8 @@ public class Tabs extends Container {
         
     }
 
-    // A flag that is used internally to temporily override the output of the 
-    // shoudlBlockSideSwipe method, so that we don't block our own side swipes.
+    // A flag that is used internally to temporarily override the output of the
+    // shouldBlockSideSwipe method, so that we don't block our own side swipes.
     private boolean doNotBlockSideSwipe;
     
     @Override
@@ -443,12 +443,8 @@ public class Tabs extends Container {
      * @see #removeTabAt
      */
     public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
-        int index = tabsContainer.getComponentCount();
-        FontImage i = FontImage.createMaterial(materialIcon, "Tab", iconSize);
-        insertTab(title, i, component, index);
-        Style sel = getUIManager().getComponentCustomStyle("Tab", "press");
-        i = FontImage.createMaterial(materialIcon, sel, iconSize);
-        setTabSelectedIcon(index, i);
+        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,
+                tabsContainer.getComponentCount());
         return this;
     }
     
@@ -1438,6 +1434,18 @@ public class Tabs extends Container {
                                 // start drag not imediately, giving components some sort
                                 // of weight.
                                 dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                                if(dragStarted) {
+                                    int diff = x - initialX;
+                                    if(shouldBlockSideSwipeLeft() && diff < 0 ||
+                                            shouldBlockSideSwipeRight() && diff > 0) {
+                                        lastX = -1;
+                                        initialX = -1;
+                                        initialY = -1;
+                                        blockSwipe = true;
+                                        dragStarted = false;
+                                        return;
+                                    }
+                                }
                                 Form parent = getComponentForm();
                                 parent.clearComponentsAwaitingRelease();
                             }

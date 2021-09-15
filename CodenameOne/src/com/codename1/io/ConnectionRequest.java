@@ -751,7 +751,6 @@ public class ConnectionRequest implements IOProgressListener {
     /**
      * This callback is used internally to check SSL certificates, only on platforms that require
      * native callbacks for checking SSL certs.  Currently only iOS requires this.
-     * @param req The ConnectionRequest to check SSL certificates for.
      * @return True if the certificates checkout OK, or if the request doesn't require SSL cert checks.
      * @deprecated For internal use only.
      * @see NetworkManager#checkCertificatesNativeCallback(int) 
@@ -785,6 +784,7 @@ public class ConnectionRequest implements IOProgressListener {
     void performOperation() throws IOException {
         performOperationComplete();
     }
+    private Object _connection;
     /**
      * Performs the actual network request on behalf of the network manager
      * @return true if the operation completed, false if the network request is scheduled to be retried.
@@ -818,6 +818,7 @@ public class ConnectionRequest implements IOProgressListener {
             } else {
                 connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());
             }
+            _connection = connection;
             if(shouldStop()) {
                 return true;
             }
@@ -865,7 +866,7 @@ public class ConnectionRequest implements IOProgressListener {
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
                 checkSSLCertificates(sslCertificates);
-                    if(shouldStop()) {
+                if(shouldStop()) {
                     return true;
                 }
             }
@@ -1014,6 +1015,7 @@ public class ConnectionRequest implements IOProgressListener {
             input = null;
             output = null;
             connection = null;
+            _connection = null;
         }
         if(!isKilled()) {
             Display.getInstance().callSerially(new Runnable() {
@@ -1409,11 +1411,23 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public SSLCertificate[] getSSLCertificates() throws IOException {
         if (sslCertificates == null) {
+            if (_connection != null && Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
+                // On iOS we need to do some contortions to get the SSL certificates there at the right time.
+                // The _connection object will only be set while a connection is in progress.
+                // It is a reference to the native connection object.
+                // The native certificate callback will be triggered in the iOS port after it has set its SSL certificates
+                // so they should be available.
+
+                sslCertificates = getSSLCertificatesImpl(_connection, url);
+            }
+
+        }
+        if (sslCertificates == null) {
             sslCertificates = new SSLCertificate[0];
         }
         return sslCertificates;
     }
-    
+
     private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
         String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
@@ -2383,10 +2397,28 @@ public class ConnectionRequest implements IOProgressListener {
     
     /**
      * Indicates whether the native Cookie stores should be used
+     * <p>NOTE: If the platform doesn't support Native Cookie sharing, then this method will
+     * have no effect.  Use {@link #isNativeCookieSharingSupported()}} to check if the platform
+     * supports native cookie sharing at runtime.</p>
+     *
      * @param b true to enable native cookie stores when applicable
      */
     public static void setUseNativeCookieStore(boolean b) {
         Util.getImplementation().setUseNativeCookieStore(b);
+    }
+
+    /**
+     * Checks if the platform supports sharing cookies between the native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only iOS and Android support this.
+     *
+     * <p>If the platform does not support native cookie sharing, then methods like {@link #setUseNativeCookieStore(boolean)} will
+     * have no effect.</p>
+     *
+     * @return true if the platform supports native cookie sharing.
+     * @since 8.0
+     */
+    public static boolean isNativeCookieSharingSupported() {
+        return Util.getImplementation().isNativeCookieSharingSupported();
     }
 
     /**

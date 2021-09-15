@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0.11-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-maven-plugin</artifactId>
-    <version>7.0.11-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
     <name>codenameone-maven-plugin</name>
   
@@ -23,6 +23,11 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.jdom</groupId>
+            <artifactId>jdom2</artifactId>
+            <version>2.0.6</version>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -40,6 +45,11 @@
         <dependency>
             <groupId>org.apache.maven.plugin-tools</groupId>
             <artifactId>maven-plugin-annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.surefire</groupId>
+            <artifactId>surefire-api</artifactId>
+
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -104,7 +114,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-cef</artifactId>
-            <version>84.4.1-M2</version>
+            <version>84.4.1-M3</version>
             <type>pom</type>
         </dependency>
 

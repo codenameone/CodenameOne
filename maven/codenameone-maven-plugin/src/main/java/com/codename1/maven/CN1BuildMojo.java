@@ -9,6 +9,8 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -21,6 +23,8 @@ import org.apache.tools.ant.types.resources.Sort;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.*;
 
 import static com.codename1.maven.PathUtil.path;
@@ -64,8 +68,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     @Parameter(property = "open", defaultValue = "true")
     private boolean open;
 
+
+    private String cn1MavenPluginVersion = "";
+    private String cn1MavenVersion = "";
+
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if ("none".equalsIgnoreCase(buildTarget)) {
+            getLog().info("BuildTarget is None.  Skipping cn1build goal");
+            return;
+        }
+        cn1MavenPluginVersion = project.getProperties().getProperty("cn1.plugin.version", "");
+        cn1MavenVersion = project.getProperties().getProperty("cn1.version", "");
+
 
         File retrolambdaJar = getJar("net.orfjackal.retrolambda", "retrolambda");
         if (retrolambdaJar != null && retrolambdaJar.exists()) {
@@ -147,6 +163,77 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     private static String[] BUNDLE_ARTIFACT_ID_BLACKLIST = new String[] {"codenameone-core", "java-runtime"};
 
+    /**
+     * Gets the app extensions jar file that should be included in any iOS builds.
+     * @return The app extensions jar file if it exists.  null otherwise.
+     * @throws IOException
+     */
+    private File getAppExtensionsJar() throws IOException {
+
+        if (!project.getProperties().getProperty("codename1.platform", "").equalsIgnoreCase("ios")){
+            // App extensions are only for iOS
+            return null;
+        }
+        if (!project.getBasedir().getName().equalsIgnoreCase("ios")) {
+            // Make sure we're building the ios project
+            return null;
+        }
+
+        File appExtensionsDir = new File(project.getBasedir(), "app_extensions");
+
+        if (!appExtensionsDir.isDirectory()) return null;
+
+        File appExtensionsJar = new File(project.getBuild().getDirectory() + File.separator + "codenameone" + File.separator + "app_extensions.jar");
+        if (appExtensionsJar.exists() && appExtensionsJar.lastModified() < lastModifiedRecursive(appExtensionsDir)) {
+            // The app extensions jar is out of date.
+            appExtensionsJar.delete();
+        }
+
+        if (!appExtensionsJar.exists()) {
+            File tmpDir = new File(appExtensionsJar.getParentFile(), "app_extensions");
+            if (tmpDir.exists()) {
+                FileUtils.deleteDirectory(tmpDir);
+            }
+            tmpDir.mkdirs();
+            for (File appExtension : appExtensionsDir.listFiles()) {
+                Zip task = (Zip)antProject.createTask("zip");
+                File dest = new File(tmpDir, appExtension.getName()+".ios.appext");
+                task.setDestFile(dest);
+                task.setUpdate(false);
+                if (appExtension.isDirectory()) {
+                    FileSet fs = new FileSet();
+                    fs.setProject(this.antProject);
+                    fs.setDir(appExtension);
+                    task.addFileset(fs);
+                    task.execute();
+                } else if (appExtension.getName().endsWith(".zip")) {
+                    ZipFileSet fileset = new ZipFileSet();
+                    fileset.setProject(antProject);
+                    fileset.setSrc(appExtension);
+                    task.addZipfileset(fileset);
+                    task.execute();
+                }
+
+
+            }
+            Zip task = (Zip)antProject.createTask("zip");
+            task.setDestFile(appExtensionsJar);
+            task.setUpdate(false);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(tmpDir);
+            task.addFileset(fs);
+            task.execute();
+
+        }
+
+        if (appExtensionsJar.exists()) {
+            return appExtensionsJar;
+        }
+
+        return null;
+    }
+
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
         File cn1dir = new File(project.getBuild().getDirectory() + File.separator + "codenameone");
         File antProject = new File(cn1dir, "antProject");
@@ -169,13 +256,34 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         // Build a jar with all dependencies that we will send to the build server.
         File jarWithDependencies = new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-jar-with-dependencies.jar"));
+        List<String> cpElements;
+        try {
+            //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
+            cpElements = project.getCompileClasspathElements();
+        } catch (Exception ex) {
+            throw new MojoExecutionException("Failed to get classpath elements", ex);
+
+        }
+
+        File appExtensionsJar = getAppExtensionsJar();
+        if (appExtensionsJar != null) {
+            cpElements.add(appExtensionsJar.getAbsolutePath());
+        }
+        getLog().debug("Classpath Elements: "+cpElements);
         if (jarWithDependencies.exists()) {
             getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
             // Evidently pom.xml file has already built the jar file - we will use that one.  This allows
             // developers to override what is included in the jar file that is sent to the server.
-            for (Artifact artifact : project.getAttachedArtifacts()) {
-                File jar = artifact.getFile();
-                if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
+
+            for (String artifact : cpElements) {
+                File jar = new File(artifact);
+                if (jar.isDirectory()) {
+                    if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+                        getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                        jarWithDependencies.delete();
+                        break;
+                    }
+                } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
                     // One of the dependency jar files is newer... so we delete the dependencies jar file
                     // and will generate a new one.
                     getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
@@ -185,30 +293,43 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             }
         }
+
+
+
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-            List<String> cpElements;
-            try {
-                //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
-                cpElements = project.getCompileClasspathElements();
-            } catch (Exception ex) {
-                throw new MojoExecutionException("Failed to get classpath elements", ex);
 
-            }
             List<String> blackListJars = new ArrayList<String>();
+            getLog().info("Project artifacts: "+project.getArtifacts());
             for (Artifact artifact : project.getArtifacts()) {
+                boolean addToBlacklist = false;
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+                    addToBlacklist = true;
+                }
+                if (!"compile".equals(artifact.getScope())) {
+                    addToBlacklist = true;
+                }
+                if (addToBlacklist) {
                     File jar = getJar(artifact);
                     if (jar != null) {
                         blackListJars.add(jar.getAbsolutePath());
+                        blackListJars.add(jar.getPath());
+                        try {
+                            blackListJars.add(jar.getCanonicalPath());
+                        } catch (Exception ex){}
                     }
                 }
+
             }
+            getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
             for (String element : cpElements) {
 
+                String canonicalEl = element;
+                try {
+                    canonicalEl = new File(canonicalEl).getCanonicalPath();
+                } catch (Exception ex){}
 
-
-                if (blackListJars.contains(element)) {
+                if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
                     continue;
                 }
                 if (!new File(element).exists()) {
@@ -218,13 +339,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 mergeJars(jarWithDependencies, new File(element));
             }
 
-
-
-
-
         }
-
-
 
         try {
             updateCodenameOne(false);
@@ -293,7 +408,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
-
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-maven-plugin", cn1MavenPluginVersion);
         try (FileOutputStream fos = new FileOutputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.store(fos,"");
 
@@ -336,16 +452,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
 
         });
-        File[] results = null;
+
 
         try {
 
             if (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 automated = false;
                 if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                    results = doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                    doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
-                    results = doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
@@ -489,7 +605,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
     }
 
-    private File[] doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+    private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
 
             File generatedProject = getGeneratedAndroidProjectSourceDirectory();
@@ -502,7 +618,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         if (open) {
                             openAndroidStudioProject(generatedProject);
                         }
-                        return new File[]{generatedProject};
+                        return;
 
                     }
                 }
@@ -547,7 +663,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
         r.setType("android");
 
-        r.setKeystoreAlias(props.getProperty("codenamekeystore1.android.keystoreAlias"));
+        r.setKeystoreAlias(props.getProperty("codename1.android.keystoreAlias"));
         String keystorePath = props.getProperty("codename1.android.keystore");
         if (keystorePath != null) {
             File keystoreFile = new File(keystorePath);
@@ -606,6 +722,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         r.setCertificatePassword(props.getProperty("codename1.android.keystorePassword"));
+
         for (Object k : props.keySet()) {
             String key = (String)k;
             if(key.startsWith("codename1.arg.")) {
@@ -619,11 +736,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         BuildRequest request = r;
-        String incSources = request.getArg("build.incSources", null);
         request.setIncludeSource(true);
-
-
-
         String testBuild = request.getArg("build.unitTest", null);
         if(testBuild != null && testBuild.equals("1")) {
             e.setUnitTestMode(true);
@@ -636,28 +749,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!result) {
                 getLog().error("Received false return value from build()");
                 throw new MojoExecutionException("Android build failed.  Received false return value for build");
-            }
-            // send the response to the server
-            File[] results = e.getResults();
-
-            for (File child : results) {
-                if (child == null) continue;
-                String name = child.getName();
-                int dotpos = name.lastIndexOf(".");
-                if (dotpos < 0) {
-                    continue;
-                }
-                String extension = name.substring(dotpos);
-                String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
-                try {
-                    FileUtils.copyFile(child, copyTo);
-                } catch (IOException ex) {
-                    throw new MojoExecutionException("Failed to copy APK to output directory", ex);
-                }
-                if (".apk".equals(extension)) {
-                    projectHelper.attachArtifact(project, "apk", "android-app", copyTo);
-                }
             }
 
             if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget) && e.getGradleProjectDirectory() != null) {
@@ -675,7 +766,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (open) {
                 openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
             }
-            return results;
+
 
         } catch (BuildException ex) {
 
@@ -733,7 +824,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    private File[] doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+    private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
 
         if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
 
@@ -748,7 +839,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                             getLog().info("Opening workspace project "+getWorkspace(props, generatedProject));
                             openWorkspace(getWorkspace(props, generatedProject));
                         }
-                        return new File[]{generatedProject};
+                        return;
 
                     }
                 }
@@ -823,28 +914,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!result) {
                 throw new MojoExecutionException("iOS build failed");
             }
-            // send the response to the server
-            File[] results = e.getResults();
-
-            for (File child : results) {
-                if (child == null) continue;
-                String name = child.getName();
-                int dotpos = name.lastIndexOf(".");
-                if (dotpos < 0) {
-                    continue;
-                }
-                String extension = name.substring(dotpos);
-                String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
-                try {
-                    FileUtils.copyFile(child, copyTo);
-                } catch (IOException ex) {
-                    throw new MojoExecutionException("Failed to copy APK to output directory", ex);
-                }
-                if (".ipa".equals(extension)) {
-                    projectHelper.attachArtifact(project, "ipa", "ios-app", copyTo);
-                }
-            }
 
             if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
@@ -864,7 +933,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
 
-            return results;
 
         } catch (BuildException ex) {
             throw new MojoExecutionException("Failed to build ios app", ex);
@@ -927,6 +995,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if(!merged.containsKey(key)){
                 merged.put(key, libProps.getProperty(key));
             }else{
+
                 //if this property already exists with a different value the
                 //install will fail
                 if(!merged.get(key).equals(libProps.getProperty(key))){
