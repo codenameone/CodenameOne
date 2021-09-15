@@ -227,7 +227,7 @@ public class Toolbar extends Container {
                 && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
             setTitleCentered(true);
         }
-        setSafeArea(true);
+        //setSafeArea(true);
     }
 
     /**
