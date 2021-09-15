@@ -1432,15 +1432,13 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to generate icon files", ex);
         }
 
-        if (purchasePermissions) {
-            File billingPackage = new File(dummyClassesDir, "com/android/vending/billing");
-
-            new File(billingPackage, "IInAppBillingService.java").delete();
-            new File(srcDir, "com/android/vending/billing/IInAppBillingService.java").delete();
-            new File(billingPackage, "IInAppBillingService.class").delete();
-            new File(billingPackage, "IInAppBillingService$Stub$Proxy.class").delete();
-            new File(billingPackage, "IInAppBillingService$Stub.class").delete();
+        if (!purchasePermissions) {
+            File billingSupport = new File(srcDir, path("com", "codename1", "impl", "android", "BillingSupport.java"));
+            if (billingSupport.exists()) {
+                billingSupport.delete();
+            }
         }
+
         try {
             zipDir(new File(libsDir, "userClasses.jar").getAbsolutePath(), dummyClassesDir.getAbsolutePath());
         } catch (Exception ex) {
@@ -1833,27 +1831,11 @@ public class AndroidGradleBuilder extends Executor {
             activityBillingSource
                     = "    protected boolean isBillingEnabled() {\n"
                     + "        return true;\n"
+                    + "    }\n\n"
+                    + "    protected com.codename1.impl.android.IBillingSupport createBillingSupport() {\n"
+                    + "        return new com.codename1.impl.android.BillingSupport(this);\n"
                     + "    }\n\n";
 
-            String aidlFile = "package com.android.vending.billing;\n\n"
-                    + "import android.os.Bundle;\n"
-                    + "interface IInAppBillingService {\n"
-                    + "    int isBillingSupported(int apiVersion, String packageName, String type);\n"
-                    + "    Bundle getSkuDetails(int apiVersion, String packageName, String type, in Bundle skusBundle);\n"
-                    + "    Bundle getBuyIntent(int apiVersion, String packageName, String sku, String type,\n"
-                    + "        String developerPayload);\n"
-                    + "    Bundle getPurchases(int apiVersion, String packageName, String type, String continuationToken);\n"
-                    + "    int consumePurchase(int apiVersion, String packageName, String purchaseToken);\n"
-                    + "}\n\n";
-            File aidlDir = new File(srcDir, "com/android/vending/billing");
-            aidlDir.mkdirs();
-            try {
-                FileOutputStream aidl = new FileOutputStream(new File(aidlDir, "IInAppBillingService.aidl"));
-                aidl.write(aidlFile.getBytes());
-                aidl.close();
-            } catch (IOException ex) {
-                throw new BuildException("Failed to write IInAppBillinService", ex);
-            }
         }
 
 
@@ -3035,6 +3017,10 @@ public class AndroidGradleBuilder extends Executor {
             if(playServicesWear){
                 additionalDependencies += " compile 'com.google.android.gms:play-services-wearable:"+playServicesVersion+"'\n";
             }
+        }
+
+        if (purchasePermissions) {
+            additionalDependencies += " implementation 'com.android.billingclient:billing:4.0.0'\n";
         }
 
         String useLegacyApache = "";
