@@ -55,7 +55,7 @@ jobs:
       run: ant -noinput -buildfile Ports/Android/build.xml jar
 
     - name: Packaging Everything
-      run: zip result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
+      run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
     - name: Copying Files to Server
       uses: marcodallasanta/ssh-scp-deploy@v1.0.5
