@@ -39,7 +39,7 @@ jobs:
         java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar src build/tempJavaSources
         find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
         cd dist/javadoc
-        zip -r ../../javadocs.zip *
+        zip -rj ../../javadocs.zip *
         cd ..
 
     - name: Build iOS Port
