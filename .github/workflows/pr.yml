@@ -58,10 +58,10 @@ jobs:
       run: zip result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
     - name: Copying Files to Server
-      uses: appleboy/scp-action@v0.0.1
+      uses: marcodallasanta/ssh-scp-deploy@v1.0.5
       with:
         host: ${{ secrets.WP_HOST }}
-        username: ${{ secrets.WP_USER }}
+        user: ${{ secrets.WP_USER }}
         password: ${{ secrets.WP_PASSWORD }}
-        source: result.zip
+        local: result.zip
   
