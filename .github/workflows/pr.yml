@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - master
+  push:
+    branches:
+      - master
 
 jobs:
   build-linux-jdk8-fx:
@@ -25,6 +28,20 @@ jobs:
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
+    - name: Build JavaDocs
+      run: |
+        cd CodenameOne
+        mkdir -p build
+        mkdir -p build/tempJavaSources
+        mkdir -p dist
+        mkdir -p dist/javadoc
+        wget https://github.com/codenameone/JavaDocSourceEmbed/releases/download/refs%2Fheads%2Fmaster/JavaDocSourceEmbed-1.0-SNAPSHOT.jar
+        java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar src build/tempJavaSources
+        find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
+        cd dist/javadoc
+        zip -r ../../javadocs.zip *
+        cd ..
+
     - name: Build iOS Port
       run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
 
@@ -36,3 +53,15 @@ jobs:
 
     - name: Build Android Port
       run: ant -noinput -buildfile Ports/Android/build.xml jar
+
+    - name: Packaging Everything
+      run: zip result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
+
+    - name: Copying Files to Server
+      uses: marcodallasanta/ssh-scp-deploy@v1.0.5
+      with:
+        host: ${{ secrets.WP_HOST }}
+        user: ${{ secrets.WP_USER }}
+        password: ${{ secrets.WP_PASSWORD }}
+        local: result.zip
+  
