@@ -2086,7 +2086,6 @@ public class AndroidGradleBuilder extends Executor {
                 + "             currentForm = null;\n"
                 + "        }\n"
                 + "        Display.getInstance().callSerially(new Runnable() { public void run() {i.stop();} });\n"
-                + "        stopped = true;\n"
                 + "        running = false;\n"
                 + "    }\n\n";
 
@@ -2225,7 +2224,6 @@ public class AndroidGradleBuilder extends Executor {
                     + "    private static " + request.getMainClass() + "Stub stubInstance;\n"
                     + "    private static " + request.getMainClass() + " i;\n"
                     + "    private boolean running;\n"
-                    + "    private boolean stopped = true;\n"
                     + "    private" + firstTimeStatic + " boolean firstTime = true;\n"
                     + "    private Form currentForm;\n"
                     + "    private static final Object LOCK = new Object();\n"
@@ -2340,13 +2338,10 @@ public class AndroidGradleBuilder extends Executor {
                             + localNotificationCode
                             + "        Display.getInstance().callSerially(new Runnable(){\n"
                             + "            Form currForm = currentForm;\n"
-                            + "            boolean wasStopped = stopped;\n"
                             + "            public void run() {\n"
-                            + "                if (!firstTime && !wasStopped && i != null) i.stop();\n"
-                            + "                " + request.getMainClass() + "Stub.this.run(Display.getInstance().getCurrent() == null ? currForm : Display.getInstance().getCurrent());\n"
+                            + "                " + request.getMainClass() + "Stub.this.run(currForm);\n"
                             + "            }\n"
                             + "        });\n"
-                            + "        stopped = false;\n"
                             + "        synchronized(LOCK) {\n"
                             + "            currentForm = null;\n"
                             + "        }\n"
