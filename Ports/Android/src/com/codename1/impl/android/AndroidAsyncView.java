@@ -353,6 +353,11 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         }
     }
 
+    // A counter used in flushGraphics to count how many times the rendering operations
+    // being non-empty blocks a flushGraphics call.
+    // When this reaches 10, the rendering operations are flushed.
+    private int timeoutCounter=0;
+
     @Override
     public void flushGraphics(Rect rect) {
         //Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "Flush graphics invoked with pending: " + pendingRenderingOperations.size() + " and current " + renderingOperations.size());
@@ -368,12 +373,31 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 // don't let the EDT die here
                 counter++;
                 if (counter > 10) {
+                    synchronized (RENDERING_OPERATIONS_LOCK) {
+                        pendingRenderingOperations.clear();
+                        if (timeoutCounter++ > 10) {
+                            renderingOperations.clear();
+                        }
+                    }
+
                     //Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "Flush graphics timed out!!!");
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            Form f = Display.getInstance().getCurrent();
+                            if (f != null) {
+                                f.repaint();
+                            }
+                        }
+
+                    });
                     return;
                 }
             } catch (InterruptedException err) {
             }
         }
+        timeoutCounter = 0;
         ArrayList<AsyncOp> tmp = renderingOperations;
         renderingOperations = pendingRenderingOperations;
         pendingRenderingOperations = tmp;
