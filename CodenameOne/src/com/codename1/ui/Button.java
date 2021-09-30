@@ -876,6 +876,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     @Override
     void deinitializeImpl() {
+        if (state == STATE_PRESSED) {
+            setReleased();
+        }
         super.deinitializeImpl(); 
         if(pressedIcon != null) {
             pressedIcon.unlock();
