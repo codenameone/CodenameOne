@@ -73,10 +73,10 @@ public class BillingSupport implements IBillingSupport {
     }
 
     //private final Object lock = new Object();
-    private Inventory inventory = new Inventory();
+    private final Inventory inventory = new Inventory();
 
     //IabHelper mHelper;
-    private PurchasesUpdatedListener purchasesUpdatedListener = new PurchasesUpdatedListener() {
+    private final PurchasesUpdatedListener purchasesUpdatedListener = new PurchasesUpdatedListener() {
         @Override
         public void onPurchasesUpdated(BillingResult billingResult, List<Purchase> purchases) {
             // To be implemented in a later section.
@@ -98,6 +98,7 @@ public class BillingSupport implements IBillingSupport {
 
     private boolean billingConnected;
 
+    @Override
     public void initBilling() {
         if (!activity.isBillingEnabled()) return;
         billingClient= BillingClient.newBuilder(activity)
@@ -137,27 +138,9 @@ public class BillingSupport implements IBillingSupport {
         }
     }
 
-    private void queryPurchases() {
-        billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, new PurchasesResponseListener() {
-            @Override
-            public void onQueryPurchasesResponse(BillingResult billingResult, List<Purchase> purchases) {
-                if (isFailure(billingResult)) {
-                    return;
-                }
-                if (purchases != null && !purchases.isEmpty()) {
-                    for (Purchase purchase : purchases) {
-                        for (String sku : purchase.getSkus()) {
-                            inventory.add(sku, purchase);
-                        }
-                    }
-                    // Now load all of the sku details for our purchases
-                    inventory.loadSkuDetailsAsync();
-                }
 
-            }
-        });
-    }
 
+    @Override
     public void consumeAndAcknowlegePurchases() {
         billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, new PurchasesResponseListener() {
             @Override
@@ -172,24 +155,44 @@ public class BillingSupport implements IBillingSupport {
         });
     }
 
-
+    private Set<String> handlingPurchase = new HashSet<String>();
 
     private void handlePurchase(final Purchase purchase) {
+        if (handlingPurchase.contains(purchase.getPurchaseToken())) {
+            return;
+
+        }
+        handlingPurchase.add(purchase.getPurchaseToken());
+
+        final PurchaseCallback pc = getPurchaseCallback();
         if (!verifyDeveloperPayload(purchase)) {
+            if (pc != null && pc instanceof PendingPurchaseCallback) {
+                final PendingPurchaseCallback ppc = (PendingPurchaseCallback)pc;
+                CN.callSerially(new Runnable() {
+                    public void run() {
+                        for (String sku : purchase.getSkus()) {
+                            ppc.itemPurchaseError(sku, "Invalid developer payload");
+                        }
+
+                    }
+                });
+            }
+            handlingPurchase.remove(purchase.getPurchaseToken());
             return;
         }
-        final PurchaseCallback pc = getPurchaseCallback();
         if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) {
             // This must be a pending purchase.  We don't do anything here.
             // This will be called again when the purchase completes.
             if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING && pc != null && pc instanceof PendingPurchaseCallback) {
                 final PendingPurchaseCallback ppc = (PendingPurchaseCallback)pc;
                 CN.callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         ppc.itemPurchasePending(purchase.getSkus().iterator().next());
                     }
                 });
             }
+            handlingPurchase.remove(purchase.getPurchaseToken());
             return;
 
         }
@@ -197,43 +200,49 @@ public class BillingSupport implements IBillingSupport {
 
         final String sku = purchase.getSkus().iterator().next();
 
-        if (pc != null) {
-            Display.getInstance().callSerially(new Runnable() {
+        final Runnable onPurchaseAcknowledged = new Runnable() {
+            public void run() {
+                if (pc != null) {
+                    Display.getInstance().callSerially(new Runnable() {
 
-                @Override
-                public void run() {
-                    // Sandbox transactions have no order ID, so we'll make a dummy transaction ID
-                    // in this case.
-                    String transactionId = (purchase.getOrderId() == null || purchase.getOrderId().isEmpty()) ?
-                            "play-sandbox-"+ UUID.randomUUID().toString() : purchase.getOrderId();
-                    String purchaseJsonStr = purchase.getOriginalJson();
-                    try {
-                        // In order to verify receipts, we'll need both the order data and the signature
-                        // so we'll pack it all into a single JSON string.
-                        JSONObject purchaseJson = new JSONObject(purchaseJsonStr);
-                        JSONObject rootJson = new JSONObject();
-                        rootJson.put("data", purchaseJson);
-                        rootJson.put("signature", purchase.getSignature());
-                        purchaseJsonStr = rootJson.toString();
+                        @Override
+                        public void run() {
+                            // Sandbox transactions have no order ID, so we'll make a dummy transaction ID
+                            // in this case.
+                            String transactionId = (purchase.getOrderId() == null || purchase.getOrderId().isEmpty()) ?
+                                    "play-sandbox-"+ UUID.randomUUID().toString() : purchase.getOrderId();
+                            String purchaseJsonStr = purchase.getOriginalJson();
+                            try {
+                                // In order to verify receipts, we'll need both the order data and the signature
+                                // so we'll pack it all into a single JSON string.
+                                JSONObject purchaseJson = new JSONObject(purchaseJsonStr);
+                                JSONObject rootJson = new JSONObject();
+                                rootJson.put("data", purchaseJson);
+                                rootJson.put("signature", purchase.getSignature());
+                                purchaseJsonStr = rootJson.toString();
 
-                    } catch (JSONException ex) {
-                        Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchaseJsonStr);
-                    pc.itemPurchased(sku);
+                            } catch (JSONException ex) {
+                                Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                            com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchaseJsonStr);
+                            pc.itemPurchased(sku);
+                        }
+                    });
+                    inventory.add(sku, purchase);
+                    //This is a temp hack to get the last purchase raw data
+                    //The IAP API needs to be modified to support this on all platforms
+                    Display.getInstance().setProperty("lastPurchaseData", purchase.getOriginalJson());
                 }
-            });
-            inventory.add(purchase.getSkus().iterator().next(), purchase);
-            //This is a temp hack to get the last purchase raw data
-            //The IAP API needs to be modified to support this on all platforms
-            Display.getInstance().setProperty("lastPurchaseData", purchase.getOriginalJson());
-        }
+            }
+        };
         //check if this product is a non consumable product
+
         if (!isConsumable(sku)) {
             if (!purchase.isAcknowledged()) {
                 billingClient.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(), new AcknowledgePurchaseResponseListener() {
                     @Override
                     public void onAcknowledgePurchaseResponse(final BillingResult billingResult) {
+                        handlingPurchase.remove(purchase.getPurchaseToken());
                         if (isFailure(billingResult)) {
                             final PurchaseCallback pc = getPurchaseCallback();
                             if (pc != null) {
@@ -246,9 +255,13 @@ public class BillingSupport implements IBillingSupport {
                                     }
                                 });
                             }
+                        } else {
+                            onPurchaseAcknowledged.run();
                         }
                     }
                 });
+            } else {
+                handlingPurchase.remove(purchase.getPurchaseToken());
             }
             return;
         }
@@ -260,6 +273,7 @@ public class BillingSupport implements IBillingSupport {
         ConsumeResponseListener listener = new ConsumeResponseListener() {
             @Override
             public void onConsumeResponse(final BillingResult billingResult, String purchaseToken) {
+                handlingPurchase.remove(purchase.getPurchaseToken());
                 if (isFailure(billingResult)) {
                     final PurchaseCallback pc = getPurchaseCallback();
                     if (pc != null) {
@@ -272,6 +286,8 @@ public class BillingSupport implements IBillingSupport {
                             }
                         });
                     }
+                } else {
+                    onPurchaseAcknowledged.run();
                 }
                 if(purchase != null){
                     inventory.erasePurchase(sku);
@@ -279,14 +295,21 @@ public class BillingSupport implements IBillingSupport {
             }
         };
 
-        billingClient.consumeAsync(consumeParams, listener);
+        if (!purchase.isAcknowledged()) {
+            billingClient.consumeAsync(consumeParams, listener);
+        } else {
+            handlingPurchase.remove(purchase.getPurchaseToken());
+        }
+
     }
 
 
+    @Override
     public void purchase(final String item) {
         _purchase(item, BillingClient.SkuType.INAPP);
     }
 
+    @Override
     public void subscribe(final String item) {
         _purchase(item, BillingClient.SkuType.SUBS);
     }
@@ -298,6 +321,7 @@ public class BillingSupport implements IBillingSupport {
                 return;
             }
             CN.callSerially(new Runnable() {
+                @Override
                 public void run() {
                     pc.itemPurchaseError(item, "Subscriptions are not supported on this device");
                 }
@@ -315,6 +339,7 @@ public class BillingSupport implements IBillingSupport {
                         return;
                     }
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             pc.itemPurchaseError(item, billingResult.getDebugMessage());
                         }
@@ -329,6 +354,7 @@ public class BillingSupport implements IBillingSupport {
                         return;
                     }
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             pc.itemPurchaseError(item, "No item could be found in the Playstore with sku "+item);
                         }
@@ -356,9 +382,10 @@ public class BillingSupport implements IBillingSupport {
     }
 
     private class Inventory {
-        private Set<String> subscriptions = new HashSet<String>();
-        private LinkedHashMap<String, Product> products = new LinkedHashMap<String,Product>();
-        private LinkedHashMap<String,Purchase> purchases = new LinkedHashMap<String,Purchase>();
+        private final Set<String> subscriptions = new HashSet<String>();
+        private final LinkedHashMap<String, Product> products = new LinkedHashMap<String,Product>();
+        private final LinkedHashMap<String,Purchase> purchases = new LinkedHashMap<String,Purchase>();
+
 
         public synchronized boolean hasDetails(String sku) {
             return products.containsKey(sku);
@@ -379,7 +406,10 @@ public class BillingSupport implements IBillingSupport {
             p.setDisplayName(details.getTitle());
             p.setLocalizedPrice(details.getPrice());
             add(details.getSku(), p);
-            subscriptions.add(details.getSku());
+            if (subscription) {
+
+                subscriptions.add(details.getSku());
+            }
         }
 
         public synchronized Product getProduct(String sku) {
@@ -410,6 +440,7 @@ public class BillingSupport implements IBillingSupport {
             Set<String> skus = new HashSet<String>();
             skus.addAll(purchases.keySet());
             skus.removeAll(products.keySet());
+
             if (!skus.isEmpty()) {
 
                 billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
@@ -435,6 +466,7 @@ public class BillingSupport implements IBillingSupport {
                                 }
 
                             }
+
                         }
                     });
                 }
@@ -458,6 +490,7 @@ public class BillingSupport implements IBillingSupport {
         return billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK;
     }
 
+    @Override
     public Product[] getProducts(String[] skus, boolean fromCacheOnly){
 
         if(inventory != null){
@@ -529,6 +562,7 @@ public class BillingSupport implements IBillingSupport {
 
                 while (complete[0] < 2) {
                     CN.invokeAndBlock(new Runnable() {
+                        @Override
                         public void run() {
                             synchronized (lock) {
                                 while (complete[0] < 2) {
@@ -556,6 +590,7 @@ public class BillingSupport implements IBillingSupport {
         return null;
     }
 
+    @Override
     public boolean isConsumable(String sku){
 
         if (isSubscription(sku) || sku.endsWith("nonconsume")) {
@@ -570,23 +605,10 @@ public class BillingSupport implements IBillingSupport {
 
     }
 
+    @Override
     public boolean wasPurchased(String item) {
-        if(inventory != null){
-            return inventory.hasPurchase(item);
-        }
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while(inventory == null){
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            }
-        });
         return inventory.hasPurchase(item);
+
     }
 
     public PurchaseCallback getPurchaseCallback() {
@@ -595,6 +617,7 @@ public class BillingSupport implements IBillingSupport {
         return pc;
     }
 
+    @Override
     public void onDestroy() {
         if (billingClient != null) {
             billingClient.endConnection();
