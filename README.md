@@ -2,10 +2,11 @@
  <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/08/CN1-Banner-Dark-Blue.jpg" />
 </h1>
 
-![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=plastic)
-![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?style=plastic)
-![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=blue&style=plastic)
-![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-blue?style=plastic)
+![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=flat-square)
+![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?style=flat-square)
+![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=blue?style=flat-square)
+![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-blue?style=flat-square)
+![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
 ## Codename One - Cross Platform Native Apps with Java or Kotlin
