@@ -6,7 +6,7 @@
 ![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?color=orange&style=flat-square)
 ![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=success&style=flat-square)
 ![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-FFFF00?style=flat-square)
-![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)
+[![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)](https://github.com/codenameone/CodenameOne/labels/Hacktoberfest)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
 ## Codename One - Cross Platform Native Apps with Java or Kotlin
