@@ -798,7 +798,10 @@ public class Executor {
             if (srcMain.exists()) {
                 sourceWatcher.addWatchFolder(srcMain);
             }
-
+            File srcMainKotlin = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "kotlin");
+            if (srcMainKotlin.exists()) {
+                sourceWatcher.addWatchFolder(srcMainKotlin);
+            }
 
             File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
             if (srcRad.exists()) {
