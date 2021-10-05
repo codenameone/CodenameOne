@@ -55,7 +55,7 @@ This means faster debugging cycle and faster development process!
 ### Large Selection of Device Skins
 
 Choose from a large selection of device “skins” to see how your app will look on particular devices. The skin takes into account factors such as resolution and
-device density to provide a pixel-perfectre presentation of your app, as it would appear on the real device.
+device density to provide a pixel-perfect presentation of your app, as it would appear on the real device.
 Switching between device skins is nearly instant.
 
 You can edit and contribute skins in their own open source project [here](https://github.com/codenameone/codenameone-skins).
@@ -167,7 +167,7 @@ You can get started with the binary and the birds eye view in the [download sect
 
 ## Setup & Getting Started With The Code
 
-NOTE: We are in the process of migrating from Ant to Maven, which simplifies the process for building from source.  This section still refers to the process for for building with Ant.  See [Maven Quick Start](#maven) for the new Maven build instructions.
+NOTE: We are in the process of migrating from Ant to Maven, which simplifies the process for building from source.  This section still refers to the process for building with Ant.  See [Maven Quick Start](#maven) for the new Maven build instructions.
 
 Setup is covered in depth in [this article and video](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html). Notice that this covers debugging the simulator and working with the code that requires the Codename One plugin for NetBeans. You can install that by installing NetBeans and typing "Codename One" in the plugin search section see [the getting started tutorial](https://www.codenameone.com/getting-started.html).
 
