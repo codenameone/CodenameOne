@@ -51,12 +51,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected static final String GROUP_ID="com.codenameone";
     protected static final String JAVA_RUNTIME_ARTIFACT_ID = "java-runtime";
     protected static final String ARTIFACT_ID="codenameone-maven-plugin";
-    
-    
-    @Component
+
+
+    @Parameter( defaultValue = "${projectHelper}", readonly = true )
     protected MavenProjectHelper projectHelper;
-    
-    @Component
+
+    @Parameter( defaultValue = "${project}", readonly = true)
     protected MavenProject project;
 
     @Parameter(property = "project.build.directory", readonly = true)
