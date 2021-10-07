@@ -213,6 +213,8 @@ $ ant samples
 
 ### Quick Start with Maven
 
+IMPORTANT: Building Codename One requires JDK 8, currently.  You cannot use JDK 11 as some sub-modules must use `-source 1.5` and `-target 1.5` to maintain backward compatibility with parts of the toolchain.
+
 ~~~~
 git clone https://github.com/codenameone/CodenameOne
 cd CodenameOne/maven
