@@ -53,7 +53,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected static final String ARTIFACT_ID="codenameone-maven-plugin";
 
 
-    @Parameter( defaultValue = "${projectHelper}", readonly = true )
+    @Component
     protected MavenProjectHelper projectHelper;
 
     @Parameter( defaultValue = "${project}", readonly = true)
