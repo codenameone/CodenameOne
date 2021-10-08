@@ -344,7 +344,7 @@ public class IPhoneBuilder extends Executor {
         // We must now go through and extract this tar file into a separate directory so that we can copy them
         // into the project folder after ByteCodeTranslator has created the Xcode project.
         
-        // Look for frameworks
+        // Look for frameworks and localized strings
         Set<String> variantGroups = new HashSet<String>();
         for (File child : resDir.listFiles()) {
             if (child.getName().endsWith(".lproj.zip")) {
