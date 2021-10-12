@@ -2044,7 +2044,7 @@ public class GroupLayout extends Layout {
                 if (!baselineSpring.isResizable(VERTICAL)) {
                     // Spring to use for baseline isn't resizable. In this case
                     // baseline resize behavior can be determined based on how
-                    // preceeding springs resize.
+                    // preceding springs resize.
                     boolean leadingResizable = false;
                     for (int i = 0, max = springs.size(); i < max; i++) {
                         Spring spring = getSpring(i);
