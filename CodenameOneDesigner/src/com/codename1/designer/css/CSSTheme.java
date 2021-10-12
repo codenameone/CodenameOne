@@ -1692,13 +1692,21 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, disabledId+"#marUnit", el.getThemeMarginUnit(disabledStyles));
 
                 currToken = "elevation";
-                res.setThemeProperty(themeName, unselId+".elevation", el.getThemeElevation(unselectedStyles));
+                if (unselectedStyles.containsKey("elevation")) {
+                    res.setThemeProperty(themeName, unselId + ".elevation", el.getThemeElevation(unselectedStyles));
+                }
                 currToken = "selected elevation";
-                res.setThemeProperty(themeName, selId+"#elevation", el.getThemeElevation(selectedStyles));
+                if (selectedStyles.containsKey("elevation")) {
+                    res.setThemeProperty(themeName, selId + "#elevation", el.getThemeElevation(selectedStyles));
+                }
                 currToken = "pressed elevation";
-                res.setThemeProperty(themeName, pressedId+"#elevation", el.getThemeElevation(pressedStyles));
+                if (pressedStyles.containsKey("elevation")) {
+                    res.setThemeProperty(themeName, pressedId + "#elevation", el.getThemeElevation(pressedStyles));
+                }
                 currToken = "disabled elevation";
-                res.setThemeProperty(themeName, disabledId+"#elevation", el.getThemeElevation(disabledStyles));
+                if (disabledStyles.containsKey("elevation")) {
+                    res.setThemeProperty(themeName, disabledId + "#elevation", el.getThemeElevation(disabledStyles));
+                }
 
                 currToken = "iconGap";
                 float gap = el.getThemeIconGap(unselectedStyles);
@@ -1741,13 +1749,21 @@ public class CSSTheme {
 
 
                 currToken = "surface";
-                res.setThemeProperty(themeName, unselId+".surface", el.getThemeSurface(unselectedStyles));
+                if (unselectedStyles.containsKey("surface")) {
+                    res.setThemeProperty(themeName, unselId + ".surface", el.getThemeSurface(unselectedStyles));
+                }
                 currToken = "selected surface";
-                res.setThemeProperty(themeName, selId+"#surface", el.getThemeSurface(selectedStyles));
+                if (selectedStyles.containsKey("surface")) {
+                    res.setThemeProperty(themeName, selId + "#surface", el.getThemeSurface(selectedStyles));
+                }
                 currToken = "pressed surface";
-                res.setThemeProperty(themeName, pressedId+"#surface", el.getThemeSurface(pressedStyles));
+                if (pressedStyles.containsKey("surface")) {
+                    res.setThemeProperty(themeName, pressedId + "#surface", el.getThemeSurface(pressedStyles));
+                }
                 currToken = "disabled surface";
-                res.setThemeProperty(themeName, disabledId+"#surface", el.getThemeSurface(disabledStyles));
+                if (disabledStyles.containsKey("surface")) {
+                    res.setThemeProperty(themeName, disabledId + "#surface", el.getThemeSurface(disabledStyles));
+                }
 
 
                 currToken = "fgColor";
@@ -1961,7 +1977,9 @@ public class CSSTheme {
         
         
     }
-    
+
+
+
     
     private Set<String> referencedImageNames;
     
