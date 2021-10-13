@@ -386,8 +386,9 @@ public class IPhoneBuilder extends Executor {
                                 log("Failed to reparent nested strings file "+nestedStringsFile+" to "+destStringsFile);
                             }
                         }
+                        delTree(nestedLanguageDir, true);
                     }
-                    delTree(nestedLanguageDir, true);
+
                 }
 
                 if (!languageDir.exists()) {
