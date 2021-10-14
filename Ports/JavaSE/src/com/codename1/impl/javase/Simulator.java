@@ -159,7 +159,7 @@ public class Simulator {
         if (cn1Props.exists()) {
             File commonClasses = new File(cn1Props.getParentFile(), "target" + File.separator + "classes");
             if (commonClasses.exists()) {
-                files.add(commonClasses);
+                files.add(commonClasses.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
         }
@@ -169,7 +169,7 @@ public class Simulator {
         }
         int len = t.countTokens();
         for (int iter = 0; iter < len; iter++) {
-            files.add(new File(t.nextToken()));
+            files.add(new File(t.nextToken()).getAbsoluteFile());
         }
         File javase = new File("native" + File.separator + "javase");
         File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
@@ -179,7 +179,7 @@ public class Simulator {
                 for (File jar : dir.listFiles()) {
                     if (jar.getName().endsWith(".jar")) {
                         if (!files.contains(jar)) {
-                            files.add(jar);
+                            files.add(jar.getAbsoluteFile());
                             System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());
                         }
                     }
@@ -212,7 +212,7 @@ public class Simulator {
                 System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
                 for (File jar : cef.listFiles()) {
                     if (jar.getName().endsWith(".jar") && !jar.getName().endsWith("-tests.jar")) {
-                        files.add(jar);
+                        files.add(jar.getAbsoluteFile());
                     }
                 }
             }
@@ -221,7 +221,7 @@ public class Simulator {
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
             System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jmf.getAbsolutePath());
-            files.add(jmf);
+            files.add(jmf.getAbsoluteFile());
         }
         
         String implementation = System.getProperty("cn1.javase.implementation", "");
@@ -470,7 +470,7 @@ public class Simulator {
             List<File> files = new ArrayList<File>();
             for (String part : parts) {
                 part = part.trim();
-                files.add(new File(part));
+                files.add(new File(part).getAbsoluteFile());
             }
             return files;
         }
