@@ -930,7 +930,7 @@ public class ByteCodeClass {
                 b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
                 b.append("    int len = values->length;\n");
                 b.append("    for (int i=0; i<len; i++) {\n");
-                b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
+                b.append("        JAVA_OBJECT name = (*(struct obj__").append(clsName).append("*)data[i]).java_lang_Enum_name;\n");
                 b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
                 b.append("    }\n");
                 b.append("    return JAVA_NULL;\n");
@@ -1102,19 +1102,31 @@ public class ByteCodeClass {
     }
     
     private void buildInstanceFieldList(List<ByteCodeField> fieldList) {
+        buildInstanceFieldList(fieldList, true);
+    }
+    
+    private void buildInstanceFieldList(List<ByteCodeField> fieldList, boolean includePrivateFields) {
         for(ByteCodeField bf : fields) {
+            // We don't include private fields from parent classes.
+            if (!includePrivateFields && bf.isPrivate()) continue;
             if(!bf.isStaticField() && !fieldList.contains(bf)) {
                 fieldList.add(bf);
             } 
         }
         if(baseClassObject != null) {
-            baseClassObject.buildInstanceFieldList(fieldList);
+            baseClassObject.buildInstanceFieldList(fieldList, false);
         }        
     } 
 
     private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList) {
+        return buildStaticFieldList(fieldList, true);
+    }
+    
+    private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList, boolean includePrivateFields) {
         if (fields != null) {
             for(ByteCodeField bf : fields) {
+                // We don't include private fields from parent classes.
+                if (!includePrivateFields && bf.isPrivate()) continue;
                 if(bf.isStaticField() && !fieldList.contains(bf)) {
                     fieldList.add(bf);
                 } 
@@ -1122,11 +1134,11 @@ public class ByteCodeClass {
         }
         if(baseInterfacesObject != null) {
             for(ByteCodeClass baseInterface : baseInterfacesObject) {
-                baseInterface.buildStaticFieldList(fieldList);
+                baseInterface.buildStaticFieldList(fieldList, false);
             }
         }
         if(baseClassObject != null) {
-            baseClassObject.buildStaticFieldList(fieldList);
+            baseClassObject.buildStaticFieldList(fieldList, false);
         }        
         return fieldList;
     } 
