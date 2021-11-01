@@ -585,6 +585,7 @@ public class IPhoneBuilder extends Executor {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
                 public void usesClass(String cls) {
+                    if (cls == null) return;
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -596,7 +597,7 @@ public class IPhoneBuilder extends Executor {
                 }
             });
         } catch (Exception ex) {
-            throw new BuildException("Failed to scan project classes for permissions.");
+            throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         
 
