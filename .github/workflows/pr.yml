@@ -48,8 +48,20 @@ jobs:
     - name: Build iOS VM API
       run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
 
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: JavaAPI.jar
+        path: vm/JavaAPI/dist/JavaAPI.jar
+
     - name: Build iOS VM
       run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
+
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: ByteCodeTranslator.jar
+        path: vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar
 
     - name: Build Android Port
       run: ant -noinput -buildfile Ports/Android/build.xml jar
@@ -65,3 +77,4 @@ jobs:
         password: ${{ secrets.WP_PASSWORD }}
         local: result.zip
   
+
