@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>8.0-SNAPSHOT</version>
+        <version>7.0.46</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone.tests</groupId>
     <artifactId>codenameone-tests</artifactId>
-    <version>8.0-SNAPSHOT</version>
+    <version>7.0.46</version>
     <packaging>pom</packaging>
     <name>codenameone-tests</name>
     <description>codenameone-tests</description>
