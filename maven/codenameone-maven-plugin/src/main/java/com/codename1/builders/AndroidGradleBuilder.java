@@ -2188,7 +2188,16 @@ public class AndroidGradleBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.lightColor\", \""+notificationChannelLightColor+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.enableVibration\", \""+notificationChannelEnableVibration+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.vibrationPattern\", "+notificationChannelVibrationPattern+");\n"
+                    + "        try {\n"
+                    + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION).toString());\n"
+                    + "        } catch (Exception ex){}\n";
             ;
+            if (request.getArg("android.pushSound", null) != null) {
+                pushInitDisplayProperties += "        try {\n"
+                        + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", \"android.resource://" + request.getPackageName() + "/raw/" + request.getArg("android.pushSound", null)+"\");\n"
+                        + "        } catch (Exception ex){}\n";
+            }
+
         }
 
         String waitingForPermissionsRequest=

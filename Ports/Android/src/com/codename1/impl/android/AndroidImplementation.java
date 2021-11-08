@@ -6840,7 +6840,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         "android.NotificationChannel.enableLights",
         "android.NotificationChannel.lightColor",
         "android.NotificationChannel.enableVibration",
-        "android.NotificationChannel.vibrationPattern"
+        "android.NotificationChannel.vibrationPattern",
+        "android.NotoficationChannel.soundUri"
     };
     
     /**
@@ -7024,6 +7025,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     method = clsNotificationChannel.getMethod("setVibrationPattern", long[].class);
                     method.invoke(mChannel, new Object[]{pattern});
                     //mChannel.setVibrationPattern(pattern);
+                }
+                
+                String soundUri = getServiceProperty("android.NotificationChannel.soundUri", null, context);
+                if (soundUri != null) {
+                    Uri uri= android.net.Uri.parse(soundUri);
+                    
+                    android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .build();
+                    method = clsNotificationChannel.getMethod("setSound", android.net.Uri.class, android.media.AudioAttributes.class);
+                    method.invoke(mChannel, new Object[]{uri, audioAttributes});
                 }
                 
                 method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);
