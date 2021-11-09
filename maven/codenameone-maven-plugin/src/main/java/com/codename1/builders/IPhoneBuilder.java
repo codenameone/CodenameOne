@@ -1606,6 +1606,9 @@ public class IPhoneBuilder extends Executor {
                     }
                     addMinDeploymentTarget(targetStr);
                     deploymentTargetStr = "begin\n"
+                            + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
+                            + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
+                            + "  }\n"
                             + "  xcproj.targets.each do |target|\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
