@@ -68,6 +68,7 @@ public class IPhoneBuilder extends Executor {
     private boolean photoLibraryUsage;
     private String buildVersion;
     private boolean usesLocalNotifications;
+    private boolean usesPurchaseAPI;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -588,6 +589,9 @@ public class IPhoneBuilder extends Executor {
                     if (cls == null) return;
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
+                    }
+                    if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
+                        usesPurchaseAPI = true;
                     }
                 }
 
@@ -1319,6 +1323,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController_h, "#define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization", "#define CN1_REQUEST_LOCATION_AUTH requestAlwaysAuthorization");
 
             }
+            if (usesPurchaseAPI) {
+                File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
+                replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_STOREKIT", "#define CN1_USE_STOREKIT");
+
+            }
         } catch (Exception ex) {
             throw new BuildException("Failure while injecting code from build hints", ex);
         }
@@ -1443,6 +1452,10 @@ public class IPhoneBuilder extends Executor {
                     if (addLibs.indexOf("QuartzCore.framework") < 0) {
                         addLibs += ";QuartzCore.framework";
                     }
+                }
+
+                if (usesPurchaseAPI) {
+                    addLibs += ";StoreKit.framework";
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failed to process build hints", ex);

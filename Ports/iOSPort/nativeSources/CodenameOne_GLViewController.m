@@ -74,6 +74,8 @@
 #endif
 #import "com_codename1_payment_Purchase.h"
 
+
+
 //#define CN1_USE_SPLASH_SCREEN
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
@@ -2205,7 +2207,9 @@ EAGLView* lastFoundEaglView;
         [[self eaglView] presentFramebuffer];
         GLErrorLog;
     }
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+#endif
 }
 
 CGFloat getOriginY() {
@@ -3418,6 +3422,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 
 extern JAVA_OBJECT productsArrayPending;
 
+#ifdef CN1_USE_STOREKIT
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
 	POOL_BEGIN();
     if(productsArrayPending != nil) {
@@ -3525,6 +3530,8 @@ extern SKPayment *paymentInstance;
     CN1Log(@"Restore error");
     com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
 }
+
+#endif
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
     CN1Log(@"audioRecorderDidFinishRecording: %i", (int)flag);

@@ -319,7 +319,7 @@ public class ByteCodeTranslator {
             includeFrameworks.add("libsqlite3.0.dylib");
             includeFrameworks.add("GameKit.framework");
             includeFrameworks.add("Security.framework");
-            includeFrameworks.add("StoreKit.framework");
+            //includeFrameworks.add("StoreKit.framework");
             includeFrameworks.add("CoreMotion.framework");
             includeFrameworks.add("CoreLocation.framework");
             includeFrameworks.add("MessageUI.framework");

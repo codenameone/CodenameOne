@@ -35,7 +35,10 @@
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
 #import <CoreLocation/CoreLocation.h>
+//#define CN1_USE_STOREKIT
+#ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
+#endif
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
 //#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
@@ -154,7 +157,11 @@
 
 //ADD_INCLUDE
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, 
+#ifdef CN1_USE_STOREKIT
+SKProductsRequestDelegate, SKPaymentTransactionObserver, 
+#endif
+MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif
