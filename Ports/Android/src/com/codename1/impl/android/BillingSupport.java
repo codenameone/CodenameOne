@@ -41,6 +41,10 @@ import com.codename1.payment.PurchaseCallback;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+import com.codename1.util.SuccessCallback;
+import java.io.IOException;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -97,34 +101,84 @@ public class BillingSupport implements IBillingSupport {
     private BillingClient billingClient;
 
     private boolean billingConnected;
+    private AsyncResource pendingConnection;
 
     @Override
     public void initBilling() {
-        if (!activity.isBillingEnabled()) return;
-        billingClient= BillingClient.newBuilder(activity)
-                .setListener(purchasesUpdatedListener)
-                .enablePendingPurchases()
-                .build();
-        billingClient.startConnection(new com.android.billingclient.api.BillingClientStateListener() {
+        requireConnection();
+    }
+    
+    private AsyncResource runWithConnection(final Runnable r) {
+        final AsyncResource out = new AsyncResource();
+        requireConnection().ready(new SuccessCallback() {
             @Override
-            public void onBillingSetupFinished(com.android.billingclient.api.BillingResult billingResult) {
-                if (billingResult.getResponseCode() ==  BillingClient.BillingResponseCode.OK) {
-                    billingConnected = true;
-                    consumeAndAcknowlegePurchases();
-
-                } else {
-                    System.err.println("Failed to connect to billing service: "+billingResult.getDebugMessage());
-                }
+            public void onSucess(Object arg0) {
+                r.run();
+                out.complete(true);
             }
-            @Override
-            public void onBillingServiceDisconnected() {
-                // Try to restart the connection on the next request to
-                // Google Play by calling the startConnection() method.
-                billingConnected = false;
-
-
+        }).except(new SuccessCallback() {
+            public void onSucess(Object arg0) {
+                out.error((Throwable)arg0);
             }
         });
+        return out;
+    }
+    
+    private AsyncResource requireConnection() {
+        final AsyncResource out;
+        synchronized(this) {
+            if (pendingConnection != null) {
+                return pendingConnection;
+            }
+            out = new AsyncResource();
+            pendingConnection = out;
+        }
+        
+        if (!activity.isBillingEnabled()){
+            out.error(new UnsupportedOperationException("Billing is not enabled."));
+            return out;
+        }
+        if (billingClient == null) {
+            billingClient= BillingClient.newBuilder(activity)
+                    .setListener(purchasesUpdatedListener)
+                    .enablePendingPurchases()
+                    .build();
+        }
+        
+        if (billingConnected) {
+            out.complete(true);
+        } else {
+            billingClient.startConnection(new com.android.billingclient.api.BillingClientStateListener() {
+                @Override
+                public void onBillingSetupFinished(com.android.billingclient.api.BillingResult billingResult) {
+                    if (billingResult.getResponseCode() ==  BillingClient.BillingResponseCode.OK) {
+                        billingConnected = true;
+                        synchronized(BillingSupport.this) {
+                            pendingConnection = null;
+                        }
+                        consumeAndAcknowlegePurchases();
+                        
+                        out.complete(true);
+
+                    } else {
+                        synchronized(BillingSupport.this) {
+                            pendingConnection = null;
+                        }
+                        System.err.println("Failed to connect to billing service: "+billingResult.getDebugMessage());
+                        out.error(new IOException(billingResult.getDebugMessage()));
+                    }
+                }
+                @Override
+                public void onBillingServiceDisconnected() {
+                    // Try to restart the connection on the next request to
+                    // Google Play by calling the startConnection() method.
+                    billingConnected = false;
+
+
+                }
+            });
+        }
+        return out;
     }
 
 
@@ -132,27 +186,36 @@ public class BillingSupport implements IBillingSupport {
         return (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK);
     }
 
-    private void consumeAndAcknowlegePurchases(List<Purchase> purchases) {
-        for (Purchase pur : purchases) {
-            handlePurchase(pur);
-        }
+    private void consumeAndAcknowlegePurchases(final List<Purchase> purchases) {
+        runWithConnection(new Runnable() {
+            public void run() {
+                for (Purchase pur : purchases) {
+                    handlePurchase(pur);
+                }
+            }
+        });
     }
 
 
 
     @Override
     public void consumeAndAcknowlegePurchases() {
-        billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, new PurchasesResponseListener() {
-            @Override
-            public void onQueryPurchasesResponse(BillingResult billingResult, List<Purchase> purchases) {
-                if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                    return;
-                }
-                if (purchases != null && !purchases.isEmpty()) {
-                    consumeAndAcknowlegePurchases(purchases);
-                }
+        runWithConnection(new Runnable() {
+            public void run() {
+                billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, new PurchasesResponseListener() {
+                    @Override
+                    public void onQueryPurchasesResponse(BillingResult billingResult, List<Purchase> purchases) {
+                        if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+                            return;
+                        }
+                        if (purchases != null && !purchases.isEmpty()) {
+                            consumeAndAcknowlegePurchases(purchases);
+                        }
+                    }
+                });
             }
         });
+        
     }
 
     private Set<String> handlingPurchase = new HashSet<String>();
@@ -239,41 +302,46 @@ public class BillingSupport implements IBillingSupport {
 
         if (!isConsumable(sku)) {
             if (!purchase.isAcknowledged()) {
-                billingClient.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(), new AcknowledgePurchaseResponseListener() {
-                    @Override
-                    public void onAcknowledgePurchaseResponse(final BillingResult billingResult) {
-                        handlingPurchase.remove(purchase.getPurchaseToken());
-                        if (isFailure(billingResult)) {
-                            final PurchaseCallback pc = getPurchaseCallback();
-                            if (pc != null) {
-                                Display.getInstance().callSerially(new Runnable() {
+                runWithConnection(new Runnable() {
+                    public void run() {
+                        billingClient.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(), new AcknowledgePurchaseResponseListener() {
+                            @Override
+                            public void onAcknowledgePurchaseResponse(final BillingResult billingResult) {
+                                handlingPurchase.remove(purchase.getPurchaseToken());
+                                if (isFailure(billingResult)) {
+                                    final PurchaseCallback pc = getPurchaseCallback();
+                                    if (pc != null) {
+                                        Display.getInstance().callSerially(new Runnable() {
 
-                                    @Override
-                                    public void run() {
+                                            @Override
+                                            public void run() {
 
-                                        pc.itemPurchaseError(sku, billingResult.getDebugMessage());
+                                                pc.itemPurchaseError(sku, billingResult.getDebugMessage());
+                                            }
+                                        });
                                     }
-                                });
+                                } else {
+                                    onPurchaseAcknowledged.run();
+                                }
                             }
-                        } else {
-                            onPurchaseAcknowledged.run();
-                        }
+                        });
                     }
                 });
+                
             } else {
                 handlingPurchase.remove(purchase.getPurchaseToken());
             }
             return;
         }
-        ConsumeParams consumeParams =
+        final ConsumeParams consumeParams =
                 ConsumeParams.newBuilder()
                         .setPurchaseToken(purchase.getPurchaseToken())
                         .build();
 
-        ConsumeResponseListener listener = new ConsumeResponseListener() {
+        final ConsumeResponseListener listener = new ConsumeResponseListener() {
             @Override
             public void onConsumeResponse(final BillingResult billingResult, String purchaseToken) {
-                handlingPurchase.remove(purchase.getPurchaseToken());
+                if (purchase != null) handlingPurchase.remove(purchase.getPurchaseToken());
                 if (isFailure(billingResult)) {
                     final PurchaseCallback pc = getPurchaseCallback();
                     if (pc != null) {
@@ -296,7 +364,31 @@ public class BillingSupport implements IBillingSupport {
         };
 
         if (!purchase.isAcknowledged()) {
-            billingClient.consumeAsync(consumeParams, listener);
+            
+            runWithConnection(new Runnable() {
+                public void run() {
+                    billingClient.consumeAsync(consumeParams, listener);
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                if (purchase != null) handlingPurchase.remove(purchase.getPurchaseToken());
+                
+                final PurchaseCallback pc = getPurchaseCallback();
+                if (pc != null) {
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+
+                            pc.itemPurchaseError(sku, billingResult.getDebugMessage());
+                        }
+                    });
+                }
+                if(purchase != null){
+                    inventory.erasePurchase(sku);
+                }
+                
+            });
+            
         } else {
             handlingPurchase.remove(purchase.getPurchaseToken());
         }
@@ -330,54 +422,60 @@ public class BillingSupport implements IBillingSupport {
             return;
         }
 
-        billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(type).setSkusList((List<String>) Arrays.asList(item)).build(), new SkuDetailsResponseListener() {
-            @Override
-            public void onSkuDetailsResponse(final BillingResult billingResult, final List<SkuDetails> list) {
-                if (isFailure(billingResult)) {
-                    final PurchaseCallback pc = getPurchaseCallback();
-                    if (pc == null) {
-                        return;
-                    }
-                    CN.callSerially(new Runnable() {
-                        @Override
-                        public void run() {
-                            pc.itemPurchaseError(item, billingResult.getDebugMessage());
-                        }
-
-                    });
-                    return;
-
-                }
-                if (list == null || list.isEmpty()) {
-                    final PurchaseCallback pc = getPurchaseCallback();
-                    if (pc == null) {
-                        return;
-                    }
-                    CN.callSerially(new Runnable() {
-                        @Override
-                        public void run() {
-                            pc.itemPurchaseError(item, "No item could be found in the Playstore with sku "+item);
-                        }
-
-                    });
-                    return;
-                }
-                for (SkuDetails details : list) {
-                    inventory.add(details, type.equals(BillingClient.SkuType.SUBS) );
-                }
-                activity.runOnUiThread(new Runnable() {
+        runWithConnection(new Runnable() {
+            public void run() {
+                billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(type).setSkusList((List<String>) Arrays.asList(item)).build(), new SkuDetailsResponseListener() {
                     @Override
-                    public void run() {
-                        billingClient.launchBillingFlow(activity,
-                                BillingFlowParams.newBuilder()
-                                        .setSkuDetails(list.iterator().next()).build()
-                        );
+                    public void onSkuDetailsResponse(final BillingResult billingResult, final List<SkuDetails> list) {
+                        if (isFailure(billingResult)) {
+                            final PurchaseCallback pc = getPurchaseCallback();
+                            if (pc == null) {
+                                return;
+                            }
+                            CN.callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    pc.itemPurchaseError(item, billingResult.getDebugMessage());
+                                }
+
+                            });
+                            return;
+
+                        }
+                        if (list == null || list.isEmpty()) {
+                            final PurchaseCallback pc = getPurchaseCallback();
+                            if (pc == null) {
+                                return;
+                            }
+                            CN.callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    pc.itemPurchaseError(item, "No item could be found in the Playstore with sku "+item);
+                                }
+
+                            });
+                            return;
+                        }
+                        for (SkuDetails details : list) {
+                            inventory.add(details, type.equals(BillingClient.SkuType.SUBS) );
+                        }
+                        activity.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                
+                                billingClient.launchBillingFlow(activity,
+                                        BillingFlowParams.newBuilder()
+                                                .setSkuDetails(list.iterator().next()).build()
+                                );
+
+                            }
+                        });
 
                     }
                 });
-
             }
         });
+        
 
     }
 
@@ -437,39 +535,43 @@ public class BillingSupport implements IBillingSupport {
 
 
         public synchronized void loadSkuDetailsAsync() {
-            Set<String> skus = new HashSet<String>();
+            final Set<String> skus = new HashSet<String>();
             skus.addAll(purchases.keySet());
             skus.removeAll(products.keySet());
 
             if (!skus.isEmpty()) {
+                runWithConnection(new Runnable() {
+                    public void run() {
+                        billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
+                            @Override
+                            public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
+                                if (list != null && !list.isEmpty()) {
+                                    for (SkuDetails details : list) {
+                                        add(details);
 
-                billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
-                    @Override
-                    public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
-                        if (list != null && !list.isEmpty()) {
-                            for (SkuDetails details : list) {
-                                add(details);
-
+                                    }
+                                }
                             }
+                        });
+                        if (areSubscriptionsSupported()) {
+                            billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
+                                @Override
+                                public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
+                                    if (list != null && !list.isEmpty()) {
+                                        for (SkuDetails details : list) {
+
+                                            add(details, true);
+
+                                        }
+
+                                    }
+
+                                }
+                            });
                         }
                     }
                 });
-                if (areSubscriptionsSupported()) {
-                    billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
-                        @Override
-                        public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
-                            if (list != null && !list.isEmpty()) {
-                                for (SkuDetails details : list) {
-
-                                    add(details, true);
-
-                                }
-
-                            }
-
-                        }
-                    });
-                }
+                
             }
         }
 
@@ -495,7 +597,7 @@ public class BillingSupport implements IBillingSupport {
 
         if(inventory != null){
             final ArrayList pList = new ArrayList<Product>();
-            ArrayList moreskusList = new ArrayList<Product>();
+            final ArrayList moreskusList = new ArrayList<Product>();
             for (int i = 0; i < skus.length; i++) {
                 String sku = skus[i];
                 if(inventory.hasDetails(sku)){
@@ -510,48 +612,74 @@ public class BillingSupport implements IBillingSupport {
 
                 final int[] complete = new int[1];
                 final Object lock = new Object();
-                billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
-                    @Override
-                    public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
-                        synchronized (lock) {
-                            if (isFailure(billingResult)) {
-                                complete[0]++;
-                                lock.notifyAll();
-                                return;
+                runWithConnection(new Runnable() {
+                    public void run() {
+                        billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
+                            @Override
+                            public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
+                                synchronized (lock) {
+                                    if (isFailure(billingResult)) {
+                                        complete[0]++;
+                                        lock.notifyAll();
+                                        return;
+                                    }
+
+                                    for (SkuDetails details : list) {
+
+                                        inventory.add(details);
+
+
+                                    }
+                                    complete[0]++;
+                                    lock.notifyAll();
+                                }
                             }
-
-                            for (SkuDetails details : list) {
-
-                                inventory.add(details);
-
-
-                            }
+                        });
+                    }
+                    
+                }).except(new SuccessCallback<Throwable>() {
+                    public void onSucess(Throwable t) {
+                        synchronized(lock) {
                             complete[0]++;
                             lock.notifyAll();
                         }
+                        
                     }
                 });
+                
                 if (areSubscriptionsSupported()) {
-                    billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
-                        @Override
-                        public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
-                            synchronized (lock) {
-                                if (isFailure(billingResult)) {
-                                    complete[0]++;
-                                    lock.notifyAll();
-                                    return;
+                    runWithConnection(new Runnable() {
+                        public void run() {
+                            billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
+                                @Override
+                                public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
+                                    synchronized (lock) {
+                                        if (isFailure(billingResult)) {
+                                            complete[0]++;
+                                            lock.notifyAll();
+                                            return;
+                                        }
+
+                                        for (SkuDetails details : list) {
+
+                                            inventory.add(details, true);
+
+                                        }
+                                        complete[0]++;
+                                        lock.notifyAll();
+                                    }
                                 }
-
-                                for (SkuDetails details : list) {
-
-                                    inventory.add(details, true);
-
-                                }
+                            });
+                        }
+                    }).except(new SuccessCallback<Throwable>() {
+                        public void onSucess(Throwable t) {
+                            synchronized(lock) {
                                 complete[0]++;
                                 lock.notifyAll();
                             }
                         }
                     });
+                    
                 } else {
                     synchronized (lock) {
                         complete[0]++;
