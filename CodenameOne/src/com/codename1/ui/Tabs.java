@@ -60,6 +60,9 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
  * 
+ * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis:
+ * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
+ * 
  * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
  * form and swiping is used to move between pages:</p>
  * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
@@ -1366,21 +1369,27 @@ public class Tabs extends Container {
     
     /**
      * <p>
-     * It defaults to "false"; you can set it to "true" for use cases like the
+     * It defaults to <code>true</code>; you can set it to <code>false</code> for use cases like the
      * one discussed here:
      * <a href="https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/">Realize
      * a set of Containers that are browsable with a finger, like a deck of
      * cards</a>
      * </p>Example of usage:</p>
-     * <script src="https://gist.github.com/jsfan3/92c8b852157c4196e11825c330641dae.js"></script>
+     * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
      *
-     * @param b "true" to set the swipe on the Y-Axis
+     * @param b <code>true</code> to set the swipe on the X-Axis, <code>false</code> to set the swipe on the Y-Axis
      * @since 8.0
      */
-    public void setSwipeOnYAxis(boolean b) {
-        if (b) {
-            swipeOnXAxis = false;
-        }
+    public void setSwipeOnXAxis(boolean b) {
+        swipeOnXAxis = b;
+    }
+
+    /**
+     * Returns <code>true</code> if the swipe is on the X-Axis, <code>false</code> if the swipe is on the Y-Axis.
+     * @return swipe direction flag
+     */
+    public boolean isSwipeOnXAxis() {
+        return swipeOnXAxis;
     }
     
     private boolean blockSwipe;
