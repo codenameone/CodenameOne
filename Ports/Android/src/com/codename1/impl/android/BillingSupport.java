@@ -370,22 +370,25 @@ public class BillingSupport implements IBillingSupport {
                     billingClient.consumeAsync(consumeParams, listener);
                 }
             }).except(new SuccessCallback<Throwable>() {
-                if (purchase != null) handlingPurchase.remove(purchase.getPurchaseToken());
-                
-                final PurchaseCallback pc = getPurchaseCallback();
-                if (pc != null) {
-                    Display.getInstance().callSerially(new Runnable() {
+                public void onSucess(final Throwable t) {
+                    if (purchase != null) handlingPurchase.remove(purchase.getPurchaseToken());
 
-                        @Override
-                        public void run() {
+                    final PurchaseCallback pc = getPurchaseCallback();
+                    if (pc != null) {
+                        Display.getInstance().callSerially(new Runnable() {
 
-                            pc.itemPurchaseError(sku, billingResult.getDebugMessage());
-                        }
-                    });
+                            @Override
+                            public void run() {
+
+                                pc.itemPurchaseError(sku, t.getMessage());
+                            }
+                        });
+                    }
+                    if(purchase != null){
+                        inventory.erasePurchase(sku);
+                    }
                 }
-                if(purchase != null){
-                    inventory.erasePurchase(sku);
-                }
+
                 
             });
             
