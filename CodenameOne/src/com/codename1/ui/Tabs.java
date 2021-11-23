@@ -60,7 +60,7 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
  * 
- * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis:
+ * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):
  * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
  * 
  * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
@@ -267,21 +267,35 @@ public class Tabs extends Container {
     public boolean animate() {
         boolean b = super.animate();
         if (slideToDestMotion != null) {
-            int motionX = slideToDestMotion.getValue();
-            final int size = contentPane.getComponentCount();
-            int tabWidth = contentPane.getWidth() - tabsGap*2;
-            for (int i = 0; i < size; i++) {
-                int xOffset;
-                if(isRTL()) {
-                    xOffset = (size - i) * tabWidth;
-                    xOffset -= ((size - active) * tabWidth);
-                } else {
-                    xOffset = i * tabWidth;
-                    xOffset -= (active * tabWidth);
+            if (swipeOnXAxis) {
+                int motionX = slideToDestMotion.getValue();
+                final int size = contentPane.getComponentCount();
+                int tabWidth = contentPane.getWidth() - tabsGap * 2;
+                for (int i = 0; i < size; i++) {
+                    int xOffset;
+                    if (isRTL()) {
+                        xOffset = (size - i) * tabWidth;
+                        xOffset -= ((size - active) * tabWidth);
+                    } else {
+                        xOffset = i * tabWidth;
+                        xOffset -= (active * tabWidth);
+                    }
+                    xOffset += motionX;
+                    Component component = contentPane.getComponentAt(i);
+                    component.setX(xOffset);
                 }
-                xOffset += motionX;
-                Component component = contentPane.getComponentAt(i);
-                component.setX(xOffset);
+            } else {
+                int motionY = slideToDestMotion.getValue();
+                final int size = contentPane.getComponentCount();
+                int tabHeight = contentPane.getHeight() - tabsGap * 2;
+                for (int i = 0; i < size; i++) {
+                    int yOffset;
+                    yOffset = i * tabHeight;
+                    yOffset -= (active * tabHeight);
+                    yOffset += motionY;
+                    Component component = contentPane.getComponentAt(i);
+                    component.setY(yOffset);
+                }
             }
             if (slideToDestMotion.isFinished()) {
                 for (int i = 0; i < contentPane.getComponentCount() ; i++) {
@@ -1009,8 +1023,15 @@ public class Tabs extends Container {
         
         Form form = getComponentForm();
         if(slideToSelected && form != null){
-            int end = contentPane.getComponentAt(activeComponent).getX();
-            int start = contentPane.getComponentAt(index).getX();
+            int end;
+            int start;
+            if (swipeOnXAxis) {
+                end = contentPane.getComponentAt(activeComponent).getX();
+                start = contentPane.getComponentAt(index).getX();
+            } else {
+                end = contentPane.getComponentAt(activeComponent).getY();
+                start = contentPane.getComponentAt(index).getY();
+            }
             slideToDestMotion = createTabSlideMotion(start, end);
             slideToDestMotion.start();
             form.registerAnimatedInternal(Tabs.this);
@@ -1374,14 +1395,18 @@ public class Tabs extends Container {
      * <a href="https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/">Realize
      * a set of Containers that are browsable with a finger, like a deck of
      * cards</a>
-     * </p>Example of usage:</p>
+     * </p>Example of usage (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):</p>
      * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
      *
      * @param b <code>true</code> to set the swipe on the X-Axis, <code>false</code> to set the swipe on the Y-Axis
      * @since 8.0
      */
     public void setSwipeOnXAxis(boolean b) {
-        swipeOnXAxis = b;
+        if (swipeOnXAxis != b) {
+            swipeOnXAxis = b;
+            contentPane.setShouldCalcPreferredSize(true);
+            revalidateLater();
+        }
     }
 
     /**
