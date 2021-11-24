@@ -25,6 +25,7 @@ package com.codename1.impl.javase.fx;
 import com.codename1.impl.javase.IBrowserComponent;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.util.AsyncResource;
@@ -844,6 +845,23 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
 
     @Override
     public String getTitle() {
+        if (!Platform.isFxApplicationThread()) {
+            final String[] out = new String[1];
+            final boolean[] complete = new boolean[1];
+            Platform.runLater(new Runnable() {
+                public void run() {
+                    synchronized (complete) {
+                        out[0] = getTitle();
+                        complete[0] = true;
+                        complete.notifyAll();
+                    }
+                }
+            });
+            while (!complete[0]) {
+                Util.wait(complete, 1000);
+            }
+            return out[0];
+        }
         return web.getEngine().getTitle();
     }
 
