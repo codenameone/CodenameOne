@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone.tests</groupId>
         <artifactId>codenameone-tests</artifactId>
-        <version>7.0.49</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone.tests</groupId>
     <artifactId>mojo-tests</artifactId>
-    <version>7.0.49</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Mojo Tests</name>
     <description>Mojo Tests</description>
