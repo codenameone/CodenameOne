@@ -139,11 +139,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (srcFile.isDirectory()) {
                 FileSet fs = new FileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fs.setExcludes("**/META-INF/versions/**");
                 fs.setProject(this.antProject);
                 fs.setDir(srcFile);
                 task.addFileset(fs);
+
             } else {
                 ZipFileSet fileset = new ZipFileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fileset.setExcludes("**/META-INF/versions/**");
                 fileset.setProject(antProject);
                 fileset.setSrc(srcFile);
                 task.addZipfileset(fileset);
@@ -847,6 +854,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } catch (BuildException ex) {
 
             getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
+            getLog().error(e.getErrorMessage());
             throw new MojoExecutionException("Failed to build android app", ex);
         } finally {
 
