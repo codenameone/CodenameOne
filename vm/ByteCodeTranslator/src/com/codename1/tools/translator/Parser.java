@@ -414,17 +414,22 @@ public class Parser extends ClassVisitor {
             // because native source may be the only thing referencing a class,
             // and the class may be purged before it even has a shot.
             readNativeFiles(outputDirectory);
+            System.out.println("UsedByNativeCheck()...");
             usedByNativeCheck();
+            System.out.println("Updating dependencies...");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
-            }   
+            }
+            System.out.println("Marking dependencies...");
             ByteCodeClass.markDependencies(classes);
+            System.out.println("Clearing unmarked...");
             classes = ByteCodeClass.clearUnmarked(classes);
 
 
             // loop over methods and start eliminating the body of unused methods
             if (BytecodeMethod.optimizerOn) {
+                System.out.println("Optimizer On: Removing unused methods and classes...");
                 Date now = new Date();
                 int neliminated = eliminateUnusedMethods();
                 Date later = new Date();
@@ -481,6 +486,7 @@ public class Parser extends ClassVisitor {
     }
     
     private static int eliminateUnusedMethods() {
+        System.out.println("eliminateUnusedMethods;:usedByNativeCheck()...");
         usedByNativeCheck();
     	return(eliminateUnusedMethods(0));
     }
@@ -493,6 +499,7 @@ public class Parser extends ClassVisitor {
 
     private static int cullMethods(boolean found) {
     	int nfound = 0;
+    	System.out.println("cullMethods()...");
         for(ByteCodeClass bc : classes) {
             bc.unmark();
             if(bc.isIsInterface() || bc.getBaseClass() == null) {
@@ -561,6 +568,7 @@ public class Parser extends ClassVisitor {
     }
 
     private static void cullClasses(boolean found, int depth) {
+        System.out.println("cullClasses()");
         if(found && depth < 3) {
             for(ByteCodeClass bc : classes) {
                 bc.updateAllDependencies();
@@ -582,15 +590,43 @@ public class Parser extends ClassVisitor {
     }
     
     private static void usedByNativeCheck() {
+        StringBuilder b = new StringBuilder();
         for(ByteCodeClass bc : classes) {
+            if (bc.hasBeenCheckedForNativeUse()) {
+                continue;
+            }
+            bc.setHasBeenCheckedForNativeUse();
             //java_lang_Thread_runImpl___long
+
+            // On M1 the string comparisons are so slow that
+            // it routinely times out while checking methods against
+            // native sources, so it is more efficient to put in some
+            // checks first to see if we actually need to check for
+            // native sources.
+
+            // First check if we've already checked for native
+            // source on this class.
+            //  We do this by checking all of the methods in the class
+
+
+            boolean foundClassName = false;
+            for(String s : nativeSources) {
+                if(s.contains(bc.getClsName())) {
+                    foundClassName = true;
+                }
+            }
+            if (!foundClassName) {
+                continue;
+            }
+
             for(BytecodeMethod mtd : bc.getMethods()) {
-                // check native code        
-                StringBuilder b = new StringBuilder();
+                // check native code
+                if (mtd.isUsedByNative()) continue;
+                b.setLength(0);
                 mtd.appendFunctionPointer(b);
-                String str = b.toString();
+                //String str = b.toString();
                 for(String s : nativeSources) {
-                    if(s.contains(str)) {
+                    if(s.contains(b)) {
                         mtd.setUsedByNative(true);
                         break;
                     }

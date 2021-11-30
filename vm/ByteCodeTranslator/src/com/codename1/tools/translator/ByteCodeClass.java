@@ -72,9 +72,16 @@ public class ByteCodeClass {
     private boolean isSynthetic;
     private boolean isAnnotation;
     private boolean isAnonymous;
+    // Flag to check if this class is used by native.
+    // This is set lazily.
     private boolean usedByNative;
+
+    // Flag to check if this class has already been scanned to see if
+    // it has been used by native.
+    private boolean hasBeenCheckedForNativeUse;
     private static boolean saveUnitTests;
     private boolean isUnitTest;
+
 
     private static Set<String> arrayTypes = new TreeSet<String>();
     
@@ -128,6 +135,14 @@ public class ByteCodeClass {
         m.setSourceFile(sourceFile);
         m.setForceVirtual(isInterface);
         methods.add(m);
+    }
+
+    public void setHasBeenCheckedForNativeUse() {
+        hasBeenCheckedForNativeUse = true;
+    }
+
+    public boolean hasBeenCheckedForNativeUse() {
+        return hasBeenCheckedForNativeUse;
     }
 
     public void addField(ByteCodeField m) {
