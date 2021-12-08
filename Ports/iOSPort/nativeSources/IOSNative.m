@@ -2874,7 +2874,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
-            WKWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
             [w reload];
 #endif
         } else {
