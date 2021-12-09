@@ -9,8 +9,6 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -18,14 +16,11 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
-import org.apache.tools.ant.types.resources.Sort;
-
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.*;
+
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -405,6 +400,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             }
             getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
+            List<File> jarsToMerge = new ArrayList<File>();
             for (String element : cpElements) {
 
                 String canonicalEl = element;
@@ -419,8 +415,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     continue;
                 }
                 getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
-                mergeJars(jarWithDependencies, new File(element));
+                jarsToMerge.add(new File(element));
             }
+            mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
 
         }
 

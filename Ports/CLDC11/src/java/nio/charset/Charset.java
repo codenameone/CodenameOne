@@ -41,7 +41,7 @@ public class Charset implements Comparable<Charset> {
         return name;
     }
     
-    public Charset forName(String name) {
+    public static Charset forName(String name) {
         throw new UnsupportedOperationException("Charset.forName not implemented on this platform");
     }
     

@@ -222,4 +222,12 @@ public final class Math{
         }
         return Double.longBitsToDouble(bits);
     }
+    
+    public static double nextAfter(double start, double direction) {
+        throw new RuntimeException("Math.nextAfter() not supported.  Use MathUtil.nextAfter()");
+    }
+
+    public static float nextAfter(float start, double direction) {
+        throw new RuntimeException("Math.nextAfter() not supported.  Use MathUtil.nextAfter()");
+    }
 }

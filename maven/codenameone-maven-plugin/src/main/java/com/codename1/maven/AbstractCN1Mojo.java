@@ -398,7 +398,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected File getJar(Artifact artifact) {
         File[] out = new File[1];
         out[0] = artifact.getFile();
-        if (out[0] != null) {
+
+        if (out[0] != null && !"pom.xml".equals(out[0].getName()) && !out[0].getName().endsWith(".pom")) {
             return out[0];
         }
         
@@ -412,7 +413,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (result.isSuccess()) {
             out[0] = artifact.getFile().getAbsoluteFile();
         }
-        
+        if (out[0] == null || "pom.xml".equals(out[0].getName()) || out[0].getName().endsWith(".pom")){
+            return null;
+        }
         return out[0];
     }
 
