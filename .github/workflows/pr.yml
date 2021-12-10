@@ -21,7 +21,10 @@ jobs:
         java-version: 1.8
         java-package: jdk+fx
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install xvfb
+      run: |
+        sudo apt-get update && sudo apt-get install xvfb
+        wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
+        unzip master.zip -d ..
 #    - name: Build with Ant
 #      run: xvfb-run ant test-javase
 
@@ -62,6 +65,12 @@ jobs:
       with:
         name: ByteCodeTranslator.jar
         path: vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar
+
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: CLDC11.jar
+        path: Ports/CLDC11/dist/CLDC11.jar
 
     - name: Build Android Port
       run: ant -noinput -buildfile Ports/Android/build.xml jar
