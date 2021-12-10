@@ -26,8 +26,8 @@ jobs:
         wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
         unzip master.zip -d ..
         mv ../cn1-binaries-master ../cn1-binaries
-#    - name: Build with Ant
-#      run: xvfb-run ant test-javase
+    - name: Build with Ant
+      run: xvfb-run ant test-javase
 
     - name: Build CLDC11 JAR
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
