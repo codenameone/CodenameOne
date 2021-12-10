@@ -25,6 +25,7 @@ jobs:
         sudo apt-get update && sudo apt-get install xvfb
         wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
         unzip master.zip -d ..
+        mv ../cn1-binaries-master ../cn1-binaries
 #    - name: Build with Ant
 #      run: xvfb-run ant test-javase
 
