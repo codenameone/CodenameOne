@@ -52,6 +52,9 @@ jobs:
     - name: Build iOS VM API
       run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
 
+    - name: Build CLDC11 JAR
+      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
+
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.2.4
       with:
