@@ -29,6 +29,9 @@ jobs:
 #    - name: Build with Ant
 #      run: xvfb-run ant test-javase
 
+    - name: Build CLDC11 JAR
+      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
+      
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
@@ -51,9 +54,6 @@ jobs:
 
     - name: Build iOS VM API
       run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
-
-    - name: Build CLDC11 JAR
-      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.2.4
