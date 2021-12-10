@@ -22,8 +22,8 @@ jobs:
         java-package: jdk+fx
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install xvfb
-    - name: Build with Ant
-      run: xvfb-run ant test-javase
+#    - name: Build with Ant
+#      run: xvfb-run ant test-javase
 
     - name: Build Release
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
