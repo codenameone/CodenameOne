@@ -61,6 +61,9 @@ jobs:
     - name: Build iOS VM
       run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
 
+    - name: Build CLDC 11 VM
+      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
+
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.2.4
       with:
