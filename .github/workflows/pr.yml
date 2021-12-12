@@ -92,5 +92,11 @@ jobs:
         user: ${{ secrets.WP_USER }}
         password: ${{ secrets.WP_PASSWORD }}
         local: result.zip
+        
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: result.zip
+        path: result.zip
   
 
