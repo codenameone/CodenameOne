@@ -77,7 +77,7 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
-
+            <version>8.0</version><!-- Dummy version to avoid build errors that demand a version -->
             <scope>system</scope>
             <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
