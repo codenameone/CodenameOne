@@ -103,11 +103,6 @@
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-buildclient</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-resources-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
