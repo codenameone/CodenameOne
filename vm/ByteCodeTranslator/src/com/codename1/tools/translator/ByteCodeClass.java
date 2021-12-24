@@ -434,23 +434,10 @@ public class ByteCodeClass {
         }
     }
 
-    /**
-     * Removes all eliminated virtual methods from the virtual method list.
-     * This is called before generating source code so that eliminated methods
-     * don't end up in the interface method map, or elsewhere.
-     */
-    private void purgeEliminatedVirtualMethods() {
-        List<BytecodeMethod> out = new ArrayList<BytecodeMethod>();
-        for (BytecodeMethod m : virtualMethodList) {
-            if (!m.isEliminated()) {
-                out.add(m);
-            }
-        }
-        virtualMethodList = out;
-    }
+
 
     public String generateCCode(List<ByteCodeClass> allClasses) {
-        purgeEliminatedVirtualMethods();
+
         StringBuilder b = new StringBuilder();
         b.append("#include \"");
         b.append(clsName);
@@ -1220,7 +1207,6 @@ public class ByteCodeClass {
     }
     
     public String generateCHeader() {
-        purgeEliminatedVirtualMethods();
         StringBuilder b = new StringBuilder();
         b.append("#ifndef __");
         b.append(clsName.toUpperCase());
