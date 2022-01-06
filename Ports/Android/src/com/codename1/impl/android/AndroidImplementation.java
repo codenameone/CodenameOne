@@ -4670,6 +4670,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
+                        wv.getSettings().setAllowFileAccess(true);
+                        wv.getSettings().setAllowContentAccess(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
                         if (android.os.Build.VERSION.SDK_INT >= 17) {
