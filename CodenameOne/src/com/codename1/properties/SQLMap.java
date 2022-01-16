@@ -524,7 +524,7 @@ public class SQLMap {
             execute(createStatement.toString(), values);
         }        
     }
-    
+
     /**
      * Fetches the components from the database matching the given cmp description, the fields that aren't
      * null within the cmp will match the where clause
@@ -533,9 +533,38 @@ public class SQLMap {
      * @param ascending true to indicate ascending order
      * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
      * @param page  the page within the query to match the max elements value
-     * @return the result of the query 
+     * @return the result of the query
      */
     public java.util.List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+        return selectImpl(false, cmp, orderBy, ascending, maxElements, page);
+    }
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will <strong>NOT</strong> match the where clause
+     * @param cmp the component to match
+     * @param orderBy the column to order by, can be null to ignore order
+     * @param ascending true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page  the page within the query to match the max elements value
+     * @return the result of the query
+     */
+    public java.util.List<PropertyBusinessObject> selectNot(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+        return selectImpl(true, cmp, orderBy, ascending, maxElements, page);
+    }
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will match the where clause
+     * @param not indicates if the query should be a "not" query
+     * @param cmp the component to match
+     * @param orderBy the column to order by, can be null to ignore order
+     * @param ascending true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page  the page within the query to match the max elements value
+     * @return the result of the query 
+     */
+    private java.util.List<PropertyBusinessObject> selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         String tableName = getTableName(cmp);
         StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
         createStatement.append(tableName);
@@ -552,7 +581,11 @@ public class SQLMap {
                     found = true;
                     params.add(((Property)p).get());
                     createStatement.append(getColumnName(p));
-                    createStatement.append(" = ?");
+                    if(not) {
+                        createStatement.append(" <> ?");
+                    } else {
+                        createStatement.append(" = ?");
+                    }
                 }
             }
         }
