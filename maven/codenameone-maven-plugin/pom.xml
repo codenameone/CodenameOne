@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>8.0-SNAPSHOT</version>
+        <version>7.0.56</version>
     </parent>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-maven-plugin</artifactId>
-    <version>8.0-SNAPSHOT</version>
+    <version>7.0.56</version>
     <packaging>maven-plugin</packaging>
     <name>codenameone-maven-plugin</name>
   
@@ -77,11 +77,11 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
-            <version>8.0</version><!-- Dummy version to avoid build errors that demand a version -->
+            <version>8.0</version>
             <scope>system</scope>
             <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
-        
+
         <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
         <dependency>
             <groupId>org.codehaus.mojo</groupId>
