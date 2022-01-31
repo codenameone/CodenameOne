@@ -934,7 +934,9 @@ public class RequestBuilder {
         }
         for (ActionListener<NetworkEvent> l : errorCallbacks) {
             req.addExceptionListener(l);
+            req.addResponseCodeListener(l);
         }
+        
         req.setInsecure(insecure);
         if (cookiesEnabled != null) {
             req.setCookiesEnabled(cookiesEnabled);
