@@ -47,7 +47,7 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
     }
     
     public static String getURL(String streamId) {
-        return scheme+"://"+domain+"/streams/"+streamId;
+        return scheme+"://streams/"+streamId;
     }
     private static final int LIMIT = 65536*2;
     private int written;
@@ -133,7 +133,7 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
             }
             
             
-            //response_length.set(-1);
+            response_length.set(-1);
             System.out.println("Set response length to "+response_length.get());
             
         } else {
@@ -180,7 +180,7 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
 
             try {
 
-                if (stream.getStream().available() > 0) {
+                //if (stream.getStream().available() > 0) {
                     System.out.println("Abbout to attempt reading "+bytes_to_read);
                     int read = stream.getStream().read(data_out, 0, bytes_to_read > 0 ? Math.min(bytes_to_read, data_out.length) : data_out.length);
                     
@@ -204,12 +204,12 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
                         return true;
                     }
 
-                } else {
-                    System.out.println("No bytes available");
-                    bytes_read.set(0);
+                //} else {
+                    //System.out.println("No bytes available");
+                    //bytes_read.set(0);
                     
                     
-                }
+                //}
             } catch (IOException ex) {
                 Log.e(ex);
             }
