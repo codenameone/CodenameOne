@@ -5855,13 +5855,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
-            if(read){
-                if(timeout > -1) {
-                    c.setReadTimeout(timeout);
-                }else{
-                    c.setReadTimeout(10000);
-                }
-            }
+
             if (android.os.Build.VERSION.SDK_INT > 13) {
                 c.setRequestProperty("Connection", "close");
             }
