@@ -25,6 +25,7 @@ package com.codename1.location;
 import android.content.Context;
 import android.location.Criteria;
 import android.location.GpsStatus;
+import android.location.GnssStatus;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.os.Bundle;
@@ -43,7 +44,7 @@ import java.io.IOException;
  *
  * @author Chen
  */
-public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener, GpsStatus.Listener {
+public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener {
     private LocationManager locationManager;
     private String bestProvider;
     private Context context;
@@ -55,6 +56,87 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
     private AndroidLocationManager(Context ctx) {
         this.context = ctx;
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+    }
+    
+    
+    private class GpsStatusListener0 implements GpsStatus.Listener {
+
+        @Override
+        public void onGpsStatusChanged(int event) {
+            boolean isGPSFix = false;
+            switch (event) {
+                case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+                    if (lastLocation != null) {
+                        isGPSFix = (SystemClock.elapsedRealtime() - lastLocationMillis) < 10000;
+                    }
+                    if (isGPSFix) { // A fix has been acquired.
+                        setLocationManagerStatus(AVAILABLE);
+                    } else { // The fix has been lost.
+                        setLocationManagerStatus(TEMPORARILY_UNAVAILABLE);
+                    }
+                    break;
+                case GpsStatus.GPS_EVENT_FIRST_FIX:
+                    setLocationManagerStatus(AVAILABLE);
+                    break;
+            }
+        }
+
+    }
+    
+    private class GnssStatusListener0 extends GnssStatus.Callback {
+
+        @Override
+        public void onFirstFix(int ttffMillis) {
+            setLocationManagerStatus(AVAILABLE);
+            
+        }
+
+        @Override
+        public void onSatelliteStatusChanged(GnssStatus status) {
+            
+            boolean isGPSFix = false;
+            if (lastLocation != null) {
+                isGPSFix = (SystemClock.elapsedRealtime() - lastLocationMillis) < 10000;
+            }
+            if (isGPSFix) { // A fix has been acquired.
+                setLocationManagerStatus(AVAILABLE);
+            } else { // The fix has been lost.
+                setLocationManagerStatus(TEMPORARILY_UNAVAILABLE);
+            }
+            
+        }
+
+        @Override
+        public void onStarted() {
+            
+        }
+
+        @Override
+        public void onStopped() {
+            setLocationManagerStatus(TEMPORARILY_UNAVAILABLE);
+        }
+        
+        
+        
+        
+
+    }
+    
+    private GpsStatusListener0 gpsStatusListener;
+    private GpsStatusListener0 gpsStatusListener() {
+        if (gpsStatusListener == null) {
+            gpsStatusListener = new GpsStatusListener0();
+
+        }
+        return gpsStatusListener;
+    }
+    
+    private GnssStatusListener0 gnssStatusListener;
+    private GnssStatusListener0 gnssStatusListener() {
+        if (gnssStatusListener == null) {
+            gnssStatusListener = new GnssStatusListener0();
+        }
+        return gnssStatusListener;
     }
 
     public static AndroidLocationManager getInstance(Context context) {
@@ -147,19 +229,27 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
             public void run() {
                 locationManager.requestLocationUpdates(bestProvider, 0, 0, AndroidLocationManager.this);
-                locationManager.addGpsStatusListener(AndroidLocationManager.this);
+                if (android.os.Build.VERSION.SDK_INT >= 24) {
+                    locationManager.unregisterGnssStatusCallback(gnssStatusListener());
+                } else {
+                    locationManager.addGpsStatusListener(gpsStatusListener());
+                }
             }
         });
     }
 
     public void clearListener() {
         searchForProvider = false;
-        Handler mHandler = new Handler(Looper.getMainLooper());
+        final Handler mHandler = new Handler(Looper.getMainLooper());
         mHandler.post(new Runnable() {
 
             public void run() {
                 locationManager.removeUpdates(AndroidLocationManager.this);
-                locationManager.removeGpsStatusListener(AndroidLocationManager.this);
+                if (android.os.Build.VERSION.SDK_INT >= 24) {
+                    locationManager.registerGnssStatusCallback(gnssStatusListener());
+                } else {
+                    locationManager.removeGpsStatusListener(gpsStatusListener());
+                }
             }
         });
     }
@@ -193,24 +283,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         }
     }
 
-    public void onGpsStatusChanged(int event) {
-        boolean isGPSFix = false;
-        switch (event) {
-            case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
-                if (lastLocation != null) {
-                    isGPSFix = (SystemClock.elapsedRealtime() - lastLocationMillis) < 10000;
-                }
-                if (isGPSFix) { // A fix has been acquired.
-                    setLocationManagerStatus(AVAILABLE);
-                } else { // The fix has been lost.
-                    setLocationManagerStatus(TEMPORARILY_UNAVAILABLE);
-                }
-                break;
-            case GpsStatus.GPS_EVENT_FIRST_FIX:
-                setLocationManagerStatus(AVAILABLE);
-                break;
-        }
-    }
+    
 
     public void onStatusChanged(String provider, int status, Bundle extras) {
         int s = convertStatus(status);
