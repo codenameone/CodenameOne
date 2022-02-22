@@ -10377,9 +10377,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                             } else {
                                 ext= imageTypes[0];
                             }
+                            if (ext.length() > 0 && ext.charAt(0) != '.') {
+                                ext = "." + ext;
+                            }
                             File tmp = selected;
                             if (!"true".equals(Display.getInstance().getProperty("openGallery.openFilesInPlace", "false"))) {
-                                tmp = File.createTempFile("temp", "." + ext);
+                                tmp = File.createTempFile("temp",  ext);
                                 tmp.deleteOnExit();
                                 copyFile(selected, tmp);
                             }
