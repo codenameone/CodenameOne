@@ -6968,8 +6968,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
+     * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
+        setNotificationChannel(nm, mNotifyBuilder, context, (String)null);
+        
+    }
+    
+    /**
+     * Sets the notification channel on a notification builder.  Uses service properties to 
+     * set properties of channel.
+     * @param nm The notification manager.
+     * @param mNotifyBuilder The notify builder
+     * @param context The context
+     * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
+     *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
+     * @since 8.0
+     */
+    public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
