@@ -2790,6 +2790,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     menuDisplayed = false;
                 }
             });
+
+            JMenuItem buildHintEditor = new JMenuItem("Edit Build Hints...");
+            buildHintEditor.addActionListener(evt->{
+                new BuildHintEditor(this).show();
+            });
+            toolsMenu.add(buildHintEditor);
+
             
             JMenuItem rotate = new JMenuItem("Rotate");
             rotate.setEnabled(!desktopSkin);
