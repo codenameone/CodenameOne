@@ -8,18 +8,20 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.plaf.basic.BasicBorders;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.beans.PropertyChangeSupport;
 import java.net.URI;
 import java.util.*;
 import java.util.List;
 
+/**
+ * A GUI editor for editing build hints.  This includes support for cn1libs to tie into it at runtime.
+ *
+ */
 public class BuildHintEditor {
     private final JavaSEPort javaSEPort;
     private JFrame frame;

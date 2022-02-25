@@ -2792,9 +2792,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             JMenuItem buildHintEditor = new JMenuItem("Edit Build Hints...");
-            buildHintEditor.addActionListener(evt->{
-                new BuildHintEditor(this).show();
-            });
+            ActionListener l = new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    new BuildHintEditor(JavaSEPort.this).show();
+                }
+            };
+            buildHintEditor.addActionListener(l);
             toolsMenu.add(buildHintEditor);
 
             
