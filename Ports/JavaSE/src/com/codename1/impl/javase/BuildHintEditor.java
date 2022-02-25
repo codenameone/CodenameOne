@@ -272,7 +272,7 @@ public class BuildHintEditor {
 
 
 
-    private static void addChangeListenerTo(JTextComponent textField, Runnable r) {
+    private static void addChangeListenerTo(JTextComponent textField, final Runnable r) {
         textField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
