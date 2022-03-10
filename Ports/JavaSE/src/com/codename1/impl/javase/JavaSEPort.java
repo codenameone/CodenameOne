@@ -33,6 +33,7 @@ import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -206,6 +207,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
+import static com.codename1.impl.javase.util.MavenUtils.isRunningInMaven;
 
 /**
  * An implementation of Codename One based on Java SE
@@ -2700,6 +2703,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+
+
     @Override
     public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
         if (!isSimulator() || safeAreaPortrait == null || safeAreaLandscape == null) {
@@ -3334,8 +3339,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             hotReloadGroup.add(disableHotReload);
             hotReloadGroup.add(reloadSimulator);
             hotReloadGroup.add(reloadCurrentForm);
-
-            if (System.getProperty("maven.home") != null) {
+            if (isRunningInMaven() && MavenUtils.isRunningInJDK()) {
                 toolsMenu.add(hotReloadMenu);
             }
             

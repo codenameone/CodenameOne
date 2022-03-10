@@ -23,6 +23,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.util.MavenUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -50,7 +51,7 @@ public class Simulator {
      * @param projectDir
      */
     private static void loadSimulatorProperties(File projectDir) {
-       if (System.getProperty("maven.home") == null) {
+       if (!MavenUtils.isRunningInMaven()) {
            // simulator.properties file is only for maven.
            // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder.
            return;

@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.sun.nio.file.SensitivityWatchEventModifier;
@@ -353,11 +354,6 @@ public class SourceChangeWatcher implements Runnable {
             return false;
         }
 
-        String mavenHome = System.getProperty("maven.home");
-        if (mavenHome == null) {
-            Log.p("Not recompiling path "+path+" because maven.home system property was not found.");
-            return false;
-        }
 
         String javaHome = System.getProperty("java.home");
         File javac = new File(new File(javaHome), "bin" + File.separator + "javac");
