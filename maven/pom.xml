@@ -63,7 +63,7 @@
         <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
-        <module>codenameone-maven-goals</module>
+        <!--<module>codenameone-maven-goals</module>-->
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
