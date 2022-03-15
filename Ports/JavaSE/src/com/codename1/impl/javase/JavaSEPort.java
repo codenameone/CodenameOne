@@ -26,8 +26,6 @@ package com.codename1.impl.javase;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.charts.util.ColorUtil;
-import com.codename1.components.AudioRecorderComponent;
-import com.codename1.components.AudioRecorderComponent.RecorderState;
 import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
@@ -42,6 +40,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.javase.simulator.AppFrame;
+import com.codename1.impl.javase.simulator.AppPanel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
@@ -91,6 +91,7 @@ import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
 import java.util.StringTokenizer;
+import java.util.Timer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -117,24 +118,20 @@ import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.Accessor;
-import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.CN;
 import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
-import com.codename1.ui.animations.Motion;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
-import com.codename1.util.SuccessCallback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -182,8 +179,6 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
-import javax.sound.sampled.LineEvent;
-import javax.sound.sampled.LineListener;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.TargetDataLine;
 import javax.swing.*;
@@ -194,7 +189,6 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.event.MouseInputAdapter;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
@@ -731,6 +725,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean blockMonitors;
     protected static boolean fxExists = false;
     private JFrame window;
+    // Application frame used for simulator
+    private AppFrame appFrame;
     private long lastIdleTime;
     private static boolean showEDTWarnings = true;
     private static boolean showEDTViolationStacks = false;
@@ -3271,13 +3267,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     disconnectedMode = true;
                     break;
             }
-
+            
             JMenuItem componentTreeInspector = new JMenuItem("Component Inspector");
             componentTreeInspector.addActionListener(new ActionListener() {
 
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    new ComponentTreeInspector();
+                    if (appFrame != null) return;
+                    
+                    new ComponentTreeInspector().showInFrame();
                 }
             });
             
@@ -3462,7 +3460,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             simulateMenu.add(pushSim);
 
-            toolsMenu.add(componentTreeInspector);
+            if (appFrame == null) {
+                toolsMenu.add(componentTreeInspector);
+            }
             toolsMenu.add(scriptingConsole);
             
 
@@ -3872,9 +3872,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     pref.putBoolean("Scrollable", scrollableSkin);
 
                     if (scrollableSkin) {
-                        frm.add(java.awt.BorderLayout.SOUTH, hSelector);
-                        frm.add(java.awt.BorderLayout.EAST, vSelector);
+                        if (appFrame == null) {
+                            frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+                            frm.add(java.awt.BorderLayout.EAST, vSelector);
+                        } else {
+                            canvas.getParent().add(java.awt.BorderLayout.SOUTH, hSelector);
+                            canvas.getParent().add(java.awt.BorderLayout.EAST, vSelector);
+                        }
+                        
                     } else {
+
                         frm.remove(hSelector);
                         frm.remove(vSelector);
                     }
@@ -3890,7 +3897,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         float zoom = Math.min(zoomX, zoomY);
                         canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
                         if (window != null) {
-                            window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoom), (int)(getSkin().getHeight() * zoom)));
+                            if (appFrame == null) {
+                                window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoom), (int) (getSkin().getHeight() * zoom)));
+                            }
                         }
                     }
                     parent.add(BorderLayout.CENTER, canvas);
@@ -4434,9 +4443,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void showNetworkMonitor() {
         if (netMonitor == null) {
             netMonitor = new NetworkMonitor();
-            netMonitor.pack();
-            netMonitor.setLocationByPlatform(true);
-            netMonitor.setVisible(true);
+            if (appFrame == null) {
+
+                netMonitor.showInNewWindow();
+
+            } else {
+                AppPanel existing = appFrame.getAppPanelById("NetworkMonitor");
+                if (existing == null) {
+                    existing = new AppPanel("NetworkMonitor", "Network Monitor", new NetworkMonitor());
+                    existing.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
+                    existing.setScrollable(false, true);
+                    appFrame.add(existing);
+                }
+            }
         }
     }
 
@@ -4519,28 +4538,32 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public void deinitializeSync() {
         final Thread[] t = new Thread[1];
+        final boolean[] finished = new boolean[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
 
             @Override
             public void run() {
+                try {
+                    t[0] = Thread.currentThread();
 
-                t[0] = Thread.currentThread();
+                    Form currForm = CN.getCurrentForm();
+                    if (currForm != null) {
+                        // Change to a dummy form to allow the current form to run its shutdown hooks.
+                        Form dummy = new Form();
+                        dummy.setTransitionInAnimator(null);
+                        dummy.setTransitionOutAnimator(null);
+                        currForm.setTransitionInAnimator(null);
+                        currForm.setTransitionOutAnimator(null);
+                        dummy.show();
+                    }
 
-                Form currForm = CN.getCurrentForm();
-                if (currForm != null) {
-                    // Change to a dummy form to allow the current form to run its shutdown hooks.
-                    Form dummy = new Form();
-                    dummy.setTransitionInAnimator(null);
-                    dummy.setTransitionOutAnimator(null);
-                    currForm.setTransitionInAnimator(null);
-                    currForm.setTransitionOutAnimator(null);
-                    dummy.show();
-                }
-
-                ArrayList<Runnable> toDeinitialize = new ArrayList<Runnable>(deinitializeHooks);
-                deinitializeHooks.clear();
-                for (Runnable r : toDeinitialize) {
-                    r.run();
+                    ArrayList<Runnable> toDeinitialize = new ArrayList<Runnable>(deinitializeHooks);
+                    deinitializeHooks.clear();
+                    for (Runnable r : toDeinitialize) {
+                        r.run();
+                    }
+                } finally {
+                    finished[0] = true;
                 }
 
 
@@ -4554,8 +4577,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         NetworkManager.getInstance().shutdownSync();
         try {
+
             if (t[0] != null) {
-                t[0].join();
+                long maxWait = 5000L;
+                long startTime = System.currentTimeMillis();
+                while (!finished[0] && (System.currentTimeMillis() - maxWait < startTime)) {
+                    Thread.sleep(100);
+                }
+                //t[0].join();
             }
         } catch (Throwable ex) {
             ex.printStackTrace();
@@ -4673,8 +4702,28 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
+
+        final ArrayList<Runnable> delayedTasks = new ArrayList<Runnable>();
+        Timer delayedTasksTimer = new Timer();
+        TimerTask delayedTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+
+                while (!delayedTasks.isEmpty()) {
+                    EventQueue.invokeLater(delayedTasks.remove(0));
+                }
+            }
+        };
+        delayedTasksTimer.schedule(delayedTimerTask, 1000L);
+
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
-            showNetworkMonitor();
+
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showNetworkMonitor();
+                }
+
+            });
         }
         if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
             pushSimulation = new PushSimulator();
@@ -4689,27 +4738,67 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (canvas.getParent() != null) {
             canvas.getParent().remove(canvas);
         }
-        if (m != null && m instanceof java.awt.Container) {
-            java.awt.Container cnt = (java.awt.Container) m;
-            if (cnt.getLayout() instanceof java.awt.BorderLayout) {
-                cnt.add(java.awt.BorderLayout.CENTER, canvas);
-            } else {
-                cnt.add(canvas);
-            }
-        } else {
-            window = new JFrame();
-            window.setLayout(new java.awt.BorderLayout());
+
+        if (hasSkins()) {
+            appFrame = new AppFrame("Simulator");
             hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
             vSelector = new JScrollBar(Scrollbar.VERTICAL);
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
+
+            JPanel canvasWrapper = new JPanel();
+            canvasWrapper.setLayout(new BorderLayout());
+            canvasWrapper.add(canvas, java.awt.BorderLayout.CENTER);
+            canvasWrapper.setPreferredSize(new Dimension(640, 640));
             scrollableSkin = pref.getBoolean("Scrollable", scrollableSkin);
             if (scrollableSkin) {
-                window.add(java.awt.BorderLayout.SOUTH, hSelector);
-                window.add(java.awt.BorderLayout.EAST, vSelector);
+                canvasWrapper.add(hSelector, java.awt.BorderLayout.SOUTH);
+                canvasWrapper.add(vSelector, java.awt.BorderLayout.EAST);
             }
-            
-            window.add(java.awt.BorderLayout.CENTER, canvas);
+
+
+            ComponentTreeInspector componentTreeInspector = new ComponentTreeInspector();
+            AppPanel componentTreeInspectorPanel = new AppPanel("Components", "Components", componentTreeInspector.removeComponentTree());
+            componentTreeInspectorPanel.setPreferredFrame(AppFrame.FrameLocation.LeftPanel);
+            componentTreeInspectorPanel.addAction(componentTreeInspector.new RefreshAction());
+
+            AppPanel canvasPanel = new AppPanel("Simulator", "Simulator", canvasWrapper);
+            canvasPanel.setPreferredFrame(AppFrame.FrameLocation.CenterPanel);
+
+            AppPanel detailsPanel = new AppPanel("Details", "Component Details", componentTreeInspector);
+            detailsPanel.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
+            detailsPanel.setScrollable(false, true);
+
+            appFrame.add(detailsPanel);
+            appFrame.add(canvasPanel);
+            appFrame.add(componentTreeInspectorPanel);
+
+
+
+        }
+
+        if (m != null && m instanceof java.awt.Container) {
+            java.awt.Container cnt = (java.awt.Container) m;
+            java.awt.Component mainContents = appFrame == null ? canvas : appFrame;
+            if (cnt.getLayout() instanceof java.awt.BorderLayout) {
+                cnt.add(java.awt.BorderLayout.CENTER, mainContents);
+            } else {
+                cnt.add(mainContents);
+            }
+        } else {
+            window = new JFrame();
+
+            window.setLayout(new java.awt.BorderLayout());
+            if (appFrame == null) {
+
+                scrollableSkin = pref.getBoolean("Scrollable", scrollableSkin);
+                if (scrollableSkin) {
+                    window.add(hSelector, java.awt.BorderLayout.SOUTH);
+                    window.add(vSelector, java.awt.BorderLayout.EAST);
+                }
+            }
+            java.awt.Component mainContents = appFrame == null ? canvas : appFrame;
+            window.add(mainContents, java.awt.BorderLayout.CENTER);
         }
         if (findTopFrame() != null && retinaScale > 1.0) {
             findTopFrame().setGlassPane(new CN1GlassPane());
