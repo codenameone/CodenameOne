@@ -7,13 +7,8 @@ package com.codename1.impl.javase.simulator;
 
 import com.codename1.impl.javase.util.SwingUtils;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Dimension;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
+import java.awt.*;
+import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
@@ -40,6 +35,7 @@ public class AppFrame extends JPanel {
     private JSplitPane outerSplit, innerSplit, centerSplit;
 
     private Map<String,AppPanel> appPanels = new HashMap<String,AppPanel>();
+    private Map<AppPanel, AppPanelWindowHandle> windows = new HashMap<AppPanel, AppPanelWindowHandle>();
     
 
 
@@ -48,6 +44,106 @@ public class AppFrame extends JPanel {
     
     private JScrollPane canvasScroller;
     private JComponent canvas;
+
+    private class AppPanelWindowHandle {
+        private AppPanel panel;
+        private JFrame window;
+        private AppFrame.FrameLocation previousLocation;
+
+        private AppPanelWindowHandle(AppPanel panel, AppFrame.FrameLocation previousLocation) {
+            this.panel = panel;
+            this.previousLocation = previousLocation;
+        }
+
+        private void fitWindowOntoScreen() {
+            if (window == null) throw new IllegalStateException("Cannot fit window onto screen until it is created");
+            Point pos = new Point(window.getBounds().getLocation());
+            pos.x += window.getWidth()/2;
+            pos.y += window.getHeight()/2;
+            Rectangle screenBounds = SwingUtils.getScreenBoundsAt(pos);
+            if (screenBounds == null) {
+                window.pack();
+                window.setLocationByPlatform(true);
+            } else if (!screenBounds.contains(window.getBounds())) {
+                Rectangle newBounds = new Rectangle();
+                newBounds.width = window.getWidth();
+                newBounds.height = window.getHeight();
+                newBounds.x = window.getX();
+                if (newBounds.x < screenBounds.x) {
+                    newBounds.x = screenBounds.x;
+                } else if (newBounds.x > screenBounds.width + screenBounds.x) {
+                    newBounds.x = screenBounds.x;
+                }
+                if (newBounds.y < screenBounds.y) {
+                    newBounds.y = screenBounds.y;
+                } else if (newBounds.y > screenBounds.y + screenBounds.height) {
+                    newBounds.y = screenBounds.y;
+                }
+
+                if (newBounds.x + 100 > screenBounds.x+screenBounds.width) {
+                    newBounds.x = screenBounds.x + screenBounds.width - 100;
+                }
+                if (newBounds.y + 100 > screenBounds.y + screenBounds.height) {
+                    newBounds.y = screenBounds.y + screenBounds.height - 100;
+                }
+                window.setBounds(newBounds);
+
+            }
+
+
+        }
+
+        private void show() {
+            if (window == null) {
+                window = new JFrame(panel.getLabel());
+                window.getContentPane().setLayout(new BorderLayout());
+
+                //window.setPreferredSize(new Dimension(panel.getPreferredSize()));
+                Container parent = panel.getParent();
+                if (parent != null) {
+                    parent.remove(panel);
+                }
+                window.getContentPane().add(panel, BorderLayout.CENTER);
+                //window.setSize(new Dimension(window.getPreferredSize()));
+                //window.setLocationByPlatform(true);
+                window.setBounds(panel.getPreferredWindowBounds());
+
+
+
+                window.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                window.addWindowListener(frameListener);
+                window.addComponentListener(frameListener);
+                window.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosing(WindowEvent e) {
+                        FrameLocation target = previousLocation;
+                        if (target == null && panel.getPreferredFrame() != FrameLocation.SeparateWindow) {
+                            target = panel.getPreferredFrame();
+                        }
+                        if (target != null) {
+                            if (windows.containsKey(panel)) {
+                                moveTo(panel, target);
+                            }
+                        } else {
+                            if (windows.containsKey(panel)) {
+                                removePanel(panel);
+                            }
+                        }
+                    }
+                });
+                fitWindowOntoScreen();
+
+            }
+            window.setVisible(true);
+        }
+
+        private void dispose() {
+            if (window != null) {
+                window.dispose();
+                window = null;
+            }
+        }
+    }
     
     
     public AppFrame(String name) {
@@ -155,6 +251,9 @@ public class AppFrame extends JPanel {
             prefs.putInt(prefix + "height", getHeight());
         }
 
+        for (AppPanel panel : appPanels.values()) {
+            panel.savePreferences(this, prefs);
+        }
         
         try {
             prefs.flush();
@@ -224,7 +323,8 @@ public class AppFrame extends JPanel {
         LeftPanel,
         RightPanel,
         CenterPanel,
-        BottomPanel
+        BottomPanel,
+        SeparateWindow
     }
     
     public static enum PanelName {
@@ -249,19 +349,38 @@ public class AppFrame extends JPanel {
                 return bottomPanel;
             case CenterPanel:
                 return centerPanel;
+            case SeparateWindow:
+                return null;
         }
         throw new IllegalArgumentException("Unsupported location in getPanel() "+location);
     }
-    
+
+
+
     
     public void add(AppPanel comp, FrameLocation location) {
+        if (windows.containsKey(comp)) {
+            throw new IllegalStateException("Panel is already added to the app frame in its own window.");
+        }
+        if (getPanelLocation(comp) != null) {
+            throw new IllegalStateException("Panel is already added to this app frame.");
+        }
         Container parent = comp.getParent();
         if (parent != null) {
             parent.remove(comp);
         }
-        JTabbedPane pane = getPanel(location);
-        pane.addTab(comp.getLabel(), comp);
+
         appPanels.put(comp.getId(), comp);
+        comp.setAppFrame(this);
+        if (location != FrameLocation.SeparateWindow) {
+            JTabbedPane pane = getPanel(location);
+            pane.addTab(comp.getLabel(), comp);
+        } else {
+            AppPanelWindowHandle windowHandle = new AppPanelWindowHandle(comp, null);
+            windows.put(comp, windowHandle);
+            windowHandle.show();
+        }
+
         comp.savePreferences(this, prefs());
         setShouldSavePreferences();
     }
@@ -282,6 +401,9 @@ public class AppFrame extends JPanel {
     }
 
     public AppFrame.FrameLocation getPanelLocation(AppPanel panel) {
+        if (windows.containsKey(panel)) {
+            return FrameLocation.SeparateWindow;
+        }
         java.awt.Container parent = getParentTabbedPane(panel);
         if (parent == bottomPanel) {
             return FrameLocation.BottomPanel;
@@ -294,22 +416,59 @@ public class AppFrame extends JPanel {
         }
         return null;
     }
-    
+
+
+    public void removePanel(AppPanel panel) {
+        FrameLocation oldLocation = getPanelLocation(panel);
+        if (oldLocation == FrameLocation.SeparateWindow) {
+            AppPanelWindowHandle handle = windows.get(panel);
+            if (handle == null) {
+                throw new IllegalStateException("Attempt to remove window, but it isn't registered.");
+            }
+            windows.remove(panel);
+            handle.dispose();
+        } else {
+            JTabbedPane tabbedPane = getParentTabbedPane(panel);
+            tabbedPane.remove(panel);
+        }
+        appPanels.remove(panel.getId());
+    }
     
     public void moveTo(AppPanel panel, FrameLocation location) {
         FrameLocation oldLocation = getPanelLocation(panel);
         if (oldLocation == location) return;
 
-        JTabbedPane tabbedPane = getPanel(oldLocation);
-        tabbedPane.remove(panel);
+        if (oldLocation == FrameLocation.SeparateWindow) {
+            AppPanelWindowHandle handle = windows.get(panel);
+            if (handle == null) {
+                throw new IllegalStateException("Panel window not registered");
+            }
+            windows.remove(panel);
+            Container parent = panel.getParent();
+            if (parent != null) {
+                parent.remove(panel);
+            }
+            handle.dispose();
+        } else {
+
+            JTabbedPane tabbedPane = getPanel(oldLocation);
+            tabbedPane.remove(panel);
+        }
 
         add(panel, location);
+        if (location == FrameLocation.SeparateWindow) {
+            AppPanelWindowHandle handle = windows.get(panel);
+            if (handle == null) {
+                throw new IllegalStateException("Cannot find window handle after adding to separate window");
+            }
+            handle.previousLocation = oldLocation;
+        }
     }
 
     private Timer timer;
     private TimerTask timerTask;
 
-    private class FrameListener implements PropertyChangeListener, ComponentListener {
+    private class FrameListener implements PropertyChangeListener, ComponentListener, WindowListener  {
 
         @Override
         public void propertyChange(PropertyChangeEvent evt) {
@@ -337,6 +496,41 @@ public class AppFrame extends JPanel {
 
         @Override
         public void componentHidden(ComponentEvent e) {
+
+        }
+
+        @Override
+        public void windowOpened(WindowEvent e) {
+            setShouldSavePreferences();
+        }
+
+        @Override
+        public void windowClosing(WindowEvent e) {
+
+        }
+
+        @Override
+        public void windowClosed(WindowEvent e) {
+            setShouldSavePreferences();
+        }
+
+        @Override
+        public void windowIconified(WindowEvent e) {
+
+        }
+
+        @Override
+        public void windowDeiconified(WindowEvent e) {
+
+        }
+
+        @Override
+        public void windowActivated(WindowEvent e) {
+
+        }
+
+        @Override
+        public void windowDeactivated(WindowEvent e) {
 
         }
     }
@@ -382,5 +576,13 @@ public class AppFrame extends JPanel {
         if (pane.getDividerLocation() != location) {
             pane.setDividerLocation(location);
         }
+    }
+
+    JFrame getWindow(AppPanel panel) {
+        AppPanelWindowHandle handle = windows.get(panel);
+        if (handle == null) {
+            return null;
+        }
+        return handle.window;
     }
 }

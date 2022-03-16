@@ -126,6 +126,9 @@ public class Executor {
     
     
     public static void main(final Class launcherClass, final String[] argv) throws Exception {
+        if (System.getProperty("cn1.simulator.useAppFrame", null) == null) {
+            System.setProperty("cn1.simulator.useAppFrame", "true");
+        }
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {

@@ -723,6 +723,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
+    private static boolean useAppFrame = Boolean.getBoolean("cn1.simulator.useAppFrame");
     protected static boolean fxExists = false;
     private JFrame window;
     // Application frame used for simulator
@@ -936,6 +937,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public static void blockMonitors() {
         blockMonitors = true;
+    }
+
+    public static void useAppFrame() {
+        useAppFrame = true;
     }
 
     static void disableNetworkMonitor() {
@@ -4740,12 +4745,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         if (hasSkins()) {
-            appFrame = new AppFrame("Simulator");
+
             hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
             vSelector = new JScrollBar(Scrollbar.VERTICAL);
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
-
+        }
+        if (hasSkins() && useAppFrame) {
+            appFrame = new AppFrame("Simulator");
             JPanel canvasWrapper = new JPanel();
             canvasWrapper.setLayout(new BorderLayout());
             canvasWrapper.add(canvas, java.awt.BorderLayout.CENTER);
@@ -4761,7 +4768,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             AppPanel componentTreeInspectorPanel = new AppPanel("Components", "Components", componentTreeInspector.removeComponentTree());
             componentTreeInspectorPanel.setPreferredFrame(AppFrame.FrameLocation.LeftPanel);
             componentTreeInspectorPanel.addAction(componentTreeInspector.new RefreshAction());
-
+            componentTreeInspectorPanel.addAction(componentTreeInspector.new ValidateAction());
             AppPanel canvasPanel = new AppPanel("Simulator", "Simulator", canvasWrapper);
             canvasPanel.setPreferredFrame(AppFrame.FrameLocation.CenterPanel);
 

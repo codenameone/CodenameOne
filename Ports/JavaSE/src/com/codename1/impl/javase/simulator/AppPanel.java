@@ -21,11 +21,12 @@ import javax.swing.*;
 public class AppPanel extends JPanel {
 
    
-   
+    private AppFrame appFrame;
     private String label;
     private String id;
     private JComponent content;
     private AppFrame.FrameLocation preferredFrame;
+    private java.awt.Rectangle preferredWindowBounds;
     private JScrollPane scrollPane;
     private boolean scrollableX, scrollableY;
     private JButton popupMenu;
@@ -36,7 +37,7 @@ public class AppPanel extends JPanel {
     private JMenuItem moveToRight = new JMenuItem("Right");
     private JMenuItem moveToBottom = new JMenuItem("Bottom");
     private JMenuItem moveToCenter = new JMenuItem("Center");
-
+    private JMenuItem moveToSeparateWindow = new JMenuItem("New Window");
 
     
     public AppPanel(String id, String label, JComponent content) {
@@ -101,7 +102,7 @@ public class AppPanel extends JPanel {
         add(north, BorderLayout.NORTH);
 
 
-        for (JMenuItem menuItem : new JMenuItem[]{moveToLeft, moveToRight, moveToBottom, moveToCenter}) {
+        for (JMenuItem menuItem : new JMenuItem[]{moveToLeft, moveToRight, moveToBottom, moveToCenter, moveToSeparateWindow}) {
             menuItem.addActionListener(new PanelListener());
         }
 
@@ -126,6 +127,8 @@ public class AppPanel extends JPanel {
             getAppFrame().moveTo(this, AppFrame.FrameLocation.BottomPanel);
         } else if (source == moveToCenter) {
             getAppFrame().moveTo(this, AppFrame.FrameLocation.CenterPanel);
+        } else if (source == moveToSeparateWindow) {
+            getAppFrame().moveTo(this, AppFrame.FrameLocation.SeparateWindow);
         }
     }
     
@@ -166,6 +169,17 @@ public class AppPanel extends JPanel {
         this.id = id;
     }
 
+    public Rectangle getPreferredWindowBounds() {
+        if (preferredWindowBounds == null) {
+            return new Rectangle(0, 0, getPreferredSize().width, getPreferredSize().height);
+        }
+        return preferredWindowBounds;
+    }
+
+    public void setPreferredWindowBounds(Rectangle preferredWindowBounds) {
+        this.preferredWindowBounds = preferredWindowBounds;
+    }
+
     private class PanelListener implements ActionListener {
 
         @Override
@@ -192,6 +206,9 @@ public class AppPanel extends JPanel {
         if (currentLocation != AppFrame.FrameLocation.CenterPanel) {
             moveTo.add(moveToCenter);
         }
+        if (currentLocation != AppFrame.FrameLocation.SeparateWindow) {
+            moveTo.add(moveToSeparateWindow);
+        }
 
 
         menu.add(moveTo);
@@ -199,14 +216,7 @@ public class AppPanel extends JPanel {
     }
 
     public AppFrame getAppFrame() {
-        java.awt.Container parent = getParent();
-        while (parent != null) {
-            if (parent instanceof AppFrame) {
-                return (AppFrame)parent;
-            }
-            parent = parent.getParent();
-        }
-        return null;
+        return appFrame;
     }
 
     public void addAction(Action action) {
@@ -227,6 +237,17 @@ public class AppPanel extends JPanel {
         } else {
             prefs.put(prefix + "preferredFrame", location.name());
         }
+
+        if (location == AppFrame.FrameLocation.SeparateWindow) {
+            JFrame window = frame.getWindow(this);
+            if (window != null) {
+                Rectangle r = window.getBounds();
+                prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.x", r.x);
+                prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.y", r.y);
+                prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.width", r.width);
+                prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.height", r.height);
+            }
+        }
     }
 
     public void applyPreferences(AppFrame frame, Preferences prefs) {
@@ -236,5 +257,18 @@ public class AppPanel extends JPanel {
                 preferredFrame = AppFrame.FrameLocation.valueOf(preferredFrameName);
             } catch (IllegalArgumentException ex){}
         }
+        preferredWindowBounds = new Rectangle(0, 0, getPreferredSize().width, getPreferredSize().height);
+        preferredWindowBounds.x = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.x", preferredWindowBounds.x);
+        preferredWindowBounds.y = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.y", preferredWindowBounds.y);
+        preferredWindowBounds.width = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.width", preferredWindowBounds.width);
+        preferredWindowBounds.height = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.height", preferredWindowBounds.height);
+
+
     }
+
+    void setAppFrame(AppFrame appFrame) {
+        this.appFrame = appFrame;
+    }
+
+
 }
