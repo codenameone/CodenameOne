@@ -10,6 +10,8 @@ import com.codename1.impl.javase.util.SwingUtils;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.prefs.Preferences;
 import javax.swing.*;
@@ -26,6 +28,7 @@ public class AppPanel extends JPanel {
     private String id;
     private JComponent content;
     private AppFrame.FrameLocation preferredFrame;
+    private AppFrame.FrameLocation preferredInternalFrame;
     private java.awt.Rectangle preferredWindowBounds;
     private JScrollPane scrollPane;
     private boolean scrollableX, scrollableY;
@@ -143,6 +146,11 @@ public class AppPanel extends JPanel {
      * @param preferredFrame the preferredFrame to set
      */
     public void setPreferredFrame(AppFrame.FrameLocation preferredFrame) {
+        if (preferredFrame == AppFrame.FrameLocation.SeparateWindow &&
+                this.preferredFrame != AppFrame.FrameLocation.SeparateWindow &&
+                preferredInternalFrame == null) {
+            preferredInternalFrame = this.preferredFrame;
+        }
         this.preferredFrame = preferredFrame;
     }
     
@@ -178,6 +186,20 @@ public class AppPanel extends JPanel {
 
     public void setPreferredWindowBounds(Rectangle preferredWindowBounds) {
         this.preferredWindowBounds = preferredWindowBounds;
+    }
+
+    public AppFrame.FrameLocation getPreferredInternalFrame() {
+        if (preferredInternalFrame == null) {
+            AppFrame.FrameLocation out = getPreferredFrame();
+            if (out != AppFrame.FrameLocation.SeparateWindow) {
+                return out;
+            }
+        };
+        return preferredInternalFrame;
+    }
+
+    public void setPreferredInternalFrame(AppFrame.FrameLocation preferredInternalFrame) {
+        this.preferredInternalFrame = preferredInternalFrame;
     }
 
     private class PanelListener implements ActionListener {
@@ -220,7 +242,12 @@ public class AppPanel extends JPanel {
     }
 
     public void addAction(Action action) {
-        leftToolBar.add(action);
+        if (action instanceof SelectableAction) {
+            JToggleButton toggle = new JToggleButton(action);
+            leftToolBar.add(toggle);
+        } else {
+            leftToolBar.add(action);
+        }
     }
 
     String getPreferencesPrefix(AppFrame frame) {
@@ -254,7 +281,7 @@ public class AppPanel extends JPanel {
         String preferredFrameName = prefs.get(getPreferencesPrefix(frame)+"preferredFrame", null);
         if (preferredFrameName != null) {
             try {
-                preferredFrame = AppFrame.FrameLocation.valueOf(preferredFrameName);
+                setPreferredFrame(AppFrame.FrameLocation.valueOf(preferredFrameName));
             } catch (IllegalArgumentException ex){}
         }
         preferredWindowBounds = new Rectangle(0, 0, getPreferredSize().width, getPreferredSize().height);

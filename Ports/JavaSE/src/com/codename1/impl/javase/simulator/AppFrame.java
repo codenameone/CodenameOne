@@ -8,13 +8,12 @@ package com.codename1.impl.javase.simulator;
 import com.codename1.impl.javase.util.SwingUtils;
 
 import java.awt.*;
+import java.awt.List;
 import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.BackingStoreException;
@@ -36,7 +35,8 @@ public class AppFrame extends JPanel {
 
     private Map<String,AppPanel> appPanels = new HashMap<String,AppPanel>();
     private Map<AppPanel, AppPanelWindowHandle> windows = new HashMap<AppPanel, AppPanelWindowHandle>();
-    
+
+    private java.util.List<UpdatableUI> updateCallbacks = new ArrayList<UpdatableUI>();
 
 
     private boolean shouldSavePreferences = false;
@@ -117,8 +117,8 @@ public class AppFrame extends JPanel {
                     @Override
                     public void windowClosing(WindowEvent e) {
                         FrameLocation target = previousLocation;
-                        if (target == null && panel.getPreferredFrame() != FrameLocation.SeparateWindow) {
-                            target = panel.getPreferredFrame();
+                        if (target == null) {
+                            target = panel.getPreferredInternalFrame();
                         }
                         if (target != null) {
                             if (windows.containsKey(panel)) {
@@ -281,7 +281,7 @@ public class AppFrame extends JPanel {
     }
 
     private boolean inAppFrameUI = false;
-    protected void updateAppFrameUI() {
+    public void updateAppFrameUI() {
         if (inAppFrameUI) {
             return;
         }
@@ -290,6 +290,11 @@ public class AppFrame extends JPanel {
 
         } finally {
             inAppFrameUI = false;
+        }
+        if (!updateCallbacks.isEmpty()) {
+            for (UpdatableUI callback : updateCallbacks) {
+                callback.onUpdateAppFrameUI(this);
+            }
         }
     }
 
@@ -585,4 +590,19 @@ public class AppFrame extends JPanel {
         }
         return handle.window;
     }
+
+
+    public void registerUpdateCallback(UpdatableUI callback) {
+        updateCallbacks.add(callback);
+    }
+
+    public void deregisterUpdateCallback(UpdatableUI callback) {
+        updateCallbacks.remove(callback);
+    }
+
+    public static interface UpdatableUI {
+        public void onUpdateAppFrameUI(AppFrame frame);
+    }
+
+
 }

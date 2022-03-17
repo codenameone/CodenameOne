@@ -31,7 +31,9 @@ import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.impl.javase.simulator.SelectableAction;
 import com.codename1.impl.javase.util.MavenUtils;
+import com.codename1.impl.javase.util.SwingUtils;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -212,7 +214,7 @@ import static com.codename1.impl.javase.util.MavenUtils.isRunningInMaven;
 public class JavaSEPort extends CodenameOneImplementation {
 
     
-    
+    private static final int ICON_SIZE=24;
     public final static boolean IS_MAC;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
@@ -2734,6 +2736,260 @@ public class JavaSEPort extends CodenameOneImplementation {
             
         }
     }
+
+    private static ImageIcon getZoomIcon(boolean scrollableSkinValue) {
+        if (scrollableSkinValue) {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_zoom_in_black_24dp.png"), ICON_SIZE, ICON_SIZE);
+        } else {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_zoom_out_black_24dp.png"), ICON_SIZE, ICON_SIZE);
+        }
+    }
+
+    /**
+     * Mutator for scrollable skin that will trigger a UI update on
+     * change.
+     * @param scrollableSkinValue
+     */
+    private static void setScrollableSkin(boolean scrollableSkinValue) {
+        if (scrollableSkin != scrollableSkinValue) {
+            scrollableSkin = scrollableSkinValue;
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            pref.putBoolean("Scrollable", scrollableSkin);
+            instance.updateFrameUI();
+        }
+    }
+
+    private void setPortrait(boolean portraitValue) {
+        if (portrait != portraitValue) {
+            portrait = portraitValue;
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            pref.putBoolean("Portrait", portrait);
+            updateFrameUI();
+
+        }
+    }
+
+
+    private void updateFrameUI() {
+        if (instance.appFrame != null) {
+            if (EventQueue.isDispatchThread()) {
+                instance.appFrame.updateAppFrameUI();
+            } else {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        instance.appFrame.updateAppFrameUI();
+                    }
+                });
+            }
+        }
+    }
+
+
+    public class ZoomAction extends AbstractAction implements AppFrame.UpdatableUI {
+
+        private final boolean scrollableSkinValue;
+
+        public ZoomAction(boolean scrollableSkinValue) {
+            super("", getZoomIcon(scrollableSkinValue));
+            this.scrollableSkinValue = scrollableSkinValue;
+            if (scrollableSkinValue) {
+                putValue(SHORT_DESCRIPTION, "Zoom in");
+            } else {
+                putValue(SHORT_DESCRIPTION, "Zoom out");
+            }
+            update();
+
+
+        }
+
+
+
+
+        protected void update() {
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            if (pref.getBoolean("desktopSkin", false)) {
+                setEnabled(false);
+                return;
+            }
+            if (scrollableSkin == scrollableSkinValue) {
+                setEnabled(false);
+            } else {
+                setEnabled(true);
+            }
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JFrame frm = window;
+            setScrollableSkin(scrollableSkinValue);
+
+
+            if (scrollableSkin) {
+                if (appFrame == null) {
+                    frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+                    frm.add(java.awt.BorderLayout.EAST, vSelector);
+                } else {
+                    canvas.getParent().add(java.awt.BorderLayout.SOUTH, hSelector);
+                    canvas.getParent().add(java.awt.BorderLayout.EAST, vSelector);
+                }
+
+            } else {
+                java.awt.Container selectorParent = hSelector.getParent();
+                if (selectorParent != null) {
+                    selectorParent.remove(hSelector);
+                    selectorParent.remove(vSelector);
+                }
+            }
+            Container parent = canvas.getParent();
+            parent.remove(canvas);
+            if (scrollableSkin) {
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+            } else {
+                int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                float zoom = Math.min(zoomX, zoomY);
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
+                if (window != null) {
+                    if (appFrame == null) {
+                        window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoom), (int) (getSkin().getHeight() * zoom)));
+                    } else {
+
+                        // THis is a hack to get it to repaint.
+                        // Probably this is because a full refresh of the canvas
+                        // is triggered by the ancestorResized event, but
+                        // Can't figure out how to trigger it otherwise, we
+                        // this ugly thing increases the decreases the window size by
+                        // one pixel to trigger the refresh.
+                        // Without this, the simulator canvas doesn't update
+                        // until the window is resized.
+                        java.awt.Container top = (parent instanceof JComponent) ?
+                                ((JComponent)parent).getTopLevelAncestor() :
+                                window;
+                        if (top == null) top = window;
+
+                        int currW = top.getWidth();
+                        int currH = top.getHeight();
+                        top.setSize(new Dimension(currW+1, currH+1));
+                        top.revalidate();
+                        top.setSize(new Dimension(currW, currH));
+                        top.revalidate();
+                    }
+                }
+            }
+            parent.add(BorderLayout.CENTER, canvas);
+
+            canvas.x = 0;
+            canvas.y = 0;
+            zoomLevel = 1;
+
+            if (appFrame != null) {
+                appFrame.revalidate();
+                Display.getInstance().getCurrent().repaint();
+                appFrame.repaint();
+                parent.revalidate();
+                parent.revalidate();
+                canvas.repaint();
+                Timer timer = new Timer();
+                TimerTask tt = new TimerTask() {
+
+                    @Override
+                    public void run() {
+                        EventQueue.invokeLater(new Runnable() {
+                            public void run() {
+                                canvas.revalidate();
+                                canvas.repaint();
+
+                            }
+                        });
+                    }
+                };
+                timer.schedule(tt, 100L);
+
+            } else {
+                frm.invalidate();
+                frm.pack();
+                Display.getInstance().getCurrent().repaint();
+                frm.repaint();
+            }
+
+        }
+
+        @Override
+        public void onUpdateAppFrameUI(AppFrame frame) {
+            update();
+        }
+    }
+
+
+    private static ImageIcon getRotateActionImageIcon(boolean portraitValue) {
+        if (portraitValue) {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_stay_current_portrait_black_24dp.png"), ICON_SIZE, ICON_SIZE);
+        } else {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_stay_current_landscape_black_24dp.png"), ICON_SIZE, ICON_SIZE);
+        }
+    }
+
+
+    public class RotateAction extends AbstractAction implements AppFrame.UpdatableUI, SelectableAction {
+        private boolean portraitValue;
+        public RotateAction(boolean portraitValue) {
+            super("", getRotateActionImageIcon(portraitValue));
+            this.portraitValue = portraitValue;
+            if (portraitValue) {
+                putValue(SHORT_DESCRIPTION, "Rotate to portrait mode");
+            } else {
+                putValue(SHORT_DESCRIPTION, "Rotate to landscape mode");
+            }
+            update();
+        }
+
+        private void update() {
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+            setEnabled(!desktopSkin);
+            Boolean selected = (Boolean)getValue(SELECTED_KEY);
+            if (selected == null) {
+                selected = false;
+            }
+            if (selected != (portraitValue == portrait)) {
+                putValue(SELECTED_KEY, portraitValue == portrait);
+            }
+
+
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            setPortrait(portraitValue);
+
+            Container parent = canvas.getParent();
+            parent.remove(canvas);
+            canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
+            if (appFrame == null) {
+                if (window != null) {
+                    window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoomLevel), (int) (getSkin().getHeight() * zoomLevel)));
+                }
+            }
+            java.awt.Container top = ((JComponent)parent).getTopLevelAncestor();
+            top.revalidate();
+            top.repaint();
+            parent.add(BorderLayout.CENTER, canvas);
+            if (appFrame == null) {
+                window.pack();
+            }
+
+            //zoomLevel = 1;
+            JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+
+        }
+
+        @Override
+        public void onUpdateAppFrameUI(AppFrame frame) {
+            update();
+        }
+    }
     
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
@@ -2808,12 +3064,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             toolsMenu.add(buildHintEditor);
 
             
-            JMenuItem rotate = new JMenuItem("Rotate");
-            rotate.setEnabled(!desktopSkin);
 
-            simulatorMenu.add(rotate);
             final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
-            simulatorMenu.add(zoomMenu);
+            if (appFrame == null) simulatorMenu.add(zoomMenu);
 
             JMenu debugEdtMenu = new JMenu("Debug EDT");
             toolsMenu.add(debugEdtMenu);
@@ -3817,40 +4070,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(helpMenu);
             }
 
-            rotate.addActionListener(new ActionListener() {
 
-                public void actionPerformed(ActionEvent ae) {
-                    portrait = !portrait;
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    pref.putBoolean("Portrait", portrait);
-                    if (scrollableSkin) {
-                        float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth()/(float)retinaScale);
-                        float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight()/(float)retinaScale);
-                        zoomLevel = Math.min(1, Math.min(h1, w1));
-                    } else {
-                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
-                        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
-                        float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
-                        float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
-                        float zoom = Math.min(1, Math.min(zoomX, zoomY));
-                    
-                        zoomLevel = zoom; //Math.min(h1, w1);
-                    }
-                    
-                    
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
-                    if (window != null) {
-                        window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
-                    }
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-
-                    zoomLevel = 1;
-                    JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
-                }
-            });
             
             alwaysOnTopFlag.addItemListener(new ItemListener() {
 
@@ -3872,9 +4092,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             ItemListener zoomListener = new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
-                    scrollableSkin = !scrollableSkin;
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    pref.putBoolean("Scrollable", scrollableSkin);
+                    setScrollableSkin(!scrollableSkin);
 
                     if (scrollableSkin) {
                         if (appFrame == null) {
@@ -4771,6 +4989,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             componentTreeInspectorPanel.addAction(componentTreeInspector.new ValidateAction());
             AppPanel canvasPanel = new AppPanel("Simulator", "Simulator", canvasWrapper);
             canvasPanel.setPreferredFrame(AppFrame.FrameLocation.CenterPanel);
+            RotateAction portraitAction = new RotateAction(true);
+            RotateAction landscapeAction = new RotateAction(false);
+            canvasPanel.addAction(portraitAction);
+            canvasPanel.addAction(landscapeAction);
+            ZoomAction zoomIn = new ZoomAction(true);
+            ZoomAction zoomOut = new ZoomAction(false);
+            canvasPanel.addAction(zoomIn);
+            canvasPanel.addAction(zoomOut);
+            appFrame.registerUpdateCallback(zoomIn);
+            appFrame.registerUpdateCallback(zoomOut);
+            appFrame.registerUpdateCallback(portraitAction);
+            appFrame.registerUpdateCallback(landscapeAction);
 
             AppPanel detailsPanel = new AppPanel("Details", "Component Details", componentTreeInspector);
             detailsPanel.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
@@ -4914,7 +5144,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 zoomLevel = zoomLevel();
             }
 
-            portrait = pref.getBoolean("Portrait", true);
+            setPortrait(pref.getBoolean("Portrait", true));
             
             if (getSkin() != null) {
                 if (scrollableSkin) {
