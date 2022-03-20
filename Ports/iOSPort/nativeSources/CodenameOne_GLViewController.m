@@ -74,6 +74,8 @@
 #endif
 #import "com_codename1_payment_Purchase.h"
 
+
+
 //#define CN1_USE_SPLASH_SCREEN
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
@@ -2205,7 +2207,9 @@ EAGLView* lastFoundEaglView;
         [[self eaglView] presentFramebuffer];
         GLErrorLog;
     }
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+#endif
 }
 
 CGFloat getOriginY() {
@@ -3363,6 +3367,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
 
     NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
+    NSURL* mediaURL = [info objectForKey:@"UIImagePickerControllerImageURL"];
     if ([mediaType isEqualToString:@"public.image"]) {
         // get the image
         UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
@@ -3377,12 +3382,23 @@ void cn1_addSelectedImagePath(NSString* path) {
             UIGraphicsEndImageContext();
         }
 #endif
-        
-        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        NSString* fileName = (mediaURL != nil) ? [mediaURL lastPathComponent] : nil;
+        fileName = fileName == nil ? nil : [fileName lowercaseString];
+        NSData* data;
+        NSString* tempImageName = @"temp_image.jpg";
+        if (fileName == nil || [fileName hasSuffix:@".jpg"] || [fileName hasSuffix:@".jpeg"]) {
+            data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        } else if ([fileName hasSuffix:@".png"]) {
+            tempImageName = @"temp_image.png";
+            data = UIImagePNGRepresentation(image);
+        } else {
+            tempImageName = @"temp_image.png";
+            data = UIImagePNGRepresentation(image);
+        }
         
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:tempImageName];
         [data writeToFile:path atomically:YES];
         com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
     
@@ -3418,6 +3434,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 
 extern JAVA_OBJECT productsArrayPending;
 
+#ifdef CN1_USE_STOREKIT
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
 	POOL_BEGIN();
     if(productsArrayPending != nil) {
@@ -3525,6 +3542,8 @@ extern SKPayment *paymentInstance;
     CN1Log(@"Restore error");
     com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
 }
+
+#endif
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
     CN1Log(@"audioRecorderDidFinishRecording: %i", (int)flag);

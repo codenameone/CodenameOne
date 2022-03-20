@@ -1472,11 +1472,13 @@ public final class Display extends CN1Constants {
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
                     }
+
+                    while (!runningSerialCallsQueue.isEmpty()) {
+                        pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
+                    }
                 }
                 
-                while (!runningSerialCallsQueue.isEmpty()) {
-                    pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
-                }
+
 
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {

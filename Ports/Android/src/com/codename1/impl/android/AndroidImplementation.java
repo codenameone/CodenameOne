@@ -4670,6 +4670,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
+                        wv.getSettings().setAllowFileAccess(true);
+                        wv.getSettings().setAllowContentAccess(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
                         if (android.os.Build.VERSION.SDK_INT >= 17) {
@@ -5853,13 +5855,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
-            if(read){
-                if(timeout > -1) {
-                    c.setReadTimeout(timeout);
-                }else{
-                    c.setReadTimeout(10000);
-                }
-            }
+
             if (android.os.Build.VERSION.SDK_INT > 13) {
                 c.setRequestProperty("Connection", "close");
             }
@@ -6840,7 +6836,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         "android.NotificationChannel.enableLights",
         "android.NotificationChannel.lightColor",
         "android.NotificationChannel.enableVibration",
-        "android.NotificationChannel.vibrationPattern"
+        "android.NotificationChannel.vibrationPattern",
+        "android.NotoficationChannel.soundUri"
     };
     
     /**
@@ -6971,8 +6968,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
+     * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
+        setNotificationChannel(nm, mNotifyBuilder, context, (String)null);
+        
+    }
+    
+    /**
+     * Sets the notification channel on a notification builder.  Uses service properties to 
+     * set properties of channel.
+     * @param nm The notification manager.
+     * @param mNotifyBuilder The notify builder
+     * @param context The context
+     * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
+     *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
+     * @since 8.0
+     */
+    public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
@@ -7024,6 +7037,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     method = clsNotificationChannel.getMethod("setVibrationPattern", long[].class);
                     method.invoke(mChannel, new Object[]{pattern});
                     //mChannel.setVibrationPattern(pattern);
+                }
+                
+                String soundUri = getServiceProperty("android.NotificationChannel.soundUri", null, context);
+                if (soundUri != null) {
+                    Uri uri= android.net.Uri.parse(soundUri);
+                    
+                    android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .build();
+                    method = clsNotificationChannel.getMethod("setSound", android.net.Uri.class, android.media.AudioAttributes.class);
+                    method.invoke(mChannel, new Object[]{uri, audioAttributes});
                 }
                 
                 method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);

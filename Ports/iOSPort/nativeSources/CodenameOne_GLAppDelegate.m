@@ -138,6 +138,22 @@ static void installSignalHandlers() {
         }
         com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
     }
+    if (@available(iOS 8, *)) {
+        // App Links from associated domains
+        NSDictionary *activityDictionary = [launchOptions objectForKey:UIApplicationLaunchOptionsUserActivityDictionaryKey];
+        if (activityDictionary) {
+            NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
+            if (userActivity != nil) {
+                if ([NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
+                    JAVA_OBJECT launchUrlStr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
+                    JAVA_OBJECT appArgKey = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
+                    JAVA_OBJECT displayInstObj = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+
+                    com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG displayInstObj, appArgKey, launchUrlStr);
+                }
+            }
+        }
+    }
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     if (launchOptions[UIApplicationLaunchOptionsLocalNotificationKey]) {

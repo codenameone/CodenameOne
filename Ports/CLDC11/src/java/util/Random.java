@@ -113,5 +113,11 @@ public class Random{
     public boolean nextBoolean() {
         return false;
     }
+    
+    public void nextBytes(byte[] bytes) {
+        for (int i = 0; i < bytes.length; ++i) {
+            bytes[i] = (byte) next(8);
+        }
+    }
 
 }

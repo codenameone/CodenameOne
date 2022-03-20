@@ -63,7 +63,7 @@
         <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
-
+        <!--<module>codenameone-maven-goals</module>-->
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
@@ -99,11 +99,6 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-designer</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-buildclient</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -216,6 +211,7 @@
                 <artifactId>maven-plugin-api</artifactId>
                 <version>3.3.3</version>
             </dependency>
+
             <dependency>
                 <groupId>org.apache.maven.surefire</groupId>
                 <artifactId>surefire-api</artifactId>
@@ -284,9 +280,9 @@
             </dependency>
 
             <dependency>
-                <groupId>net.sf.proguard</groupId>
+                <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-base</artifactId>
-                <version>6.3.0beta1</version>
+                <version>7.2.0-beta2</version>
             </dependency>
             <dependency>
                 <groupId>javax.xml.bind</groupId>
@@ -508,9 +504,9 @@
             <dependencyManagement>
                 <dependencies>
                     <dependency>
-                        <version>${project.version}</version>
                         <groupId>com.codenameone</groupId>
                         <artifactId>codenameone-buildclient</artifactId>
+                        <version>8.0</version><!-- Dummy version to avoid build errors that demand a version -->
                         <scope>system</scope>
                         <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
                     </dependency>

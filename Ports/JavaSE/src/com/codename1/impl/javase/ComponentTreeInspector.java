@@ -1,40 +1,28 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *  
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- * 
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
- * need additional information or have any questions.
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
  */
 package com.codename1.impl.javase;
+
+import com.codename1.impl.javase.util.SwingUtils;
+import javax.swing.*;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Painter;
-import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import java.awt.BorderLayout;
 import java.awt.Desktop;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -43,15 +31,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.EventObject;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
-import javax.swing.JPopupMenu;
-import javax.swing.JTree;
-import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeModelListener;
@@ -61,15 +45,13 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 /**
- * A visual view of the component hierarchy within the current Codename One form
- * this UI monitors the tree of components and gives us some information of its
- * structure which can be useful for debugging applications.
  *
- * @author Shai Almog
+ * @author shannah
  */
-public class ComponentTreeInspector extends javax.swing.JFrame {
+public class ComponentTreeInspector extends JPanel {
     private List<String> themePaths = new ArrayList<String>();
     private List<String> themeNames = new ArrayList<String>();
+    private JFrame frame;
 
     class SelectedComponentGlassPane implements Painter {
         Component cmp;
@@ -89,9 +71,39 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         
     }
     
+    public JFrame showInFrame() {
+        if (frame == null) {
+            frame = new JFrame("Component Inspector");
+            frame.getContentPane().setLayout(new BorderLayout());
+            
+            frame.getContentPane().add(this, BorderLayout.CENTER);
+            frame.pack();
+            frame.setLocationByPlatform(true);
+            
+        }
+        frame.setVisible(true);
+        return frame;
+    }
+    
+    public void dispose() {
+        if (frame != null) {
+            frame.dispose();
+            frame = null;
+        }
+    }
+
+    
+    
+    
+    public javax.swing.JComponent removeComponentTree() {
+        jScrollPane1.getParent().remove(jScrollPane1);
+        return jScrollPane1;
+    }
+    
     private Component currentComponent; 
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
+        setLayout(new BorderLayout());
         initComponents();
         
         File[] resFiles = new File("src").listFiles(new FileFilter() {
@@ -253,9 +265,9 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                 }
             }
         });
-        pack();
-        setLocationByPlatform(true);
-        setVisible(true);
+        //pack();
+        //setLocationByPlatform(true);
+        //setVisible(true);
     }
 
     private void refreshComponentTree() {
@@ -300,14 +312,14 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         margin = new javax.swing.JTextField();
         unselected = new javax.swing.JButton();
         themes = new javax.swing.JComboBox();
-        jToolBar1 = new javax.swing.JToolBar();
-        refreshTree = new javax.swing.JButton();
-        validate = new javax.swing.JButton();
+        //jToolBar1 = new javax.swing.JToolBar();
+        //refreshTree = new javax.swing.JButton();
+       // validate = new javax.swing.JButton();
 
         FormListener formListener = new FormListener();
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-        setTitle("Component Tree Inspector");
+        //setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        //setTitle("Component Tree Inspector");
 
         jScrollPane1.setViewportView(componentTree);
 
@@ -446,46 +458,13 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
 
         jSplitPane1.setRightComponent(jPanel1);
 
-        getContentPane().add(jSplitPane1, java.awt.BorderLayout.CENTER);
+        add(jSplitPane1, java.awt.BorderLayout.CENTER);
 
-        jToolBar1.setRollover(true);
 
-        refreshTree.setText("Refresh");
-        refreshTree.setFocusable(false);
-        refreshTree.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        refreshTree.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
-        refreshTree.addActionListener(formListener);
-        jToolBar1.add(refreshTree);
 
-        validate.setText("Validate");
-        validate.setFocusable(false);
-        validate.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-        validate.setName(""); // NOI18N
-        validate.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
-        validate.addActionListener(formListener);
-        jToolBar1.add(validate);
-
-        getContentPane().add(jToolBar1, java.awt.BorderLayout.PAGE_START);
-
-        pack();
     }
 
-    // Code for dispatching events from components to event handlers.
-
-    private class FormListener implements java.awt.event.ActionListener {
-        FormListener() {}
-        public void actionPerformed(java.awt.event.ActionEvent evt) {
-            if (evt.getSource() == unselected) {
-                ComponentTreeInspector.this.unselectedActionPerformed(evt);
-            }
-            else if (evt.getSource() == refreshTree) {
-                ComponentTreeInspector.this.refreshTreeActionPerformed(evt);
-            }
-            else if (evt.getSource() == validate) {
-                ComponentTreeInspector.this.validateActionPerformed(evt);
-            }
-        }
-    }// </editor-fold>//GEN-END:initComponents
+    
 
 private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshTreeActionPerformed
     refreshComponentTree();
@@ -674,14 +653,64 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JPanel jPanel1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JSplitPane jSplitPane1;
-    private javax.swing.JToolBar jToolBar1;
+    //private javax.swing.JToolBar jToolBar1;
     private javax.swing.JTextField layout;
     private javax.swing.JTextField margin;
     private javax.swing.JTextField padding;
     private javax.swing.JTextField preferredSize;
-    private javax.swing.JButton refreshTree;
+    //private javax.swing.JButton refreshTree;
     private javax.swing.JComboBox themes;
     private javax.swing.JButton unselected;
     private javax.swing.JButton validate;
     // End of variables declaration//GEN-END:variables
+    
+    // Code for dispatching events from components to event handlers.
+
+    private class FormListener implements java.awt.event.ActionListener {
+        FormListener() {}
+        public void actionPerformed(java.awt.event.ActionEvent evt) {
+            if (evt.getSource() == unselected) {
+                ComponentTreeInspector.this.unselectedActionPerformed(evt);
+            }
+            //else if (evt.getSource() == refreshTree) {
+            //    ComponentTreeInspector.this.refreshTreeActionPerformed(evt);
+            //}
+            else if (evt.getSource() == validate) {
+                ComponentTreeInspector.this.validateActionPerformed(evt);
+            }
+        }
+    }// </editor-fold>
+
+    public class RefreshAction extends AbstractAction {
+
+        RefreshAction() {
+            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("refresh.png"), 16, 16));
+            setToolTipText("Refresh comonent tree");
+        }
+
+
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            ComponentTreeInspector.this.refreshComponentTree();
+        }
+    }
+
+    public class ValidateAction extends AbstractAction {
+
+        ValidateAction() {
+            super("Validate");
+            setToolTipText("Validate component tree and report problems.");
+            
+        }
+
+
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            ComponentTreeInspector.this.validateActionPerformed(e);
+        }
+    }
+
+
 }

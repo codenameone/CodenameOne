@@ -1707,9 +1707,17 @@ public class Resources {
                 }
                 if (Math.abs(scale-1f) > 0.01) {
                     for (String fontKey : fontKeys) {
-                        Font f = (Font)theme.get(fontKey);
-                        f = f.derive(f.getPixelSize() * scale, f.getStyle());
-                        theme.put(fontKey, f);
+                        Font f = (Font) theme.get(fontKey);
+                        if (f != null && f.isTTFNativeFont()) {
+                            try {
+                                f = f.derive(f.getPixelSize() * scale, f.getStyle());
+                                theme.put(fontKey, f);
+                            } catch (Exception ex) {
+                                Log.p("Failed to derive font " + f + " while loading font key " + fontKey + " from resource file. " + ex.getMessage());
+                                Log.e(ex);
+                            }
+                        }
+
                     }
                 }
             }

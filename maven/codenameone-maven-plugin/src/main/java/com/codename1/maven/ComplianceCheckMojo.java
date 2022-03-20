@@ -11,7 +11,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -20,9 +19,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.tools.ant.taskdefs.Java;
-import org.apache.tools.ant.taskdefs.Javac;
 import org.apache.tools.ant.types.Path;
-
 import static com.codename1.maven.PathUtil.path;
 
 /**
@@ -155,6 +152,7 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         Path libraryJarsPath = new Path(antProject, getJavaRuntimeJar().getAbsolutePath());
         libraryJarsPath.add(new Path(antProject, getCodenameOneJar().getAbsolutePath()));
         java.createArg().setPath(libraryJarsPath);
+        getLog().debug("Compliance check -libraryjars="+libraryJarsPath);
         File complianceCheckJar =  new File(project.getBuild().getDirectory() + File.separator + "compliance-check.jar");
         java.createArg().setValue("-keepattributes");
         java.createArg().setValue("Signature");
@@ -164,26 +162,31 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         // access package-private stuff
         java.createArg().setValue("-dontskipnonpubliclibraryclasses");
         java.createArg().setValue("-dontskipnonpubliclibraryclassmembers");
+        java.createArg().setValue("-dontoptimize");
+
         if (passNum == 0) {
             // The -injars parameter of proguard is the list of jars/directories that
             // we want to operate on.  We will operate on all dependencies, stripping out unused
             // code and place the result into a complianceCheck jar file.  This jar file
             // will be checked for consistency on the second pass.
             Path inJars = new Path(antProject, project.getBuild().getOutputDirectory());
-            //File kotlinIc = new File(project.getBuild().getDirectory(), path("kotlin-ic", "compile", "classes"));
-            //if (kotlinIc.exists()) {
-            //
-            //    inJars.add(new Path(antProject, kotlinIc.getAbsolutePath()));
-            //}
 
             project.getArtifacts().forEach(artifact -> {
                 getLog().info("artifact "+artifact);
                 if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("codenameone-core")) {
                     return;
                 }
+                if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("java-runtime")) {
+                    return;
+                }
                 if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
-                    getLog().info("Adding to injars: "+getJar(artifact));
-                    inJars.add(new Path(antProject, getJar(artifact).getAbsolutePath()+"(!META-INF/**)"));
+                    File jar = getJar(artifact);
+                    if (jar != null) {
+                        getLog().info("Adding to injars: " + jar);
+                        inJars.add(new Path(antProject, getJar(artifact).getAbsolutePath()+"(!META-INF/**)"));
+                    } else {
+                        getLog().warn("No jar found for artifact "+artifact+".  This might cause problems for the compliance check");
+                    }
                 }
             });
             getLog().info("injars = "+inJars);
@@ -212,6 +215,8 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             java.createArg().setValue("-keep");
             java.createArg().setValue(keep);
             getLog().info("Keeping "+keep);
+
+
         } else {
 
             List<String> keeps = new ArrayList<String>();
@@ -236,6 +241,9 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
             java.createArg().setValue("-dontwarn **");
             //java.createArg().setValue("**");
             java.createArg().setValue("-ignorewarnings");
+        }
+        if (getLog().isDebugEnabled()) {
+            java.createArg().setValue("-verbose");
         }
 
         int result = java.executeJava();
@@ -316,11 +324,20 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
         // This should be solved in Maven 2.1
         //Starting in v. 7.0.0., proguard got split up in proguard-base and proguard-core,
         //both of which need to be on the classpath.
+        Artifact proguardBase = null;
+        for (Artifact artifact : pluginArtifacts) {
+            if (artifact.getArtifactId().equals("proguard-base")) {
+                proguardBase = artifact;
+                break;
+            }
+        }
+
+        //getLog().info("Proguard dependencies are "+getArtifactsDependencies(proguardBase));
         for (Artifact artifact : pluginArtifacts) {
             getLog().debug("pluginArtifact: " + artifact.getFile());
 
             final String artifactId = artifact.getArtifactId();
-            if (artifactId.startsWith("proguard")) {
+            if (!(artifactId.equals("java-runtime") && artifact.getGroupId().equals("com.codenameone"))) {
                 int distance = artifact.getDependencyTrail().size();
                 getLog().debug("proguard DependencyTrail: " + distance);
 

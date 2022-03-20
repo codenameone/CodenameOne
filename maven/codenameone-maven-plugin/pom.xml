@@ -77,11 +77,11 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-buildclient</artifactId>
-
+            <version>8.0</version>
             <scope>system</scope>
             <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
-        
+
         <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
         <dependency>
             <groupId>org.codehaus.mojo</groupId>
@@ -108,9 +108,10 @@
                 
             </dependency>
         <dependency>
-            <groupId>net.sf.proguard</groupId>
+            <groupId>com.guardsquare</groupId>
             <artifactId>proguard-base</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-cef</artifactId>
@@ -209,7 +210,7 @@
         <dependency>
             <groupId>net.lingala.zip4j</groupId>
             <artifactId>zip4j</artifactId>
-            <version>2.7.0</version>
+            <version>2.9.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>

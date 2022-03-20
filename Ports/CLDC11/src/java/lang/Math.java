@@ -255,4 +255,14 @@ public final class Math{
         return Double.longBitsToDouble(bits);
     }
     
+    
+    public static double nextAfter(double start, double direction) {
+        return 0;
+    }
+
+    public static float nextAfter(float start, double direction) {
+        return 0;
+    }
+ 
+    
 }

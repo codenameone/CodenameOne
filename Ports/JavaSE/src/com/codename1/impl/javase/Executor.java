@@ -24,6 +24,7 @@ package com.codename1.impl.javase;
 
 import com.codename1.components.ToastBar;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.push.PushContent;
@@ -41,6 +42,8 @@ import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.prefs.Preferences;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -123,6 +126,9 @@ public class Executor {
     
     
     public static void main(final Class launcherClass, final String[] argv) throws Exception {
+        if (System.getProperty("cn1.simulator.useAppFrame", null) == null) {
+            System.setProperty("cn1.simulator.useAppFrame", "true");
+        }
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
@@ -282,7 +288,7 @@ public class Executor {
                             Display.init(null);
                             
                             //if (isDebug && usingHotswapAgent) {
-                            if (System.getProperty("maven.home") != null) {
+                            if (MavenUtils.isRunningInMaven() && MavenUtils.isRunningInJDK()) {
                                 // In debug mode, when the Hotswap Agent is present, the simulator
                                 // will monitor all the source files for changes, and automatically
                                 // trigger a re-compile - then hotswap the classes.
@@ -299,6 +305,11 @@ public class Executor {
                             } else {
                                 System.out.println("Hotswap Agent not detected. To enable enhanced live class reloading feature, run with DCEVM JDK and add -XX:HotswapAgent=core to the VM options");
 
+                            }
+                            
+                            if (!MavenUtils.isRunningInJDK() && System.getProperty("cn1.jdk.warning", null) == null) {
+                                System.getProperty("cn1.jdk.warning", "true");
+                                JOptionPane.showMessageDialog(null, new JLabel("<html><p style='width:400px'>You are currently running inside Java Runtime environment that does not include development tools.  Some features, such as hot-reload require a full JDK and will be disabled.  \n\nPlease change your JAVA_HOME to be a full JDK.\n\n Your current JAVA_HOME is "+System.getProperty("java.home")+"</p></html>"));
                             }
                             
                             Display.getInstance().callSerially(new Runnable() {
@@ -798,7 +809,10 @@ public class Executor {
             if (srcMain.exists()) {
                 sourceWatcher.addWatchFolder(srcMain);
             }
-
+            File srcMainKotlin = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "kotlin");
+            if (srcMainKotlin.exists()) {
+                sourceWatcher.addWatchFolder(srcMainKotlin);
+            }
 
             File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
             if (srcRad.exists()) {

@@ -207,7 +207,13 @@ public final class Character implements Comparable<Character>{
     public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE = 17;
     public static final byte DIRECTIONALITY_POP_DIRECTIONAL_FORMAT = 18;
 
-    
+    private static final int SURROGATE_NEUTRAL_BIT_MASK = 0xF800;
+    private static final int SURROGATE_BITS = 0xD800;
+    private static final int SURROGATE_BIT_MASK = 0xFC00;
+    private static final int SURROGATE_BIT_INV_MASK = 0x03FF;
+    private static final int HIGH_SURROGATE_BITS = 0xD800;
+    private static final int LOW_SURROGATE_BITS = 0xDC00;
+    private static final int MEANINGFUL_SURROGATE_BITS = 10;
     
 
     private char value;
@@ -532,6 +538,8 @@ public final class Character implements Comparable<Character>{
         return (MIN_CODE_POINT <= codePoint && MAX_CODE_POINT >= codePoint);
     }
 
+
+
     /**
      * <p>
      * A test for determining if the <code>codePoint</code> is within the
@@ -561,6 +569,16 @@ public final class Character implements Comparable<Character>{
     public static boolean isHighSurrogate(char ch) {
         return (MIN_HIGH_SURROGATE <= ch && MAX_HIGH_SURROGATE >= ch);
     }
+
+    public static char highSurrogate(int codePoint) {
+        codePoint -= MIN_SUPPLEMENTARY_CODE_POINT;
+        return (char) (HIGH_SURROGATE_BITS | (codePoint >> MEANINGFUL_SURROGATE_BITS) & SURROGATE_BIT_INV_MASK);
+    }
+
+    public static char lowSurrogate(int codePoint) {
+        return (char) (LOW_SURROGATE_BITS | codePoint & SURROGATE_BIT_INV_MASK);
+    }
+
 
     /**
      * <p>
@@ -1315,8 +1333,27 @@ public final class Character implements Comparable<Character>{
     public int compareTo(Character another) {
         return toString().compareTo(String.valueOf(another.value));
     }
-    
-    
+
+    private static String _codepointToString(int cp) {
+        StringBuilder sb = new StringBuilder();
+        if (isBmpCodePoint(cp)) {
+            sb.append((char) cp);
+        } else if (isValidCodePoint(cp)) {
+            sb.append(highSurrogate(cp));
+            sb.append(lowSurrogate(cp));
+        } else {
+            sb.append('?');
+        }
+        return sb.toString();
+    }
+
+    public static int toTitleCase(int codePoint) {
+        return _codepointToString(codePoint).charAt(0);
+    }
+
+    public static char toTitleCase(char c) {
+        return String.valueOf(c).toUpperCase().charAt(0);
+    }
     
 }
 
@@ -1630,4 +1667,7 @@ final class Base46 {
             return c - ' ' - 2;
         }
     }
+
+
+
 }

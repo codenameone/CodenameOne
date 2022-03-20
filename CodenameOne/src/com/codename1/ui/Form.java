@@ -2396,6 +2396,7 @@ public class Form extends Container {
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;
+        pressedCmp = null;
         dragged = null;
     }
 

@@ -24,9 +24,8 @@
 package com.codename1.tools.translator;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
@@ -414,19 +413,26 @@ public class Parser extends ClassVisitor {
             // because native source may be the only thing referencing a class,
             // and the class may be purged before it even has a shot.
             readNativeFiles(outputDirectory);
-            usedByNativeCheck();
+
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
-            }   
-            ByteCodeClass.markDependencies(classes);
+            }
+            ByteCodeClass.markDependencies(classes, nativeSources);
+            Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
-
+            unmarked.removeAll(classes);
+            int neliminated = 0;
+            for (ByteCodeClass removedClass : unmarked) {
+                removedClass.setEliminated(true);
+                neliminated++;
+            }
 
             // loop over methods and start eliminating the body of unused methods
             if (BytecodeMethod.optimizerOn) {
+                System.out.println("Optimizer On: Removing unused methods and classes...");
                 Date now = new Date();
-                int neliminated = eliminateUnusedMethods();
+                neliminated += eliminateUnusedMethods();
                 Date later = new Date();
                 long dif = later.getTime()-now.getTime();
                 System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
@@ -481,40 +487,40 @@ public class Parser extends ClassVisitor {
     }
     
     private static int eliminateUnusedMethods() {
-        usedByNativeCheck();
-    	return(eliminateUnusedMethods(0));
+        return(eliminateUnusedMethods(false, 0));
     }
 
-    private static int eliminateUnusedMethods(int depth) {
-        int nfound = cullMethods(false);
-        cullClasses(nfound>0, depth);
+    private static int eliminateUnusedMethods(boolean forceFound, int depth) {
+        int nfound = cullMethods();
+        nfound += cullClasses(nfound>0 || forceFound, depth);
         return(nfound);
     }
 
-    private static int cullMethods(boolean found) {
+    private static int cullMethods() {
     	int nfound = 0;
-        for(ByteCodeClass bc : classes) {
+    	for(ByteCodeClass bc : classes) {
             bc.unmark();
             if(bc.isIsInterface() || bc.getBaseClass() == null) {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
-                if(mtd.isEliminated() || mtd.isUsedByNative() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
+                if(mtd.isEliminated() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
+                    if (!mtd.isEliminated() && mtd.getMethodName().contains("yield")) {
+                        System.out.println("Not eliminating method ");
+                        System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
+                    }
                     continue;
                 }
 
-                if(!isMethodUsed(mtd)) {
+                if(!isMethodUsed(mtd, bc)) {
                     if(isMethodUsedByBaseClassOrInterface(mtd, bc)) {
                         continue;
                     }
-                    found = true;
                     mtd.setEliminated(true);
                     nfound++;
-                    /*if(ByteCodeTranslator.verbose) {
-                    System.out.println("Eliminating method: " + mtd.getClsName() + "." + mtd.getMethodName());
-                    }*/
-                } 
+                }
             }
+
         }
         return nfound;
     }
@@ -540,8 +546,9 @@ public class Parser extends ClassVisitor {
         if(cls.getBaseInterfacesObject() != null) {
             for(ByteCodeClass bc : cls.getBaseInterfacesObject()) {
                 for(BytecodeMethod m :  bc.getMethods()) {
+                    if (m.isEliminated()) continue;
                     if(m.getMethodName().equals(mtd.getMethodName())) {
-                        if(m.isUsedByNative()) {
+                        if (isMethodUsed(m, bc)) {
                             return true;
                         }
                         break;
@@ -550,8 +557,9 @@ public class Parser extends ClassVisitor {
             }
         }
         for(BytecodeMethod m :  cls.getMethods()) {
+            if (m.isEliminated()) continue;
             if(m.getMethodName().equals(mtd.getMethodName())) {
-                if(m.isUsedByNative()) {
+                if(isMethodUsed(m, cls)) {
                     return true;
                 }
                 break;
@@ -560,13 +568,14 @@ public class Parser extends ClassVisitor {
         return false;
     }
 
-    private static void cullClasses(boolean found, int depth) {
-        if(found && depth < 3) {
+    private static int cullClasses(boolean found, int depth) {
+        System.out.println("cullClasses()");
+        if(found && depth < 4) {
             for(ByteCodeClass bc : classes) {
                 bc.updateAllDependencies();
             }   
-            //int classCount = classes.size();
-            ByteCodeClass.markDependencies(classes);
+
+            ByteCodeClass.markDependencies(classes, nativeSources);
             List<ByteCodeClass> tmp = ByteCodeClass.clearUnmarked(classes);
             /*if(ByteCodeTranslator.verbose) {
             System.out.println("Classes removed from: " + classCount + " to " + classes.size());
@@ -576,30 +585,32 @@ public class Parser extends ClassVisitor {
             }
             }
             }*/
-            classes = tmp;
-            eliminateUnusedMethods(depth + 1);
-        }
-    }
-    
-    private static void usedByNativeCheck() {
-        for(ByteCodeClass bc : classes) {
-            //java_lang_Thread_runImpl___long
-            for(BytecodeMethod mtd : bc.getMethods()) {
-                // check native code        
-                StringBuilder b = new StringBuilder();
-                mtd.appendFunctionPointer(b);
-                String str = b.toString();
-                for(String s : nativeSources) {
-                    if(s.contains(str)) {
-                        mtd.setUsedByNative(true);
-                        break;
-                    }
-                }  
+
+            // 2nd pass to mark classes as eliminated so that we can propagate down to each
+            // method of the class to mark it eliminated so that virtual methods
+            // aren't included later on when writing virtual methods
+            Set<ByteCodeClass> removedClasses = new HashSet<ByteCodeClass>(classes);
+            removedClasses.removeAll(tmp);
+            int nfound = 0;
+            for (ByteCodeClass cls : removedClasses) {
+                nfound += cls.setEliminated(true);
             }
+            classes = tmp;
+            return nfound + eliminateUnusedMethods(nfound > 0, depth + 1);
         }
+
+        // Note: We may still have a lot of classes that are kept around solely because
+        // they implement an interface that is used.
+        // We should try to remove such classes
+        return 0;
     }
     
-    private static boolean isMethodUsed(BytecodeMethod m) {
+
+    
+    private static boolean isMethodUsed(BytecodeMethod m, ByteCodeClass cls) {
+        if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
+            return true;
+        }
         for(ByteCodeClass bc : classes) {
             for(BytecodeMethod mtd : bc.getMethods()) {
                 if(mtd.isEliminated() || mtd == m) {
@@ -610,18 +621,6 @@ public class Parser extends ClassVisitor {
                 }
             }
         }
-        
-        // check native code        
-        StringBuilder b = new StringBuilder();
-        m.appendFunctionPointer(b);
-        String str = b.toString();
-        for(String s : nativeSources) {
-            if(s.contains(str)) {
-                return true;
-            }
-        }
-        
-        
         return false;
     }
 

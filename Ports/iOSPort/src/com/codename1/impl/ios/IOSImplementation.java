@@ -409,7 +409,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void stopTextEditing() {  
+    public void stopTextEditing() {
         if (isAsyncEditMode()) {
             foldKeyboard();
         } else {
@@ -488,7 +488,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
             Form form = cmp.getComponentForm();
-            if (form == null || form != CN.getCurrentForm()) {
+            if (form == null || form != CN.getCurrentForm() ) {
                 instance.stopTextEditing();
                 return;
             }
@@ -574,7 +574,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 instance.stopTextEditing();
                 return;
             }
-            if (x <= 0 || y <= 0 || w <= 0 || h <= 0) {
+            if (x < 0 || y < 0 || w <= 0 || h <= 0) {
                 instance.stopTextEditing();
                 return;
             }

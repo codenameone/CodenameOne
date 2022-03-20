@@ -108,6 +108,7 @@ public class SwipeableContainer extends Container {
      * {@inheritDoc}
      */
     protected void deinitialize() {
+        waitForRelease = false;
         Form form = this.getComponentForm();
         if (form != null) {
             form.removePointerPressedListener(press);

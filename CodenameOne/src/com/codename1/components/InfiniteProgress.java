@@ -201,12 +201,12 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     protected void deinitialize() {
-        super.deinitialize();
         Form f = getComponentForm();
         if(f == null) {
             f = Display.getInstance().getCurrent();
         }
         f.deregisterAnimated(this);
+        super.deinitialize();
     }
 
     /**

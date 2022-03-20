@@ -56,7 +56,9 @@
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
 #include "OpenUDID.h"
+#ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
+#endif
 #include "com_codename1_contacts_Contact.h"
 #include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
@@ -2872,7 +2874,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
-            WKWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
             [w reload];
 #endif
         } else {
@@ -6118,6 +6120,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THR
 JAVA_OBJECT productsArrayPending = nil;
 
 void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT skus, JAVA_OBJECT products) {
+#ifdef CN1_USE_STOREKIT
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* strArray = skus;
@@ -6143,23 +6146,33 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     request.delegate = [CodenameOne_GLViewController instance];
     [request start];
     POOL_END();
+#endif
 }
-
+#ifdef CN1_USE_STOREKIT
 SKPayment *paymentInstance = nil;
+#endif
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
+#ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
     dispatch_async(dispatch_get_main_queue(), ^{
         paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_restorePurchases__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 NSLocale *currentLocale = NULL;

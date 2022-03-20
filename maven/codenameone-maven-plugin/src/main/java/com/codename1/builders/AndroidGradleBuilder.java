@@ -2188,7 +2188,16 @@ public class AndroidGradleBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.lightColor\", \""+notificationChannelLightColor+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.enableVibration\", \""+notificationChannelEnableVibration+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.vibrationPattern\", "+notificationChannelVibrationPattern+");\n"
+                    + "        try {\n"
+                    + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION).toString());\n"
+                    + "        } catch (Exception ex){}\n";
             ;
+            if (request.getArg("android.pushSound", null) != null) {
+                pushInitDisplayProperties += "        try {\n"
+                        + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", \"android.resource://" + request.getPackageName() + "/raw/" + request.getArg("android.pushSound", null)+"\");\n"
+                        + "        } catch (Exception ex){}\n";
+            }
+
         }
 
         String waitingForPermissionsRequest=
@@ -2337,9 +2346,11 @@ public class AndroidGradleBuilder extends Executor {
                             + "        }\n"
                             + localNotificationCode
                             + "        Display.getInstance().callSerially(new Runnable(){\n"
+                            + "            boolean wasStopped = (currentForm == null);\n"
                             + "            Form currForm = currentForm;\n"
                             + "            public void run() {\n"
-                            + "                " + request.getMainClass() + "Stub.this.run(currForm);\n"
+                            + "                Form displayForm = Display.getInstance().getCurrent();\n"
+                            + "                " + request.getMainClass() + "Stub.this.run(displayForm == null ? currForm : displayForm, wasStopped);\n"
                             + "            }\n"
                             + "        });\n"
                             + "        synchronized(LOCK) {\n"
@@ -2353,21 +2364,21 @@ public class AndroidGradleBuilder extends Executor {
                             + "        }\n"
                             + "        running = false;\n"
                             + "    }\n\n"
-                            + "    public void run(Form currentForm) {\n"
+                            + "    public void run(Form currentForm, boolean wasStopped) {\n"
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode
                             + "         } else {\n"
                             + "             synchronized(LOCK) {\n"
-                            + "                 if(currentForm != null) {\n"
+                            + "                 if(!wasStopped) {\n"
                             + "                     if(currentForm instanceof Dialog) {\n"
                             + "                         ((Dialog)currentForm).showModeless();\n"
                             + "                     }else{\n"
                             + "                         currentForm.show();\n"
                             + "                     }\n"
                             + "                     fireIntentResult();\n"
-                            + "                     setWaitingForResult(false);"
+                            + "                     setWaitingForResult(false);\n"
                             + "                     return;\n"
                             + "                 }\n"
                             + "             }\n"
