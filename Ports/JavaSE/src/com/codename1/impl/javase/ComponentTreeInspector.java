@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.simulator.SelectableAction;
 import com.codename1.impl.javase.util.SwingUtils;
 import javax.swing.*;
 
@@ -51,7 +52,16 @@ import javax.swing.tree.TreePath;
 public class ComponentTreeInspector extends JPanel {
     private List<String> themePaths = new ArrayList<String>();
     private List<String> themeNames = new ArrayList<String>();
+    private boolean simulatorRightClickEnabled = true;
     private JFrame frame;
+
+    public boolean isSimulatorRightClickEnabled() {
+        return simulatorRightClickEnabled;
+    }
+
+    public void setSimulatorRightClickEnabled(boolean simulatorRightClickEnabled) {
+        this.simulatorRightClickEnabled = simulatorRightClickEnabled;
+    }
 
     class SelectedComponentGlassPane implements Painter {
         Component cmp;
@@ -684,7 +694,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     public class RefreshAction extends AbstractAction {
 
         RefreshAction() {
-            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("refresh.png"), 16, 16));
+            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("refresh.png"), 24, 24));
             setToolTipText("Refresh comonent tree");
         }
 
@@ -699,8 +709,9 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     public class ValidateAction extends AbstractAction {
 
         ValidateAction() {
-            super("Validate");
-            setToolTipText("Validate component tree and report problems.");
+            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("baseline_rule_black_24dp.png"), 24, 24));
+            putValue(SHORT_DESCRIPTION, "Validate component tree and report problems.");
+
             
         }
 
@@ -711,6 +722,49 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
             ComponentTreeInspector.this.validateActionPerformed(e);
         }
     }
+    
+    private ImageIcon getToggleInspectSimulatorIcon() {
+        if (simulatorRightClickEnabled) {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("arrow_24_black.png"), 24, 24);
+        } else {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("arrow_24_disabled.png"), 24, 24);
+        }
+    }
+
+    public class ToggleInspectSimulatorAction extends AbstractAction {
+
+        ToggleInspectSimulatorAction() {
+            super("", getToggleInspectSimulatorIcon());
+
+            //putValue(SELECTED_KEY, simulatorRightClickEnabled);
+            setShortDescription();
+        }
+
+        private void setShortDescription() {
+            if (simulatorRightClickEnabled) {
+                putValue(SHORT_DESCRIPTION, "'Right-click' in simulator to inspect elements is currently enabled.  Click to disable.");
+            } else {
+                putValue(SHORT_DESCRIPTION, "Enable 'Right-click' in simulator to inspect elements");
+            }
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            simulatorRightClickEnabled = !simulatorRightClickEnabled;
+            //putValue(SELECTED_KEY, simulatorRightClickEnabled);
+            putValue(SMALL_ICON, getToggleInspectSimulatorIcon());
+            putValue(LARGE_ICON_KEY, getToggleInspectSimulatorIcon());
+        }
+    }
+    
+    public void inspectComponent(com.codename1.ui.Component cmp) {
+        ComponentTreeInspector.this.refreshComponentTree();
+        TreePath path = ((ComponentTreeModel)componentTree.getModel()).createPathToComponent(cmp);
+        componentTree.setSelectionPath(path);
+        componentTree.scrollPathToVisible(path);
+        
+    }
+    
 
 
 }

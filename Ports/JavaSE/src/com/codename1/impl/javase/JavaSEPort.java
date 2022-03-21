@@ -719,6 +719,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private String platformName = "ios";
     private String[] platformOverrides = new String[0];
     private static NetworkMonitor netMonitor;
+    private ComponentTreeInspector componentTreeInspector;
     private static PerformanceMonitor perfMonitor;
     static LocationSimulation locSimulation;
     static PushSimulator pushSimulation;
@@ -1859,6 +1860,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             e.consume();
         }
 
+        private boolean showContextMenu(final MouseEvent me) {
+            if (componentTreeInspector == null || !componentTreeInspector.isSimulatorRightClickEnabled()) return false;
+            JPopupMenu menu = new JPopupMenu();
+            JMenuItem inspectElement = new JMenuItem("Inspect Component");
+            inspectElement.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (componentTreeInspector != null && componentTreeInspector.isSimulatorRightClickEnabled()) {
+                        Form f = Display.getInstance().getCurrent();
+                        if (f != null) {
+                            int x = scaleCoordinateX(me.getX());
+                            int y = scaleCoordinateY(me.getY());
+                            Component cmp = f.getComponentAt(x, y);
+                            componentTreeInspector.inspectComponent(cmp);
+                        }
+                    }
+                }
+            });
+            menu.add(inspectElement);
+            menu.show(me.getComponent(), me.getX(), me.getY());
+            return true;
+        }
+
         private int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
@@ -1875,6 +1900,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         Integer triggeredKeyCode;
         private boolean mouseDown;
         public void mousePressed(MouseEvent e) {
+            if (e.isPopupTrigger()) {
+                if (showContextMenu(e)) {
+                    return;
+                }
+            }
             this.mouseDown = true;
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
@@ -1939,6 +1969,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseReleased(MouseEvent e) {
+            if (e.isPopupTrigger()) {
+
+                if (showContextMenu(e)) {
+                    return;
+                }
+            }
             boolean mouseDown = this.mouseDown;
             this.mouseDown = false;
             cn1GrabbedDrag = false;
@@ -5197,11 +5233,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
 
-            ComponentTreeInspector componentTreeInspector = new ComponentTreeInspector();
+            componentTreeInspector = new ComponentTreeInspector();
             AppPanel componentTreeInspectorPanel = new AppPanel("Components", "Components", componentTreeInspector.removeComponentTree());
             componentTreeInspectorPanel.setPreferredFrame(AppFrame.FrameLocation.LeftPanel);
             componentTreeInspectorPanel.addAction(componentTreeInspector.new RefreshAction());
             componentTreeInspectorPanel.addAction(componentTreeInspector.new ValidateAction());
+            componentTreeInspectorPanel.addAction(componentTreeInspector.new ToggleInspectSimulatorAction());
             AppPanel canvasPanel = new AppPanel("Simulator", "Simulator", canvasWrapper);
             canvasPanel.setPreferredFrame(AppFrame.FrameLocation.CenterPanel);
             RotateAction portraitAction = new RotateAction(true);
