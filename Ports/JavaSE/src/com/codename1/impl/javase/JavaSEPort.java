@@ -31,7 +31,7 @@ import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
-import com.codename1.impl.javase.simulator.SelectableAction;
+import com.codename1.impl.javase.simulator.*;
 import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.impl.javase.util.SwingUtils;
 import com.codename1.messaging.Message;
@@ -42,8 +42,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.impl.javase.simulator.AppFrame;
-import com.codename1.impl.javase.simulator.AppPanel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
@@ -746,6 +744,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private JLabel heightLabel;
 
     private boolean includeHeaderInScreenshot = true;
+    private boolean includeSkinInScreenshot = false;
 
     private boolean slowConnectionMode;
     private boolean disconnectedMode;
@@ -2932,6 +2931,211 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
 
+    public class ScreenshotSettingsAction extends AbstractAction implements CompanionMenuAction {
+
+        public ScreenshotSettingsAction() {
+            super("", SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_expand_more_black_24dp.png"), ICON_SIZE/2, ICON_SIZE/2));
+            putValue(SHORT_DESCRIPTION, "Screenshot settings");
+        }
+
+
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
+            final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
+            includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
+            includeHeaderMenu.setSelected(includeHeaderInScreenshot);
+
+            includeHeaderMenu.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent e) {
+                    includeHeaderInScreenshot = includeHeaderMenu.isSelected();
+                    pref.putBoolean("includeHeaderScreenshot", includeHeaderInScreenshot);
+                }
+            });
+
+            includeSkinInScreenshot = pref.getBoolean("includeSkinInScreenshot", false);
+            final JCheckBoxMenuItem includeSkinMenu = new JCheckBoxMenuItem("Screenshot Skin");
+            includeSkinMenu.setToolTipText("Include skin in Screenshots");
+            includeSkinMenu.setSelected(includeSkinInScreenshot);
+
+            includeSkinMenu.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent e) {
+                    includeSkinInScreenshot = includeSkinMenu.isSelected();
+                    pref.putBoolean("includeSkinInScreenshot", includeSkinInScreenshot);
+                }
+            });
+
+
+            JPopupMenu popupMenu = new JPopupMenu();
+            popupMenu.add(includeHeaderMenu);
+            popupMenu.add(includeSkinMenu);
+
+            if (e.getSource() instanceof java.awt.Component) {
+
+                java.awt.Component cmp = (java.awt.Component)e.getSource();
+                popupMenu.show(cmp, 0, cmp.getHeight());
+            }
+        }
+    }
+
+    public class ScreenshotAction extends AbstractAction {
+
+        public ScreenshotAction() {
+            super("", SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_photo_camera_black_24dp.png"), ICON_SIZE, ICON_SIZE));
+            putValue(SHORT_DESCRIPTION, "Screenshot");
+
+
+        }
+
+        public void actionPerformedWithSkin(ActionEvent e) {
+            final float zoom = zoomLevel;
+            zoomLevel = 1;
+
+            final Form frm = Display.getInstance().getCurrent();
+            BufferedImage headerImageTmp;
+            if (isPortrait()) {
+                headerImageTmp = header;
+            } else {
+                headerImageTmp = headerLandscape;
+            }
+            if (!includeHeaderInScreenshot) {
+                headerImageTmp = null;
+            }
+            int headerHeightTmp = 0;
+            if (headerImageTmp != null) {
+                headerHeightTmp = headerImageTmp.getHeight();
+            }
+            final int headerHeight = headerHeightTmp;
+            final BufferedImage headerImage = headerImageTmp;
+            //gr.translate(0, statusBarHeight);
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                    com.codename1.ui.Graphics gr = img.getGraphics();
+                    takingScreenshot = true;
+                    screenshotActualZoomLevel = zoom;
+                    try {
+                        frm.paint(gr);
+                    } finally {
+                        takingScreenshot = false;
+                    }
+                    final int imageWidth = img.getWidth();
+                    final int imageHeight = img.getHeight();
+                    final int[] imageRGB = img.getRGB();
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                            bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                            BufferedImage skin = getSkin();
+                            BufferedImage newSkin = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                            Graphics2D g2d = newSkin.createGraphics();
+                            g2d.drawImage(bi, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                            if (headerImage != null) {
+                                g2d.drawImage(headerImage, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                            }
+                            g2d.drawImage(skin, 0, 0, null);
+                            g2d.dispose();
+                            OutputStream out = null;
+                            try {
+                                out = new FileOutputStream(findScreenshotFile());
+                                ImageIO.write(newSkin, "png", out);
+                                out.close();
+                            } catch (Throwable ex) {
+                                ex.printStackTrace();
+                                System.exit(1);
+                            } finally {
+                                zoomLevel = zoom;
+                                try {
+                                    out.close();
+                                } catch (Throwable ex) {
+                                }
+                                frm.repaint();
+                                canvas.repaint();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        public void actionPerformed(ActionEvent ae) {
+            boolean includeSkin = includeSkinInScreenshot;
+            if (includeSkin) {
+                actionPerformedWithSkin(ae);
+                return;
+            }
+            final float zoom = zoomLevel;
+            zoomLevel = 1;
+
+            final Form frm = Display.getInstance().getCurrent();
+            BufferedImage headerImageTmp;
+            if (isPortrait()) {
+                headerImageTmp = header;
+            } else {
+                headerImageTmp = headerLandscape;
+            }
+            if (!includeHeaderInScreenshot) {
+                headerImageTmp = null;
+            }
+            int headerHeightTmp = 0;
+            if (headerImageTmp != null) {
+                headerHeightTmp = headerImageTmp.getHeight();
+            }
+            final int headerHeight = headerHeightTmp;
+            final BufferedImage headerImage = headerImageTmp;
+            //gr.translate(0, statusBarHeight);
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                    com.codename1.ui.Graphics gr = img.getGraphics();
+                    takingScreenshot = true;
+                    screenshotActualZoomLevel = zoom;
+                    try {
+                        frm.paint(gr);
+                    } finally {
+                        takingScreenshot = false;
+                    }
+                    final int imageWidth = img.getWidth();
+                    final int imageHeight = img.getHeight();
+                    final int[] imageRGB = img.getRGB();
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                            bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                            if (headerImage != null) {
+                                Graphics2D g2d = bi.createGraphics();
+                                g2d.drawImage(headerImage, 0, 0, null);
+                                g2d.dispose();
+                            }
+                            OutputStream out = null;
+                            try {
+                                out = new FileOutputStream(findScreenshotFile());
+                                ImageIO.write(bi, "png", out);
+                                out.close();
+                            } catch (Throwable ex) {
+                                ex.printStackTrace();
+                                System.exit(1);
+                            } finally {
+                                zoomLevel = zoom;
+                                try {
+                                    out.close();
+                                } catch (Throwable ex) {
+                                }
+                                frm.repaint();
+                                canvas.repaint();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+    }
+
     public class RotateAction extends AbstractAction implements AppFrame.UpdatableUI, SelectableAction {
         private boolean portraitValue;
         public RotateAction(boolean portraitValue) {
@@ -3128,7 +3332,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             JMenuItem screenshot = new JMenuItem("Screenshot");
-            simulatorMenu.add(screenshot);
+            if (appFrame == null) simulatorMenu.add(screenshot);
             KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
             screenshot.setAccelerator(f2);
             screenshot.addActionListener(new ActionListener() {
@@ -3202,7 +3406,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             JMenuItem screenshotWithSkin = new JMenuItem("Screenshot With Skin");
-            simulatorMenu.add(screenshotWithSkin);
+            if (appFrame == null) simulatorMenu.add(screenshotWithSkin);
             screenshotWithSkin.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -3282,7 +3486,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
             includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
             includeHeaderMenu.setSelected(includeHeaderInScreenshot);
-            simulatorMenu.add(includeHeaderMenu);
+            if (appFrame == null) simulatorMenu.add(includeHeaderMenu);
             includeHeaderMenu.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent e) {
@@ -3936,9 +4140,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
-            simulatorMenu.add(alwaysOnTopFlag);
+            if (appFrame == null) simulatorMenu.add(alwaysOnTopFlag);
             
-            simulatorMenu.addSeparator();
+            if (appFrame == null) simulatorMenu.addSeparator();
 
 
             JMenuItem exit = new JMenuItem("Exit");
@@ -5008,6 +5212,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             ZoomAction zoomOut = new ZoomAction(false);
             canvasPanel.addAction(zoomIn);
             canvasPanel.addAction(zoomOut);
+            canvasPanel.addAction(new SeparatorAction());
+            canvasPanel.addAction(new ScreenshotAction());
+            canvasPanel.addAction(new ScreenshotSettingsAction());
+
             appFrame.registerUpdateCallback(zoomIn);
             appFrame.registerUpdateCallback(zoomOut);
             appFrame.registerUpdateCallback(portraitAction);

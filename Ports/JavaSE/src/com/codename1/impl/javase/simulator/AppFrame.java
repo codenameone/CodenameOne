@@ -96,6 +96,7 @@ public class AppFrame extends JPanel {
         private void show() {
             if (window == null) {
                 window = new JFrame(panel.getLabel());
+                window.setAlwaysOnTop(panel.isPreferredAlwaysOnTop());
                 window.getContentPane().setLayout(new BorderLayout());
 
                 //window.setPreferredSize(new Dimension(panel.getPreferredSize()));
