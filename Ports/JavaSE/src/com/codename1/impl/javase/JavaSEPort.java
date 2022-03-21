@@ -2942,7 +2942,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
             final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
             includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
