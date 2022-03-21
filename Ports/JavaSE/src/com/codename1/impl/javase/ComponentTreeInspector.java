@@ -754,6 +754,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
             //putValue(SELECTED_KEY, simulatorRightClickEnabled);
             putValue(SMALL_ICON, getToggleInspectSimulatorIcon());
             putValue(LARGE_ICON_KEY, getToggleInspectSimulatorIcon());
+            setShortDescription();
         }
     }
     
