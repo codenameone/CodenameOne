@@ -131,6 +131,7 @@ public class AppFrame extends JPanel {
                         }
                     }
                 });
+                decoratePanelWindow(panel, window);
                 fitWindowOntoScreen();
 
             }
@@ -144,7 +145,10 @@ public class AppFrame extends JPanel {
             }
         }
     }
-    
+
+    protected void decoratePanelWindow(AppPanel panel, Window window) {
+
+    }
     
     public AppFrame(String name) {
         setLayout(new BorderLayout());

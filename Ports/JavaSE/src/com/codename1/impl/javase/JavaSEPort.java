@@ -4970,7 +4970,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             vSelector.addAdjustmentListener(canvas);
         }
         if (hasSkins() && useAppFrame) {
-            appFrame = new AppFrame("Simulator");
+            appFrame = new AppFrame("Simulator") {
+                @Override
+                protected void decoratePanelWindow(AppPanel panel, Window window) {
+                    try {
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+                        installMenu((JFrame) window, desktopSkin);
+                    } catch (Exception ex) {
+                        throw new RuntimeException("Failed to decorate panel window in app frame.", ex);
+                    }
+                }
+            };
             JPanel canvasWrapper = new JPanel();
             canvasWrapper.setLayout(new BorderLayout());
             canvasWrapper.add(canvas, java.awt.BorderLayout.CENTER);
