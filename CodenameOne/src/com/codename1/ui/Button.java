@@ -24,14 +24,13 @@
 
 package com.codename1.ui;
 
-import com.codename1.ui.util.EventDispatcher;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
-import java.util.ArrayList;
+import com.codename1.ui.util.EventDispatcher;
 import java.util.Collection;
 import java.util.Vector;
 
@@ -876,6 +875,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     @Override
     void deinitializeImpl() {
+        if (state == STATE_PRESSED) {
+            setReleased();
+        }
         super.deinitializeImpl(); 
         if(pressedIcon != null) {
             pressedIcon.unlock();
