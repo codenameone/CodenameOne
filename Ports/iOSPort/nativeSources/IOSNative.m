@@ -4174,8 +4174,6 @@ void openGalleryMultiple(JAVA_INT type) {
         pickerController.showsNumberOfSelectedAssets = YES;
         pickerController.delegate = [CodenameOne_GLViewController instance];
         if (type==0 || type == 3){
-            
-        } else if (type==0 || type == 3){
             pickerController.mediaType = QBImagePickerMediaTypeImage;
         } else if (type==1 || type == 4){
             pickerController.mediaType = QBImagePickerMediaTypeVideo;
