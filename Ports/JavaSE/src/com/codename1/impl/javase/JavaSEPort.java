@@ -60,22 +60,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.AdjustmentEvent;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.HierarchyBoundsListener;
-import java.awt.event.HierarchyEvent;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
+import java.awt.event.*;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
@@ -136,15 +121,6 @@ import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.AdjustmentListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
-import java.awt.event.TextEvent;
-import java.awt.event.TextListener;
-import java.awt.event.WindowAdapter;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
 import java.awt.geom.GeneralPath;
@@ -5293,6 +5269,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             java.awt.Component mainContents = appFrame == null ? canvas : appFrame;
             window.add(mainContents, java.awt.BorderLayout.CENTER);
+            if (appFrame != null) {
+                window.addComponentListener(new ComponentAdapter() {
+                    @Override
+                    public void componentResized(ComponentEvent e) {
+                        appFrame.setPreferredSize(new Dimension(window.getContentPane().getSize()));
+                        appFrame.setSize(new Dimension(window.getContentPane().getSize()));
+                        appFrame.revalidate();
+                    }
+                });
+            }
         }
         if (findTopFrame() != null && retinaScale > 1.0) {
             findTopFrame().setGlassPane(new CN1GlassPane());
@@ -5364,7 +5350,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
             
             alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
-            window.setAlwaysOnTop(alwaysOnTop);
+            if (appFrame == null) window.setAlwaysOnTop(alwaysOnTop);
             
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
@@ -9051,21 +9037,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void processMouseEvent(MouseEvent e) {
             //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
+
+
             if (!sendToCn1(e)) {
-                if (isFocusable() && !hasFocus()) {
-                    if (e.getID() == MouseEvent.MOUSE_PRESSED) {
-                        requestFocus();
+                if (isOnCanvas(e)) {
+                    if (isFocusable() && !hasFocus()) {
+                        if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+                            requestFocus();
+                        }
                     }
+
+                    super.processMouseEvent(e);
                 }
-                super.processMouseEvent(e);
+
             }
             
         }
 
         @Override
+        public boolean contains(int x, int y) {
+            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
+            return instance.canvas.getVisibleRect().contains(p);
+        }
+
+        @Override
         protected void processMouseMotionEvent(MouseEvent e) {
             if (!sendToCn1(e)) {
-                super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+                if (isOnCanvas(e)) {
+                    super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+                }
             }
             
         }
@@ -9073,20 +9073,27 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         protected void processMouseWheelEvent(MouseWheelEvent e) {
             if (!sendToCn1(e)) {
-                super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+                if (isOnCanvas(e)) {
+                    super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+                }
             }
         }
 
 
-        
+        private boolean isOnCanvas(MouseEvent e) {
+            Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), instance.canvas);
+            return instance.canvas.getVisibleRect().contains(p);
+
+        }
         
         private boolean peerGrabbedDrag=false;
         
         private boolean sendToCn1(MouseEvent e) {
-            
+
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
             if ((!peerGrabbedDrag || true) && Display.isInitialized()) {
+                if (!isOnCanvas(e)) return false;
                 Form f = Display.getInstance().getCurrent();
                 if (f != null) {
                     Component cmp = f.getComponentAt(cn1X, cn1Y);
@@ -9228,61 +9235,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         public CN1JPanel() {
             final CN1JPanel panel = this;
-            
-            /*
-            panel.addMouseListener(new MouseListener() {
-                
-                
 
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    sendToCn1(e);
-                }
-
-                @Override
-                public void mousePressed(MouseEvent e) {
-                    sendToCn1(e);
-                }
-
-                @Override
-                public void mouseReleased(MouseEvent e) {
-                    sendToCn1(e);
-                }
-
-                @Override
-                public void mouseEntered(MouseEvent e) {
-                    //SEBrowserComponent.this.instance.canvas.mouseE
-                }
-
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-                }
-            });
-
-            panel.addMouseMotionListener(new MouseMotionListener() {
-
-                @Override
-                public void mouseDragged(MouseEvent e) {
-                    sendToCn1(e);
-                }
-
-                @Override
-                public void mouseMoved(MouseEvent e) {
-                    sendToCn1(e);
-                }
-
-            });
-
-            panel.addMouseWheelListener(new MouseWheelListener() {
-
-                @Override
-                public void mouseWheelMoved(MouseWheelEvent e) {
-                    sendToCn1(e);
-                }
-
-            });
-            */
             
         }
 
@@ -12769,7 +12722,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
     
-    public static class Peer extends PeerComponent {
+    public static class Peer extends PeerComponent implements HierarchyListener {
         
         // Container that will hold the native peer component.
         // Wrapping the component in a container allows us to
@@ -13057,6 +13010,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     matchCN1Style = true;
                     applyStyle();
                 }
+
             }
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
@@ -13083,6 +13037,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             super.initComponent();
             if (!init) {
                 addNativeCnt();
+                instance.canvas.addHierarchyListener(this);
+
             }
             
         }
@@ -13094,8 +13050,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 instance.testRecorder.dispose();
                 instance.testRecorder = null;
             }
+
             if (init) {
+                instance.canvas.removeHierarchyListener(this);
                 removeNativeCnt();
+
             }
             
             // We set visibility to false, and then schedule removal
@@ -13276,6 +13235,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (cnt == null) {
                 return;
             }
+
             Form f = getComponentForm();
             if (cnt.getParent() == null
                     && f != null
@@ -13312,19 +13272,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
+                    Point absCanvasLocation = SwingUtilities.convertPoint(instance.canvas.getParent(), instance.canvas.getLocation(), frm);
                     if (peerBuffer == null) {
                         double scale = zoom/retinaScale;
+
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale),
-                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
                     } else {
                         double scale = zoom/retinaScale;
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale),
-                                (int) ((y + screenY + instance.canvas.y) * scale),
+                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
@@ -13344,6 +13306,32 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
             }
             SwingUtilities.invokeLater(r);
+        }
+
+        private boolean _inHierarchyChanged;
+        @Override
+        public void hierarchyChanged(HierarchyEvent e) {
+            if (_inHierarchyChanged) return;
+            _inHierarchyChanged = true;
+            try {
+                java.awt.Container win = instance.canvas.getTopLevelAncestor();
+                if (win != frm) {
+                    removeNativeCnt();
+                    lastH=0;
+                    lastW=0;
+                    lastX=0;
+                    lastY=0;
+                    if (win instanceof JFrame) {
+                        frm = (JFrame) win;
+                        addNativeCnt();
+                    }
+
+                }
+                onPositionSizeChange();
+            } finally {
+                _inHierarchyChanged = false;
+            }
+
         }
     }
     
@@ -13511,6 +13499,21 @@ public class JavaSEPort extends CodenameOneImplementation {
            addMouseListener(dispatcher);
            addMouseMotionListener(dispatcher);
            addMouseWheelListener(dispatcher);
+
+           instance.canvas.addHierarchyListener(new HierarchyListener() {
+               @Override
+               public void hierarchyChanged(HierarchyEvent e) {
+                   java.awt.Container canvasTop = instance.canvas.getTopLevelAncestor();
+                   java.awt.Container glassTop = CN1GlassPane.this.getTopLevelAncestor();
+                   if (glassTop != canvasTop && glassTop instanceof JFrame && canvasTop instanceof JFrame) {
+                       JFrame glassFrame = (JFrame)glassTop;
+                       JFrame canvasFrame = (JFrame)canvasTop;
+                       CN1GlassPane.this.getParent().remove(CN1GlassPane.this);
+                       canvasFrame.setGlassPane(CN1GlassPane.this);
+
+                   }
+               }
+           });
        }
        
         
