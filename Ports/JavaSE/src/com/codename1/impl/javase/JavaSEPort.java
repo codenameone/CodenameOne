@@ -13525,18 +13525,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             // would go to Canvas.  If we don't do this, then the glasspane will 
             // intercept all events, even those destined for the menu items - and
             // that causes all hell to break loose on Windows.
-            JFrame jframe = findTopFrame();
-            JLayeredPane jlp = jframe.getLayeredPane();
-            Point containerPoint = SwingUtilities.convertPoint(
-                                            this,
-                                            new Point(x, y),
-                                            jlp);
-            java.awt.Component component = 
-                SwingUtilities.getDeepestComponentAt(
-                                        jlp,
-                                        containerPoint.x,
-                                        containerPoint.y);
-            return (component != null && (canvas == component || containsInHierarchy(canvas, component)));   
+            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
+            return instance.canvas.getVisibleRect().contains(p);
+
         }
    }
    
