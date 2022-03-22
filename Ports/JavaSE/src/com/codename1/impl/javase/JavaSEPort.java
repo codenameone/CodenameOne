@@ -4913,7 +4913,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 AppPanel existing = appFrame.getAppPanelById("NetworkMonitor");
                 if (existing == null) {
-                    existing = new AppPanel("NetworkMonitor", "Network Monitor", new NetworkMonitor());
+                    netMonitor = new NetworkMonitor();
+                    existing = new AppPanel("NetworkMonitor", "Network Monitor", netMonitor);
                     existing.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
                     existing.setScrollable(false, true);
                     appFrame.add(existing);
