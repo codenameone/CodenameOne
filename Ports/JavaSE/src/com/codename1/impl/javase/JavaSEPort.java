@@ -9184,7 +9184,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            //return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom) / zoom);
             return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
         }
 
@@ -9226,7 +9225,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
             return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
-            //return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom) / zoom );
+
         }
         
         public void setZoom(double zoom) {
@@ -9234,9 +9233,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         public CN1JPanel() {
-            final CN1JPanel panel = this;
-
-            
+            setBorder(new EmptyBorder(0, 0, 0, 0));
         }
 
         
@@ -13272,7 +13269,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
-                    Point absCanvasLocation = SwingUtilities.convertPoint(instance.canvas.getParent(), instance.canvas.getLocation(), frm);
+                    if (cnt.getParent() == null) return;
+                    Point absCanvasLocation = SwingUtilities.convertPoint(instance.canvas, new Point(0, 0), cnt.getParent());
                     if (peerBuffer == null) {
                         double scale = zoom/retinaScale;
 

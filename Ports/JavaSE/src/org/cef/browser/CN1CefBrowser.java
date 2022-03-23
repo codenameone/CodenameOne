@@ -81,7 +81,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             CefRequestContext context, CN1CefBrowser parent, Point inspectAt) {
         super(client, url, context, parent, inspectAt);
         isTransparent_ = transparent;
-        //renderer_ = new CefRenderer(transparent);
         createComponent();
     }
     
@@ -105,7 +104,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
      */
     @Override
     public Component getUIComponent() {
-        //return canvas_;
         return component_;
     }
 
