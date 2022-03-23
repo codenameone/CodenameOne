@@ -1600,27 +1600,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             if (buffer != null) {
                 Graphics2D g2 = (Graphics2D)g.create();
-                //System.out.println("blitx="+blitTx+", blitY="+blitTy+", tx="+g2.getTransform().getTranslateX()+", ty="+g2.getTransform().getTranslateY());
-                //if (zoomLevel == 1) {
+
                 AffineTransform t = g2.getTransform();
                 double tx = t.getTranslateX();
                 double ty = t.getTranslateY();
-                AffineTransform t2;
-                if (getJavaVersion() >= 9) {
-                    t2 = AffineTransform.getScaleInstance(retinaScale, retinaScale);
-                } else {
+                AffineTransform t2 = AffineTransform.getScaleInstance(retinaScale, retinaScale);
+                t2.translate(tx, ty);
+                if (getJavaVersion() < 9) {
+                    // Java 8 didn't have full retina support
                     t2 = AffineTransform.getScaleInstance(1, 1);
-                }
-                if (zoomLevel == 1) {
-                    t2.translate(tx * retinaScale, ty * retinaScale);
-                } else {
                     t2.translate(tx * retinaScale, ty * retinaScale);
                 }
-                //g2.translate( - tx / zoomLevel + tx * retinaScale / zoomLevel,  - ty / zoomLevel + ty * retinaScale / zoomLevel);
+
+
+
                 g2.setTransform(t2);
-                //} else {
-                //    g2.translate(-blitTx - g2.getTransform().getTranslateX(), -blitTy - g2.getTransform().getTranslateY());
-                //}
+
                 synchronized(bufferLock) {
                     drawScreenBuffer(g2);
                 }
