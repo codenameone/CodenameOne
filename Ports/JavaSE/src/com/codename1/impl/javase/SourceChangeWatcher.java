@@ -163,10 +163,6 @@ public class SourceChangeWatcher implements Runnable {
             }
         }
 
-
-
-
-
     }
 
     private String parentEntityViewClass = "AbstractEntityView", viewModelType = "Entity" ;
@@ -238,6 +234,8 @@ public class SourceChangeWatcher implements Runnable {
     private String escapeJava(String str) {
         return str.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
+
+
 
     private void generateRADViewClass(File xmlViewFile) throws IOException {
         //getLog().debug("Generating RAD View for XML template "+xmlViewFile);
@@ -356,7 +354,10 @@ public class SourceChangeWatcher implements Runnable {
 
 
         String javaHome = System.getProperty("java.home");
-        File javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+        File javac = MavenUtils.findJavac();
+        if (javac == null) {
+            javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+        }
         if (!javac.exists()) {
             javac = new File(javac.getParentFile(), "javac.exe");
 
@@ -505,62 +506,6 @@ public class SourceChangeWatcher implements Runnable {
             System.setProperty("reload.simulator", "true");
             return true;
         }
-
-        /*
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-
-                final Sheet sheet = new Sheet(null, "Source Change Detected");
-                Container contentPane = sheet.getContentPane();
-                contentPane.setLayout(new BorderLayout());
-                contentPane.add(BorderLayout.CENTER, new SpanLabel("Changes were detected to files in the classpath.  Apply these changes now and refresh?"));
-                Container buttons = new Container(BoxLayout.y());
-                Button refreshSimulator = new Button("Refresh Simulator");
-                Button refreshForm = new Button("Refresh Current Form");
-                Button ignore = new Button("Ignore");
-
-                refreshSimulator.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        stopped = true;
-                        System.setProperty("reload.simulator", "true");
-                        sheet.back();
-                    }
-                });
-
-
-                refreshForm.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-
-
-                        try {
-
-                            System.setProperty("restore-to-bookmark", "true");
-                            CN.restoreToBookmark();
-
-                        } catch (Exception ex) {
-                            Log.e(ex);
-                        }
-                    }
-                });
-
-                ignore.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                    }
-                });
-
-                buttons.addAll(refreshForm, refreshSimulator, ignore);
-                contentPane.add(BorderLayout.SOUTH, buttons);
-                sheet.setPosition(BorderLayout.CENTER);
-                sheet.show();
-
-
-
-
-            }
-        });
-        */
         return true;
 
 

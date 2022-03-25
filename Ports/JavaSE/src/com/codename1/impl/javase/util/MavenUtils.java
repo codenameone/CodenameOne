@@ -27,12 +27,51 @@ public class MavenUtils {
         }
         return isRunningInMaven;
     }
+
+    public static File findJavac() {
+        String javaHome = System.getProperty("java.home");
+        File javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+        if (!javac.exists()) {
+            javac = new File(javac.getParentFile(), "javac.exe");
+
+        }
+        if (!javac.exists()) {
+            javac = new File(new File(javaHome).getParentFile(), "bin" + File.separator + "javac");
+        }
+        if (!javac.exists()) {
+            javac = new File(javac.getParentFile(), "javac.exe");
+
+        }
+        if (!javac.exists()) {
+            String PATH = System.getenv("PATH");
+            if (PATH != null) {
+                String[] parts = PATH.split(File.pathSeparator);
+                for (String path : parts) {
+                    javac = new File(path + File.separator + "javac");
+                    if (!javac.exists()) {
+                        javac = new File(javac.getParentFile(), "javac.exe");
+                    }
+                    if (javac.exists()) {
+                        return javac;
+                    }
+                }
+            }
+        }
+        return null;
+    }
     
     public static boolean isRunningInJDK() {
         if (!isRunningInJDKChecked) {
             isRunningInJDKChecked = true;
             String javaHome = System.getProperty("java.home");
             File javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+            if (!javac.exists()) {
+                javac = new File(javac.getParentFile(), "javac.exe");
+
+            }
+            if (!javac.exists()) {
+                javac = new File(new File(javaHome).getParentFile(), "bin" + File.separator + "javac");
+            }
             if (!javac.exists()) {
                 javac = new File(javac.getParentFile(), "javac.exe");
 
