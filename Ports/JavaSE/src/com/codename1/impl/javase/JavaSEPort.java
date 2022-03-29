@@ -701,6 +701,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
     private static boolean useAppFrame = Boolean.getBoolean("cn1.simulator.useAppFrame");
+    static {
+        try {
+            if (useAppFrame) {
+                // If  the app frame is enabled in System properties, it can be disabled
+                // by the user preferences.
+                // If the system property is false, however, then it should not be overridden
+                // by the preference. The app frame must be DOUBLE activated - in system property
+                // and preferences to be active to prevent it from accendentally being enabled
+                // in other contexts, like unit tests or desktop app distributions.
+                Preferences prefs = Preferences.userNodeForPackage(JavaSEPort.class);
+                useAppFrame = prefs.getBoolean("cn1.simulator.useAppFrame", useAppFrame);
+            }
+
+        } catch (Exception ex){}
+    }
     protected static boolean fxExists = false;
     private JFrame window;
     // Application frame used for simulator
@@ -3201,1161 +3216,1148 @@ public class JavaSEPort extends CodenameOneImplementation {
             update();
         }
     }
-    
+
+    /**
+     * The simulator blit() function tends to draw over menus, so this method will
+     * register a menu to disable blit while the menu is opened.
+     * @param menu
+     */
+    public void registerMenuWithBlit(JMenu menu) {
+        menu.setDoubleBuffered(true);
+        menu.addMenuListener(new MenuListener(){
+
+            @Override
+            public void menuSelected(MenuEvent e) {
+                menuDisplayed = true;
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                menuDisplayed = false;
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                menuDisplayed = false;
+            }
+        });
+    }
+
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
-            JMenuBar bar = new JMenuBar();
-            frm.setJMenuBar(bar);
-            
-            JMenu simulatorMenu = new JMenu("Simulator");
-            simulatorMenu.setDoubleBuffered(true);
-            simulatorMenu.addMenuListener(new MenuListener(){
+        final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        JMenuBar bar = new JMenuBar();
+        frm.setJMenuBar(bar);
 
-                @Override
-                public void menuSelected(MenuEvent e) {
-                    menuDisplayed = true;
-                }
+        JMenu simulatorMenu = new JMenu("Simulator");
+        registerMenuWithBlit(simulatorMenu);
+        JMenu simulateMenu = new JMenu("Simulate");
+        registerMenuWithBlit(simulateMenu);
+        JMenu toolsMenu = new JMenu("Tools");
+        registerMenuWithBlit(toolsMenu);
 
-                @Override
-                public void menuCanceled(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-
-                @Override
-                public void menuDeselected(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-            });
-            JMenu simulateMenu = new JMenu("Simulate");
-            simulateMenu.setDoubleBuffered(true);
-            simulateMenu.addMenuListener(new MenuListener(){
-
-                @Override
-                public void menuSelected(MenuEvent e) {
-                    menuDisplayed = true;
-                }
-
-                @Override
-                public void menuCanceled(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-
-                @Override
-                public void menuDeselected(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-            });
-            JMenu toolsMenu = new JMenu("Tools");
-            toolsMenu.setDoubleBuffered(true);
-            toolsMenu.addMenuListener(new MenuListener(){
-
-                @Override
-                public void menuSelected(MenuEvent e) {
-                    menuDisplayed = true;
-                }
-
-                @Override
-                public void menuCanceled(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-
-                @Override
-                public void menuDeselected(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-            });
-
-            JMenuItem buildHintEditor = new JMenuItem("Edit Build Hints...");
-            ActionListener l = new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    new BuildHintEditor(JavaSEPort.this).show();
-                }
-            };
-            buildHintEditor.addActionListener(l);
-            toolsMenu.add(buildHintEditor);
-
-            
-
-            final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
-            if (appFrame == null) simulatorMenu.add(zoomMenu);
-
-            JMenu debugEdtMenu = new JMenu("Debug EDT");
-            toolsMenu.add(debugEdtMenu);
-            
-            zoomMenu.setEnabled(!desktopSkin);
-
-            JRadioButtonMenuItem debugEdtNone = new JRadioButtonMenuItem("None");
-            JRadioButtonMenuItem debugEdtLight = new JRadioButtonMenuItem("Light");
-            JRadioButtonMenuItem debugEdtFull = new JRadioButtonMenuItem("Full");
-            debugEdtMenu.add(debugEdtNone);
-            debugEdtMenu.add(debugEdtLight);
-            debugEdtMenu.add(debugEdtFull);
-            ButtonGroup bg = new ButtonGroup();
-            bg.add(debugEdtNone);
-            bg.add(debugEdtLight);
-            bg.add(debugEdtFull);
-            final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-            int debugEdtSelection = pref.getInt("debugEDTMode", 0);
-            switch (debugEdtSelection) {
-                case 0:
-                    debugEdtNone.setSelected(true);
-                    setShowEDTWarnings(false);
-                    setShowEDTViolationStacks(false);
-                    break;
-                case 2:
-                    debugEdtFull.setSelected(true);
-                    setShowEDTWarnings(true);
-                    setShowEDTViolationStacks(true);
-                    break;
-                default:
-                    debugEdtLight.setSelected(true);
-                    setShowEDTWarnings(true);
-                    setShowEDTViolationStacks(false);
-                    break;
+        JMenuItem buildHintEditor = new JMenuItem("Edit Build Hints...");
+        ActionListener l = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new BuildHintEditor(JavaSEPort.this).show();
             }
-            debugEdtNone.addActionListener(new ActionListener() {
+        };
+        buildHintEditor.addActionListener(l);
+        toolsMenu.add(buildHintEditor);
 
-                public void actionPerformed(ActionEvent e) {
-                    setShowEDTWarnings(false);
-                    setShowEDTViolationStacks(false);
-                    pref.putInt("debugEDTMode", 0);
+        final JCheckBoxMenuItem useAppFrameMenu = new JCheckBoxMenuItem("Single Window Mode", useAppFrame);
+        useAppFrameMenu.setToolTipText("Check this option to enable Single Window mode, in which the simulator, component inspector, network monitor and other tools are all included in a single, multi-panel window");
+        useAppFrameMenu.addItemListener(new ItemListener() {
+
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+
+                try {
+                    pref.putBoolean("cn1.simulator.useAppFrame", useAppFrameMenu.isSelected());
+                    deinitializeSync();
+                    frm.dispose();
+                    System.setProperty("reload.simulator", "true");
+                } catch (Exception ex) {
+                    Log.e(ex);
                 }
-            });
-            debugEdtFull.addActionListener(new ActionListener() {
 
-                public void actionPerformed(ActionEvent e) {
-                    setShowEDTWarnings(true);
-                    setShowEDTViolationStacks(true);
-                    pref.putInt("debugEDTMode", 2);
+            }
+        });
+        simulatorMenu.add(useAppFrameMenu);
+
+        final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
+        if (appFrame == null) simulatorMenu.add(zoomMenu);
+
+        JMenu debugEdtMenu = new JMenu("Debug EDT");
+        toolsMenu.add(debugEdtMenu);
+
+        zoomMenu.setEnabled(!desktopSkin);
+
+        JRadioButtonMenuItem debugEdtNone = new JRadioButtonMenuItem("None");
+        JRadioButtonMenuItem debugEdtLight = new JRadioButtonMenuItem("Light");
+        JRadioButtonMenuItem debugEdtFull = new JRadioButtonMenuItem("Full");
+        debugEdtMenu.add(debugEdtNone);
+        debugEdtMenu.add(debugEdtLight);
+        debugEdtMenu.add(debugEdtFull);
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(debugEdtNone);
+        bg.add(debugEdtLight);
+        bg.add(debugEdtFull);
+
+        int debugEdtSelection = pref.getInt("debugEDTMode", 0);
+        switch (debugEdtSelection) {
+            case 0:
+                debugEdtNone.setSelected(true);
+                setShowEDTWarnings(false);
+                setShowEDTViolationStacks(false);
+                break;
+            case 2:
+                debugEdtFull.setSelected(true);
+                setShowEDTWarnings(true);
+                setShowEDTViolationStacks(true);
+                break;
+            default:
+                debugEdtLight.setSelected(true);
+                setShowEDTWarnings(true);
+                setShowEDTViolationStacks(false);
+                break;
+        }
+        debugEdtNone.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                setShowEDTWarnings(false);
+                setShowEDTViolationStacks(false);
+                pref.putInt("debugEDTMode", 0);
+            }
+        });
+        debugEdtFull.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                setShowEDTWarnings(true);
+                setShowEDTViolationStacks(true);
+                pref.putInt("debugEDTMode", 2);
+            }
+        });
+        debugEdtLight.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                setShowEDTWarnings(true);
+                setShowEDTViolationStacks(false);
+                pref.putInt("debugEDTMode", 1);
+            }
+        });
+
+        JMenuItem screenshot = new JMenuItem("Screenshot");
+        if (appFrame == null) simulatorMenu.add(screenshot);
+        KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
+        screenshot.setAccelerator(f2);
+        screenshot.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                final float zoom = zoomLevel;
+                zoomLevel = 1;
+
+                final Form frm = Display.getInstance().getCurrent();
+                BufferedImage headerImageTmp;
+                if (isPortrait()) {
+                    headerImageTmp = header;
+                } else {
+                    headerImageTmp = headerLandscape;
                 }
-            });
-            debugEdtLight.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    setShowEDTWarnings(true);
-                    setShowEDTViolationStacks(false);
-                    pref.putInt("debugEDTMode", 1);
+                if (!includeHeaderInScreenshot) {
+                    headerImageTmp = null;
                 }
-            });
-
-            JMenuItem screenshot = new JMenuItem("Screenshot");
-            if (appFrame == null) simulatorMenu.add(screenshot);
-            KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
-            screenshot.setAccelerator(f2);
-            screenshot.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    final float zoom = zoomLevel;
-                    zoomLevel = 1;
-                    
-                    final Form frm = Display.getInstance().getCurrent();
-                    BufferedImage headerImageTmp;
-                    if (isPortrait()) {
-                        headerImageTmp = header;
-                    } else {
-                        headerImageTmp = headerLandscape;
-                    }
-                    if (!includeHeaderInScreenshot) {
-                        headerImageTmp = null;
-                    }
-                    int headerHeightTmp = 0;
-                    if (headerImageTmp != null) {
-                        headerHeightTmp = headerImageTmp.getHeight();
-                    }
-                    final int headerHeight = headerHeightTmp;
-                    final BufferedImage headerImage = headerImageTmp;
-                    //gr.translate(0, statusBarHeight);
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
-                            com.codename1.ui.Graphics gr = img.getGraphics();
-                            takingScreenshot = true;
-                            screenshotActualZoomLevel = zoom;
-                            try {
-                                frm.paint(gr);
-                            } finally {
-                                takingScreenshot = false;
-                            }
-                            final int imageWidth = img.getWidth();
-                            final int imageHeight = img.getHeight();
-                            final int[] imageRGB = img.getRGB();
-                            SwingUtilities.invokeLater(new Runnable() {
-                                public void run() {
-                                    BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
-                                    bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
-                                    if (headerImage != null) {
-                                        Graphics2D g2d = bi.createGraphics();
-                                        g2d.drawImage(headerImage, 0, 0, null);
-                                        g2d.dispose();
-                                    }
-                                    OutputStream out = null;
-                                    try {
-                                        out = new FileOutputStream(findScreenshotFile());
-                                        ImageIO.write(bi, "png", out);
-                                        out.close();
-                                    } catch (Throwable ex) {
-                                        ex.printStackTrace();
-                                        System.exit(1);
-                                    } finally {
-                                        zoomLevel = zoom;
-                                        try {
-                                            out.close();
-                                        } catch (Throwable ex) {
-                                        }
-                                        frm.repaint();
-                                        canvas.repaint();
-                                    }
-                                }
-                            });
+                int headerHeightTmp = 0;
+                if (headerImageTmp != null) {
+                    headerHeightTmp = headerImageTmp.getHeight();
+                }
+                final int headerHeight = headerHeightTmp;
+                final BufferedImage headerImage = headerImageTmp;
+                //gr.translate(0, statusBarHeight);
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                        com.codename1.ui.Graphics gr = img.getGraphics();
+                        takingScreenshot = true;
+                        screenshotActualZoomLevel = zoom;
+                        try {
+                            frm.paint(gr);
+                        } finally {
+                            takingScreenshot = false;
                         }
-                    });
-                }
-            });
-
-            JMenuItem screenshotWithSkin = new JMenuItem("Screenshot With Skin");
-            if (appFrame == null) simulatorMenu.add(screenshotWithSkin);
-            screenshotWithSkin.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    final float zoom = zoomLevel;
-                    zoomLevel = 1;
-                    
-                    final Form frm = Display.getInstance().getCurrent();
-                    BufferedImage headerImageTmp;
-                    if (isPortrait()) {
-                        headerImageTmp = header;
-                    } else {
-                        headerImageTmp = headerLandscape;
-                    }
-                    if (!includeHeaderInScreenshot) {
-                        headerImageTmp = null;
-                    }
-                    int headerHeightTmp = 0;
-                    if (headerImageTmp != null) {
-                        headerHeightTmp = headerImageTmp.getHeight();
-                    }
-                    final int headerHeight = headerHeightTmp;
-                    final BufferedImage headerImage = headerImageTmp;
-                    //gr.translate(0, statusBarHeight);
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
-                            com.codename1.ui.Graphics gr = img.getGraphics();
-                            takingScreenshot = true;
-                            screenshotActualZoomLevel = zoom;
-                            try {
-                                frm.paint(gr);
-                            } finally {
-                                takingScreenshot = false;
-                            }
-                            final int imageWidth = img.getWidth();
-                            final int imageHeight = img.getHeight();
-                            final int[] imageRGB = img.getRGB();
-                            SwingUtilities.invokeLater(new Runnable() {
-                                public void run() {
-                                    BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
-                                    bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
-                                    BufferedImage skin = getSkin();
-                                    BufferedImage newSkin = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                                    Graphics2D g2d = newSkin.createGraphics();
-                                    g2d.drawImage(bi, getScreenCoordinates().x, getScreenCoordinates().y, null);
-                                    if (headerImage != null) {
-                                        g2d.drawImage(headerImage, getScreenCoordinates().x, getScreenCoordinates().y, null);
-                                    }                        
-                                    g2d.drawImage(skin, 0, 0, null);
+                        final int imageWidth = img.getWidth();
+                        final int imageHeight = img.getHeight();
+                        final int[] imageRGB = img.getRGB();
+                        SwingUtilities.invokeLater(new Runnable() {
+                            public void run() {
+                                BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                                bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                                if (headerImage != null) {
+                                    Graphics2D g2d = bi.createGraphics();
+                                    g2d.drawImage(headerImage, 0, 0, null);
                                     g2d.dispose();
-                                    OutputStream out = null;
+                                }
+                                OutputStream out = null;
+                                try {
+                                    out = new FileOutputStream(findScreenshotFile());
+                                    ImageIO.write(bi, "png", out);
+                                    out.close();
+                                } catch (Throwable ex) {
+                                    ex.printStackTrace();
+                                    System.exit(1);
+                                } finally {
+                                    zoomLevel = zoom;
                                     try {
-                                        out = new FileOutputStream(findScreenshotFile());
-                                        ImageIO.write(newSkin, "png", out);
                                         out.close();
                                     } catch (Throwable ex) {
-                                        ex.printStackTrace();
-                                        System.exit(1);
-                                    } finally {
-                                        zoomLevel = zoom;
-                                        try {
-                                            out.close();
-                                        } catch (Throwable ex) {
-                                        }
-                                        frm.repaint();
-                                        canvas.repaint();
                                     }
+                                    frm.repaint();
+                                    canvas.repaint();
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        JMenuItem screenshotWithSkin = new JMenuItem("Screenshot With Skin");
+        if (appFrame == null) simulatorMenu.add(screenshotWithSkin);
+        screenshotWithSkin.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final float zoom = zoomLevel;
+                zoomLevel = 1;
+
+                final Form frm = Display.getInstance().getCurrent();
+                BufferedImage headerImageTmp;
+                if (isPortrait()) {
+                    headerImageTmp = header;
+                } else {
+                    headerImageTmp = headerLandscape;
+                }
+                if (!includeHeaderInScreenshot) {
+                    headerImageTmp = null;
+                }
+                int headerHeightTmp = 0;
+                if (headerImageTmp != null) {
+                    headerHeightTmp = headerImageTmp.getHeight();
+                }
+                final int headerHeight = headerHeightTmp;
+                final BufferedImage headerImage = headerImageTmp;
+                //gr.translate(0, statusBarHeight);
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                        com.codename1.ui.Graphics gr = img.getGraphics();
+                        takingScreenshot = true;
+                        screenshotActualZoomLevel = zoom;
+                        try {
+                            frm.paint(gr);
+                        } finally {
+                            takingScreenshot = false;
+                        }
+                        final int imageWidth = img.getWidth();
+                        final int imageHeight = img.getHeight();
+                        final int[] imageRGB = img.getRGB();
+                        SwingUtilities.invokeLater(new Runnable() {
+                            public void run() {
+                                BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                                bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                                BufferedImage skin = getSkin();
+                                BufferedImage newSkin = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                                Graphics2D g2d = newSkin.createGraphics();
+                                g2d.drawImage(bi, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                                if (headerImage != null) {
+                                    g2d.drawImage(headerImage, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                                }
+                                g2d.drawImage(skin, 0, 0, null);
+                                g2d.dispose();
+                                OutputStream out = null;
+                                try {
+                                    out = new FileOutputStream(findScreenshotFile());
+                                    ImageIO.write(newSkin, "png", out);
+                                    out.close();
+                                } catch (Throwable ex) {
+                                    ex.printStackTrace();
+                                    System.exit(1);
+                                } finally {
+                                    zoomLevel = zoom;
+                                    try {
+                                        out.close();
+                                    } catch (Throwable ex) {
+                                    }
+                                    frm.repaint();
+                                    canvas.repaint();
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+
+        includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
+        final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
+        includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
+        includeHeaderMenu.setSelected(includeHeaderInScreenshot);
+        if (appFrame == null) simulatorMenu.add(includeHeaderMenu);
+        includeHeaderMenu.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                includeHeaderInScreenshot = includeHeaderMenu.isSelected();
+                pref.putBoolean("includeHeaderScreenshot", includeHeaderInScreenshot);
+            }
+        });
+
+
+        JMenu networkDebug = new JMenu("Network");
+        toolsMenu.add(networkDebug);
+
+        JMenuItem networkMonitor = new JMenuItem("Network Monitor");
+        networkMonitor.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if (netMonitor == null) {
+                    showNetworkMonitor();
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("NetworkMonitor", true);
+                }
+            }
+        });
+        networkDebug.add(networkMonitor);
+
+        JMenuItem proxy = new JMenuItem("Proxy Settings");
+        proxy.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                final JDialog proxy;
+                if(window !=null){
+                    proxy = new JDialog(window);
+                }else{
+                    proxy = new JDialog();
+                }
+                final Preferences pref = Preferences.userNodeForPackage(Component.class);
+                int proxySel = pref.getInt("proxySel", 2);
+                String proxySelHttp = pref.get("proxySel-http", "");
+                String proxySelPort = pref.get("proxySel-port", "");
+
+                JPanel panel = new JPanel();
+                panel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+                JPanel proxyUrl= new JPanel();
+                proxyUrl.setLayout(new FlowLayout(FlowLayout.LEFT));
+                proxyUrl.add(new JLabel("Http Proxy:"));
+                final JTextField http = new JTextField(proxySelHttp);
+                http.setColumns(20);
+                proxyUrl.add(http);
+                proxyUrl.add(new JLabel("Port:"));
+                final JTextField port = new JTextField(proxySelPort);
+                port.setColumns(4);
+                proxyUrl.add(port);
+
+                final JRadioButton noproxy = new JRadioButton("No Proxy");
+                JPanel rbPanel= new JPanel();
+                rbPanel.setLayout(new java.awt.GridLayout(1, 0));
+                rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                rbPanel.add(noproxy);
+                Dimension d = rbPanel.getPreferredSize();
+                d.width = proxyUrl.getPreferredSize().width;
+                rbPanel.setMinimumSize(d);
+                //noproxy.setPreferredSize(d);
+                panel.add(rbPanel);
+
+                final JRadioButton systemProxy = new JRadioButton("Use System Proxy");
+                rbPanel= new JPanel();
+                rbPanel.setLayout(new java.awt.GridLayout(1, 0));
+                rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                rbPanel.add(systemProxy);
+                d = rbPanel.getPreferredSize();
+                d.width = proxyUrl.getPreferredSize().width;
+                rbPanel.setPreferredSize(d);
+                panel.add(rbPanel);
+
+                final JRadioButton manual = new JRadioButton("Manual Proxy Settings:");
+                rbPanel= new JPanel();
+                rbPanel.setLayout(new java.awt.GridLayout(1, 0));
+                rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                rbPanel.add(manual);
+                d = rbPanel.getPreferredSize();
+                d.width = proxyUrl.getPreferredSize().width;
+                rbPanel.setPreferredSize(d);
+                panel.add(rbPanel);
+
+                rbPanel= new JPanel();
+                rbPanel.setLayout(new java.awt.GridLayout(1, 0));
+                rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                rbPanel.add(proxyUrl);
+                panel.add(rbPanel);
+
+                ButtonGroup group = new ButtonGroup();
+                group.add(noproxy);
+                group.add(systemProxy);
+                group.add(manual);
+                noproxy.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        http.setEnabled(false);
+                        port.setEnabled(false);
+                    }
+                });
+                systemProxy.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        http.setEnabled(false);
+                        port.setEnabled(false);
+                    }
+                });
+                manual.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        http.setEnabled(true);
+                        port.setEnabled(true);
+                    }
+                });
+
+                switch (proxySel){
+                    case 1:
+                        noproxy.setSelected(true);
+                        http.setEnabled(false);
+                        port.setEnabled(false);
+                        break;
+                    case 2:
+                        systemProxy.setSelected(true);
+                        http.setEnabled(false);
+                        port.setEnabled(false);
+                        break;
+                    case 3:
+                        manual.setSelected(true);
+                        break;
+                }
+                JPanel closePanel = new JPanel();
+                JButton close = new JButton("Ok");
+                close.addActionListener(new ActionListener() {
+
+                    public void actionPerformed(ActionEvent e) {
+                        if (noproxy.isSelected()) {
+                            pref.putInt("proxySel", 1);
+                        } else if (systemProxy.isSelected()) {
+                            pref.putInt("proxySel", 2);
+                        } else if (manual.isSelected()) {
+                            pref.putInt("proxySel", 3);
+                            pref.put("proxySel-http", http.getText());
+                            pref.put("proxySel-port", port.getText());
+                        }
+                        proxy.dispose();
+
+                        if (netMonitor != null) {
+                            netMonitor.dispose();
+                            netMonitor = null;
+                        }
+                        if (perfMonitor != null) {
+                            perfMonitor.dispose();
+                            perfMonitor = null;
+                        }
+                        String mainClass = System.getProperty("MainClass");
+                        if (mainClass != null) {
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                            deinitializeSync();
+                            frm.dispose();
+                            System.setProperty("reload.simulator", "true");
+                        } else {
+                            refreshSkin(frm);
+                    }
+
+                    }
+                });
+                closePanel.add(close);
+                panel.add(closePanel);
+
+                proxy.add(panel);
+                proxy.pack();
+                if(window != null){
+                    proxy.setLocationRelativeTo(window);
+                }
+                proxy.setResizable(false);
+                proxy.setVisible(true);
+
+
+            }
+        });
+        networkDebug.add(proxy);
+        networkDebug.addSeparator();
+
+
+        JRadioButtonMenuItem regularConnection = new JRadioButtonMenuItem("Regular Connection");
+        regularConnection.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                slowConnectionMode = false;
+                disconnectedMode = false;
+                pref.putInt("connectionStatus", 0);
+            }
+        });
+        networkDebug.add(regularConnection);
+
+        JRadioButtonMenuItem slowConnection = new JRadioButtonMenuItem("Slow Connection");
+        slowConnection.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                slowConnectionMode = true;
+                disconnectedMode = false;
+                pref.putInt("connectionStatus", 1);
+            }
+        });
+        networkDebug.add(slowConnection);
+
+        JRadioButtonMenuItem disconnected = new JRadioButtonMenuItem("Disconnected");
+        disconnected.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                slowConnectionMode = false;
+                disconnectedMode = true;
+                pref.putInt("connectionStatus", 2);
+            }
+        });
+        networkDebug.add(disconnected);
+
+        ButtonGroup connectionGroup = new ButtonGroup();
+        connectionGroup.add(regularConnection);
+        connectionGroup.add(slowConnection);
+        connectionGroup.add(disconnected);
+
+        switch(pref.getInt("connectionStatus", 0)) {
+            case 0:
+                regularConnection.setSelected(true);
+                break;
+            case 1:
+                slowConnection.setSelected(true);
+                slowConnectionMode = true;
+                break;
+            case 2:
+                disconnected.setSelected(true);
+                disconnectedMode = true;
+                break;
+        }
+
+        JMenuItem componentTreeInspector = new JMenuItem("Component Inspector");
+        componentTreeInspector.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if (appFrame != null) return;
+
+                new ComponentTreeInspector().showInFrame();
+            }
+        });
+
+        JMenuItem scriptingConsole = new JMenuItem("Groovy Console");
+        scriptingConsole.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                new CN1Console().open((java.awt.Component)e.getSource());
+            }
+        });
+
+
+        List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+        //final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+        //final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+        ButtonGroup hotReloadGroup = new ButtonGroup();
+        JRadioButtonMenuItem disableHotReload = new JRadioButtonMenuItem("Disabled");
+        disableHotReload.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                pref.putInt("hotReload", 0);
+                System.setProperty("hotReload", "0");
+            }
+        });
+        JRadioButtonMenuItem reloadSimulator = new JRadioButtonMenuItem("Reload Simulator");
+        reloadSimulator.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                pref.putInt("hotReload", 1);
+                System.setProperty("hotReload", "1");
+            }
+        });
+        JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Requires CodeRAD)");
+
+        reloadCurrentForm.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                pref.putInt("hotReload", 2);
+                System.setProperty("hotReload", "2");
+            }
+        });
+
+        switch (pref.getInt("hotReload", 0)) {
+            case 0:
+                disableHotReload.setSelected(true);
+                System.setProperty("hotReload", "0");
+                break;
+            case 1:
+                reloadSimulator.setSelected(true);
+                System.setProperty("hotReload", "1");
+                break;
+            case 2:
+                reloadCurrentForm.setSelected(true);
+                System.setProperty("hotReload", "2");
+                break;
+
+        }
+
+        JMenu hotReloadMenu = new JMenu("Hot Reload");
+        hotReloadMenu.add(disableHotReload);
+        hotReloadMenu.add(reloadSimulator);
+        hotReloadMenu.add(reloadCurrentForm);
+        hotReloadGroup.add(disableHotReload);
+        hotReloadGroup.add(reloadSimulator);
+        hotReloadGroup.add(reloadCurrentForm);
+        if (isRunningInMaven() && MavenUtils.isRunningInJDK()) {
+            toolsMenu.add(hotReloadMenu);
+        }
+
+
+        scriptingConsole.setToolTipText("Open interactive console");
+
+        JMenuItem appArg = new JMenuItem("Send App Argument");
+        appArg.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Executor.stopApp();
+                JPanel pnl = new JPanel();
+                JTextField tf = new JTextField(20);
+                pnl.add(new JLabel("Argument to The App"));
+                pnl.add(tf);
+                int val = JOptionPane.showConfirmDialog(canvas, pnl, "Please Enter The Argument", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                if (val != JOptionPane.OK_OPTION) {
+                    Executor.startApp();
+                    return;
+                }
+                String arg = tf.getText();
+                Display.getInstance().setProperty("AppArg", arg);
+                Executor.startApp();
+            }
+        });
+        simulateMenu.add(appArg);
+
+
+        JMenuItem debugWebViews = new JMenuItem("Debug Web Views");
+        debugWebViews.setEnabled(false);
+        debugInChromeMenuItem = debugWebViews;
+        debugWebViews.setToolTipText("Debug app's BrowserComponents' Javascript and DOM inside Chrome's debugger");
+        debugWebViews.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                CN.callSerially(new Runnable() {
+                    public void run() {
+                        String port = System.getProperty("cef.debugPort", null);
+                        if (port != null) {
+                            final Sheet sheet = new Sheet(null, "Debug Web Views");
+                            SpanLabel info = new SpanLabel("You can debug this app's web views in Chrome's "
+                                    + "debugger by opening the following URL in Chrome:");
+
+                            SpanLabel warning = new SpanLabel("Debugging only works in Chrome.  If Chrome is not your default browser "
+                                    + "then you'll need to copy and paste the URL above into Chrome");
+                            ComponentSelector.select("*", warning).add(warning, true)
+                                    .selectAllStyles()
+                                    .setFontSizeMillimeters(2)
+                                    .setFgColor(0x555555);
+                            FontImage.setMaterialIcon(warning, FontImage.MATERIAL_WARNING, 3);
+                            final com.codename1.ui.TextField tf = new com.codename1.ui.TextField("http://localhost:"+port);
+                            tf.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+                                @Override
+                                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                    Display.getInstance().copyToClipboard(tf.getText());
+                                    ToastBar.showInfoMessage("URL Copied to Clipboard");
+                                    sheet.back();
                                 }
                             });
-                        }
-                    });
-                }
-            });
-            
-            
-            includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
-            final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
-            includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
-            includeHeaderMenu.setSelected(includeHeaderInScreenshot);
-            if (appFrame == null) simulatorMenu.add(includeHeaderMenu);
-            includeHeaderMenu.addActionListener(new ActionListener() {
+                            tf.setEditable(false);
 
-                public void actionPerformed(ActionEvent e) {
-                    includeHeaderInScreenshot = includeHeaderMenu.isSelected();
-                    pref.putBoolean("includeHeaderScreenshot", includeHeaderInScreenshot);
-                }
-            });
+                            com.codename1.ui.Button copy = new com.codename1.ui.Button(com.codename1.ui.FontImage.MATERIAL_CONTENT_COPY);
+                            copy.addActionListener(new com.codename1.ui.events.ActionListener() {
+                                @Override
+                                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                    Display.getInstance().copyToClipboard(tf.getText());
+                                    ToastBar.showInfoMessage("URL Copied to Clipboard");
+                                    sheet.back();
+                                }
+                            });
 
+                            com.codename1.ui.Button open = new com.codename1.ui.Button("Open In Default Browser");
+                            open.addActionListener(new com.codename1.ui.events.ActionListener() {
+                                @Override
+                                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                                    CN.execute(tf.getText());
+                                    sheet.back();
+                                }
+                            });
 
-            JMenu networkDebug = new JMenu("Network");
-            toolsMenu.add(networkDebug);
-            
-            JMenuItem networkMonitor = new JMenuItem("Network Monitor");
-            networkMonitor.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if (netMonitor == null) {
-                        showNetworkMonitor();
-                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                        pref.putBoolean("NetworkMonitor", true);
-                    }
-                }
-            });
-            networkDebug.add(networkMonitor);
-
-            JMenuItem proxy = new JMenuItem("Proxy Settings");
-            proxy.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    final JDialog proxy;
-                    if(window !=null){
-                        proxy = new JDialog(window);
-                    }else{
-                        proxy = new JDialog();                    
-                    }
-                    final Preferences pref = Preferences.userNodeForPackage(Component.class);
-                    int proxySel = pref.getInt("proxySel", 2);
-                    String proxySelHttp = pref.get("proxySel-http", ""); 
-                    String proxySelPort = pref.get("proxySel-port", "");                             
-                    
-                    JPanel panel = new JPanel();                    
-                    panel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
-                    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));                    
-
-                    JPanel proxyUrl= new JPanel();
-                    proxyUrl.setLayout(new FlowLayout(FlowLayout.LEFT));                                        
-                    proxyUrl.add(new JLabel("Http Proxy:"));
-                    final JTextField http = new JTextField(proxySelHttp);
-                    http.setColumns(20);
-                    proxyUrl.add(http);
-                    proxyUrl.add(new JLabel("Port:"));
-                    final JTextField port = new JTextField(proxySelPort);
-                    port.setColumns(4);
-                    proxyUrl.add(port);
-                    
-                    final JRadioButton noproxy = new JRadioButton("No Proxy");
-                    JPanel rbPanel= new JPanel();
-                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
-                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
-                    rbPanel.add(noproxy);
-                    Dimension d = rbPanel.getPreferredSize();
-                    d.width = proxyUrl.getPreferredSize().width;
-                    rbPanel.setMinimumSize(d);
-                    //noproxy.setPreferredSize(d);
-                    panel.add(rbPanel);
-                    
-                    final JRadioButton systemProxy = new JRadioButton("Use System Proxy");
-                    rbPanel= new JPanel();
-                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
-                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
-                    rbPanel.add(systemProxy);
-                    d = rbPanel.getPreferredSize();
-                    d.width = proxyUrl.getPreferredSize().width;
-                    rbPanel.setPreferredSize(d);
-                    panel.add(rbPanel);
-                    
-                    final JRadioButton manual = new JRadioButton("Manual Proxy Settings:");
-                    rbPanel= new JPanel();
-                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
-                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
-                    rbPanel.add(manual);
-                    d = rbPanel.getPreferredSize();
-                    d.width = proxyUrl.getPreferredSize().width;
-                    rbPanel.setPreferredSize(d);
-                    panel.add(rbPanel);
-                                                            
-                    rbPanel= new JPanel();
-                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
-                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
-                    rbPanel.add(proxyUrl);
-                    panel.add(rbPanel);
-                    
-                    ButtonGroup group = new ButtonGroup();
-                    group.add(noproxy);
-                    group.add(systemProxy);
-                    group.add(manual);
-                    noproxy.addActionListener(new ActionListener() {
-
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            http.setEnabled(false);
-                            port.setEnabled(false);
-                        }
-                    });
-                    systemProxy.addActionListener(new ActionListener() {
-
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            http.setEnabled(false);
-                            port.setEnabled(false);
-                        }
-                    });
-                    manual.addActionListener(new ActionListener() {
-
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            http.setEnabled(true);
-                            port.setEnabled(true);
-                        }
-                    });
-                    
-                    switch (proxySel){
-                        case 1:
-                            noproxy.setSelected(true);
-                            http.setEnabled(false);
-                            port.setEnabled(false);
-                            break;
-                        case 2:
-                            systemProxy.setSelected(true);
-                            http.setEnabled(false);
-                            port.setEnabled(false);
-                            break;
-                        case 3:
-                            manual.setSelected(true);                            
-                            break;
-                    }
-                    JPanel closePanel = new JPanel();
-                    JButton close = new JButton("Ok");
-                    close.addActionListener(new ActionListener() {
-
-                        public void actionPerformed(ActionEvent e) {
-                            if (noproxy.isSelected()) {
-                                pref.putInt("proxySel", 1);
-                            } else if (systemProxy.isSelected()) {
-                                pref.putInt("proxySel", 2);
-                            } else if (manual.isSelected()) {
-                                pref.putInt("proxySel", 3);
-                                pref.put("proxySel-http", http.getText());
-                                pref.put("proxySel-port", port.getText());
-                            }
-                            proxy.dispose();
-                            
-                            if (netMonitor != null) {
-                                netMonitor.dispose();
-                                netMonitor = null;
-                            }
-                            if (perfMonitor != null) {
-                                perfMonitor.dispose();
-                                perfMonitor = null;
-                            }
-                            String mainClass = System.getProperty("MainClass");
-                            if (mainClass != null) {
-                                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                                deinitializeSync();
-                                frm.dispose();
-                                System.setProperty("reload.simulator", "true");
-                            } else {
-                                refreshSkin(frm);
-                        }
-                            
-                        }
-                    });
-                    closePanel.add(close);
-                    panel.add(closePanel);
-                    
-                    proxy.add(panel);
-                    proxy.pack();
-                    if(window != null){
-                        proxy.setLocationRelativeTo(window);
-                    }
-                    proxy.setResizable(false);
-                    proxy.setVisible(true);
-                    
-                    
-                }
-            });
-            networkDebug.add(proxy);
-            networkDebug.addSeparator();
-            
-            
-            JRadioButtonMenuItem regularConnection = new JRadioButtonMenuItem("Regular Connection");
-            regularConnection.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    slowConnectionMode = false;
-                    disconnectedMode = false;
-                    pref.putInt("connectionStatus", 0);
-                }
-            });
-            networkDebug.add(regularConnection);
-            
-            JRadioButtonMenuItem slowConnection = new JRadioButtonMenuItem("Slow Connection");
-            slowConnection.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    slowConnectionMode = true;
-                    disconnectedMode = false;
-                    pref.putInt("connectionStatus", 1);
-                }
-            });
-            networkDebug.add(slowConnection);
-            
-            JRadioButtonMenuItem disconnected = new JRadioButtonMenuItem("Disconnected");
-            disconnected.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    slowConnectionMode = false;
-                    disconnectedMode = true;
-                    pref.putInt("connectionStatus", 2);
-                }
-            });
-            networkDebug.add(disconnected);
-
-            ButtonGroup connectionGroup = new ButtonGroup();
-            connectionGroup.add(regularConnection);
-            connectionGroup.add(slowConnection);
-            connectionGroup.add(disconnected);
-            
-            switch(pref.getInt("connectionStatus", 0)) {
-                case 0:
-                    regularConnection.setSelected(true);
-                    break;
-                case 1:
-                    slowConnection.setSelected(true);
-                    slowConnectionMode = true;
-                    break;
-                case 2:
-                    disconnected.setSelected(true);
-                    disconnectedMode = true;
-                    break;
-            }
-            
-            JMenuItem componentTreeInspector = new JMenuItem("Component Inspector");
-            componentTreeInspector.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if (appFrame != null) return;
-                    
-                    new ComponentTreeInspector().showInFrame();
-                }
-            });
-            
-            JMenuItem scriptingConsole = new JMenuItem("Groovy Console");
-            scriptingConsole.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    new CN1Console().open((java.awt.Component)e.getSource());
-                }
-            });
+                            sheet.getContentPane().setLayout(com.codename1.ui.layouts.BoxLayout.y());
+                            sheet.getContentPane().add(info);
+                            sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.centerEastWest(tf, copy, null));
+                            sheet.getContentPane().add(open);
+                            sheet.getContentPane().add(warning);
+                            sheet.setPosition(com.codename1.ui.layouts.BorderLayout.CENTER);
+                            sheet.show();
 
 
-            List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
-            //final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
-            //final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
-            ButtonGroup hotReloadGroup = new ButtonGroup();
-            JRadioButtonMenuItem disableHotReload = new JRadioButtonMenuItem("Disabled");
-            disableHotReload.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    pref.putInt("hotReload", 0);
-                    System.setProperty("hotReload", "0");
-                }
-            });
-            JRadioButtonMenuItem reloadSimulator = new JRadioButtonMenuItem("Reload Simulator");
-            reloadSimulator.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    pref.putInt("hotReload", 1);
-                    System.setProperty("hotReload", "1");
-                }
-            });
-            JRadioButtonMenuItem reloadCurrentForm = new JRadioButtonMenuItem("Reload Current Form (Requires CodeRAD)");
-
-            reloadCurrentForm.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    pref.putInt("hotReload", 2);
-                    System.setProperty("hotReload", "2");
-                }
-            });
-
-            switch (pref.getInt("hotReload", 0)) {
-                case 0:
-                    disableHotReload.setSelected(true);
-                    System.setProperty("hotReload", "0");
-                    break;
-                case 1:
-                    reloadSimulator.setSelected(true);
-                    System.setProperty("hotReload", "1");
-                    break;
-                case 2:
-                    reloadCurrentForm.setSelected(true);
-                    System.setProperty("hotReload", "2");
-                    break;
-
-            }
-
-            JMenu hotReloadMenu = new JMenu("Hot Reload");
-            hotReloadMenu.add(disableHotReload);
-            hotReloadMenu.add(reloadSimulator);
-            hotReloadMenu.add(reloadCurrentForm);
-            hotReloadGroup.add(disableHotReload);
-            hotReloadGroup.add(reloadSimulator);
-            hotReloadGroup.add(reloadCurrentForm);
-            if (isRunningInMaven() && MavenUtils.isRunningInJDK()) {
-                toolsMenu.add(hotReloadMenu);
-            }
-            
-            
-            scriptingConsole.setToolTipText("Open interactive console");
-            
-            JMenuItem appArg = new JMenuItem("Send App Argument");
-            appArg.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    Executor.stopApp();
-                    JPanel pnl = new JPanel();
-                    JTextField tf = new JTextField(20);
-                    pnl.add(new JLabel("Argument to The App"));
-                    pnl.add(tf);
-                    int val = JOptionPane.showConfirmDialog(canvas, pnl, "Please Enter The Argument", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                    if (val != JOptionPane.OK_OPTION) {
-                        Executor.startApp();
-                        return;
-                    }
-                    String arg = tf.getText();
-                    Display.getInstance().setProperty("AppArg", arg);
-                    Executor.startApp();
-                }
-            });
-            simulateMenu.add(appArg);
-            
-            
-            JMenuItem debugWebViews = new JMenuItem("Debug Web Views");
-            debugWebViews.setEnabled(false);
-            debugInChromeMenuItem = debugWebViews;
-            debugWebViews.setToolTipText("Debug app's BrowserComponents' Javascript and DOM inside Chrome's debugger");
-            debugWebViews.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    CN.callSerially(new Runnable() {
-                        public void run() {
-                            String port = System.getProperty("cef.debugPort", null);
-                            if (port != null) {
-                                final Sheet sheet = new Sheet(null, "Debug Web Views");
-                                SpanLabel info = new SpanLabel("You can debug this app's web views in Chrome's "
-                                        + "debugger by opening the following URL in Chrome:");
-                                
-                                SpanLabel warning = new SpanLabel("Debugging only works in Chrome.  If Chrome is not your default browser "
-                                        + "then you'll need to copy and paste the URL above into Chrome");
-                                ComponentSelector.select("*", warning).add(warning, true)
-                                        .selectAllStyles()
-                                        .setFontSizeMillimeters(2)
-                                        .setFgColor(0x555555);
-                                FontImage.setMaterialIcon(warning, FontImage.MATERIAL_WARNING, 3);
-                                final com.codename1.ui.TextField tf = new com.codename1.ui.TextField("http://localhost:"+port);
-                                tf.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
-                                    @Override
-                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                                        Display.getInstance().copyToClipboard(tf.getText());
-                                        ToastBar.showInfoMessage("URL Copied to Clipboard");
-                                        sheet.back();
-                                    }
-                                });
-                                tf.setEditable(false);
-                                
-                                com.codename1.ui.Button copy = new com.codename1.ui.Button(com.codename1.ui.FontImage.MATERIAL_CONTENT_COPY);
-                                copy.addActionListener(new com.codename1.ui.events.ActionListener() {
-                                    @Override
-                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                                        Display.getInstance().copyToClipboard(tf.getText());
-                                        ToastBar.showInfoMessage("URL Copied to Clipboard");
-                                        sheet.back();
-                                    }
-                                });
-                                
-                                com.codename1.ui.Button open = new com.codename1.ui.Button("Open In Default Browser");
-                                open.addActionListener(new com.codename1.ui.events.ActionListener() {
-                                    @Override
-                                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                                        CN.execute(tf.getText());
-                                        sheet.back();
-                                    }
-                                });
-                                
-                                sheet.getContentPane().setLayout(com.codename1.ui.layouts.BoxLayout.y());
-                                sheet.getContentPane().add(info);
-                                sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.centerEastWest(tf, copy, null));
-                                sheet.getContentPane().add(open);
-                                sheet.getContentPane().add(warning);
-                                sheet.setPosition(com.codename1.ui.layouts.BorderLayout.CENTER);
-                                sheet.show();
-                                
-                                
-                            } else {
-                                ToastBar.showErrorMessage("Debugger not available.  The Chrome debugger is only available in apps that contain a BrowserComponent");
-                            }
-                        }
-                    });
-                }
-            });
-            toolsMenu.add(debugWebViews);
-            
-            JMenuItem locationSim = new JMenuItem("Location Simulation");
-            locationSim.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if(locSimulation==null) {
-                            locSimulation = new LocationSimulation();
-                    }
-                    locSimulation.setVisible(true);
-                }
-            });
-            simulateMenu.add(locationSim);
-            
-            JMenuItem pushSim = new JMenuItem("Push Simulation");
-            pushSim.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if(pushSimulation == null) {
-                            pushSimulation = new PushSimulator();
-                    }
-                    pref.putBoolean("PushSimulator", true);
-                    pushSimulation.setVisible(true);
-                }
-            });
-            simulateMenu.add(pushSim);
-
-            if (appFrame == null) {
-                toolsMenu.add(componentTreeInspector);
-            }
-            toolsMenu.add(scriptingConsole);
-            
-
-            JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
-            testRecorderMenu.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if (testRecorder == null) {
-                        showTestRecorder();
-                    }
-                }
-            });
-            toolsMenu.add(testRecorderMenu);
-
-            /*
-            JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
-            simulatorMenu.add(darkLightModeMenu);
-            final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
-            final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
-            final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
-            ButtonGroup group = new ButtonGroup();
-            group.add(darkMode);
-            group.add(lightMode);
-            group.add(unsupportedMode);
-            darkMode.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    JavaSEPort.this.darkMode = true;
-                }
-            });
-            
-            lightMode.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    JavaSEPort.this.darkMode = false;
-                }
-            });
-
-            unsupportedMode.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    JavaSEPort.this.darkMode = null;
-                }
-            });
-            */
-            
-            manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
-            managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
-            subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
-            refundSupported = pref.getBoolean("refundSupported", true);
-            JMenu purchaseMenu = new JMenu("In App Purchase");
-            simulateMenu.add(purchaseMenu);
-            final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
-            manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
-            final JCheckBoxMenuItem managedPurchaseSupportedMenu = new JCheckBoxMenuItem("Managed Purchase");
-            managedPurchaseSupportedMenu.setSelected(managedPurchaseSupported);
-            final JCheckBoxMenuItem subscriptionSupportedMenu = new JCheckBoxMenuItem("Subscription");
-            subscriptionSupportedMenu.setSelected(subscriptionSupported);
-            final JCheckBoxMenuItem refundSupportedMenu = new JCheckBoxMenuItem("Refunds");
-            refundSupportedMenu.setSelected(refundSupported);
-            manualPurchaseSupportedMenu.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    manualPurchaseSupported = manualPurchaseSupportedMenu.isSelected();
-                    pref.putBoolean("manualPurchaseSupported", manualPurchaseSupported);
-                }
-            });
-            managedPurchaseSupportedMenu.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    managedPurchaseSupported = managedPurchaseSupportedMenu.isSelected();
-                    pref.putBoolean("managedPurchaseSupported", managedPurchaseSupported);
-                }
-            });
-            subscriptionSupportedMenu.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    subscriptionSupported = subscriptionSupportedMenu.isSelected();
-                    pref.putBoolean("subscriptionSupported", subscriptionSupported);
-                }
-            });
-            refundSupportedMenu.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    refundSupported = refundSupportedMenu.isSelected();
-                    pref.putBoolean("refundSupported", refundSupported);
-                }
-            });
-            purchaseMenu.add(manualPurchaseSupportedMenu);
-            purchaseMenu.add(managedPurchaseSupportedMenu);
-            purchaseMenu.add(subscriptionSupportedMenu);
-            purchaseMenu.add(refundSupportedMenu);
-
-            JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
-            performanceMonitor.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    if (perfMonitor == null) {
-                        showPerformanceMonitor();
-                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                        pref.putBoolean("PerformanceMonitor", true);
-                    }
-                }
-            });
-            toolsMenu.add(performanceMonitor);
-            
-            JMenuItem clean = new JMenuItem("Clean Storage");
-            clean.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
-                    if(!home.exists()){
-                        return;
-                    }
-                    if(JOptionPane.showConfirmDialog(frm,
-                            "Are you sure you want to Clean all Storage under "
-                                    + home.getAbsolutePath() + " ?", 
-                            "Clean Storage", 
-                            JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION){
-                    File [] files = home.listFiles();
-                    for (int i = 0; i < files.length; i++) {
-                        File file = files[i];
-                        file.delete();
-                    }
-                }
-                }
-            });
-            toolsMenu.add(clean);
-            
-            
-
-            JMenu skinMenu = createSkinsMenu(frm, null);
-            skinMenu.addMenuListener(new MenuListener(){
-
-                @Override
-                public void menuSelected(MenuEvent e) {
-                    menuDisplayed = true;
-                }
-
-                @Override
-                public void menuCanceled(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-
-                @Override
-                public void menuDeselected(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-                
-                
-            
-            });
-            
-
-            //final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
-            //simulatorMenu.add(touchFlag);
-            //final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
-            //simulatorMenu.add(nativeInputFlag);
-            //final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
-            //simulatorMenu.add(simulateAndroidVKBFlag);
-
-            /*final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
-            toolsMenu.add(slowMotionFlag);
-            slowMotionFlag.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    Motion.setSlowMotion(slowMotionFlag.isSelected());
-                }
-            });*/
-            
-            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
-            simulateMenu.add(permFlag);
-            permFlag.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    android6PermissionsFlag = !android6PermissionsFlag;
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    pref.putBoolean("Android6Permissions", android6PermissionsFlag);
-                    
-                }
-            });
-
-            pause = new JMenuItem("Pause App");
-            simulateMenu.addSeparator();            
-            simulateMenu.add(pause);
-            pause.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    if (pause.getText().startsWith("Pause")) {
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                Executor.stopApp();
-                                minimized = true;
-                            }
-                        });
-                        canvas.setEnabled(false);
-                        pause.setText("Resume App");
-                    } else {
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                Executor.startApp();
-                                minimized = false;
-                            }
-                        });
-                        canvas.setEnabled(true);
-                        pause.setText("Pause App");
-                    }
-                }
-            });
-
-            final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
-            if (appFrame == null) simulatorMenu.add(alwaysOnTopFlag);
-            
-            if (appFrame == null) simulatorMenu.addSeparator();
-
-
-            JMenuItem exit = new JMenuItem("Exit");
-            simulatorMenu.add(exit);
-            
-            JMenu helpMenu = new JMenu("Help");
-            helpMenu.setDoubleBuffered(true);
-            helpMenu.addMenuListener(new MenuListener(){
-
-                @Override
-                public void menuSelected(MenuEvent e) {
-                    menuDisplayed = true;
-                }
-
-                @Override
-                public void menuCanceled(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-
-                @Override
-                public void menuDeselected(MenuEvent e) {
-                    menuDisplayed = false;
-                }
-            });
-            
-
-            JMenuItem javadocs = new JMenuItem("Javadocs");
-            javadocs.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    launchBrowserThatWorks("https://www.codenameone.com/javadoc/");
-                }
-            });
-            helpMenu.add(javadocs);
-
-            JMenuItem how = new JMenuItem("How Do I?...");
-            how.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    launchBrowserThatWorks("https://www.codenameone.com/how-do-i.html");
-                }
-            });
-            helpMenu.add(how);
-
-            JMenuItem forum = new JMenuItem("Community Forum");
-            forum.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    launchBrowserThatWorks("https://www.codenameone.com/discussion-forum.html");
-                }
-            });
-            helpMenu.add(forum);
-            
-            JMenuItem bserver = new JMenuItem("Build Server");
-            bserver.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    launchBrowserThatWorks("https://cloud.codenameone.com/secure/index.html");
-                }
-            });
-            helpMenu.addSeparator();
-            helpMenu.add(bserver);
-            helpMenu.addSeparator();
-            
-            JMenuItem about = new JMenuItem("About");
-            about.addActionListener(new ActionListener() {
-                
-                public void actionPerformed(ActionEvent e) {
-                    final JDialog about;
-                    if(window !=null){
-                        about = new JDialog(window);
-                    }else{
-                        about = new JDialog();                    
-                    }
-                    JPanel panel = new JPanel();                    
-                    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));                    
-
-                    JPanel imagePanel = new JPanel();
-                    
-                    JLabel image = new JLabel(new javax.swing.ImageIcon(getClass().getResource("/CodenameOne_Small.png")));
-                    image.setHorizontalAlignment(SwingConstants.CENTER);
-                    imagePanel.add(image);
-                    
-                    panel.add(imagePanel);
-                    
-                    JPanel linkPanel = new JPanel();
-                    
-                    JButton link = new JButton();
-                    link.setText("<HTML>For more information, please <br>visit <FONT color=\"#000099\"><U>www.codenameone.com</U></FONT></HTML>");
-                    link.setHorizontalAlignment(SwingConstants.LEFT);
-                    link.setBorderPainted(false);
-                    link.setOpaque(false);
-                    link.setBackground(Color.WHITE);
-                    link.addActionListener(new ActionListener() {
-
-                        public void actionPerformed(ActionEvent e) {
-                        launchBrowserThatWorks("https://www.codenameone.com");
-                        }
-                    });
-                    linkPanel.add(link);
-                    panel.add(linkPanel);
-
-                    JPanel closePanel = new JPanel();
-                    JButton close = new JButton("close");
-                    close.addActionListener(new ActionListener() {
-
-                        public void actionPerformed(ActionEvent e) {
-                          about.dispose();
-                        }
-                    });
-                    closePanel.add(close);
-                    panel.add(closePanel);
-                    
-                    about.add(panel);
-                    about.pack();
-                    if(window != null){
-                        about.setLocationRelativeTo(window);
-                    }
-                    about.setVisible(true);
-                }
-            });            
-            helpMenu.add(about);
-
-            if (showMenu) {
-                bar.add(simulatorMenu);
-                bar.add(simulateMenu);
-                bar.add(toolsMenu);
-                bar.add(skinMenu);
-                bar.add(helpMenu);
-            }
-
-
-            
-            alwaysOnTopFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    alwaysOnTop = !alwaysOnTop;
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    pref.putBoolean("AlwaysOnTop", alwaysOnTop);
-                    window.setAlwaysOnTop(alwaysOnTop);
-                }
-            });
-            
-            /*simulateAndroidVKBFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    simulateAndroidKeyboard = !simulateAndroidKeyboard;
-                }
-            });*/
-            
-            ItemListener zoomListener = new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    setScrollableSkin(!scrollableSkin);
-
-                    if (scrollableSkin) {
-                        if (appFrame == null) {
-                            frm.add(java.awt.BorderLayout.SOUTH, hSelector);
-                            frm.add(java.awt.BorderLayout.EAST, vSelector);
                         } else {
-                            canvas.getParent().add(java.awt.BorderLayout.SOUTH, hSelector);
-                            canvas.getParent().add(java.awt.BorderLayout.EAST, vSelector);
-                        }
-                        
-                    } else {
-
-                        frm.remove(hSelector);
-                        frm.remove(vSelector);
-                    }
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    if (scrollableSkin) {
-                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
-                    } else {
-                        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
-                        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
-                        float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
-                        float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
-                        float zoom = Math.min(zoomX, zoomY);
-                        canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
-                        if (window != null) {
-                            if (appFrame == null) {
-                                window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoom), (int) (getSkin().getHeight() * zoom)));
-                            }
+                            ToastBar.showErrorMessage("Debugger not available.  The Chrome debugger is only available in apps that contain a BrowserComponent");
                         }
                     }
-                    parent.add(BorderLayout.CENTER, canvas);
-                    
-                    canvas.x = 0;
-                    canvas.y = 0;
-                    zoomLevel = 1;
-                    frm.invalidate();
-                    frm.pack();
-                    Display.getInstance().getCurrent().repaint();
-                    frm.repaint();
-                }
-            };
+                });
+            }
+        });
+        toolsMenu.add(debugWebViews);
 
-            zoomMenu.addItemListener(zoomListener);
-            
-            exit.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    exitApplication();
+        JMenuItem locationSim = new JMenuItem("Location Simulation");
+        locationSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(locSimulation==null) {
+                        locSimulation = new LocationSimulation();
                 }
-            });
+                locSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(locationSim);
+
+        JMenuItem pushSim = new JMenuItem("Push Simulation");
+        pushSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(pushSimulation == null) {
+                        pushSimulation = new PushSimulator();
+                }
+                pref.putBoolean("PushSimulator", true);
+                pushSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(pushSim);
+
+        if (appFrame == null) {
+            toolsMenu.add(componentTreeInspector);
+        }
+        toolsMenu.add(scriptingConsole);
+
+
+        JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
+        testRecorderMenu.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if (testRecorder == null) {
+                    showTestRecorder();
+                }
+            }
+        });
+        toolsMenu.add(testRecorderMenu);
+
+        /*
+        JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
+        simulatorMenu.add(darkLightModeMenu);
+        final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
+        final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
+        final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
+        ButtonGroup group = new ButtonGroup();
+        group.add(darkMode);
+        group.add(lightMode);
+        group.add(unsupportedMode);
+        darkMode.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JavaSEPort.this.darkMode = true;
+            }
+        });
+
+        lightMode.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JavaSEPort.this.darkMode = false;
+            }
+        });
+
+        unsupportedMode.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JavaSEPort.this.darkMode = null;
+            }
+        });
+        */
+
+        manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
+        managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
+        subscriptionSupported = pref.getBoolean("subscriptionSupported", true);
+        refundSupported = pref.getBoolean("refundSupported", true);
+        JMenu purchaseMenu = new JMenu("In App Purchase");
+        simulateMenu.add(purchaseMenu);
+        final JCheckBoxMenuItem manualPurchaseSupportedMenu = new JCheckBoxMenuItem("Manual Purchase");
+        manualPurchaseSupportedMenu.setSelected(manualPurchaseSupported);
+        final JCheckBoxMenuItem managedPurchaseSupportedMenu = new JCheckBoxMenuItem("Managed Purchase");
+        managedPurchaseSupportedMenu.setSelected(managedPurchaseSupported);
+        final JCheckBoxMenuItem subscriptionSupportedMenu = new JCheckBoxMenuItem("Subscription");
+        subscriptionSupportedMenu.setSelected(subscriptionSupported);
+        final JCheckBoxMenuItem refundSupportedMenu = new JCheckBoxMenuItem("Refunds");
+        refundSupportedMenu.setSelected(refundSupported);
+        manualPurchaseSupportedMenu.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                manualPurchaseSupported = manualPurchaseSupportedMenu.isSelected();
+                pref.putBoolean("manualPurchaseSupported", manualPurchaseSupported);
+            }
+        });
+        managedPurchaseSupportedMenu.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                managedPurchaseSupported = managedPurchaseSupportedMenu.isSelected();
+                pref.putBoolean("managedPurchaseSupported", managedPurchaseSupported);
+            }
+        });
+        subscriptionSupportedMenu.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                subscriptionSupported = subscriptionSupportedMenu.isSelected();
+                pref.putBoolean("subscriptionSupported", subscriptionSupported);
+            }
+        });
+        refundSupportedMenu.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                refundSupported = refundSupportedMenu.isSelected();
+                pref.putBoolean("refundSupported", refundSupported);
+            }
+        });
+        purchaseMenu.add(manualPurchaseSupportedMenu);
+        purchaseMenu.add(managedPurchaseSupportedMenu);
+        purchaseMenu.add(subscriptionSupportedMenu);
+        purchaseMenu.add(refundSupportedMenu);
+
+        JMenuItem performanceMonitor = new JMenuItem("Performance Monitor");
+        performanceMonitor.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if (perfMonitor == null) {
+                    showPerformanceMonitor();
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("PerformanceMonitor", true);
+                }
+            }
+        });
+        toolsMenu.add(performanceMonitor);
+
+        JMenuItem clean = new JMenuItem("Clean Storage");
+        clean.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
+                if(!home.exists()){
+                    return;
+                }
+                if(JOptionPane.showConfirmDialog(frm,
+                        "Are you sure you want to Clean all Storage under "
+                                + home.getAbsolutePath() + " ?",
+                        "Clean Storage",
+                        JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION){
+                File [] files = home.listFiles();
+                for (int i = 0; i < files.length; i++) {
+                    File file = files[i];
+                    file.delete();
+                }
+            }
+            }
+        });
+        toolsMenu.add(clean);
+
+
+
+        JMenu skinMenu = createSkinsMenu(frm, null);
+        skinMenu.addMenuListener(new MenuListener(){
+
+            @Override
+            public void menuSelected(MenuEvent e) {
+                menuDisplayed = true;
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                menuDisplayed = false;
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                menuDisplayed = false;
+            }
+
+
+
+        });
+
+
+        //final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
+        //simulatorMenu.add(touchFlag);
+        //final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
+        //simulatorMenu.add(nativeInputFlag);
+        //final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
+        //simulatorMenu.add(simulateAndroidVKBFlag);
+
+        /*final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
+        toolsMenu.add(slowMotionFlag);
+        slowMotionFlag.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                Motion.setSlowMotion(slowMotionFlag.isSelected());
+            }
+        });*/
+
+        final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
+        simulateMenu.add(permFlag);
+        permFlag.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                android6PermissionsFlag = !android6PermissionsFlag;
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("Android6Permissions", android6PermissionsFlag);
+
+            }
+        });
+
+        pause = new JMenuItem("Pause App");
+        simulateMenu.addSeparator();
+        simulateMenu.add(pause);
+        pause.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (pause.getText().startsWith("Pause")) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Executor.stopApp();
+                            minimized = true;
+                        }
+                    });
+                    canvas.setEnabled(false);
+                    pause.setText("Resume App");
+                } else {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Executor.startApp();
+                            minimized = false;
+                        }
+                    });
+                    canvas.setEnabled(true);
+                    pause.setText("Pause App");
+                }
+            }
+        });
+
+        final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
+        if (appFrame == null) simulatorMenu.add(alwaysOnTopFlag);
+
+        if (appFrame == null) simulatorMenu.addSeparator();
+
+
+        JMenuItem exit = new JMenuItem("Exit");
+        simulatorMenu.add(exit);
+
+        JMenu helpMenu = new JMenu("Help");
+        helpMenu.setDoubleBuffered(true);
+        helpMenu.addMenuListener(new MenuListener(){
+
+            @Override
+            public void menuSelected(MenuEvent e) {
+                menuDisplayed = true;
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                menuDisplayed = false;
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                menuDisplayed = false;
+            }
+        });
+
+
+        JMenuItem javadocs = new JMenuItem("Javadocs");
+        javadocs.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                launchBrowserThatWorks("https://www.codenameone.com/javadoc/");
+            }
+        });
+        helpMenu.add(javadocs);
+
+        JMenuItem how = new JMenuItem("How Do I?...");
+        how.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                launchBrowserThatWorks("https://www.codenameone.com/how-do-i.html");
+            }
+        });
+        helpMenu.add(how);
+
+        JMenuItem forum = new JMenuItem("Community Forum");
+        forum.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                launchBrowserThatWorks("https://www.codenameone.com/discussion-forum.html");
+            }
+        });
+        helpMenu.add(forum);
+
+        JMenuItem bserver = new JMenuItem("Build Server");
+        bserver.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                launchBrowserThatWorks("https://cloud.codenameone.com/secure/index.html");
+            }
+        });
+        helpMenu.addSeparator();
+        helpMenu.add(bserver);
+        helpMenu.addSeparator();
+
+        JMenuItem about = new JMenuItem("About");
+        about.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent e) {
+                final JDialog about;
+                if(window !=null){
+                    about = new JDialog(window);
+                }else{
+                    about = new JDialog();
+                }
+                JPanel panel = new JPanel();
+                panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+                JPanel imagePanel = new JPanel();
+
+                JLabel image = new JLabel(new javax.swing.ImageIcon(getClass().getResource("/CodenameOne_Small.png")));
+                image.setHorizontalAlignment(SwingConstants.CENTER);
+                imagePanel.add(image);
+
+                panel.add(imagePanel);
+
+                JPanel linkPanel = new JPanel();
+
+                JButton link = new JButton();
+                link.setText("<HTML>For more information, please <br>visit <FONT color=\"#000099\"><U>www.codenameone.com</U></FONT></HTML>");
+                link.setHorizontalAlignment(SwingConstants.LEFT);
+                link.setBorderPainted(false);
+                link.setOpaque(false);
+                link.setBackground(Color.WHITE);
+                link.addActionListener(new ActionListener() {
+
+                    public void actionPerformed(ActionEvent e) {
+                    launchBrowserThatWorks("https://www.codenameone.com");
+                    }
+                });
+                linkPanel.add(link);
+                panel.add(linkPanel);
+
+                JPanel closePanel = new JPanel();
+                JButton close = new JButton("close");
+                close.addActionListener(new ActionListener() {
+
+                    public void actionPerformed(ActionEvent e) {
+                      about.dispose();
+                    }
+                });
+                closePanel.add(close);
+                panel.add(closePanel);
+
+                about.add(panel);
+                about.pack();
+                if(window != null){
+                    about.setLocationRelativeTo(window);
+                }
+                about.setVisible(true);
+            }
+        });
+        helpMenu.add(about);
+
+        if (showMenu) {
+            bar.add(simulatorMenu);
+            bar.add(simulateMenu);
+            bar.add(toolsMenu);
+            bar.add(skinMenu);
+            bar.add(helpMenu);
+        }
+
+
+
+        alwaysOnTopFlag.addItemListener(new ItemListener() {
+
+            public void itemStateChanged(ItemEvent ie) {
+                alwaysOnTop = !alwaysOnTop;
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("AlwaysOnTop", alwaysOnTop);
+                window.setAlwaysOnTop(alwaysOnTop);
+            }
+        });
+
+        ItemListener zoomListener = new ItemListener() {
+
+            public void itemStateChanged(ItemEvent ie) {
+                setScrollableSkin(!scrollableSkin);
+
+                if (scrollableSkin) {
+                    if (appFrame == null) {
+                        frm.add(java.awt.BorderLayout.SOUTH, hSelector);
+                        frm.add(java.awt.BorderLayout.EAST, vSelector);
+                    } else {
+                        canvas.getParent().add(java.awt.BorderLayout.SOUTH, hSelector);
+                        canvas.getParent().add(java.awt.BorderLayout.EAST, vSelector);
+                    }
+
+                } else {
+
+                    frm.remove(hSelector);
+                    frm.remove(vSelector);
+                }
+                Container parent = canvas.getParent();
+                parent.remove(canvas);
+                if (scrollableSkin) {
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                } else {
+                    int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+                    int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+                    float zoomY = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
+                    float zoomX = getSkin().getWidth() > screenW ? screenW/(float)getSkin().getWidth() : 1f;
+                    float zoom = Math.min(zoomX, zoomY);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight() * zoom)));
+                    if (window != null) {
+                        if (appFrame == null) {
+                            window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoom), (int) (getSkin().getHeight() * zoom)));
+                        }
+                    }
+                }
+                parent.add(BorderLayout.CENTER, canvas);
+
+                canvas.x = 0;
+                canvas.y = 0;
+                zoomLevel = 1;
+                frm.invalidate();
+                frm.pack();
+                Display.getInstance().getCurrent().repaint();
+                frm.repaint();
+            }
+        };
+
+        zoomMenu.addItemListener(zoomListener);
+
+        exit.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                exitApplication();
+            }
+        });
     }
     
     public static void resumeApp() {
