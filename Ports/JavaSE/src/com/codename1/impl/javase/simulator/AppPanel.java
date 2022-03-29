@@ -6,6 +6,7 @@
 package com.codename1.impl.javase.simulator;
 
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.util.SwingUtils;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -16,6 +17,8 @@ import java.util.ArrayList;
 import java.util.prefs.Preferences;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 /**
  *
@@ -50,6 +53,7 @@ public class AppPanel extends JPanel {
         this.id = id;
         this.label = label;
         this.content = content;
+
         initAppPanelUI();
     }
     
@@ -237,6 +241,8 @@ public class AppPanel extends JPanel {
     private JPopupMenu createPopupMenu() {
         JPopupMenu menu = new JPopupMenu();
 
+        // We need disable simulator blitting while the menu is opened
+        JavaSEPort.instance.registerMenuWithBlit(menu);
         moveTo.removeAll();
         AppFrame.FrameLocation currentLocation = getAppFrame().getPanelLocation(AppPanel.this);
 

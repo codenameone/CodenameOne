@@ -159,11 +159,9 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.TargetDataLine;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.MenuEvent;
-import javax.swing.event.MenuListener;
-import javax.swing.event.MouseInputAdapter;
+import javax.swing.event.*;
+import javax.swing.plaf.SplitPaneUI;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 import javax.swing.text.DefaultCaret;
@@ -1849,6 +1847,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean showContextMenu(final MouseEvent me) {
             if (componentTreeInspector == null || !componentTreeInspector.isSimulatorRightClickEnabled()) return false;
             JPopupMenu menu = new JPopupMenu();
+            registerMenuWithBlit(menu);
             JMenuItem inspectElement = new JMenuItem("Inspect Component");
             inspectElement.addActionListener(new ActionListener() {
 
@@ -2993,6 +2992,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
             JPopupMenu popupMenu = new JPopupMenu();
+            registerMenuWithBlit(popupMenu);
             popupMenu.add(includeHeaderMenu);
             popupMenu.add(includeSkinMenu);
 
@@ -3215,6 +3215,44 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void onUpdateAppFrameUI(AppFrame frame) {
             update();
         }
+    }
+
+    public void registerSplitPaneWithBlit(JSplitPane splitPane) {
+        SplitPaneUI spui = splitPane.getUI();
+        if (spui instanceof BasicSplitPaneUI) {
+            // Setting a mouse listener directly on split pane does not work, because no events are being received.
+            ((BasicSplitPaneUI) spui).getDivider().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+        }
+
+    }
+
+    public void registerMenuWithBlit(JPopupMenu menu) {
+        menu.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                menuDisplayed = true;
+            }
+
+            @Override
+            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                menuDisplayed = false;
+            }
+
+            @Override
+            public void popupMenuCanceled(PopupMenuEvent e) {
+                menuDisplayed = false;
+            }
+        });
     }
 
     /**

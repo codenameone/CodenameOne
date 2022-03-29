@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase.simulator;
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.util.SwingUtils;
 
 import java.awt.*;
@@ -217,12 +218,15 @@ public class AppFrame extends JPanel {
         initPanels(topPanel, leftPanel, centerPanel, rightPanel, bottomPanel);
         
         innerSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(innerSplit);
         innerSplit.setName("innerSplit");
         setDividerLocationIfChanged(innerSplit, 600);
         outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(outerSplit);
         outerSplit.setName("outerSplit");
         setDividerLocationIfChanged(outerSplit, 0);
         centerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(centerSplit);
         centerSplit.setName("centerSplit");
         setDividerLocationIfChanged(centerSplit, 600);
         outerSplit.setLeftComponent(leftPanel);
@@ -648,6 +652,8 @@ public class AppFrame extends JPanel {
     public static interface UpdatableUI {
         public void onUpdateAppFrameUI(AppFrame frame);
     }
+
+
 
 
 }
