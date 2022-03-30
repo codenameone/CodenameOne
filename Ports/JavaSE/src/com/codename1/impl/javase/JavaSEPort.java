@@ -5463,21 +5463,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     window.setBounds(r);
                 }
             }
-/*
-            
-            
-            
-            
-            if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
-            } else if (portrait && getSkin() != null) {
-                int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
-                float zoom = getSkin().getHeight() > screenH ? screenH/(float)getSkin().getHeight() : 1f;
-                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
-                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoom), (int)(getSkin().getHeight()  * zoom)));
-            }
-            */
+
             window.setVisible(true);
         }
         if (useNativeInput) {
@@ -7853,7 +7839,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (baseResourceDir != null) {
                 fontFile = new File(baseResourceDir, fileName);
             } else {
-                fontFile = new File(new File(getCWD(),"src"), fileName);
+                fontFile = new File(getSourceResourcesDir(), fileName);
             }
             if (fontFile.exists()) {
                 try {
@@ -11055,7 +11041,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
         if ("/theme.res".equals(resource)) {
-            File srcThemeRes = new File(getCWD(), "src" + File.separator + "theme.res");
+            File srcThemeRes = new File(getSourceResourcesDir(),  "theme.res");
             if (srcThemeRes.exists()) {
                 try {
                     return new FileInputStream(srcThemeRes);
@@ -13464,6 +13450,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public File getCWD() {
         return new File(System.getProperty("user.dir"));
+    }
+    
+    public File getSourceResourcesDir() {
+        File resDir = new File(getCWD(), "src" + File.separator + "main" + File.separator + "resources");
+        if (!resDir.exists()) {
+            resDir = new File(getCWD(), "src");
+        }
+        return resDir;
     }
     
     

@@ -32,6 +32,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EventObject;
 import java.util.List;
 import java.util.Objects;
@@ -91,6 +92,8 @@ public class ComponentTreeInspector extends JPanel {
             frame.setLocationByPlatform(true);
             
         }
+        refreshComponentTree();
+        loadThemes();
         frame.setVisible(true);
         return frame;
     }
@@ -114,33 +117,10 @@ public class ComponentTreeInspector extends JPanel {
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
         setLayout(new BorderLayout());
+        
         initComponents();
-        
-        File[] resFiles = new File("src").listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.getName().endsWith(".res");
-            }
-        });
         themes.removeAllItems();
-        if (resFiles != null) {
-            for(File r : resFiles) {
-                try {
-                    Resources rr = Resources.open("/" + r.getName());
-                    for(String themeName : rr.getThemeResourceNames()) {
-                        themes.addItem(r.getName() + " - " + themeName);
-                        themePaths.add(r.getAbsolutePath());
-                        themeNames.add(themeName);
-                    }
-                } catch(IOException err) {
-                    err.printStackTrace();
-                }
-            }
-        }
-
-        
         refreshComponentTree();
-        
         componentUIID.getDocument().addDocumentListener(new DocumentListener() {
 
             @Override
@@ -279,12 +259,45 @@ public class ComponentTreeInspector extends JPanel {
         //setLocationByPlatform(true);
         //setVisible(true);
     }
+    
+    private void loadThemes() {
+        if (!Display.isInitialized()) return;
+        java.util.List<File> resFiles = new ArrayList<File>();
+        
+        File[] tmpFiles = JavaSEPort.instance.getSourceResourcesDir().listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.getName().endsWith(".res");
+            }
+        });
+        if (tmpFiles != null) {
+            resFiles.addAll(Arrays.asList(tmpFiles));
+        }
+        themes.removeAllItems();
+        themePaths.clear();
+        themeNames.clear();
+        
+        for(File r : resFiles) {
+            try {
+                Resources rr = Resources.open("/" + r.getName());
+                for(String themeName : rr.getThemeResourceNames()) {
+                    themes.addItem(r.getName() + " - " + themeName);
+                    themePaths.add(r.getAbsolutePath());
+                    themeNames.add(themeName);
+                }
+            } catch(IOException err) {
+                err.printStackTrace();
+            }
+        }
+        
+    }
 
     private void refreshComponentTree() {
         TreePath tp = componentTree.getSelectionPath();
         ComponentTreeModel cm = new ComponentTreeModel(Display.getInstance().getCurrent());
         componentTree.setModel(cm);
         componentTree.setSelectionPath(tp);
+        
     }
     
     /** This method is called from within the constructor to
@@ -478,6 +491,7 @@ public class ComponentTreeInspector extends JPanel {
 
 private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshTreeActionPerformed
     refreshComponentTree();
+    loadThemes();
 }//GEN-LAST:event_refreshTreeActionPerformed
 
     private void unselectedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unselectedActionPerformed
@@ -703,6 +717,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         @Override
         public void actionPerformed(ActionEvent e) {
             ComponentTreeInspector.this.refreshComponentTree();
+            loadThemes();
         }
     }
 
@@ -760,6 +775,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     
     public void inspectComponent(com.codename1.ui.Component cmp) {
         ComponentTreeInspector.this.refreshComponentTree();
+        loadThemes();
         TreePath path = ((ComponentTreeModel)componentTree.getModel()).createPathToComponent(cmp);
         componentTree.setSelectionPath(path);
         componentTree.scrollPathToVisible(path);

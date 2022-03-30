@@ -187,7 +187,10 @@ public class CSSWatcher implements Runnable {
                 System.out.println("Watching CSS files for changes: ["+overrideInputs+"]");
             }
         }
-        File destFile = new File("src", "theme.res");
+        File resDir = JavaSEPort.instance.getSourceResourcesDir();
+        
+        File destFile = new File(resDir, "theme.res");
+        
         String overrideOutputs = System.getProperty("codename1.css.compiler.args.output", null);
         if (overrideOutputs != null) {
             destFile = new File(overrideOutputs);
