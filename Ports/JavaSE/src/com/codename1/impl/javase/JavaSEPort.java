@@ -5274,6 +5274,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             detailsPanel.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
             detailsPanel.setScrollable(false, true);
 
+            AppPanel propertiesPanel = new AppPanel("Properties", "Properties", componentTreeInspector.getPropertyDetailsPanel());
+            propertiesPanel.setPreferredFrame(AppFrame.FrameLocation.RightPanel);
+            propertiesPanel.setScrollable(false, false);
+            appFrame.add(propertiesPanel);
             appFrame.add(detailsPanel);
             appFrame.add(canvasPanel);
             appFrame.add(componentTreeInspectorPanel);

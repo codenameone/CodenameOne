@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.simulator.PropertyDetailsPanel;
 import com.codename1.impl.javase.simulator.SelectableAction;
 import com.codename1.impl.javase.util.SwingUtils;
 import javax.swing.*;
@@ -55,6 +56,7 @@ public class ComponentTreeInspector extends JPanel {
     private List<String> themeNames = new ArrayList<String>();
     private boolean simulatorRightClickEnabled = true;
     private JFrame frame;
+    private PropertyDetailsPanel propertyDetailsPanel;
 
     public boolean isSimulatorRightClickEnabled() {
         return simulatorRightClickEnabled;
@@ -117,8 +119,9 @@ public class ComponentTreeInspector extends JPanel {
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
         setLayout(new BorderLayout());
-        
+        propertyDetailsPanel = new PropertyDetailsPanel();
         initComponents();
+
         themes.removeAllItems();
         refreshComponentTree();
         componentUIID.getDocument().addDocumentListener(new DocumentListener() {
@@ -171,6 +174,25 @@ public class ComponentTreeInspector extends JPanel {
             
         });
         contextMenu.add(printComponent);
+
+        //if (currentComponent instanceof Container) {
+            JMenuItem revalidate = new JMenuItem("Revalidate");
+            revalidate.addActionListener(new java.awt.event.ActionListener() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent evt) {
+                    com.codename1.ui.CN.callSerially(new Runnable() {
+                        public void run() {
+                            if (currentComponent instanceof Container) {
+                                ((Container)currentComponent).revalidate();
+                            }
+                        }
+                    });
+
+                }
+
+            });
+            contextMenu.add(revalidate);
+        //}
         
         componentTree.addMouseListener(new MouseAdapter() {
             @Override
@@ -219,31 +241,7 @@ public class ComponentTreeInspector extends JPanel {
                                 }
                             }
                         }
-                        currentComponent = c;
-                        componentClass.setText(c.getClass().getName());
-                        componentName.setText("" + c.getName());
-                        componentUIID.setText("" + c.getUIID());
-                        componentSelected.setSelected(c.hasFocus());
-                        coordinates.setText("x: " + c.getX() + " y: " + c.getY() + " absX: " + c.getAbsoluteX()+ " absY: " + c.getAbsoluteY() + 
-                                " Width: " + c.getWidth() + " Height: " + c.getHeight());
-                        preferredSize.setText(c.getPreferredW() + ", " + c.getPreferredH());
-                        padding.setText("Top: " + c.getStyle().getPadding(Component.TOP) + " Bottom: " + c.getStyle().getPadding(Component.BOTTOM)
-                                 + " Left: " + c.getStyle().getPadding(Component.LEFT) + " Right: " + c.getStyle().getPadding(Component.RIGHT));
-                        margin.setText("Top: " + c.getStyle().getMargin(Component.TOP) + " Bottom: " + c.getStyle().getMargin(Component.BOTTOM)
-                                 + " Left: " + c.getStyle().getMargin(Component.LEFT) + " Right: " + c.getStyle().getMargin(Component.RIGHT));
-                        if(c instanceof com.codename1.ui.Container) {
-                            layout.setText(((com.codename1.ui.Container)c).getLayout().getClass().getSimpleName());
-                        } else {
-                            layout.setText("");
-                        }
-                        com.codename1.ui.Container parent = c.getParent();
-                        constraint.setText("");
-                        if(parent != null) {
-                            Object o = parent.getLayout().getComponentConstraint(c);
-                            if(o != null) {
-                                constraint.setText(o.toString());
-                            }
-                        } 
+                        setCurrentComponent(c);
                     } else {
                         if(parentForm.getGlassPane() != null && 
                             parentForm.getGlassPane() instanceof SelectedComponentGlassPane) {
@@ -781,7 +779,38 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         componentTree.scrollPathToVisible(path);
         
     }
-    
 
+    public void setCurrentComponent(Component c) {
+        currentComponent = c;
+        propertyDetailsPanel.setCurrentComponent(c);
+        componentClass.setText(c.getClass().getName());
+        componentName.setText("" + c.getName());
+        componentUIID.setText("" + c.getUIID());
+        componentSelected.setSelected(c.hasFocus());
+        coordinates.setText("x: " + c.getX() + " y: " + c.getY() + " absX: " + c.getAbsoluteX()+ " absY: " + c.getAbsoluteY() +
+                " Width: " + c.getWidth() + " Height: " + c.getHeight());
+        preferredSize.setText(c.getPreferredW() + ", " + c.getPreferredH());
+        padding.setText("Top: " + c.getStyle().getPadding(Component.TOP) + " Bottom: " + c.getStyle().getPadding(Component.BOTTOM)
+                + " Left: " + c.getStyle().getPadding(Component.LEFT) + " Right: " + c.getStyle().getPadding(Component.RIGHT));
+        margin.setText("Top: " + c.getStyle().getMargin(Component.TOP) + " Bottom: " + c.getStyle().getMargin(Component.BOTTOM)
+                + " Left: " + c.getStyle().getMargin(Component.LEFT) + " Right: " + c.getStyle().getMargin(Component.RIGHT));
+        if(c instanceof com.codename1.ui.Container) {
+            layout.setText(((com.codename1.ui.Container)c).getLayout().getClass().getSimpleName());
+        } else {
+            layout.setText("");
+        }
+        com.codename1.ui.Container parent = c.getParent();
+        constraint.setText("");
+        if(parent != null) {
+            Object o = parent.getLayout().getComponentConstraint(c);
+            if(o != null) {
+                constraint.setText(o.toString());
+            }
+        }
+    }
+
+    public PropertyDetailsPanel getPropertyDetailsPanel() {
+        return propertyDetailsPanel;
+    }
 
 }
