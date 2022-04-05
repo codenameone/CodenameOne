@@ -703,6 +703,8 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         }
     }// </editor-fold>
 
+
+
     public class RefreshAction extends AbstractAction {
 
         RefreshAction() {
@@ -811,6 +813,10 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
 
     public PropertyDetailsPanel getPropertyDetailsPanel() {
         return propertyDetailsPanel;
+    }
+
+    public Component getCurrentComponent() {
+        return currentComponent;
     }
 
 }

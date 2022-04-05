@@ -57,6 +57,9 @@ public class MavenUtils {
                 }
             }
         }
+        if (javac.exists()) {
+            return javac;
+        }
         return null;
     }
     

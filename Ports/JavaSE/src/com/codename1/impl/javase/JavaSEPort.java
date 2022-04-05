@@ -2805,6 +2805,146 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
 
+    public class OpenJavadocsAction extends AbstractAction implements AppFrame.UpdatableUI {
+        public OpenJavadocsAction() {
+            super("", SwingUtils.getImageIcon(JavaSEPort.class.getResource("baseline_help_center_black_24dp.png"), ICON_SIZE, ICON_SIZE));
+            putValue(SHORT_DESCRIPTION, "Open JavaDocs");
+            update();
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            Component currentComponent = componentTreeInspector.getCurrentComponent();
+            if (currentComponent == null) return;
+            Class componentClass = currentComponent.getClass();
+            while (componentClass != null) {
+                File jarFile = locateJar(componentClass);
+                if (jarFile != null && jarFile.exists() && jarFile.getName().endsWith(".jar")) {
+                    File javadocsJar = new File(jarFile.getParentFile(), jarFile.getName());
+                    if (!javadocsJar.getName().endsWith("-javadoc.jar")) {
+                        String jnameBase = javadocsJar.getName().substring(0, javadocsJar.getName().lastIndexOf(".jar"));
+
+                        javadocsJar = new File(javadocsJar.getParentFile(), jnameBase+"-javadoc.jar");
+
+                    }
+                    if (javadocsJar.exists()) {
+                        File extractedDir = extractJar(javadocsJar);
+                        File htmlFile = new File(extractedDir, getJavadocPath(componentClass));
+                        if (htmlFile.exists()) {
+                            if (openHtmlFile(htmlFile)) {
+                                return;
+                            }
+                        }
+
+                    }
+                }
+                componentClass = componentClass.getSuperclass();
+            }
+
+            JOptionPane.showMessageDialog(window, "No javadocs found for this component.");
+        }
+
+        protected void update() {
+
+
+        }
+
+        private boolean openHtmlFile(File file) {
+            if (Desktop.isDesktopSupported()) {
+                Desktop desktop = Desktop.getDesktop();
+                try {
+                    desktop.browse(file.toURI());
+                    return true;
+                } catch (Exception ex) {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        private File locateJar(Class clazz) {
+            try {
+
+                String uri = clazz.getResource("/"+getClassPathPathWithUnixSlash(clazz)).toURI().toString();
+                if (uri.startsWith("jar:")) {
+                    uri = uri.substring(4);
+                }
+                if (uri.contains("!")) {
+                    uri = uri.substring(0, uri.indexOf("!"));
+                }
+                return new File(new URI(uri));
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+        private File extractJar(File jarFile) {
+            File extractedDir = new File(jarFile.getParentFile(), jarFile.getName()+"-extracted");
+            if (extractedDir.exists()) {
+                return extractedDir;
+            }
+
+            extractedDir.mkdir();
+            ProcessBuilder pb = new ProcessBuilder(findJarToolPath(), "xf", jarFile.getAbsolutePath());
+            pb.directory(extractedDir);
+            try {
+                if (pb.start().waitFor() == 0) {
+                    return extractedDir;
+                } else {
+                    extractedDir.delete();
+                    return null;
+                }
+            } catch (Exception ex) {
+                extractedDir.delete();
+                return null;
+            }
+
+        }
+
+        private String findJarToolPath() {
+            if (MavenUtils.isRunningInJDK()) {
+                File javac = MavenUtils.findJavac();
+                if (javac.exists()) {
+                    File jar = new File(javac.getParentFile(), "jar");
+                    if (!jar.exists()) {
+                        jar = new File(javac.getParentFile(), "jar.exe");
+                    }
+                    if (jar.exists()) {
+                        return jar.getAbsolutePath();
+                    }
+                }
+            }
+            String javaHome = System.getProperty("java.home");
+            if (javaHome != null) {
+                File fJavaHome = new File(javaHome);
+                if (fJavaHome.exists()) {
+                    File binDir = new File(fJavaHome, "bin");
+                    File jar = new File(binDir, "jar");
+                    if (jar.exists()) {
+                        return jar.getAbsolutePath();
+                    }
+                    jar = new File(binDir, "jar.exe");
+                    if (jar.exists()) {
+                        return jar.getAbsolutePath();
+                    }
+                }
+            }
+            return "jar";
+        }
+
+        private String getClassPathPathWithUnixSlash(Class cls) {
+            return cls.getName().replace(".", "/")+".class";
+        }
+
+        private String getJavadocPath(Class cls) {
+            return cls.getName().replace(".", File.separator) + ".html";
+        }
+
+        @Override
+        public void onUpdateAppFrameUI(AppFrame frame) {
+
+        }
+    }
+
     public class ZoomAction extends AbstractAction implements AppFrame.UpdatableUI {
 
         private final boolean scrollableSkinValue;
@@ -5277,6 +5417,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             AppPanel propertiesPanel = new AppPanel("Properties", "Properties", componentTreeInspector.getPropertyDetailsPanel());
             propertiesPanel.setPreferredFrame(AppFrame.FrameLocation.RightPanel);
             propertiesPanel.setScrollable(false, false);
+            propertiesPanel.addAction(new JavaSEPort.OpenJavadocsAction());
             appFrame.add(propertiesPanel);
             appFrame.add(detailsPanel);
             appFrame.add(canvasPanel);
