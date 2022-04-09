@@ -612,6 +612,9 @@ public class SQLMap {
         createStatement.append(tableName);
 
         if(where != null && where.length() > 0) {
+            if(!where.toUpperCase().startsWith(" WHERE ")) {
+                createStatement.append(" WHERE ");
+            }
             createStatement.append(where);
         }
         
