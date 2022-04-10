@@ -572,13 +572,14 @@ public class SQLMap {
         ArrayList<Object> params = new ArrayList<Object>();
 
         StringBuilder createStatement = new StringBuilder();
-        createStatement.append(" WHERE ");
         boolean found = false;
         for(PropertyBase p : cmp.getPropertyIndex()) {
             if(p instanceof Property) {
                 if(((Property)p).get() != null) {
                     if(found) {
                         createStatement.append(" AND ");
+                    } else {
+                        createStatement.append(" WHERE ");
                     }
                     found = true;
                     params.add(((Property)p).get());
@@ -748,7 +749,6 @@ public class SQLMap {
             }
 
             StringBuilder createStatement = new StringBuilder();
-            createStatement.append(" WHERE ");
 
             boolean found = false;
             List<Object> paramList = new ArrayList<Object>();
@@ -759,6 +759,8 @@ public class SQLMap {
                 if(sb.property != null) {
                     if (found) {
                         createStatement.append(" AND ");
+                    } else {
+                        createStatement.append(" WHERE ");
                     }
                     found = true;
                     String columnName = getColumnNameImpl(sb.property);
