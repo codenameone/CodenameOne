@@ -23,6 +23,7 @@
 package com.codename1.util;
 
 
+import com.codename1.annotations.Async;
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.util.promise.Promise;
@@ -54,6 +55,11 @@ public class AsyncResource<V> extends Observable  {
     private final Object lock = new Object();
     
 
+    @Async.Schedule
+    public AsyncResource() {
+        
+    }
+    
     /**
      * Cancels loading the resource.
      * @param mayInterruptIfRunning
@@ -421,6 +427,7 @@ public class AsyncResource<V> extends Observable  {
      * Sets the resource value.  This will trigger the ready callbacks to be run.
      * @param value The value to set for the resource.
      */
+    @Async.Execute
     public void complete(final V value) {
         SuccessCallback cb = null;
         synchronized(lock) {
@@ -443,6 +450,7 @@ public class AsyncResource<V> extends Observable  {
      * the error callbacks.
      * @param t 
      */
+    @Async.Execute
     public void error(Throwable t) {
         SuccessCallback cb = null;
         synchronized(lock) {
