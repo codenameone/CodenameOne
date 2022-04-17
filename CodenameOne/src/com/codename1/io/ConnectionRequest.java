@@ -1191,8 +1191,13 @@ public class ConnectionRequest implements IOProgressListener {
                 domain = domain.substring(0, index);
             }
 
+            // Fix for https://github.com/codenameone/CodenameOne/issues/3565
+            if(domain.startsWith(".")) {
+                domain = domain.substring(1);
+            }
+
             if (url.indexOf(domain) < 0) { //if (!hc.getHost().endsWith(domain)) {
-                System.out.println("Warning: Cookie tried to set to another domain");
+                Log.p("Warning: Cookie tried to set to another domain");
                 c.setDomain(Util.getImplementation().getURLDomain(url));
             } else {
                 c.setDomain(domain);
