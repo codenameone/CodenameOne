@@ -30,6 +30,7 @@ import com.codename1.push.PushCallback;
 import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import java.awt.BorderLayout;
 import java.awt.Desktop;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -42,8 +43,10 @@ import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.prefs.Preferences;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -308,8 +311,21 @@ public class Executor {
                             }
                             
                             if (!MavenUtils.isRunningInJDK() && System.getProperty("cn1.jdk.warning", null) == null) {
-                                System.getProperty("cn1.jdk.warning", "true");
-                                JOptionPane.showMessageDialog(null, new JLabel("<html><p style='width:400px'>You are currently running inside Java Runtime environment that does not include development tools.  Some features, such as hot-reload require a full JDK and will be disabled.  \n\nPlease change your JAVA_HOME to be a full JDK.\n\n Your current JAVA_HOME is "+System.getProperty("java.home")+"</p></html>"));
+                                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                                boolean showJDKWarning = pref.getBoolean("showJDKWarning", true);
+                                if(showJDKWarning) {
+                                    System.getProperty("cn1.jdk.warning", "true");
+                                    JLabel message =
+                                            new JLabel("<html><p style='width:400px'>You are currently running inside Java Runtime environment that does not include development tools.  Some features, such as hot-reload require a full JDK and will be disabled.  \n\nPlease change your JAVA_HOME to be a full JDK.\n\n Your current JAVA_HOME is " + System.getProperty("java.home") + "</p></html>");
+                                    JPanel panel = new JPanel(new BorderLayout());
+                                    panel.add(message, BorderLayout.CENTER);
+                                    JCheckBox dontShowAgain = new JCheckBox("Don't Show this Again");
+                                    panel.add(dontShowAgain, BorderLayout.SOUTH);
+                                    JOptionPane.showMessageDialog(null, panel);
+                                    if (dontShowAgain.isSelected()) {
+                                        pref.putBoolean("showJDKWarning", false);
+                                    }
+                                }
                             }
                             
                             Display.getInstance().callSerially(new Runnable() {
