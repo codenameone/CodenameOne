@@ -1600,7 +1600,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 } else {
                     if (root instanceof Container) {
                         Container cnt = (Container)root;
-                        for (Component child : cnt) {
+                        for (int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                            Component child = cnt.getComponentAt(iter);
                             resultsImpl(results, child);
                         }
                     }
@@ -1617,7 +1618,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         }
         if (root instanceof Container) {
             Container cnt = (Container)root;
-            for (Component child : cnt) {
+            for (int iter = 0 ; iter < cnt.getComponentCount() ; iter++) {
+                Component child = cnt.getComponentAt(iter);
                 resultsImpl(out, child);
             }
         }
