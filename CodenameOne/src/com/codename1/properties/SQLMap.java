@@ -33,6 +33,7 @@ import com.codename1.util.Base64;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
@@ -297,13 +298,17 @@ public class SQLMap {
      * @return the name of the property
      */
     public String getColumnName(PropertyBase prop) {
+        return getColumnNameImpl(prop);
+    }
+
+    private static String getColumnNameImpl(PropertyBase prop) {
         String val = (String)prop.getClientProperty("cn1$sqlColumn");
         if(val == null) {
             return prop.getName();
         }
         return val;
     }
-    
+
     /**
      * Creates a table matching the given property component if one doesn't exist yet
      * @param cmp the business object
@@ -557,26 +562,24 @@ public class SQLMap {
      * Fetches the components from the database matching the given cmp description, the fields that aren't
      * null within the cmp will match the where clause
      * @param not indicates if the query should be a "not" query
-     * @param cmp the component to match
      * @param orderBy the column to order by, can be null to ignore order
      * @param ascending true to indicate ascending order
      * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
      * @param page  the page within the query to match the max elements value
-     * @return the result of the query 
+     * @return the result of the query
      */
     private java.util.List<PropertyBusinessObject> selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
-        String tableName = getTableName(cmp);
-        StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
-        createStatement.append(tableName);
         ArrayList<Object> params = new ArrayList<Object>();
-        
-        createStatement.append(" WHERE ");
+
+        StringBuilder createStatement = new StringBuilder();
         boolean found = false;
         for(PropertyBase p : cmp.getPropertyIndex()) {
             if(p instanceof Property) {
                 if(((Property)p).get() != null) {
                     if(found) {
                         createStatement.append(" AND ");
+                    } else {
+                        createStatement.append(" WHERE ");
                     }
                     found = true;
                     params.add(((Property)p).get());
@@ -589,11 +592,31 @@ public class SQLMap {
                 }
             }
         }
+        return selectImpl(cmp, createStatement.toString(), cmp.getClass(), params.toArray(), orderBy, ascending, maxElements, page);
+    }
 
-        // all properties are null undo the where append
-        if(!found) {
-            createStatement = new StringBuilder("SELECT * FROM ");
-            createStatement.append(tableName);
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will match the where clause
+     * @param where the where statement
+     * @param propertyClass the class of the property business object
+     * @param params the parameters to use in the where statement
+     * @param orderBy the column to order by, can be null to ignore order
+     * @param ascending true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page  the page within the query to match the max elements value
+     * @return the result of the query 
+     */
+    private java.util.List<PropertyBusinessObject> selectImpl(PropertyBusinessObject cmp, String where, Class propertyClass, Object[] params, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+        String tableName = getTableName(cmp);
+        StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
+        createStatement.append(tableName);
+
+        if(where != null && where.length() > 0) {
+            if(!where.toUpperCase().startsWith(" WHERE ")) {
+                createStatement.append(" WHERE ");
+            }
+            createStatement.append(where);
         }
         
         if(orderBy != null) {
@@ -616,9 +639,9 @@ public class SQLMap {
         Cursor c = null;
         try {
             ArrayList<PropertyBusinessObject> response = new ArrayList<PropertyBusinessObject>();
-            c = executeQuery(createStatement.toString(), params.toArray());
+            c = executeQuery(createStatement.toString(), params);
             while(c.next()) {
-                PropertyBusinessObject pb = (PropertyBusinessObject)cmp.getClass().newInstance();
+                PropertyBusinessObject pb = (PropertyBusinessObject)propertyClass.newInstance();
                 for(PropertyBase p : pb.getPropertyIndex()) {
                     Row currentRow = c.getRow();
                     SqlType t = getSqlType(p);
@@ -646,7 +669,129 @@ public class SQLMap {
             }
         }
     }
-    
+
+    /**
+     * Used to build the where statement as a builder pattern
+     */
+    public class SelectBuilder {
+        private final PropertyBase property;
+        private final String operator;
+        private final String prefix;
+        private final String suffix;
+        private final SelectBuilder parent;
+        private SelectBuilder child;
+
+        private SelectBuilder() {
+            this(null, null, null, null, null);
+        }
+
+        private SelectBuilder(PropertyBase property, String operator, String prefix, String suffix, SelectBuilder parent) {
+            this.property = property;
+            this.operator = operator;
+            this.prefix = prefix;
+            this.suffix = suffix;
+            this.parent = parent;
+            parent.child = this;
+        }
+
+        /**
+         * An orderBy clause
+         * @param property the property
+         * @param ascending direction of the order by
+         * @return the builder instance
+         */
+        public SelectBuilder orderBy(PropertyBase property, boolean ascending) {
+            return new SelectBuilder(property, null, " ORDER BY ", ascending ? "ASC" : "DESC", this);
+        }
+
+        /**
+         * An equals `=` operator
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder equals(PropertyBase property) {
+            return new SelectBuilder(property, " = ",  null, null, this);
+        }
+
+        /**
+         * A not equals `<>` operator
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder notEquals(PropertyBase property) {
+            return new SelectBuilder(property, " <> ",  null, null, this);
+        }
+
+        /**
+         * A greater that `&gt;` operator
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder gt(PropertyBase property) {
+            return new SelectBuilder(property, " > ",  null, null, this);
+        }
+
+        /**
+         * A lesser than `&lt;` operator
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder lt(PropertyBase property) {
+            return new SelectBuilder(property, " < ",  null, null, this);
+        }
+
+        public java.util.List<PropertyBusinessObject> build(PropertyBusinessObject obj, int maxElements, int page) throws IOException, InstantiationException {
+            ArrayList<Object> params = new ArrayList<Object>();
+
+            SelectBuilder root = this;
+            while(root.parent.property != null) {
+                root = root.parent;
+            }
+
+            StringBuilder createStatement = new StringBuilder();
+
+            boolean found = false;
+            List<Object> paramList = new ArrayList<Object>();
+            for(SelectBuilder sb = root ; sb != null ; sb = sb.child) {
+                if(sb.prefix != null) {
+                    createStatement.append(sb.prefix);
+                }
+                if(sb.property != null) {
+                    if (found) {
+                        createStatement.append(" AND ");
+                    } else {
+                        createStatement.append(" WHERE ");
+                    }
+                    found = true;
+                    String columnName = getColumnNameImpl(sb.property);
+                    createStatement.append(columnName);
+                    createStatement.append(operator);
+                    createStatement.append(" ? ");
+                    paramList.add(obj.getPropertyIndex().get(sb.property.getName()).get());
+                }
+                if(sb.suffix != null) {
+                    createStatement.append(sb.suffix);
+                }
+            }
+
+            return selectImpl(obj, createStatement.toString(), obj.getClass(), params.toArray(),
+                    null, false, maxElements, page);
+        }
+
+        SelectBuilder seed() {
+            return new SelectBuilder(null, null, null, null, null);
+        }
+    }
+
+    /**
+     * Fetches the components from the database matching the given select builder query
+     * @return the result of the query
+     */
+    public SelectBuilder selectBuild() {
+        return new SelectBuilder().seed();
+    }
+
+
     /**
      * Toggle verbose mode 
      * @param verbose 

@@ -23,6 +23,7 @@
 package com.codename1.util.promise;
 
 
+import com.codename1.annotations.Async;
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
@@ -100,6 +101,7 @@ public class Promise<T> {
      * or {@literal reject} functor to mark success or failure.
      * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise">MDN documentation for Promise</a>
      */
+    @Async.Schedule
     public Promise(ExecutorFunction executor) {
         resolve = new Functor<T, Object>() {
             public Object call(final T o) {
@@ -150,6 +152,7 @@ public class Promise<T> {
      * @param resolved Whether the promise was resolved.  If {@literal true}, it will call the resolve
      * handler.  If {@literal false}, it will call the reject handler.
      */
+    @Async.Execute
     private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {
             CN.callSerially(new Runnable() {

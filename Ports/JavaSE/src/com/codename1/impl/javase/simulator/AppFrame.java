@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase.simulator;
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.util.SwingUtils;
 
 import java.awt.*;
@@ -19,6 +20,7 @@ import java.util.logging.Logger;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 import javax.swing.*;
+import javax.swing.border.Border;
 
 /**
  *
@@ -96,6 +98,7 @@ public class AppFrame extends JPanel {
         private void show() {
             if (window == null) {
                 window = new JFrame(panel.getLabel());
+                window.setAlwaysOnTop(panel.isPreferredAlwaysOnTop());
                 window.getContentPane().setLayout(new BorderLayout());
 
                 //window.setPreferredSize(new Dimension(panel.getPreferredSize()));
@@ -104,6 +107,45 @@ public class AppFrame extends JPanel {
                     parent.remove(panel);
                 }
                 window.getContentPane().add(panel, BorderLayout.CENTER);
+                window.addComponentListener(new ComponentAdapter() {
+                    @Override
+                    public void componentResized(ComponentEvent e) {
+                        JComponent contentPane = (JComponent) window.getContentPane();
+                        panel.setSize(new Dimension(contentPane.getSize()));
+
+
+                        int paddingV = 0;
+                        int paddingH = 0;
+                        Border border = contentPane.getBorder();
+                        if (border != null) {
+                            Insets insets = border.getBorderInsets(contentPane);
+                            paddingV += insets.top + insets.bottom;
+                            paddingH += insets.left + insets.right;
+                        }
+
+
+                        BorderLayout contentPaneLayout = (BorderLayout)contentPane.getLayout();
+                        Component east = contentPaneLayout.getLayoutComponent(BorderLayout.EAST);
+                        Component west = contentPaneLayout.getLayoutComponent(BorderLayout.WEST);
+                        Component north = contentPaneLayout.getLayoutComponent(BorderLayout.NORTH);
+                        Component south = contentPaneLayout.getLayoutComponent(BorderLayout.SOUTH);
+                        if (east != null) {
+                            paddingH += east.getWidth() + contentPaneLayout.getHgap();
+                        }
+                        if (west != null) {
+                            paddingH += west.getWidth() + contentPaneLayout.getHgap();
+                        }
+                        if (north != null) {
+                            paddingV += north.getHeight() + contentPaneLayout.getVgap();
+                        }
+                        if (south != null) {
+                            paddingV += south.getHeight() + contentPaneLayout.getVgap();
+                        }
+                        panel.setSize(panel.getSize().width-paddingH, panel.getSize().height - paddingV);
+
+                        panel.revalidate();
+                    }
+                });
                 //window.setSize(new Dimension(window.getPreferredSize()));
                 //window.setLocationByPlatform(true);
                 window.setBounds(panel.getPreferredWindowBounds());
@@ -131,6 +173,7 @@ public class AppFrame extends JPanel {
                         }
                     }
                 });
+                decoratePanelWindow(panel, window);
                 fitWindowOntoScreen();
 
             }
@@ -144,7 +187,10 @@ public class AppFrame extends JPanel {
             }
         }
     }
-    
+
+    protected void decoratePanelWindow(AppPanel panel, Window window) {
+
+    }
     
     public AppFrame(String name) {
         setLayout(new BorderLayout());
@@ -172,12 +218,15 @@ public class AppFrame extends JPanel {
         initPanels(topPanel, leftPanel, centerPanel, rightPanel, bottomPanel);
         
         innerSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(innerSplit);
         innerSplit.setName("innerSplit");
         setDividerLocationIfChanged(innerSplit, 600);
         outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(outerSplit);
         outerSplit.setName("outerSplit");
         setDividerLocationIfChanged(outerSplit, 0);
         centerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        JavaSEPort.instance.registerSplitPaneWithBlit(centerSplit);
         centerSplit.setName("centerSplit");
         setDividerLocationIfChanged(centerSplit, 600);
         outerSplit.setLeftComponent(leftPanel);
@@ -603,6 +652,8 @@ public class AppFrame extends JPanel {
     public static interface UpdatableUI {
         public void onUpdateAppFrameUI(AppFrame frame);
     }
+
+
 
 
 }

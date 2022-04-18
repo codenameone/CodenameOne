@@ -5,6 +5,8 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.simulator.PropertyDetailsPanel;
+import com.codename1.impl.javase.simulator.SelectableAction;
 import com.codename1.impl.javase.util.SwingUtils;
 import javax.swing.*;
 
@@ -31,6 +33,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EventObject;
 import java.util.List;
 import java.util.Objects;
@@ -51,7 +54,17 @@ import javax.swing.tree.TreePath;
 public class ComponentTreeInspector extends JPanel {
     private List<String> themePaths = new ArrayList<String>();
     private List<String> themeNames = new ArrayList<String>();
+    private boolean simulatorRightClickEnabled = true;
     private JFrame frame;
+    private PropertyDetailsPanel propertyDetailsPanel;
+
+    public boolean isSimulatorRightClickEnabled() {
+        return simulatorRightClickEnabled;
+    }
+
+    public void setSimulatorRightClickEnabled(boolean simulatorRightClickEnabled) {
+        this.simulatorRightClickEnabled = simulatorRightClickEnabled;
+    }
 
     class SelectedComponentGlassPane implements Painter {
         Component cmp;
@@ -81,6 +94,8 @@ public class ComponentTreeInspector extends JPanel {
             frame.setLocationByPlatform(true);
             
         }
+        refreshComponentTree();
+        loadThemes();
         frame.setVisible(true);
         return frame;
     }
@@ -104,33 +119,11 @@ public class ComponentTreeInspector extends JPanel {
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
         setLayout(new BorderLayout());
+        propertyDetailsPanel = new PropertyDetailsPanel();
         initComponents();
-        
-        File[] resFiles = new File("src").listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.getName().endsWith(".res");
-            }
-        });
-        themes.removeAllItems();
-        if (resFiles != null) {
-            for(File r : resFiles) {
-                try {
-                    Resources rr = Resources.open("/" + r.getName());
-                    for(String themeName : rr.getThemeResourceNames()) {
-                        themes.addItem(r.getName() + " - " + themeName);
-                        themePaths.add(r.getAbsolutePath());
-                        themeNames.add(themeName);
-                    }
-                } catch(IOException err) {
-                    err.printStackTrace();
-                }
-            }
-        }
 
-        
+        themes.removeAllItems();
         refreshComponentTree();
-        
         componentUIID.getDocument().addDocumentListener(new DocumentListener() {
 
             @Override
@@ -181,6 +174,25 @@ public class ComponentTreeInspector extends JPanel {
             
         });
         contextMenu.add(printComponent);
+
+        //if (currentComponent instanceof Container) {
+            JMenuItem revalidate = new JMenuItem("Revalidate");
+            revalidate.addActionListener(new java.awt.event.ActionListener() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent evt) {
+                    com.codename1.ui.CN.callSerially(new Runnable() {
+                        public void run() {
+                            if (currentComponent instanceof Container) {
+                                ((Container)currentComponent).revalidate();
+                            }
+                        }
+                    });
+
+                }
+
+            });
+            contextMenu.add(revalidate);
+        //}
         
         componentTree.addMouseListener(new MouseAdapter() {
             @Override
@@ -229,31 +241,7 @@ public class ComponentTreeInspector extends JPanel {
                                 }
                             }
                         }
-                        currentComponent = c;
-                        componentClass.setText(c.getClass().getName());
-                        componentName.setText("" + c.getName());
-                        componentUIID.setText("" + c.getUIID());
-                        componentSelected.setSelected(c.hasFocus());
-                        coordinates.setText("x: " + c.getX() + " y: " + c.getY() + " absX: " + c.getAbsoluteX()+ " absY: " + c.getAbsoluteY() + 
-                                " Width: " + c.getWidth() + " Height: " + c.getHeight());
-                        preferredSize.setText(c.getPreferredW() + ", " + c.getPreferredH());
-                        padding.setText("Top: " + c.getStyle().getPadding(Component.TOP) + " Bottom: " + c.getStyle().getPadding(Component.BOTTOM)
-                                 + " Left: " + c.getStyle().getPadding(Component.LEFT) + " Right: " + c.getStyle().getPadding(Component.RIGHT));
-                        margin.setText("Top: " + c.getStyle().getMargin(Component.TOP) + " Bottom: " + c.getStyle().getMargin(Component.BOTTOM)
-                                 + " Left: " + c.getStyle().getMargin(Component.LEFT) + " Right: " + c.getStyle().getMargin(Component.RIGHT));
-                        if(c instanceof com.codename1.ui.Container) {
-                            layout.setText(((com.codename1.ui.Container)c).getLayout().getClass().getSimpleName());
-                        } else {
-                            layout.setText("");
-                        }
-                        com.codename1.ui.Container parent = c.getParent();
-                        constraint.setText("");
-                        if(parent != null) {
-                            Object o = parent.getLayout().getComponentConstraint(c);
-                            if(o != null) {
-                                constraint.setText(o.toString());
-                            }
-                        } 
+                        setCurrentComponent(c);
                     } else {
                         if(parentForm.getGlassPane() != null && 
                             parentForm.getGlassPane() instanceof SelectedComponentGlassPane) {
@@ -269,12 +257,45 @@ public class ComponentTreeInspector extends JPanel {
         //setLocationByPlatform(true);
         //setVisible(true);
     }
+    
+    private void loadThemes() {
+        if (!Display.isInitialized()) return;
+        java.util.List<File> resFiles = new ArrayList<File>();
+        
+        File[] tmpFiles = JavaSEPort.instance.getSourceResourcesDir().listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.getName().endsWith(".res");
+            }
+        });
+        if (tmpFiles != null) {
+            resFiles.addAll(Arrays.asList(tmpFiles));
+        }
+        themes.removeAllItems();
+        themePaths.clear();
+        themeNames.clear();
+        
+        for(File r : resFiles) {
+            try {
+                Resources rr = Resources.open("/" + r.getName());
+                for(String themeName : rr.getThemeResourceNames()) {
+                    themes.addItem(r.getName() + " - " + themeName);
+                    themePaths.add(r.getAbsolutePath());
+                    themeNames.add(themeName);
+                }
+            } catch(IOException err) {
+                err.printStackTrace();
+            }
+        }
+        
+    }
 
     private void refreshComponentTree() {
         TreePath tp = componentTree.getSelectionPath();
         ComponentTreeModel cm = new ComponentTreeModel(Display.getInstance().getCurrent());
         componentTree.setModel(cm);
         componentTree.setSelectionPath(tp);
+        
     }
     
     /** This method is called from within the constructor to
@@ -468,6 +489,7 @@ public class ComponentTreeInspector extends JPanel {
 
 private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshTreeActionPerformed
     refreshComponentTree();
+    loadThemes();
 }//GEN-LAST:event_refreshTreeActionPerformed
 
     private void unselectedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unselectedActionPerformed
@@ -681,10 +703,12 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         }
     }// </editor-fold>
 
+
+
     public class RefreshAction extends AbstractAction {
 
         RefreshAction() {
-            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("refresh.png"), 16, 16));
+            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("refresh.png"), 24, 24));
             setToolTipText("Refresh comonent tree");
         }
 
@@ -693,14 +717,16 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         @Override
         public void actionPerformed(ActionEvent e) {
             ComponentTreeInspector.this.refreshComponentTree();
+            loadThemes();
         }
     }
 
     public class ValidateAction extends AbstractAction {
 
         ValidateAction() {
-            super("Validate");
-            setToolTipText("Validate component tree and report problems.");
+            super("", SwingUtils.getImageIcon(ComponentTreeInspector.class.getResource("baseline_rule_black_24dp.png"), 24, 24));
+            putValue(SHORT_DESCRIPTION, "Validate component tree and report problems.");
+
             
         }
 
@@ -711,6 +737,86 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
             ComponentTreeInspector.this.validateActionPerformed(e);
         }
     }
+    
+    private ImageIcon getToggleInspectSimulatorIcon() {
+        if (simulatorRightClickEnabled) {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("arrow_24_black.png"), 24, 24);
+        } else {
+            return SwingUtils.getImageIcon(JavaSEPort.class.getResource("arrow_24_disabled.png"), 24, 24);
+        }
+    }
 
+    public class ToggleInspectSimulatorAction extends AbstractAction {
+
+        ToggleInspectSimulatorAction() {
+            super("", getToggleInspectSimulatorIcon());
+
+            //putValue(SELECTED_KEY, simulatorRightClickEnabled);
+            setShortDescription();
+        }
+
+        private void setShortDescription() {
+            if (simulatorRightClickEnabled) {
+                putValue(SHORT_DESCRIPTION, "'Right-click' in simulator to inspect elements is currently enabled.  Click to disable.");
+            } else {
+                putValue(SHORT_DESCRIPTION, "Enable 'Right-click' in simulator to inspect elements");
+            }
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            simulatorRightClickEnabled = !simulatorRightClickEnabled;
+            //putValue(SELECTED_KEY, simulatorRightClickEnabled);
+            putValue(SMALL_ICON, getToggleInspectSimulatorIcon());
+            putValue(LARGE_ICON_KEY, getToggleInspectSimulatorIcon());
+            setShortDescription();
+        }
+    }
+    
+    public void inspectComponent(com.codename1.ui.Component cmp) {
+        ComponentTreeInspector.this.refreshComponentTree();
+        loadThemes();
+        TreePath path = ((ComponentTreeModel)componentTree.getModel()).createPathToComponent(cmp);
+        componentTree.setSelectionPath(path);
+        componentTree.scrollPathToVisible(path);
+        
+    }
+
+    public void setCurrentComponent(Component c) {
+        currentComponent = c;
+        propertyDetailsPanel.setCurrentComponent(c);
+        componentClass.setText(c.getClass().getName());
+        componentName.setText("" + c.getName());
+        componentUIID.setText("" + c.getUIID());
+        componentSelected.setSelected(c.hasFocus());
+        coordinates.setText("x: " + c.getX() + " y: " + c.getY() + " absX: " + c.getAbsoluteX()+ " absY: " + c.getAbsoluteY() +
+                " Width: " + c.getWidth() + " Height: " + c.getHeight());
+        preferredSize.setText(c.getPreferredW() + ", " + c.getPreferredH());
+        padding.setText("Top: " + c.getStyle().getPadding(Component.TOP) + " Bottom: " + c.getStyle().getPadding(Component.BOTTOM)
+                + " Left: " + c.getStyle().getPadding(Component.LEFT) + " Right: " + c.getStyle().getPadding(Component.RIGHT));
+        margin.setText("Top: " + c.getStyle().getMargin(Component.TOP) + " Bottom: " + c.getStyle().getMargin(Component.BOTTOM)
+                + " Left: " + c.getStyle().getMargin(Component.LEFT) + " Right: " + c.getStyle().getMargin(Component.RIGHT));
+        if(c instanceof com.codename1.ui.Container) {
+            layout.setText(((com.codename1.ui.Container)c).getLayout().getClass().getSimpleName());
+        } else {
+            layout.setText("");
+        }
+        com.codename1.ui.Container parent = c.getParent();
+        constraint.setText("");
+        if(parent != null) {
+            Object o = parent.getLayout().getComponentConstraint(c);
+            if(o != null) {
+                constraint.setText(o.toString());
+            }
+        }
+    }
+
+    public PropertyDetailsPanel getPropertyDetailsPanel() {
+        return propertyDetailsPanel;
+    }
+
+    public Component getCurrentComponent() {
+        return currentComponent;
+    }
 
 }

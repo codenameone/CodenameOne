@@ -3284,6 +3284,7 @@ void cn1_addSelectedImagePath(NSString* path) {
                         return;
                     }
 
+//$$ DISABLE_IMAGE_ROTATION_FIX_START
 #ifndef LOW_MEM_CAMERA
                     if (image.imageOrientation != UIImageOrientationUp) {
                         UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
@@ -3292,6 +3293,7 @@ void cn1_addSelectedImagePath(NSString* path) {
                         UIGraphicsEndImageContext();
                     }
 #endif
+//$$ DISABLE_IMAGE_ROTATION_FIX_END
 
                     NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
 

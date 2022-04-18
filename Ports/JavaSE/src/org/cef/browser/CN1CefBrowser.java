@@ -41,15 +41,7 @@ import java.awt.IllegalComponentStateException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.dnd.DropTarget;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
+import java.awt.event.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
@@ -58,10 +50,8 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import javax.imageio.ImageIO;
-import javax.swing.JPanel;
+import javax.swing.*;
 
-import javax.swing.MenuSelectionManager;
-import javax.swing.SwingUtilities;
 import org.cef.OS;
 import org.cef.handler.CefScreenInfo;
 
@@ -91,7 +81,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             CefRequestContext context, CN1CefBrowser parent, Point inspectAt) {
         super(client, url, context, parent, inspectAt);
         isTransparent_ = transparent;
-        //renderer_ = new CefRenderer(transparent);
         createComponent();
     }
     
@@ -115,7 +104,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
      */
     @Override
     public Component getUIComponent() {
-        //return canvas_;
         return component_;
     }
 
@@ -198,7 +186,9 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
                 }
                 browser_rect_.setBounds(x, y, w, h);
                 try {
-                    screenPoint_ = component_.getLocationOnScreen();
+                    Point p = new Point(0, 0);
+                    SwingUtilities.convertPointToScreen(p, component_);
+                    screenPoint_ = p;
                 } catch (IllegalComponentStateException ex) {
                     System.err.println("Failed to get location on screen:"+ex.getMessage());
                     screenPoint_ = new Point(0,0);
@@ -218,7 +208,19 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             
         });
         
-        
+        component_.addHierarchyListener(new HierarchyListener() {
+            @Override
+            public void hierarchyChanged(HierarchyEvent e) {
+                try {
+                    Point p = new Point(0, 0);
+                    SwingUtilities.convertPointToScreen(p, component_);
+                    screenPoint_ = p;
+                } catch (IllegalComponentStateException ex) {
+                    System.err.println("Failed to get location on screen:"+ex.getMessage());
+                    screenPoint_ = new Point(0,0);
+                }
+            }
+        });
         
         component_.addMouseListener(new MouseListener() {
             @Override

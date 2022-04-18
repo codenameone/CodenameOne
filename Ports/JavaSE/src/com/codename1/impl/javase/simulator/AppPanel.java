@@ -6,6 +6,7 @@
 package com.codename1.impl.javase.simulator;
 
 
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.util.SwingUtils;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -15,6 +16,9 @@ import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.prefs.Preferences;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 /**
  *
@@ -30,6 +34,7 @@ public class AppPanel extends JPanel {
     private AppFrame.FrameLocation preferredFrame;
     private AppFrame.FrameLocation preferredInternalFrame;
     private java.awt.Rectangle preferredWindowBounds;
+    private boolean preferredAlwaysOnTop;
     private JScrollPane scrollPane;
     private boolean scrollableX, scrollableY;
     private JButton popupMenu;
@@ -41,12 +46,14 @@ public class AppPanel extends JPanel {
     private JMenuItem moveToBottom = new JMenuItem("Bottom");
     private JMenuItem moveToCenter = new JMenuItem("Center");
     private JMenuItem moveToSeparateWindow = new JMenuItem("New Window");
+    private JMenuItem alwaysOnTop = new JCheckBoxMenuItem("Always on top");
 
     
     public AppPanel(String id, String label, JComponent content) {
         this.id = id;
         this.label = label;
         this.content = content;
+
         initAppPanelUI();
     }
     
@@ -105,7 +112,7 @@ public class AppPanel extends JPanel {
         add(north, BorderLayout.NORTH);
 
 
-        for (JMenuItem menuItem : new JMenuItem[]{moveToLeft, moveToRight, moveToBottom, moveToCenter, moveToSeparateWindow}) {
+        for (JMenuItem menuItem : new JMenuItem[]{moveToLeft, moveToRight, moveToBottom, moveToCenter, moveToSeparateWindow, alwaysOnTop}) {
             menuItem.addActionListener(new PanelListener());
         }
 
@@ -132,6 +139,18 @@ public class AppPanel extends JPanel {
             getAppFrame().moveTo(this, AppFrame.FrameLocation.CenterPanel);
         } else if (source == moveToSeparateWindow) {
             getAppFrame().moveTo(this, AppFrame.FrameLocation.SeparateWindow);
+        } else if (source == alwaysOnTop) {
+            if (getAppFrame() != null && getAppFrame().getPanelLocation(this) == AppFrame.FrameLocation.SeparateWindow) {
+                Container w = getTopLevelAncestor();
+                if (w instanceof JFrame) {
+                    JFrame f = (JFrame)w;
+                    preferredAlwaysOnTop = !preferredAlwaysOnTop;
+                    f.setAlwaysOnTop(preferredAlwaysOnTop);
+                    alwaysOnTop.setSelected(preferredAlwaysOnTop);
+                    getAppFrame().setShouldSavePreferences();
+                }
+            }
+
         }
     }
     
@@ -202,6 +221,14 @@ public class AppPanel extends JPanel {
         this.preferredInternalFrame = preferredInternalFrame;
     }
 
+    public boolean isPreferredAlwaysOnTop() {
+        return preferredAlwaysOnTop;
+    }
+
+    public void setPreferredAlwaysOnTop(boolean preferredAlwaysOnTop) {
+        this.preferredAlwaysOnTop = preferredAlwaysOnTop;
+    }
+
     private class PanelListener implements ActionListener {
 
         @Override
@@ -214,6 +241,8 @@ public class AppPanel extends JPanel {
     private JPopupMenu createPopupMenu() {
         JPopupMenu menu = new JPopupMenu();
 
+        // We need disable simulator blitting while the menu is opened
+        JavaSEPort.instance.registerMenuWithBlit(menu);
         moveTo.removeAll();
         AppFrame.FrameLocation currentLocation = getAppFrame().getPanelLocation(AppPanel.this);
 
@@ -234,6 +263,13 @@ public class AppPanel extends JPanel {
 
 
         menu.add(moveTo);
+
+        if (currentLocation == AppFrame.FrameLocation.SeparateWindow) {
+            menu.addSeparator();
+            menu.add(alwaysOnTop);
+            alwaysOnTop.setSelected(preferredAlwaysOnTop);
+
+        }
         return menu;
     }
 
@@ -241,12 +277,18 @@ public class AppPanel extends JPanel {
         return appFrame;
     }
 
+
     public void addAction(Action action) {
-        if (action instanceof SelectableAction) {
+        if (action instanceof SeparatorAction) {
+            leftToolBar.addSeparator();
+        } else if (action instanceof SelectableAction) {
             JToggleButton toggle = new JToggleButton(action);
             leftToolBar.add(toggle);
         } else {
-            leftToolBar.add(action);
+            JButton btn = leftToolBar.add(action);
+            if (action instanceof CompanionMenuAction) {
+                btn.setBorder(new EmptyBorder(5, 0, 5, 10));
+            }
         }
     }
 
@@ -273,6 +315,7 @@ public class AppPanel extends JPanel {
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.y", r.y);
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.width", r.width);
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.height", r.height);
+                prefs.putBoolean(getPreferencesPrefix(frame) + "preferredAlwaysOnTop", preferredAlwaysOnTop);
             }
         }
     }
@@ -289,6 +332,7 @@ public class AppPanel extends JPanel {
         preferredWindowBounds.y = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.y", preferredWindowBounds.y);
         preferredWindowBounds.width = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.width", preferredWindowBounds.width);
         preferredWindowBounds.height = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.height", preferredWindowBounds.height);
+        preferredAlwaysOnTop = prefs.getBoolean(getPreferencesPrefix(frame)+"preferredAlwaysOnTop", preferredAlwaysOnTop);
 
 
     }
