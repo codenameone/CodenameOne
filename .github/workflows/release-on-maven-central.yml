@@ -25,13 +25,13 @@ jobs:
         run: |
           cat $HOME/.m2/settings.xml
           cd maven
-          bash update_version.sh "$GITHUB_REF_NAME"
+          bash update-version.sh "$GITHUB_REF_NAME"
           export GPG_TTY=$(tty)
           mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -X
           cd ..
           git clone https://github.com/shannah/cn1-maven-archetypes
           cd cn1-maven-archetypes
-          bash update_version.sh "$GITHUB_REF_NAME"
+          bash update-version.sh "$GITHUB_REF_NAME"
           mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -X
         env:
           MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
