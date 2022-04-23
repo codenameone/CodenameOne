@@ -792,7 +792,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             return PendingIntent.getService(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
-        PendingIntent.getService
     }
 
     public static PendingIntent getBroadcastPendingIntent(Context ctx, int value, Intent intent) {
@@ -802,7 +801,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             return PendingIntent.getBroadcast(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
-        PendingIntent.getService
     }
 
     /**
