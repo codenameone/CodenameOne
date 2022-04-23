@@ -775,7 +775,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return out.toArray(new PushActionCategory[out.size()]);
     }
-    
+
+    public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getActivity(ctx, value, newIntent, 67108864);
+        } else {
+            return PendingIntent.getActivity(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getService(ctx, value, newIntent, 67108864);
+        } else {
+            return PendingIntent.getService(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+        PendingIntent.getService
+    }
+
+    public static PendingIntent getBroadcastPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getBroadcast(ctx, value, newIntent, 67108864);
+        } else {
+            return PendingIntent.getBroadcast(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+        PendingIntent.getService
+    }
+
     /**
      * Adds actions to a push notification.  This is called by the Push broadcast receiver probably before 
      * Codename One is initialized
@@ -811,7 +840,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (PushAction action : category.getActions()) {
             Intent newIntent = (Intent)targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
-            PendingIntent contentIntent = PendingIntent.getActivity(context, requestCode++, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            PendingIntent contentIntent = createPendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
                 try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
@@ -7093,7 +7122,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         Intent notificationIntent = new Intent();
         notificationIntent.setComponent(activityComponentName);
-        PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
+        PendingIntent contentIntent = createPendingIntent(getContext(), 0, notificationIntent);
 
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
@@ -10416,20 +10445,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
             intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
-            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = getPendingIntent(context, 0,
+                    intent);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
         } else {
             contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
-        PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
 
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
 
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
@@ -10462,7 +10490,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notificationId);
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(pendingIntent);
     }
