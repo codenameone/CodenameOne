@@ -779,27 +779,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
             // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getActivity(ctx, value, newIntent, 67108864);
+            return PendingIntent.getActivity(ctx, value, intent, 67108864);
         } else {
-            return PendingIntent.getActivity(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
     }
 
     public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
             // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getService(ctx, value, newIntent, 67108864);
+            return PendingIntent.getService(ctx, value, intent, 67108864);
         } else {
-            return PendingIntent.getService(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            return PendingIntent.getService(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
     }
 
     public static PendingIntent getBroadcastPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
             // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getBroadcast(ctx, value, newIntent, 67108864);
+            return PendingIntent.getBroadcast(ctx, value, intent, 67108864);
         } else {
-            return PendingIntent.getBroadcast(ctx, value, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            return PendingIntent.getBroadcast(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
     }
 
