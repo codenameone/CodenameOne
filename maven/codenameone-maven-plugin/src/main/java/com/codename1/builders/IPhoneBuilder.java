@@ -209,6 +209,7 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
         try {
