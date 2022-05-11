@@ -13593,11 +13593,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     
-    public File getCWD() {
+    public static File getCWD() {
         return new File(System.getProperty("user.dir"));
     }
     
-    public File getSourceResourcesDir() {
+    public static File getSourceResourcesDir() {
         File resDir = new File(getCWD(), "src" + File.separator + "main" + File.separator + "resources");
         if (!resDir.exists()) {
             resDir = new File(getCWD(), "src");

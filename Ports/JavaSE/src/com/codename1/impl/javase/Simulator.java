@@ -81,24 +81,6 @@ public class Simulator {
 
    }
 
-
-    private static void setCWD() {
-        try {
-            File currDir = new File(System.getProperty("user.dir")).getCanonicalFile();
-            File codenameOneSettings = new File(currDir, "codenameone_settings.properties");
-            if (codenameOneSettings.exists()) {
-                return;
-            }
-            currDir = new File(currDir, "common");
-            codenameOneSettings = new File(currDir, codenameOneSettings.getName());
-            if (codenameOneSettings.exists()) {
-                System.setProperty("user.dir", currDir.getAbsolutePath());
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-
     /**
      * Accepts the classname to launch
      */
@@ -128,8 +110,7 @@ public class Simulator {
         if (System.getenv("CN1_SIMULATOR_SKIN") != null) {
             System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
         }
-        
-        
+
         String classPathStr = System.getProperty("java.class.path");
         if (System.getProperty("cn1.class.path") != null) {
             classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");

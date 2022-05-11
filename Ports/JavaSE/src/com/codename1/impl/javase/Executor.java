@@ -197,20 +197,7 @@ public class Executor {
         } 
         
         setProxySettings();
-        if (CSSWatcher.isSupported()) {
-            // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
-            Timer t = new Timer();
-            TimerTask tt = new TimerTask() {
-                @Override
-                public void run() {
-                    CSSWatcher cssWatcher = new CSSWatcher();
-                    cssWatcher.start();
-                }
-            };
-            t.schedule(tt, 2000);
 
-        }
-        
         final Properties p = new Properties();
         String currentDir = System.getProperty("user.dir");
         File props = new File(currentDir, "codenameone_settings.properties");
@@ -235,11 +222,7 @@ public class Executor {
                 } catch (IOException ex) {
                 }
             }
-            
-            
-            
-            
-        
+
         } else {
             System.out.println("Cannot find codenameone_settings.properties at "+props);
         }
@@ -289,6 +272,19 @@ public class Executor {
                                 CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
                             }
                             Display.init(null);
+                            if (CSSWatcher.isSupported()) {
+                                // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
+                                Timer t = new Timer();
+                                TimerTask tt = new TimerTask() {
+                                    @Override
+                                    public void run() {
+                                        CSSWatcher cssWatcher = new CSSWatcher();
+                                        cssWatcher.start();
+                                    }
+                                };
+                                t.schedule(tt, 2000);
+
+                            }
                             
                             //if (isDebug && usingHotswapAgent) {
                             if (MavenUtils.isRunningInMaven() && MavenUtils.isRunningInJDK()) {
