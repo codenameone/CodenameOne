@@ -332,11 +332,7 @@ public class AsyncMediaSample {
             Log.e(ex);
             
         });
-        
-        
-        
-        
-        
+ 
     }
     
     private void play() {
