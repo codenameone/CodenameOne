@@ -431,7 +431,7 @@ public class SwipeableContainer extends Container {
                                     open = true;
                                     close();
                                 }
-                            } else {
+                            } else if (topX < 0) { //check explicitly if opened to the left
                                 if (Display.getInstance().getDragSpeed(false) > 0) {
                                     open = false;
                                     openedToLeft = false;
