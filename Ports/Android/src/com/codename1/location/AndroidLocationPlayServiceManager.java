@@ -189,9 +189,8 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                             if (bgListenerClass != null) {
                                 intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
                             }
-                            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                                    intent,
-                                    PendingIntent.FLAG_UPDATE_CURRENT);
+                            PendingIntent pendingIntent = AndroidImplementation.getPendingIntent(context, 0,
+                                    intent);
                             inMemoryBackgroundLocationListener = AndroidLocationPlayServiceManager.this;
 
 
@@ -228,16 +227,15 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             Intent intent = new Intent(context, BackgroundLocationBroadcastReceiver.class);
             intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
             intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_UPDATES);
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = AndroidImplementation.getBroadcastPendingIntent(context, 0, intent);
             return pendingIntent;
         } else {
 
 
             Intent intent = new Intent(context, BackgroundLocationHandler.class);
             intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
-            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = AndroidImplementation.getPendingIntent(context, 0,
+                    intent);
             return pendingIntent;
         }
     }
@@ -290,9 +288,8 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                             if (bgListenerClass != null) {
                                 intent.putExtra("backgroundClass", bgListenerClass.getName());
                             }
-                            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                                    intent,
-                                    PendingIntent.FLAG_UPDATE_CURRENT);
+                            PendingIntent pendingIntent = AndroidImplementation.getPendingIntent(context, 0,
+                                    intent);
 
                             //LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
                             removeLocationUpdates(context, pendingIntent);
@@ -481,16 +478,15 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_GEOFENCE_TRANSITIONS);
             intent.setData(Uri.parse("http://codenameone.com/a?" + geofenceListenerClass.getName()));
             //intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_GEOFENCE_TRANSITIONS);
-            geofencePendingIntent = PendingIntent.getBroadcast(AndroidNativeUtil.getContext().getApplicationContext(), 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            geofencePendingIntent = AndroidImplementation.getBroadcastPendingIntent(AndroidNativeUtil.getContext().getApplicationContext(), 0, intent);
             return geofencePendingIntent;
         } else {
 
             Intent intent = new Intent(context, GeofenceHandler.class);
             intent.putExtra("geofenceClass", geofenceListenerClass.getName());
             intent.putExtra("geofenceID", gf.getId());
-            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = AndroidImplementation.getPendingIntent(context, 0,
+                    intent);
 
 
             return pendingIntent;
@@ -508,7 +504,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
         //Display.getInstance().scheduleBackgroundTask(new Runnable() {
-        boolean fineLocationAllowed = ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean fineLocationAllowed = AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get location");
         if (fineLocationAllowed && android.os.Build.VERSION.SDK_INT >= 29) {
 
             if (!checkBackgroundLocationPermission()) {
@@ -556,7 +552,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
                         builder.addGeofences(geofences);
 
-                        if (ActivityCompat.checkSelfPermission(AndroidNativeUtil.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        if (!AndroidNativeUtil.checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "Fine location permission required")) {
                             // TODO: Consider calling
                             //    ActivityCompat#requestPermissions
                             // here to request the missing permissions, and then overriding

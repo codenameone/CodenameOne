@@ -86,7 +86,9 @@ public class Storage {
      * a context object on other platforms
      */
     private static void init(Object data) {
-        Util.getImplementation().setStorageData(data);
+        if(Util.getImplementation() != null) {
+            Util.getImplementation().setStorageData(data);
+        }
         if(INSTANCE == null) {
             INSTANCE = new Storage();
         }

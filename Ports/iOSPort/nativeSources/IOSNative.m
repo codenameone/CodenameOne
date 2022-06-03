@@ -56,7 +56,9 @@
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
 #include "OpenUDID.h"
+#ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
+#endif
 #include "com_codename1_contacts_Contact.h"
 #include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
@@ -903,7 +905,17 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
 }
 
 
+//native void nativeDrawShadowMutable(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity);
+extern void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity);
 
+void com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable___long_int_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+    JAVA_LONG image, JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_PASS_ARG image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    POOL_END();
+
+}
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
 
@@ -2862,7 +2874,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
-            WKWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
             [w reload];
 #endif
         } else {
@@ -4216,8 +4228,6 @@ void openGalleryMultiple(JAVA_INT type) {
         pickerController.showsNumberOfSelectedAssets = YES;
         pickerController.delegate = [CodenameOne_GLViewController instance];
         if (type==0 || type == 3){
-            
-        } else if (type==0 || type == 3){
             pickerController.mediaType = QBImagePickerMediaTypeImage;
         } else if (type==1 || type == 4){
             pickerController.mediaType = QBImagePickerMediaTypeVideo;
@@ -6108,6 +6118,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THR
 JAVA_OBJECT productsArrayPending = nil;
 
 void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT skus, JAVA_OBJECT products) {
+#ifdef CN1_USE_STOREKIT
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* strArray = skus;
@@ -6133,23 +6144,33 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     request.delegate = [CodenameOne_GLViewController instance];
     [request start];
     POOL_END();
+#endif
 }
-
+#ifdef CN1_USE_STOREKIT
 SKPayment *paymentInstance = nil;
+#endif
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
+#ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
     dispatch_async(dispatch_get_main_queue(), ^{
         paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_restorePurchases__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 NSLocale *currentLocale = NULL;
@@ -9535,8 +9556,10 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
     JAVA_OBJECT nativeFont = com_codename1_ui_Font_getNativeFont___R_java_lang_Object(threadStateData, font);
     com_codename1_impl_ios_IOSImplementation_setNativeFont___java_lang_Object_java_lang_Object(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont);
     JAVA_INT fgColor = com_codename1_ui_plaf_Style_getFgColor___R_int(threadStateData, style);
+    JAVA_INT fgAlpha = com_codename1_ui_plaf_Style_getFgAlpha___R_int(threadStateData, style);
     com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, fgColor);
-    
+    JAVA_INT alpha = com_codename1_impl_ios_IOSImplementation_concatenateAlpha___java_lang_Object_int_R_int(threadStateData, __cn1ThisObject, nativeGraphics, fgAlpha);
+
     JAVA_INT iconWidth = 0;
     JAVA_INT iconHeight = 0;
     if(icon != JAVA_NULL) {
@@ -9749,6 +9772,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 break;
         }
     }
+    com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, alpha);
 }
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)

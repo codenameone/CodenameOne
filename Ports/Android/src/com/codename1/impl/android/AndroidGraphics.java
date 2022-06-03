@@ -42,20 +42,7 @@
 package com.codename1.impl.android;
 
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapShader;
-import android.graphics.Canvas;
-import android.graphics.LinearGradient;
-import android.graphics.Matrix;
-import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
-import android.graphics.RadialGradient;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.graphics.Region;
-import android.graphics.Shader;
+import android.graphics.*;
 import android.view.View;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.ui.CN;
@@ -152,6 +139,38 @@ class AndroidGraphics {
         canvas.save();
         applyTransform();
         canvas.drawBitmap((Bitmap) img, x, y, paint);
+        unapplyTransform();
+        canvas.restore();
+    }
+
+    public void drawShadow(Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        if (image == null) return;
+        Bitmap bmp = (Bitmap)image;
+        float bmpW = bmp.getWidth();
+        float bmpH = bmp.getHeight();
+        if (bmpW == 0 || bmpH == 0) return;
+
+
+
+        Bitmap scaledBmp = Bitmap.createScaledBitmap(bmp, bmp.getWidth() + 2 * spreadRadius, bmp.getHeight() + 2 * spreadRadius, false);
+
+        Paint alphaPaint = new Paint();
+
+        alphaPaint.setMaskFilter(new BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL));
+        int[] offsetXY = new int[2];
+        Bitmap bmAlpha = scaledBmp.extractAlpha(alphaPaint, offsetXY);
+        scaledBmp.recycle();
+        canvas.save();
+        applyTransform();
+        Paint shadowPaint = new Paint();
+        int alpha = (int)Math.floor(opacity * 255);
+        shadowPaint.setColor((0xff000000 | color));
+        shadowPaint.setAlpha((int)Math.floor(opacity * 255));
+
+        canvas.drawBitmap(bmAlpha, x + offsetXY[0] - spreadRadius + offsetX, y + offsetXY[1] - spreadRadius + offsetY, shadowPaint);
+        bmAlpha.recycle();
+
+
         unapplyTransform();
         canvas.restore();
     }
@@ -878,6 +897,13 @@ class AndroidGraphics {
         
     }
 
+    public int concatenateAlpha(int alpha) {
+        int oldAlpha = getAlpha();
+        if (alpha == 255) return oldAlpha;
+        setAlpha((int)(oldAlpha * (alpha/255f)));
+        return oldAlpha;
+    }
+
     public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
             Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide,
             int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
@@ -891,6 +917,7 @@ class AndroidGraphics {
         impl.setNativeFont(this, nativeFont);
         setColor(style.getFgColor());
         canvas.save();
+        concatenateAlpha(style.getFgAlpha());
         applyTransform();
 
         int iconWidth = 0;

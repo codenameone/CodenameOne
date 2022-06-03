@@ -1,11 +1,12 @@
 <h1 align=center>
- <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/06/CN1-Main-Illustration-Dark.jpg" />
+ <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/08/CN1-Banner-Dark-Blue.jpg" />
 </h1>
 
-![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=plastic)
-![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?style=plastic)
-![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=blue&style=plastic)
-![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-blue?style=plastic)
+![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=flat-square)
+![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?color=orange&style=flat-square)
+![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=success&style=flat-square)
+![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-FFFF00?style=flat-square)
+[![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)](https://github.com/codenameone/CodenameOne/labels/Hacktoberfest)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
 ## Codename One - Cross Platform Native Apps with Java or Kotlin
@@ -54,7 +55,7 @@ This means faster debugging cycle and faster development process!
 ### Large Selection of Device Skins
 
 Choose from a large selection of device “skins” to see how your app will look on particular devices. The skin takes into account factors such as resolution and
-device density to provide a pixel-perfectre presentation of your app, as it would appear on the real device.
+device density to provide a pixel-perfect presentation of your app, as it would appear on the real device.
 Switching between device skins is nearly instant.
 
 You can edit and contribute skins in their own open source project [here](https://github.com/codenameone/codenameone-skins).
@@ -166,23 +167,47 @@ You can get started with the binary and the birds eye view in the [download sect
 
 ## Setup & Getting Started With The Code
 
-NOTE: We are in the process of migrating from Ant to Maven, which simplifies the process for building from source.  This section still refers to the process for for building with Ant.  See [Maven Quick Start](#maven) for the new Maven build instructions.
+NOTE: *We are in the process of migrating from Ant to Maven, which simplifies the process for building from source. 
+See [Ant Quick Start](#quick-start-with-ant) for the legacy Ant build instructions.*
 
-Setup is covered in depth in [this article and video](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html). Notice that this covers debugging the simulator and working with the code that requires the Codename One plugin for NetBeans. You can install that by installing NetBeans and typing "Codename One" in the plugin search section see [the getting started tutorial](https://www.codenameone.com/getting-started.html).
+The setup is covered in depth in [this article and video](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html). 
 
 <div>
-  <a href="http://www.youtube.com/watch?v=2nD75pODPWk " target="_blank"><img src="https://i.imgur.com/1lckS4d.png" alt="Using The Codename One Source Code" img width="80%"> </a>
+  <a href="https://www.youtube.com/watch?v=H8-QMIsTHNc " target="_blank"><img src="https://i.imgur.com/X0xzM6H.jpg" alt="Building Codename One from Source - Maven Edition
+" img width="80%"> </a>
 </div>
 
-<br>
+**IMPORTANT:** Building Codename One requires **JDK 8**, currently. You cannot use JDK 11 as some sub-modules must use `-source 1.5` and `-target 1.5` to maintain backward compatibility with parts of the toolchain.
 
-While Codename One itself works with all major IDE's the code in this repository was designed to work with NetBeans.
 
-<img src="http://resources.jetbrains.com/storage/products/intellij-idea/img/meta/intellij-idea_logo_300x300.png" width="50"> &nbsp; &nbsp; <img src="http://codenameone.com/img/NetBeans-logo.png" width="120"> &nbsp; &nbsp; <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
+### Quick Start with Maven
 
-Please notice that while we fully support IntelliJ/IDEA (both CE and Ultimate), we don't support Android Studio which diverted too much from the mainline IDE.
+~~~~
+git clone https://github.com/codenameone/CodenameOne
+cd CodenameOne/maven
+mvn install
+~~~~
 
-### Quick Start
+This will build and install Codename One in your local Maven repository. This process can take a while since it automatically downloads dependencies with a size of ~1GB.  
+
+
+To build the archetype projects from source, you should check out the [cn1-maven-archetypes](https://github.com/shannah/cn1-maven-archetypes) repository and build it also:
+
+~~~~
+git clone https://github.com/shannah/cn1-maven-archetypes
+cd cn1-maven-archetypes
+mvn install
+~~~~  
+
+
+Now that Codename One is installed in your local Maven repository, you can use that version in a project instead of the release version.
+A new testing project can be quickly generated with the [Codename One initializr](https://start.codenameone.com).
+
+After downloading and extracting the project, open its pom.xml file and and look for the `<cn1.version>` and `<cn1.plugin.version>` properties.
+Then change these to point to the version that got installed into your *local* maven repository by `mvn install`. The locally built version will usually be a SNAPSHOT version (e.g. 7.0.21-SNAPSHOT).
+
+
+### Quick Start with Ant
 
 **Getting and Building Sources**
 
@@ -207,28 +232,6 @@ You can launch the sample runner app from the command-line using:
 ~~~
 $ ant samples
 ~~~
-
-<a id="maven">
-
-### Quick Start with Maven
-
-~~~~
-git clone https://github.com/codenameone/CodenameOne
-cd CodenameOne/maven
-mvn install
-~~~~
-
-This will build and install Codename One in your local Maven repository.
-
-To build the archetype projects from source, you should check out the [cn1-maven-archetypes](https://github.com/shannah/cn1-maven-archetypes) repository and build it also:
-
-~~~~
-git clone https://github.com/shannah/cn1-maven-archetypes
-cd cn1-maven-archetypes
-mvn install
-~~~~
-
-To get started building projects using Maven, see https://start.codenameone.com.
 
 
 ## ParparVM

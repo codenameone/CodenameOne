@@ -1296,6 +1296,19 @@ public abstract class CodenameOneImplementation {
     public abstract void setAlpha(Object graphics, int alpha);
 
     /**
+     * Concatenates alpha value to current alpha.
+     * @param graphics The graphics context
+     * @param alpha The alpha to concatenate.
+     * @return The previous alpha value.
+     */
+    public final int concatenateAlpha(Object graphics, int alpha) {
+        if (alpha == 255) return getAlpha(graphics);
+        int oldAlpha = getAlpha(graphics);
+        setAlpha(graphics, (int)(oldAlpha * (alpha/255f)));
+        return oldAlpha;
+    }
+
+    /**
      * Alpha value from 0-255 can be ignored for some operations
      * 
      * @param graphics the graphics context
@@ -1611,6 +1624,8 @@ public abstract class CodenameOneImplementation {
      */
     public abstract void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
+
+
     /**
      * Fills a rounded rectangle in the same way as drawRoundRect
      * 
@@ -1718,6 +1733,61 @@ public abstract class CodenameOneImplementation {
      * @see drawShape To learn what x, y, w, and h do.
      */
     public void fillShape(Object graphics, Shape shape){}
+
+    /**
+     * Draws a drop shadow for an image onto the given graphics context.
+     *
+     * <p>This is used for the elevation feature.</p>
+     *
+     * <p>Note: This operation is expensive on most platforms as it is not hardware accelerated.  Codename One's elevation functionality
+     * uses this method to generate shadow images which it reuses as much as possible for maximum performance.</p>
+     *
+     * <p>Note: Currently this is not supported on all platforms.  Use {@link #isDrawShadowSupported()} to check for platform support at
+     * runtime.  Use {@link #isDrawShadowFast()} to check for hardware acceleration.</p>
+     *
+     * <p>Note: On iOS, this is only supported for drawing to mutable images - not the global graphics context.</p>
+     *
+     * @param graphics The graphics context.
+     * @param image The image whose raster should be used to generate the shadow.  The alpha channel of this image is used as the
+     *              bases for the shadow projection.
+     * @param x x-coordinate of the graphics context where shadow should be painted.
+     * @param y y-coordinate of the graphics context where shadow should be painted.
+     * @param offsetX The shadow offset X in pixels.
+     * @param offsetY The shadow offset Y in pixels.
+     * @param blurRadius The blur radius in pixels.
+     * @param spreadRadius The shadow spread in pixels.
+     * @param color The shadow color.
+     * @param opacity The shadow opacity.
+     * @since 8.0
+     *
+     * @see Component#paintShadows(Graphics, int, int)
+     * @see Container#paintSurfaceShadows(Graphics)
+     * @see #isDrawShadowSupported()
+     * @see #isDrawShadowFast()
+     */
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+    }
+
+    /**
+     * Checks to see if drawing shadows is supported on this platform.
+     * @return True if the platform supports drawing shadows.
+     * @see #drawShadow(Object, Object, int, int, int, int, int, int, int, float)
+     * @since 8.0
+     */
+    public boolean isDrawShadowSupported() {
+        return false;
+    }
+
+    /**
+     * Checks to see if drawing shadows on this platform is hardware accelerated.
+     * @return True if drawing shadows is hardware accelerated.
+     * @since 8.0
+     *
+     */
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     
     /**
      * Sets the transformation matrix to be applied to all drawing operations. If 
@@ -7046,52 +7116,9 @@ public abstract class CodenameOneImplementation {
     
     /**
      * Registers a polling thread to simulate push notification
+     * @deprecated this functionality is no longer supported
      */
     protected static void registerPollingFallback() {
-        if(pollingThreadRunning || callback == null) {
-            return;
-        }
-        pollingThreadRunning = true;
-        final long pushId = Preferences.get("push_id", (long)-1);
-        if(pushId > -1) {
-            new CodenameOneThread(new Runnable() {
-                public void run() {
-                    String lastReq = Preferences.get("last_push_req", "0");
-                    while(pollingThreadRunning) {
-                        try {
-                            ConnectionRequest cr = new ConnectionRequest();
-                            cr.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "pollManualPush");
-                            cr.setPost(false);
-                            cr.setFailSilently(true);
-                            cr.addArgument("i", "" + pushId);
-                            cr.addArgument("last", lastReq);
-                            NetworkManager.getInstance().addToQueueAndWait(cr);
-                            if(cr.getResponseCode() != 200) {
-                                callback.pushRegistrationError("Server registration error", 1);
-                            } else {
-                                DataInputStream di = new DataInputStream(new ByteArrayInputStream(cr.getResponseData()));
-                                if(di.readBoolean()) {
-                                    byte type = di.readByte();
-                                    String message = di.readUTF();
-                                    lastReq = "" + di.readLong();
-                                    Preferences.set("last_push_req", lastReq);
-                                    callback.push(message);
-                                }
-                            }
-                        } catch (IOException ex) {
-                            Log.e(ex);
-                        }
-                        try {
-                            synchronized(callback) {
-                                callback.wait(pollingMillis);
-                            }
-                        } catch(Throwable t) {
-                            Log.e(t);
-                        }
-                    }
-                }
-            }, "Polling Thread").start();
-        }
     }
 
     /**
@@ -7931,6 +7958,8 @@ public abstract class CodenameOneImplementation {
         setNativeFont(nativeGraphics, nativeFont);
         setColor(nativeGraphics, style.getFgColor());
 
+        int alpha = concatenateAlpha(nativeGraphics, style.getFgAlpha());
+
         int iconWidth = 0;
         int iconHeight = 0;
         if(icon != null) {
@@ -8146,6 +8175,7 @@ public abstract class CodenameOneImplementation {
                     break;
             }
         }
+        setAlpha(nativeGraphics, alpha);
     }
         
     /**
@@ -8299,9 +8329,7 @@ public abstract class CodenameOneImplementation {
                     offset = 2;
                 }
                 setColor(nativeGraphics, newColor);
-                if (a == 0xff) {
-                    setAlpha(nativeGraphics, 140);
-                }
+                concatenateAlpha(nativeGraphics, 140);
                 drawString(nativeGraphics, nativeFont, str, x, y + offset, textDecoration, fontHeight);
                 setAlpha(nativeGraphics, a);
                 setColor(nativeGraphics, c);

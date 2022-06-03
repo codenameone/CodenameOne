@@ -1002,4 +1002,13 @@ public final class Character{
         // Let icu4c worry about non-BMP code points.
         return false;
     }
+
+    public static int toTitleCase(int codePoint) {
+        return 0;
+    }
+
+    public static char toTitleCase(char c) {
+        return (char) 0;
+    }
+
 }

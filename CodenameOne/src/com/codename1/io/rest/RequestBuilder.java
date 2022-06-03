@@ -49,8 +49,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This class is used to build, invoke the http request and to get the http 
- * response 
+ * This class is used to build, invoke the http request and to get the http
+ * response
  *
  * @author Chen Fishbein
  */
@@ -66,15 +66,15 @@ public class RequestBuilder {
     private Map<String, String> headers = new HashMap();
 
     private Map<String, String> pathParams = new HashMap();
-    
+
     private Integer timeout, readTimeout;
 
     private Boolean cookiesEnabled;
-    
+
     private Data body;
-        
+
     private String contentType;
-    
+
     private ErrorCodeHandler<byte[]> byteArrayErrorCallback;
     private ErrorCodeHandler<Map> jsonErrorCallback;
     private ErrorCodeHandler<String> stringErrorCallback;
@@ -85,7 +85,9 @@ public class RequestBuilder {
     private ConnectionRequest.CachingMode cache;
     private boolean fetched;
     private Boolean postParameters;
-    
+    private Byte priority;
+    private boolean insecure;
+
     RequestBuilder(String method, String url) {
         this.method = method;
         this.url = url;
@@ -96,7 +98,18 @@ public class RequestBuilder {
             throw new RuntimeException("This method can't be invoked after a request was sent");
         }
     }
-    
+
+    /**
+     * Turns off checking to make sure that SSL certificate is valid.
+     *
+     * @param insecure true to disable ssl certificate checking
+     * @return this request builder
+     */
+    public RequestBuilder insecure(boolean insecure) {
+        this.insecure = insecure;
+        return this;
+    }
+
     /**
      * Sets the caching mode for this request, see {@link com.codename1.io.ConnectionRequest#getCacheMode()}
      * @param cache the cache mode
@@ -129,6 +142,19 @@ public class RequestBuilder {
     }
 
     /**
+     * Sets the priority of the request.
+     * @param priority The priority.
+     * @return RequestBuilder instance.
+     * @see ConnectionRequest#setPriority(byte)
+     * @since 8.0
+     */
+    public RequestBuilder priority(byte priority) {
+        checkFetched();
+        this.priority = priority;
+        return this;
+    }
+
+    /**
      * Sets the cookiesEnabled parameter.
      * @param cookiesEnabled True to enable cookies. False to disable.
      * @return RequestBuilder instance.
@@ -139,30 +165,30 @@ public class RequestBuilder {
         this.cookiesEnabled = cookiesEnabled;
         return this;
     }
-    
+
     /**
      * Add a path param to the request.
      * For example if the request url is: http://domain.com/users/{id}
      * The path param can be - key="id", value="1"
      * When the request executes the path would be: http://domain.com/users/1
-     * 
+     *
      * @param key the identifier key in the request.
      * @param value the value to replace in the url
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder pathParam(String key, String value) {
         checkFetched();
         pathParams.put(key, value);
         return this;
     }
-    
+
     /**
      * Add a query parameter to the request
-     * 
+     *
      * @param key param key
      * @param value  param value
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder queryParam(String key, String value) {
         checkFetched();
         queryParams.put(key, value);
@@ -185,24 +211,24 @@ public class RequestBuilder {
 
     /**
      * Add a header to the request
-     * 
-     * @param key 
-     * @param value 
+     *
+     * @param key
+     * @param value
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder header(String key, String value) {
         checkFetched();
         // .toString() is used to trigger an NPE early for null headers
         headers.put(key.toString(), value.toString());
         return this;
     }
-    
+
     /**
      * Sets the request body
-     * 
-     * @param body request bodyContent 
+     *
+     * @param body request bodyContent
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder body(final String bodyContent) {
         checkFetched();
         this.body = new Data() {
@@ -218,31 +244,31 @@ public class RequestBuilder {
         };
         return this;
     }
-    
+
     /**
      * Sets the request body lazily.
      * @param body Wrapper for the request body that knows how to append to an output stream.
      * @return RequestBuilder instances
      * @since 7.0
-     * @see #body(java.lang.String) 
+     * @see #body(java.lang.String)
      */
     public RequestBuilder body(Data body) {
         checkFetched();
         this.body = body;
         return this;
     }
-    
+
     /**
      * Sets the request body to the JSON matching the given object
-     * 
-     * @param body request body 
+     *
+     * @param body request body
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder body(PropertyBusinessObject body) {
         body(body.getPropertyIndex().toJSON());
         return this;
     }
-        
+
     /**
      * In case of an error this method is invoked asynchronously to process
      * the error content with the byte array data
@@ -254,7 +280,7 @@ public class RequestBuilder {
         byteArrayErrorCallback = err;
         return this;
     }
-    
+
     /**
      * In case of an error this method is invoked asynchronously to process
      * the error content with the JSON data
@@ -281,7 +307,7 @@ public class RequestBuilder {
         errorHandlerPropertyType = errorClass;
         return this;
     }
-    
+
     /**
      * In case of an error this method is invoked asynchronously to process
      * the error content with the JSON data
@@ -293,19 +319,19 @@ public class RequestBuilder {
         stringErrorCallback = err;
         return this;
     }
-    
+
     /**
      * Invoked for exceptions or failures such as disconnect.  Replaces any existing
      * callbacks previously registered with {@link #onError(com.codename1.ui.events.ActionListener) }
      * @param error callback for a networking error
      * @return RequestBuilder instance
-     * @see #onError(com.codename1.ui.events.ActionListener, boolean) 
-     * 
+     * @see #onError(com.codename1.ui.events.ActionListener, boolean)
+     *
      */
     public RequestBuilder onError(ActionListener<NetworkEvent> error) {
         return onError(error, true);
     }
-    
+
     /**
      * Invoked for exceptions or failures such as disconnect
      * @param error callback for a networking error
@@ -322,19 +348,19 @@ public class RequestBuilder {
         errorCallbacks.add(error);
         return this;
     }
-    
+
     /**
      * Sets the request timeout
-     * 
+     *
      * @param timeout request timeout in milliseconds
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder timeout(int timeout) {
         checkFetched();
         this.timeout = timeout;
         return this;
     }
-    
+
     /**
      * Sets the request read timeout.  Only used if {@link ConnectionRequest#isReadTimeoutSupported() }
      * is true on this platform.
@@ -346,23 +372,23 @@ public class RequestBuilder {
         this.readTimeout = timeout;
         return this;
     }
-    
+
     /**
      * Sets the request to be a gzip request
-     * 
+     *
      * @return RequestBuilder instance
      * @deprecated this API was implemented incorrectly
-     */ 
+     */
     public RequestBuilder gzip() {
         header("Accept-Encoding", "gzip");
         return this;
     }
-    
+
     /**
      * Add accept json header to the request
-     * 
+     *
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder acceptJson() {
         header("Accept", "application/json");
         return this;
@@ -376,29 +402,29 @@ public class RequestBuilder {
         return contentType("application/json").
                 header("Accept", "application/json");
     }
-    
+
     /**
      * Add a basic authentication Authorization header
-     * 
+     *
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder basicAuth(String username, String password) {
         header("Authorization", "Basic " + Base64.encodeNoNewline((username + ":" + password).getBytes()));
         return this;
     }
 
     /**
-     * Add an authorization bearer header, this is shorthand for 
+     * Add an authorization bearer header, this is shorthand for
      * {@code header("Authorization", "Bearer " + token)}
-     * 
+     *
      * @param token the authorization token
      * @return RequestBuilder instance
-     */ 
+     */
     public RequestBuilder bearer(String token) {
         header("Authorization", "Bearer " + token);
         return this;
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
@@ -408,7 +434,7 @@ public class RequestBuilder {
     public ConnectionRequest fetchAsString(final OnComplete<Response<String>> callback) {
         return getAsStringAsyncImpl(callback);
     }
-    
+
     private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
         final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
@@ -431,25 +457,25 @@ public class RequestBuilder {
             }
         });
         fetched = true;
-        CN.addToQueue(request);        
+        CN.addToQueue(request);
         return request;
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
      * @deprecated please use {@link #fetchAsString(com.codename1.util.OnComplete)} instead
-     */ 
+     */
     public void getAsStringAsync(final Callback<Response<String>> callback) {
         getAsStringAsyncImpl(callback);
     }
 
     /**
      * Executes the request synchronously
-     * 
+     *
      * @return Response Object
-     */ 
+     */
     public Response<String> getAsString() {
         ConnectionRequest request = createRequest(false);
         fetched = true;
@@ -461,7 +487,7 @@ public class RequestBuilder {
             if(respData != null) {
                 resp = new String(respData, "UTF-8");
             }
-            res = new Response(request.getResponseCode(), resp, 
+            res = new Response(request.getResponseCode(), resp,
                 request.getResponseErrorMessage());
         } catch (UnsupportedEncodingException ex) {
             ex.printStackTrace();
@@ -469,17 +495,17 @@ public class RequestBuilder {
         return res;
     }
 
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
      * @return the connection request instance
-     */ 
+     */
     public ConnectionRequest fetchAsBytes(final OnComplete<Response<byte[]>> callback) {
         return getAsBytesAsyncImpl(callback);
     }
-    
+
     private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
         final Connection request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
@@ -498,25 +524,25 @@ public class RequestBuilder {
             }
         });
         fetched = true;
-        CN.addToQueue(request);        
+        CN.addToQueue(request);
         return request;
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
      * @deprecated use {@link #fetchAsBytes(com.codename1.util.OnComplete)} instead
-     */ 
+     */
     public void getAsBytesAsync(final Callback<Response<byte[]>> callback) {
         getAsBytesAsyncImpl(callback);
     }
-    
+
     /**
      * Executes the request synchronously
-     * 
+     *
      * @return Response Object
-     */ 
+     */
     public Response<byte[]> getAsBytes() {
         ConnectionRequest request = createRequest(false);
         fetched = true;
@@ -530,7 +556,7 @@ public class RequestBuilder {
      * Callback
      * @param callback writes the response to this callback
      * @return returns the Connection Request object so it can be killed if necessary
-     */ 
+     */
     public ConnectionRequest fetchAsJsonMap(final OnComplete<Response<Map>> callback) {
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
@@ -546,17 +572,17 @@ public class RequestBuilder {
             }
         });
         fetched = true;
-        CN.addToQueue(request);       
+        CN.addToQueue(request);
         return request;
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback. This fetches JSON data and parses it into a properties business object
      * @param callback writes the response to this callback
      * @param type the class of the business object returned
      * @return returns the Connection Request object so it can be killed if necessary
-     */ 
+     */
     public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
@@ -579,21 +605,21 @@ public class RequestBuilder {
             }
         });
         fetched = true;
-        CN.addToQueue(request);       
+        CN.addToQueue(request);
         return request;
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
      * @return returns the Connection Request object so it can be killed if necessary
      * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
-     */ 
+     */
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback) {
         return getAsJsonMap(callback, null);
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
@@ -601,7 +627,7 @@ public class RequestBuilder {
      * @param onError the error callback
      * @return returns the Connection Request object so it can be killed if necessary
      * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
-     */ 
+     */
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
@@ -624,10 +650,10 @@ public class RequestBuilder {
         });
         bindOnError(request, onError);
         fetched = true;
-        CN.addToQueue(request);       
+        CN.addToQueue(request);
         return request;
     }
-    
+
     private void bindOnError(final ConnectionRequest req, final FailureCallback<? extends Object> f) {
         if(f == null) {
             return;
@@ -645,22 +671,22 @@ public class RequestBuilder {
             }
         });
     }
-    
+
     /**
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
      * @deprecated use {@link #fetchAsJsonMap(com.codename1.util.OnComplete)} instead
-     */ 
+     */
     public void getAsJsonMapAsync(final Callback<Response<Map>> callback) {
         getAsJsonMap(callback, callback);
     }
-    
+
     /**
      * Executes the request synchronously
-     * 
+     *
      * @return Response Object
-     */ 
+     */
     public Response<Map> getAsJsonMap() {
         ConnectionRequest request = createRequest(true);
         fetched = true;
@@ -671,10 +697,10 @@ public class RequestBuilder {
 
     /**
      * Executes the request synchronously
-     * 
+     *
      * @param type the type of the business object to create
      * @return Response Object
-     */ 
+     */
     public Response<PropertyBusinessObject> getAsProperties(Class type) {
         ConnectionRequest request = createRequest(true);
         fetched = true;
@@ -745,7 +771,7 @@ public class RequestBuilder {
 
     /**
      * Executes the request synchronously
-     * 
+     *
      * @param type the type of the business object to create
      * @param root the root element's key of the structured content
      * @return Response Object
@@ -783,14 +809,14 @@ public class RequestBuilder {
     public String getRequestUrl() {
         return this.url;
     }
-    
+
     class Connection extends GZConnectionRequest {
         private boolean parseJSON;
         boolean errorCode;
         Map json;
         private ErrorCodeHandler errorHandler;
         private Object errorObject;
-        
+
         public Connection(boolean parseJSON) {
             this.parseJSON = parseJSON;
         }
@@ -803,8 +829,8 @@ public class RequestBuilder {
             } else {
                 super.handleErrorResponseCode(code, message);
             }
-        }   
-        
+        }
+
         @Override
         protected void readUnzipedResponse(InputStream input) throws IOException {
             if(errorCode) {
@@ -851,7 +877,7 @@ public class RequestBuilder {
                     fireResponseListener(new NetworkEvent(this, json));
                 }
                 return;
-            } 
+            }
             super.readUnzipedResponse(input);
         }
 
@@ -861,14 +887,14 @@ public class RequestBuilder {
                 errorHandler.onError(new Response(getResponseCode(), errorObject, getResponseErrorMessage()));
             }
         }
-        
+
     }
-    
+
     private Connection createRequest(boolean parseJson) {
         Connection req = new Connection(parseJson);
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
-        }       
+        }
         if(contentType != null) {
             req.setContentType(contentType);
         }
@@ -909,10 +935,15 @@ public class RequestBuilder {
         for (ActionListener<NetworkEvent> l : errorCallbacks) {
             req.addExceptionListener(l);
         }
+        
+        req.setInsecure(insecure);
         if (cookiesEnabled != null) {
             req.setCookiesEnabled(cookiesEnabled);
         }
-        
+        if (priority != null) {
+            req.setPriority(priority);
+        }
+
         return req;
     }
 }

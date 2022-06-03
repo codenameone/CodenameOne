@@ -227,6 +227,7 @@ public class Toolbar extends Container {
                 && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
             setTitleCentered(true);
         }
+        //setSafeArea(true);
     }
 
     /**
@@ -2565,6 +2566,9 @@ public class Toolbar extends Container {
         @Override
         protected void initMenuBar(Form parent) {
             Component ta = parent.getTitleArea();
+            if (ta instanceof Container) {
+                ((Container)ta).setSafeArea(true);
+            }
             parent.removeComponentFromForm(ta);
             super.initMenuBar(parent);
             if (layered) {

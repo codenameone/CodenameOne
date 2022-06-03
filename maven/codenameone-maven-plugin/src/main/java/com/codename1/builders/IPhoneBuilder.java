@@ -60,10 +60,15 @@ public class IPhoneBuilder extends Executor {
     private File icon57;
     private File icon512;
 
+    // StringBuilder used for constructing ruby script with xcodeproj
+    // which adds localized strings files to the project.
+    private StringBuilder installLocalizedStringsScript = new StringBuilder();
+
     private boolean runPods=false;
     private boolean photoLibraryUsage;
     private String buildVersion;
     private boolean usesLocalNotifications;
+    private boolean usesPurchaseAPI;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -199,9 +204,12 @@ public class IPhoneBuilder extends Executor {
         }
         return Integer.parseInt(target);
     }
-    
+
+
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
         try {
@@ -338,8 +346,82 @@ public class IPhoneBuilder extends Executor {
         // We must now go through and extract this tar file into a separate directory so that we can copy them
         // into the project folder after ByteCodeTranslator has created the Xcode project.
         
-        // Look for frameworks
+        // Look for frameworks and localized strings
+        Set<String> variantGroups = new HashSet<String>();
         for (File child : resDir.listFiles()) {
+            if (child.getName().endsWith(".lproj.zip")) {
+                // This is a zipped lproj directory that contains localized strings.
+                // We need to extract this and add the localized files to the project.
+
+                String languageBase = child.getName().substring(0, child.getName().lastIndexOf(".lproj.zip"));
+                File languageDir = new File(new File(tmpDir, "dist"), languageBase+".lproj");
+                if (languageDir.exists()) {
+                    delTree(languageDir, true);
+
+                }
+                languageDir.mkdirs();
+
+                log("Found native strings directory "+child+". Attempting extract it and add it to the project");
+                try {
+                    if (!exec(resDir, "unzip", child.getName(), "-d", languageDir.getAbsolutePath())) {
+                        log("Failed to unzip " + child.getName());
+                        return false;
+                    }
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to extract bundled strings directory "+child, ex);
+                }
+
+                if (languageDir.exists()) {
+                    // Sometmes files are zipped with the language dir as a directory within the root.  We need to detect this
+                    // case and fix it.
+                    File nestedLanguageDir = new File(languageDir, languageDir.getName());
+                    if (nestedLanguageDir.exists() && nestedLanguageDir.isDirectory()) {
+                        for (File nestedStringsFile : nestedLanguageDir.listFiles()) {
+                            if (!nestedStringsFile.getName().endsWith(".strings")) {
+                                continue;
+                            }
+                            File destStringsFile = new File(languageDir, nestedStringsFile.getName());
+                            try {
+
+                                Files.copy(nestedStringsFile.toPath(), destStringsFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException ex) {
+                                log("Failed to reparent nested strings file "+nestedStringsFile+" to "+destStringsFile);
+                            }
+                        }
+                        delTree(nestedLanguageDir, true);
+                    }
+
+                }
+
+                if (!languageDir.exists()) {
+                    log("Cannot find localization directory "+languageDir+" after extracting "+child+".  Please ensure that the localization file is located in the top level of the zip file.");
+                    return false;
+                }
+
+                // Create the Ruby xcodeproj script that will add the strings files to the project
+                for (File stringsFile : languageDir.listFiles()) {
+                    if (!stringsFile.getName().endsWith(".strings")) {
+                        // We only care about strings files.
+                        continue;
+                    }
+                    if (installLocalizedStringsScript.length() == 0) {
+                        installLocalizedStringsScript.append("variant_groups={}\n");
+                    }
+                    if (!variantGroups.contains(stringsFile.getName())) {
+                        variantGroups.add(stringsFile.getName());
+                        installLocalizedStringsScript.append("variant_group = xcproj.main_group.new_variant_group('").append(stringsFile.getName()).append("')\n");
+                        installLocalizedStringsScript.append("variant_groups['").append(stringsFile.getName()).append("'] = variant_group\n");
+                        //installLocalizedStringsScript.append("xcproj.targets.find{|e|e.name=='").append(request.getMainClass()).append("'}.add_file_reference(variant_group)\n");
+                    }
+                    installLocalizedStringsScript.append("fileref = variant_groups['").append(stringsFile.getName()).append("'].new_file('").append(languageDir.getName()).append("/").append(stringsFile.getName()).append("')\n");
+                    installLocalizedStringsScript.append("xcproj.targets.each{|e| e.add_resources([fileref])}\n");
+                }
+
+
+                child.delete();
+
+
+            }
             if (child.getName().endsWith(".framework.zip")) {
                 log("Found framework "+child+". Attempting extract it and generate podspec for it");
                 try {
@@ -505,8 +587,12 @@ public class IPhoneBuilder extends Executor {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
                 public void usesClass(String cls) {
+                    if (cls == null) return;
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
+                    }
+                    if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
+                        usesPurchaseAPI = true;
                     }
                 }
 
@@ -516,7 +602,7 @@ public class IPhoneBuilder extends Executor {
                 }
             });
         } catch (Exception ex) {
-            throw new BuildException("Failed to scan project classes for permissions.");
+            throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         
 
@@ -1238,6 +1324,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController_h, "#define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization", "#define CN1_REQUEST_LOCATION_AUTH requestAlwaysAuthorization");
 
             }
+            if (usesPurchaseAPI) {
+                File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
+                replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_STOREKIT", "#define CN1_USE_STOREKIT");
+
+            }
         } catch (Exception ex) {
             throw new BuildException("Failure while injecting code from build hints", ex);
         }
@@ -1362,6 +1453,10 @@ public class IPhoneBuilder extends Executor {
                     if (addLibs.indexOf("QuartzCore.framework") < 0) {
                         addLibs += ";QuartzCore.framework";
                     }
+                }
+
+                if (usesPurchaseAPI) {
+                    addLibs += ";StoreKit.framework";
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failed to process build hints", ex);
@@ -1525,6 +1620,9 @@ public class IPhoneBuilder extends Executor {
                     }
                     addMinDeploymentTarget(targetStr);
                     deploymentTargetStr = "begin\n"
+                            + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
+                            + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
+                            + "  }\n"
                             + "  xcproj.targets.each do |target|\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
@@ -1584,11 +1682,22 @@ public class IPhoneBuilder extends Executor {
                                 buildSettingsMap.put(key, val);
 
                             }
+
                             String extensionName = appExtension.getName();
+                            String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
+                            if (appExtension.isDirectory()) {
+                                for (File f : appExtension.listFiles()) {
+                                    if (f.getName().endsWith(".entitlements")) {
+                                        codeSignEntitlements = extensionName + "/" + f.getName();
+                                    }
+                                }
+                            }
+
+
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
-                            buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", "$(NS_CODE_SIGN_ENTITLEMENTS)");
+                            buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
                             buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
                             buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
 
@@ -1606,6 +1715,7 @@ public class IPhoneBuilder extends Executor {
                                 }
                                 buildSettingsProps.delete();
                             }
+
 
 
                             sb.append("\nservice_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
@@ -1637,6 +1747,18 @@ public class IPhoneBuilder extends Executor {
                         }
                     }
 
+                    String installLocalizedStrings = "";
+                    if (installLocalizedStringsScript.length() > 0) {
+                        installLocalizedStrings = "begin\n"+
+                                installLocalizedStringsScript.toString() +
+                                "rescue => e\n"
+                                + "  puts \"Error during processing: #{$!}\"\n"
+                                + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
+                                + "  puts 'An error occurred recreating schemes, but the build still might work...'\n"
+                                + "end\n";
+
+                    }
+
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
                             "main_class_name = \"" + request.getMainClass() + "\"\n" +
@@ -1644,6 +1766,7 @@ public class IPhoneBuilder extends Executor {
                                 tmpDir.getAbsolutePath() + "/dist/" +
                                 request.getMainClass() + ".xcodeproj\"\n" +
                             "xcproj = Xcodeproj::Project.open(project_file)\n" +
+                            installLocalizedStrings  +
                             "begin\n"
                             + "  xcproj.recreate_user_schemes\n"
                             + "rescue => e\n"
@@ -1757,7 +1880,13 @@ public class IPhoneBuilder extends Executor {
                         }
 
                     }
-                    if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "install")) {
+
+                    // We need to set default encoding for running pods
+                    // https://github.com/codenameone/CodenameOne/issues/3508
+                    Map<String,String> podEnv = new HashMap<String,String>();
+                    podEnv.put("LANG", "en_US.UTF-8");
+
+                    if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv, pod, "install")) {
                         // Perhaps we need to update the master repo
                         log("Failed to exec cocoapods.  Trying to update master repo...");
                         if (!exec(new File(tmpFile, "dist"), podTimeout * 3, pod, "repo", "update")) {
@@ -1768,10 +1897,10 @@ public class IPhoneBuilder extends Executor {
                             }
                         }
 
-                        if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "install")) {
+                        if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv,pod, "install")) {
                             log("Cocoapods failed even after updating master repo");
                             log("Trying to cleanup spec repos");
-                            if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "install")) {
+                            if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv,pod, "install")) {
                                 log("Cocoapods failed even after cleaning up spec repos.");
                                 return false;
                             }
@@ -1853,7 +1982,7 @@ public class IPhoneBuilder extends Executor {
                 sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
                 if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
                     sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");
-                } else if (!f.getName().endsWith("Info.plist")){
+                } else if (!f.getName().endsWith("Info.plist") && !f.getName().endsWith(".entitlements")){
                     sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
                 }
             } else {

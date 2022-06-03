@@ -31,6 +31,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -529,4 +530,5 @@ public class MediaManager {
         
         };
     }
+
 }

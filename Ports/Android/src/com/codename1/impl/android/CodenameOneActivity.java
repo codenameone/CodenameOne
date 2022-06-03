@@ -36,32 +36,21 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
 import android.widget.Toast;
+
 import com.codename1.payment.Product;
-import com.codename1.payment.PurchaseCallback;
-import com.codename1.payment.Receipt;
-import com.codename1.payments.v3.IabException;
-import com.codename1.payments.v3.IabHelper;
-import com.codename1.payments.v3.IabResult;
-import com.codename1.payments.v3.Inventory;
-import com.codename1.payments.v3.Purchase;
-import com.codename1.payments.v3.SkuDetails;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.UUID;
+
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class CodenameOneActivity extends Activity {
+
+
+
 
     private Menu menu;
     private boolean nativeMenu = false;
@@ -71,136 +60,8 @@ public class CodenameOneActivity extends Activity {
     private boolean background;
     private Vector intentResult = new Vector();
     boolean requestForPermission = false;
-    
-    //private final Object lock = new Object();
-    private Inventory inventory;
 
-    IabHelper mHelper;
-    // Listener that's called when we finish querying the items and subscriptions we own
-    IabHelper.QueryInventoryFinishedListener mGotInventoryListener = new IabHelper.QueryInventoryFinishedListener() {
-        public void onQueryInventoryFinished(IabResult result, Inventory inventory) {
-            // Have we been disposed of in the meantime? If so, quit.
-            if (mHelper == null) {
-                return;
-            }
-            
-            if (result.isFailure()) {
-                return;
-            }
-            List ownedItems = inventory.getAllOwnedSkus();
-            for (Iterator iterator = ownedItems.iterator(); iterator.hasNext();) {
-                String sku = (String)iterator.next();
-                if (!isConsumable(sku)) {
-                    continue;
-                }
-                //if the client own consumable products they need to be consumed
-                Purchase pur = inventory.getPurchase(sku);
-                if(pur.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
-                    mHelper.consumeAsync(pur, mConsumeFinishedListener);                
-                }
-            }
-            CodenameOneActivity.this.inventory = inventory;
-        }
-    };
-    IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
-        public void onIabPurchaseFinished(final IabResult result, final String sku, final Purchase purchase) {
-            // if we were disposed of in the meantime, quit.
-            if (mHelper == null) {
-                return;
-            }
-            final PurchaseCallback pc = getPurchaseCallback();
-            
-            if(result.isFailure()){
-                if (pc != null) {
-                    Display.getInstance().callSerially(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            pc.itemPurchaseError(sku, result.getMessage());
-                        }
-                    });
-                    return;
-                }                        
-            }
-
-            if (!verifyDeveloperPayload(purchase)) {
-                return;
-            }            
-
-            if(result.isSuccess()){
-                if (pc != null) {
-                    Display.getInstance().callSerially(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            // Sandbox transactions have no order ID, so we'll make a dummy transaction ID
-                            // in this case.
-                            String transactionId = (purchase.getOrderId() == null || purchase.getOrderId().isEmpty()) ? 
-                                    "play-sandbox-"+UUID.randomUUID().toString() : purchase.getOrderId();
-                            String purchaseJsonStr = purchase.getOriginalJson();
-                            try {
-                                // In order to verify receipts, we'll need both the order data and the signature
-                                // so we'll pack it all into a single JSON string.
-                                JSONObject purchaseJson = new JSONObject(purchaseJsonStr);
-                                JSONObject rootJson = new JSONObject();
-                                rootJson.put("data", purchaseJson);
-                                rootJson.put("signature", purchase.getSignature());
-                                purchaseJsonStr = rootJson.toString();
-                                
-                            } catch (JSONException ex) {
-                                Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                            com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchaseJsonStr);
-                            pc.itemPurchased(sku);     
-                        }
-                    });
-                    inventory.addPurchase(purchase);
-                    //This is a temp hack to get the last purchase raw data
-                    //The IAP API needs to be modified to support this on all platforms
-                    Display.getInstance().setProperty("lastPurchaseData", purchase.getOriginalJson());
-                }            
-            }
-
-            //check if this product is a non consumable product
-            if (!isConsumable(sku)) {
-                return;
-            }
-            if(purchase.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
-                mHelper.consumeAsync(purchase, mConsumeFinishedListener);                
-            }
-        }
-    };
-
-    // Called when consumption is complete
-    IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
-        public void onConsumeFinished(final Purchase purchase, final IabResult result) {
-
-            // if we were disposed of in the meantime, quit.
-            if (mHelper == null) {
-                return;
-            }
-
-            if (result.isFailure()) {
-                final PurchaseCallback pc = getPurchaseCallback();
-                if (pc != null) {
-                    Display.getInstance().callSerially(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            String sku = null;
-                            if(purchase != null){
-                                sku = purchase.getSku();
-                            }
-                            pc.itemPurchaseError(sku, result.getMessage());
-                        }
-                    });
-                }
-            }
-            if(purchase != null){
-                inventory.erasePurchase(purchase.getSku());
-            }
-        }
-    };
+    private IBillingSupport billingSupport;
 
     private PowerManager.WakeLock wakeLock;
 
@@ -212,57 +73,42 @@ public class CodenameOneActivity extends Activity {
     }
 
     boolean wasPurchased(String item) {
-        if(inventory != null){
-            return inventory.hasPurchase(item);
+        if (billingSupport != null) {
+            return billingSupport.wasPurchased(item);
         }
-        Display.getInstance().invokeAndBlock(new Runnable() {
-
-            @Override
-            public void run() {
-                while(inventory == null){
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ex) {                    
-                    }
-                }
-            }
-        });
-        return inventory.hasPurchase(item);        
+        return false;
     }
 
     void purchase(final String item) {
-        //waitingForResult = true;
-        this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mHelper.launchPurchaseFlow(CodenameOneActivity.this, item, IntentResultListener.PAYMENT,
-                        mPurchaseFinishedListener, getPayload());
-            }
-        });
+        if (billingSupport != null) billingSupport.purchase(item);
     }
+
 
     void subscribe(final String item) {
-        this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mHelper.launchPurchaseFlow(CodenameOneActivity.this,
-                        item, IabHelper.ITEM_TYPE_SUBS,
-                        IntentResultListener.PAYMENT, mPurchaseFinishedListener, getPayload());
-            }
-        });
+        if (billingSupport != null) billingSupport.subscribe(item);
     }
 
-    public PurchaseCallback getPurchaseCallback() {
-        Object app = getApp();
-        PurchaseCallback pc = app instanceof PurchaseCallback ? (PurchaseCallback) app : null;
-        return pc;
+
+    protected IBillingSupport createBillingSupport() {
+        return null;
     }
+
+    private IBillingSupport getBillingSupport() {
+        if (billingSupport == null) {
+            billingSupport = createBillingSupport();
+        }
+        return billingSupport;
+    }
+
 
     @Override
     protected void onResume() {
         super.onResume();
         AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
+        if (isBillingEnabled() && getBillingSupport() != null) {
+            billingSupport.consumeAndAcknowlegePurchases();
+        }
         background = false;
     }
 
@@ -318,26 +164,8 @@ public class CodenameOneActivity extends Activity {
                 if(k.length() == 0){
                     Log.e("Codename One", "android.licenseKey base64 is not configured");
                 }
-                mHelper = new IabHelper(this, getBase64EncodedPublicKey());
-                mHelper.enableDebugLogging(true);
-                mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
-                    public void onIabSetupFinished(IabResult result) {
+                getBillingSupport().initBilling();
 
-                        if (!result.isSuccess()) {
-                            // Oh noes, there was a problem.
-                            Log.e("Codename One", "Problem setting up in-app billing: " + result);
-                            return;
-                        }
-
-                        // Have we been disposed of in the meantime? If so, quit.
-                        if (mHelper == null) {
-                            return;
-                        }
-                        
-                        // IAB is fully set up. Now, let's get an inventory of stuff we own.
-                        mHelper.queryInventoryAsync(mGotInventoryListener);                        
-                    }
-                });
 
             }
         } catch (Throwable t) {
@@ -365,10 +193,7 @@ public class CodenameOneActivity extends Activity {
         super.onDestroy();
         AndroidNativeUtil.onDestroy();
         if (isBillingEnabled()) {
-            if (mHelper != null) {
-                mHelper.dispose();
-                mHelper = null;
-            }
+            getBillingSupport().onDestroy();
         }
         unlockScreen();
     }
@@ -534,10 +359,7 @@ public class CodenameOneActivity extends Activity {
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        //is this a payment result
-        if (mHelper != null && mHelper.handleActivityResult(requestCode, resultCode, data)) {
-            return;
-        }
+
         IntentResult response = new IntentResult(requestCode, resultCode, data);
         intentResult.add(response);
     }
@@ -606,7 +428,7 @@ public class CodenameOneActivity extends Activity {
     public void registerForPush(String key) {
         Intent registrationIntent = new Intent("com.google.android.c2dm.intent.REGISTER");
         registrationIntent.setPackage("com.google.android.gms");
-        registrationIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0)); // boilerplate
+        registrationIntent.putExtra("app", AndroidImplementation.getBroadcastPendingIntent(this, 0, new Intent())); // boilerplate
         registrationIntent.putExtra("sender", key);
         startService(registrationIntent);
     }
@@ -614,7 +436,7 @@ public class CodenameOneActivity extends Activity {
     public void stopReceivingPush() {
         Intent unregIntent = new Intent("com.google.android.c2dm.intent.UNREGISTER");
         unregIntent.setPackage("com.google.android.gms");
-        unregIntent.putExtra("app", PendingIntent.getBroadcast(this, 0, new Intent(), 0));
+        unregIntent.putExtra("app", AndroidImplementation.getBroadcastPendingIntent(this, 0, new Intent()));
         startService(unregIntent);
     }
 
@@ -643,61 +465,35 @@ public class CodenameOneActivity extends Activity {
         return key;
     }
 
-    boolean verifyDeveloperPayload(Purchase p) {
-        String payload = p.getDeveloperPayload();
 
-        return true;
-    }
 
     String getPayload() {
         return "";
     }
 
+
+
+
+
+
+
+    public boolean isConsumable(String item) {
+        if (getBillingSupport() != null) {
+            return getBillingSupport().isConsumable(item);
+        }
+        return false;
+    }
+
     Product[] getProducts(String[] skus){
-        return getProducts(skus, false);
+        if (getBillingSupport() != null) {
+            return getBillingSupport().getProducts(skus, false);
+        }
+        return new Product[0];
     }
     
-    Product[] getProducts(String[] skus, boolean fromCacheOnly){
-        
-        if(inventory != null){
-            ArrayList pList = new ArrayList<Product>();
-            ArrayList moreskusList = new ArrayList<Product>();
-            for (int i = 0; i < skus.length; i++) {
-                String sku = skus[i];
-                if(inventory.hasDetails(sku)){
-                    SkuDetails details = inventory.getSkuDetails(sku);
-                    Product p = new Product();
-                    p.setSku(sku);
-                    p.setDescription(details.getDescription());
-                    p.setDisplayName(details.getTitle());
-                    p.setLocalizedPrice(details.getPrice());
-                    pList.add(p);
-                }else{
-                    moreskusList.add(sku);
-                }                
-            }
-            //if the inventory does not all the requestes sku make an update.
-            if(moreskusList.size() > 0 && !fromCacheOnly){
-                try {
-                    inventory = mHelper.queryInventory(true, moreskusList);
-                    return getProducts(skus, true);
-                } catch (IabException ex) {
-                    Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            Product [] products = new Product[pList.size()];
-            products = (Product[]) pList.toArray(products);
-            return products;
-        }
-        return null;
-    }
+
     
-    public boolean isConsumable(String sku){
-        if (sku.endsWith("nonconsume")) {
-            return false;
-        }
-        return true;
-    }
+
 
     public void setRequestForPermission(boolean requestForPermission) {
         this.requestForPermission = requestForPermission;

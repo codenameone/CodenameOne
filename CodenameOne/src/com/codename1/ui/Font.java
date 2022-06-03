@@ -282,15 +282,25 @@ public class Font extends CN {
             }
             f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
             f.pixelSize = sizePixels;
+            f.fontUniqueId = fontUniqueId;
             f.ttf = true;
             derivedFontCache.put(key, f);
             return f;
         } else {
             // not sure if this ever happens but don't want to break that code
-        	Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
-        	f.pixelSize = sizePixels;
-        	f.ttf = true;
-            return f;
+            if (font != null) {
+                Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+                f.pixelSize = sizePixels;
+                f.ttf = true;
+                return f;
+            } else {
+                if (!ttf) {
+                    throw new IllegalArgumentException("Cannot derive font " + this + " because it is not a truetype font");
+                } else {
+                    throw new IllegalArgumentException("Cannot derive font "+ this +" because its native font representation is null.");
+                }
+            }
+
         }
     }
 

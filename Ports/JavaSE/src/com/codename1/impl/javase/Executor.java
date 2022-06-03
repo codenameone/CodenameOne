@@ -24,11 +24,13 @@ package com.codename1.impl.javase;
 
 import com.codename1.components.ToastBar;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.push.PushContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import java.awt.BorderLayout;
 import java.awt.Desktop;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -41,6 +43,10 @@ import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.prefs.Preferences;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -123,6 +129,9 @@ public class Executor {
     
     
     public static void main(final Class launcherClass, final String[] argv) throws Exception {
+        if (System.getProperty("cn1.simulator.useAppFrame", null) == null) {
+            System.setProperty("cn1.simulator.useAppFrame", "true");
+        }
         if(IS_MAC) {
             
             if (getJavaVersion() >= 9) {
@@ -188,20 +197,7 @@ public class Executor {
         } 
         
         setProxySettings();
-        if (CSSWatcher.isSupported()) {
-            // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
-            Timer t = new Timer();
-            TimerTask tt = new TimerTask() {
-                @Override
-                public void run() {
-                    CSSWatcher cssWatcher = new CSSWatcher();
-                    cssWatcher.start();
-                }
-            };
-            t.schedule(tt, 2000);
 
-        }
-        
         final Properties p = new Properties();
         String currentDir = System.getProperty("user.dir");
         File props = new File(currentDir, "codenameone_settings.properties");
@@ -226,11 +222,7 @@ public class Executor {
                 } catch (IOException ex) {
                 }
             }
-            
-            
-            
-            
-        
+
         } else {
             System.out.println("Cannot find codenameone_settings.properties at "+props);
         }
@@ -280,9 +272,22 @@ public class Executor {
                                 CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
                             }
                             Display.init(null);
+                            if (CSSWatcher.isSupported()) {
+                                // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
+                                Timer t = new Timer();
+                                TimerTask tt = new TimerTask() {
+                                    @Override
+                                    public void run() {
+                                        CSSWatcher cssWatcher = new CSSWatcher();
+                                        cssWatcher.start();
+                                    }
+                                };
+                                t.schedule(tt, 2000);
+
+                            }
                             
                             //if (isDebug && usingHotswapAgent) {
-                            if (System.getProperty("maven.home") != null) {
+                            if (MavenUtils.isRunningInMaven() && MavenUtils.isRunningInJDK()) {
                                 // In debug mode, when the Hotswap Agent is present, the simulator
                                 // will monitor all the source files for changes, and automatically
                                 // trigger a re-compile - then hotswap the classes.
@@ -299,6 +304,24 @@ public class Executor {
                             } else {
                                 System.out.println("Hotswap Agent not detected. To enable enhanced live class reloading feature, run with DCEVM JDK and add -XX:HotswapAgent=core to the VM options");
 
+                            }
+                            
+                            if (!MavenUtils.isRunningInJDK() && System.getProperty("cn1.jdk.warning", null) == null) {
+                                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                                boolean showJDKWarning = pref.getBoolean("showJDKWarning", true);
+                                if(showJDKWarning) {
+                                    System.getProperty("cn1.jdk.warning", "true");
+                                    JLabel message =
+                                            new JLabel("<html><p style='width:400px'>You are currently running inside Java Runtime environment that does not include development tools.  Some features, such as hot-reload require a full JDK and will be disabled.  \n\nPlease change your JAVA_HOME to be a full JDK.\n\n Your current JAVA_HOME is " + System.getProperty("java.home") + "</p></html>");
+                                    JPanel panel = new JPanel(new BorderLayout());
+                                    panel.add(message, BorderLayout.CENTER);
+                                    JCheckBox dontShowAgain = new JCheckBox("Don't Show this Again");
+                                    panel.add(dontShowAgain, BorderLayout.SOUTH);
+                                    JOptionPane.showMessageDialog(null, panel);
+                                    if (dontShowAgain.isSelected()) {
+                                        pref.putBoolean("showJDKWarning", false);
+                                    }
+                                }
                             }
                             
                             Display.getInstance().callSerially(new Runnable() {
@@ -798,7 +821,10 @@ public class Executor {
             if (srcMain.exists()) {
                 sourceWatcher.addWatchFolder(srcMain);
             }
-
+            File srcMainKotlin = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "kotlin");
+            if (srcMainKotlin.exists()) {
+                sourceWatcher.addWatchFolder(srcMainKotlin);
+            }
 
             File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
             if (srcRad.exists()) {

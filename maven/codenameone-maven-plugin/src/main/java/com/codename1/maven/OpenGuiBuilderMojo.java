@@ -179,6 +179,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
             formName = formName.substring(0, formName.length() - 5);
             fos.write(("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<con name=\"" + xmlize(projectName) +
+                    "\" supportsEvents=\"false" + // The we disable the events panel in maven because event handler generation doesn't yet work properly.
                     "\" formName=\"" + xmlize(formName) +
                     "\"  file=\"" + xmlize(guiFile.toURI().toURL().toExternalForm()) +
                     "\" javaFile=\"" + xmlize(javaSourceFile.toURI().toURL().toExternalForm()) +

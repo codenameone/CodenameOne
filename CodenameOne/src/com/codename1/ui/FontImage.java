@@ -9508,14 +9508,14 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverIcon(FontImage.create("" + icon, sel));
             } else {
                 b.setRolloverIcon(null);
             }
-            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icon, pre));
@@ -9523,7 +9523,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icon, dis));
@@ -9565,7 +9565,7 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
@@ -9573,7 +9573,7 @@ public class FontImage extends Image {
                 b.setRolloverPressedIcon(null);
             }
             
-            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
@@ -9581,7 +9581,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icons[Math.min(4, icons.length-1)], dis));
@@ -9670,17 +9670,17 @@ public class FontImage extends Image {
         Style sel = uim.getComponentSelectedStyle(uiid);
         Style pre = uim.getComponentCustomStyle(uiid, "press");
         Style dis = uim.getComponentCustomStyle(uiid, "dis");;
-        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
             sel = new Style(sel);
             sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
             c.setRolloverIcon(FontImage.create("" + icon, sel));
         }
-        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
             pre = new Style(pre);
             pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
             c.setPressedIcon(FontImage.create("" + icon, pre));
         }
-        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
             dis = new Style(dis);
             dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
             c.setDisabledIcon(FontImage.create("" + icon, dis));
@@ -9906,6 +9906,7 @@ public class FontImage extends Image {
     private int backgroundColor;
     private byte backgroundOpacity;
     private int opacity=-1;
+    private int fgAlpha =255;
 
     private Motion rotationMotion;
     
@@ -10000,6 +10001,7 @@ public class FontImage extends Image {
         f.text = text;
         f.color = s.getFgColor();
         f.opacity = s.getOpacity();
+        f.fgAlpha = s.getFgAlpha();
         f.fnt = fnt;
         int w = Math.max(f.getHeight(), f.fnt.stringWidth(text)) + (f.padding * 2);
         f.width = w;
@@ -10097,20 +10099,20 @@ public class FontImage extends Image {
         Font oldFont = g.getFont();
 
         if (opacity > 0 && opacity < 255) {
-            g.setAlpha(opacity);
+            g.concatenateAlpha(opacity);
         }
         
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
             g.fillRect(x, y, width, height, (byte) backgroundOpacity);
         }
-
         g.setColor(color);
         g.setFont(fnt);
         int w = fnt.stringWidth(text);
         int h = Math.round(fnt.getPixelSize());
         if (h <= 0) h = fnt.getHeight();
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
+        if (fgAlpha< 255) g.concatenateAlpha(fgAlpha);
         if (rotated != 0) {
             int tX = g.getTranslateX();
             int tY = g.getTranslateY();
@@ -10144,6 +10146,7 @@ public class FontImage extends Image {
 
         Font oldFont = g.getFont();
         Font t = sizeFont(fnt, Math.min(h, w), padding);
+        int alpha = g.concatenateAlpha(fgAlpha);
         g.setColor(color);
         g.setFont(t);
         int ww = t.stringWidth(text);
@@ -10165,6 +10168,7 @@ public class FontImage extends Image {
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
+        g.setColor(alpha);
     }
 
     /**
@@ -10269,6 +10273,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
         f.opacity = opacity;
+        f.fgAlpha = fgAlpha;
         return f;
     }
 
@@ -10280,6 +10285,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 90;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
 
@@ -10291,6 +10297,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 270;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
 
@@ -10302,6 +10309,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 180;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
     
@@ -10361,6 +10369,15 @@ public class FontImage extends Image {
      */
     public void setBgTransparency(int t) {
         backgroundOpacity = (byte)t;
+    }
+
+    /**
+     * Sets the alpha for the text foreground color.
+     * @param alpha 0-255 alpha value.
+     * @since 8.0
+     */
+    public void setFgAlpha(int alpha) {
+        fgAlpha = alpha;
     }
     
     /**

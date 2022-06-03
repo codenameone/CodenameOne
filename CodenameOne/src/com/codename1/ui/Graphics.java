@@ -194,6 +194,20 @@ public final class Graphics {
         color = 0xffffff & RGB;
         impl.setColor(nativeGraphics, color);
     }
+
+    /**
+     * Sets the current rgb color while ignoring any potential alpha component within
+     * said color value.
+     *
+     * @param RGB the RGB value for the color.
+     * @return The previous color value.
+     * @since 8.0
+     */
+    public int setAndGetColor(int RGB) {
+        int old = getColor();
+        setColor(RGB);
+        return old;
+    }
     
     /**
      * Sets paint to be used for filling shapes.  This is only used for the {@link #fillShape(com.codename1.ui.geom.Shape) } method.
@@ -365,6 +379,10 @@ public final class Graphics {
      */
     public void fillRect(int x, int y, int width, int height) {
         impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+    }
+
+    public void drawShadow(Image img, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        impl.drawShadow(nativeGraphics, img.getImage(), xTranslate + x, yTranslate + y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
     }
     
     /**
@@ -1099,6 +1117,34 @@ public final class Graphics {
      */
     public void setAlpha(int a) {
         impl.setAlpha(nativeGraphics, a);
+    }
+
+    /**
+     * Sets alpha as a value between 0-255 (0 - 0xff) where 255 is completely opaque
+     * and 0 is completely transparent
+     *
+     * @param a the alpha value
+     * @return The previous alpha value.
+     */
+    public int setAndGetAlpha(int a) {
+        int old = getAlpha();
+        setAlpha(a);
+        return old;
+    }
+
+    /**
+     * Concatenates the given alpha value to the current alpha setting, and returns the previous alpha
+     * setting.
+     * @param a Alpha value to concatenate (0-255).
+     * @return The previous alpha setting (0-255).
+     * @since 7.0
+     */
+    public int concatenateAlpha(int a) {
+        if (a == 255) return getAlpha();
+
+        int oldAlpha = getAlpha();
+        setAlpha((int)(oldAlpha * (a/255f)));
+        return oldAlpha;
     }
     
     /**

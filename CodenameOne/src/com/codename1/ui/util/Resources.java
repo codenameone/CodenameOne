@@ -1444,11 +1444,35 @@ public class Resources {
                 theme.put(key, "" + (input.readByte() & 0xff));
                 continue;
             } 
-            
+
+            if (key.endsWith("fgAlpha")) {
+                theme.put(key, (input.readInt() & 0xff));
+                continue;
+            }
             if(key.endsWith("opacity")) {
                 theme.put(key, "" + (input.readInt() & 0xff));
                 continue;
-            } 
+            }
+
+            if (key.endsWith("elevation")) {
+                theme.put(key, (input.readInt() & 0xff));
+                continue;
+            }
+
+            if (key.endsWith("iconGap")) {
+                theme.put(key, input.readFloat());
+                continue;
+            }
+
+            if (key.endsWith("iconGapUnit")) {
+                theme.put(key, input.readByte());
+                continue;
+            }
+
+            if (key.endsWith("surface")) {
+                theme.put(key, (input.readBoolean()));
+                continue;
+            }
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {
@@ -1683,9 +1707,17 @@ public class Resources {
                 }
                 if (Math.abs(scale-1f) > 0.01) {
                     for (String fontKey : fontKeys) {
-                        Font f = (Font)theme.get(fontKey);
-                        f = f.derive(f.getPixelSize() * scale, f.getStyle());
-                        theme.put(fontKey, f);
+                        Font f = (Font) theme.get(fontKey);
+                        if (f != null && f.isTTFNativeFont()) {
+                            try {
+                                f = f.derive(f.getPixelSize() * scale, f.getStyle());
+                                theme.put(fontKey, f);
+                            } catch (Exception ex) {
+                                Log.p("Failed to derive font " + f + " while loading font key " + fontKey + " from resource file. " + ex.getMessage());
+                                Log.e(ex);
+                            }
+                        }
+
                     }
                 }
             }

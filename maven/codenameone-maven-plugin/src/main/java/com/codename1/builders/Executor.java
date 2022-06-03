@@ -97,6 +97,7 @@ public abstract class Executor {
     private boolean unitTestMode;
     private String platform;
     static boolean IS_MAC;
+    protected final Map<String,String> defaultEnvironment = new HashMap<String,String>();
 
 
 
@@ -462,7 +463,7 @@ public abstract class Executor {
 
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
-        for (File current : list) {
+        for (final File current : list) {
             if (current.isDirectory()) {
                 scanClassesForPermissions(current, scanner);
             } else {
@@ -650,7 +651,8 @@ public abstract class Executor {
                         message.append(getCustomStackTrace(re));
                         message.append("Error encountered while parsing the class ");
                         message.append(current.getName());
-                        throw re;
+                        throw new RuntimeException("Failed to parse class file "+current, re);
+
                     }
                 }
             }
@@ -1106,7 +1108,11 @@ public abstract class Executor {
             }
             File destFile;
             if (fileName.endsWith(".class")) {
-                destFile = new File(classesDir, fileName);
+                if (fileName.equals("module-info.class")) {
+                    continue;
+                } else {
+                    destFile = new File(classesDir, fileName);
+                }
             } else {
                 if (fileName.endsWith(".java") || fileName.endsWith(".m") || fileName.endsWith(".h") || fileName.endsWith(".cs")) {
                     destFile = new File(sourceDir, fileName);
@@ -1331,7 +1337,12 @@ public abstract class Executor {
                 // write the files to the disk
                 File destFile;
                 if (entryName.endsWith(".class")) {
-                    destFile = new File(classesDir, entryName);
+                    if (entryName.endsWith("module-info.class")) {
+                        log("!!!!Skipping "+entryName);
+                        continue;
+                    } else {
+                        destFile = new File(classesDir, entryName);
+                    }
                 } else {
                     if (entryName.endsWith(".java") || entryName.endsWith(".m") || entryName.endsWith(".h") || entryName.endsWith(".cs")) {
                         destFile = new File(sourceDir, entryName);
@@ -1464,6 +1475,7 @@ public abstract class Executor {
 
         StringBuilder response = new StringBuilder();
         ProcessBuilder p = new ProcessBuilder(varArgs).directory(dir);
+        p.environment().putAll(defaultEnvironment);
         int val = executeProcess(p, -1, response);
         if (val != 0) {
             if (withThrow) {
@@ -1563,6 +1575,7 @@ public abstract class Executor {
         }
 
         ProcessBuilder p = new ProcessBuilder(varArgs).directory(dir);
+        p.environment().putAll(defaultEnvironment);
         if (env != null) {
             p.environment().putAll(env);
         }

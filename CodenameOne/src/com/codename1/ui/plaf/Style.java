@@ -87,6 +87,11 @@ public class Style {
     public static final String FG_COLOR = "fgColor";
 
     /**
+     * Foreground alpha attribute name for the theme hashtable
+     */
+    public static final String FG_ALPHA = "fgAlpha";
+
+    /**
      * Background image attribute name for the theme hashtable 
      */
     public static final String BG_IMAGE = "bgImage";
@@ -122,6 +127,29 @@ public class Style {
      * Opacity attribute name for the theme hashtable 
      */
     public static final String OPACITY = "opacity";
+
+
+    /**
+     * Elevation attribute name for the theme hashtable.
+     */
+    public static final String ELEVATION = "elevation";
+
+    /**
+     * Icon gap attribute name for the theme hashtable.
+     * @since 8.0
+     */
+    public static final String ICON_GAP = "iconGap";
+
+    /**
+     * Icon gap unit attribute.
+     * @since 8.0
+     */
+    public static final String ICON_GAP_UNIT = "iconGapUnit";
+
+    /**
+     * Surface attribute name for the theme hashtable.
+     */
+    public static final String SURFACE = "surface";
 
     /**
      * Margin attribute name for the theme hashtable 
@@ -403,6 +431,7 @@ public class Style {
 
 
     private int fgColor = 0x000000;
+    private int fgAlpha = 0xff;
     private int bgColor = 0xFFFFFF;
     private Font font = Font.getDefaultFont();
     private Image bgImage;
@@ -426,6 +455,10 @@ public class Style {
     private byte transparency = (byte) 0xFF; //no transparency
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
+    private int elevation; // the elevation.
+    private float iconGap = -1;
+    private byte iconGapUnit;
+    private boolean surface; // whether this should be treated as a surface
 
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
     private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;
@@ -440,7 +473,7 @@ public class Style {
      * The modified flag indicates which portions of the style have changed using
      * bitmask values
      */
-    private int modifiedFlag;
+    private long modifiedFlag;
     /**
      * Used for modified flag
      */
@@ -458,7 +491,7 @@ public class Style {
      * Used for modified flag
      */
     private static final int BG_IMAGE_MODIFIED = 32;
-
+    private static final int TEXT_DECORATION_MODIFIED = 64;
     /**
      * Used for modified flag
      */
@@ -485,8 +518,10 @@ public class Style {
 
     private static final int ALIGNMENT_MODIFIED = 16384;
     private static final int OPACITY_MODIFIED = 32768;
-    private static final int TEXT_DECORATION_MODIFIED = 64;
-
+    private static final int ELEVATION_MODIFIED = 65536;
+    private static final int SURFACE_MODIFIED = 131072;
+    private static final int FG_ALPHA_MODIFIED = 262144;
+    private static final int ICON_GAP_MODIFIED = 524288;
 
     private EventDispatcher listeners;
 
@@ -550,6 +585,11 @@ public class Style {
         setPaddingUnit(style.paddingUnit);
         setMarginUnit(style.marginUnit);
         setBorder(style.getBorder());
+        fgAlpha = style.fgAlpha;
+        elevation = style.elevation;
+        iconGap = style.iconGap;
+        iconGapUnit = style.iconGapUnit;
+        surface = style.surface;
         opacity = style.opacity;
         modifiedFlag = 0;
         align = style.align;
@@ -624,10 +664,13 @@ public class Style {
      * @param style new values of styles from the current theme
      */
     public void merge(Style style) {
-        int tmp = modifiedFlag;
+        long tmp = modifiedFlag;
 
         if ((modifiedFlag & FG_COLOR_MODIFIED) == 0) {
             setFgColor(style.getFgColor());
+        }
+        if ((modifiedFlag & FG_ALPHA_MODIFIED) == 0) {
+            setFgAlpha(style.getFgAlpha());
         }
         if ((modifiedFlag & BG_COLOR_MODIFIED) == 0) {
             setBgColor(style.getBgColor());
@@ -688,9 +731,57 @@ public class Style {
             setAlignment(style.getAlignment());
         }
 
+        if ((modifiedFlag & ELEVATION_MODIFIED) == 0) {
+            setElevation(style.getElevation());
+        }
+        if ((modifiedFlag & ICON_GAP_MODIFIED) == 0) {
+            setIconGap(style.iconGap, style.iconGapUnit);
+        }
+        if ((modifiedFlag & SURFACE_MODIFIED) == 0) {
+            setSurface(style.isSurface());
+        }
+
         this.bgPainter = style.bgPainter;
         modifiedFlag = tmp;
     }
+
+    /**
+     * Gets the elevation value of this style.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @return The elevation value.  Default is 0.
+     * @since 8.0
+     */
+    public int getElevation() {
+        return elevation;
+    }
+
+    /**
+     * Returns the icon gap in pixels.
+     * @return
+     * @since 8.0
+     */
+    public int getIconGap() {
+        if (iconGap < 0) return -1;
+        return CN.convertToPixels(iconGap, iconGapUnit);
+    }
+
+    /**
+     * Returns the icon gap unit.  One of {@link #UNIT_TYPE_REM}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_VMIN},
+     * {@link #UNIT_TYPE_VH}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_DIPS},
+     * {@link #UNIT_TYPE_PIXELS}
+     * @return The icon gap unit
+     * @since 8.0
+     */
+    public int getIconGapUnit() {
+        return iconGapUnit;
+    }
+
+    /**
+     * Checks whether the component is a surface.  Surface containers support a sort of z-index of descendants
+     * via the elevation attribute.  Surfaces will render the shadows of elevated descendants to convey depth.
+     * @return True if container should be rendered as a surface.
+     * @since 8.0
+     */
+    public boolean isSurface() { return surface; }
 
     /**
      * Returns true if the style was modified manually after it was created by the
@@ -817,12 +908,184 @@ public class Style {
     }
 
     /**
+     * Foreground alpha for the component
+     *
+     * @return the foreground alpha for the component
+     * @since 8.0
+     */
+    public int getFgAlpha() {
+        return fgAlpha;
+    }
+
+    /**
      * Font for the component
      *
      * @return the font for the component
      */
     public Font getFont() {
         return font;
+    }
+
+    /**
+     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @param elevation The elevation value.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setElevation(int elevation, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setElevation(elevation, override);
+            }
+            return;
+        }
+        if (this.elevation != elevation) {
+            this.elevation = elevation;
+            if (!override) {
+                modifiedFlag |= ELEVATION_MODIFIED;
+            }
+            firePropertyChanged(ELEVATION);
+        }
+
+    }
+
+    /**
+     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+     * @param elevation The elevation value.
+     * @since 8.0
+     */
+    public void setElevation(int elevation) {
+        setElevation(elevation, false);
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap The gap.
+     * @param units The units of the gap.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     * @see #setIconGapUnit(byte, boolean)
+     */
+    public void setIconGap(float gap, byte units, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setIconGap(gap, units, override);
+            }
+            return;
+        }
+        if (units != iconGapUnit || Math.abs(gap - iconGap) > 0.0001) {
+            iconGap = gap;
+            iconGapUnit = units;
+            if (!override) {
+                modifiedFlag |= ICON_GAP_MODIFIED;
+            }
+            firePropertyChanged(ICON_GAP);
+        }
+
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap the icon gap.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     * @see #setIconGapUnit(byte, boolean)
+     */
+    public void setIconGap(float gap, boolean override) {
+        setIconGap(gap, iconGapUnit, override);
+    }
+
+    /**
+     * Sets the icon gap.
+     * @param gap The icon gap.
+     * @param unit The unit. One of the standard style units of measurement.
+     * @since 8.0
+     */
+    public void setIconGap(float gap, byte unit) {
+        setIconGap(gap, unit, false);
+    }
+
+    /**
+     * Sets the icon gap in the current units.
+     * @param gap The icon gap.
+     * @since 8.0
+     * @see #getIconGapUnit()
+     */
+    public void setIconGap(float gap) {
+        setIconGap(gap, false);
+    }
+
+    /**
+     * Sets the icon gap unit.
+     * @param unit The icon gap unit.  One of the standard style units of measurement.
+     * @param override If set to true allows the look and feel/theme to override
+     *      the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setIconGapUnit(byte unit, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setIconGapUnit(unit);
+            }
+            return;
+        }
+        if (unit != iconGapUnit) {
+            this.iconGapUnit = unit;
+            if (!override) {
+                modifiedFlag |= ICON_GAP_MODIFIED;
+            }
+            firePropertyChanged(ICON_GAP);
+        }
+    }
+
+    /**
+     * Sets the icon gap unit.
+     * @param unit The icon gap unit.  One of the standard style units of measurement.
+     * @since 8.0
+     */
+    public void setIconGapUnit(byte unit) {
+        setIconGapUnit(unit, false);
+    }
+
+    /**
+     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+     * z-indexing of its descendants via their elevation properties.  The surface will render
+     * the shadows of elevated descendants to convey depth.
+     *
+     * @param surface True to enable surface rendering mode.
+     * @param override  If set to true allows the look and feel/theme to override
+     *     the value in this attribute when changing a theme/look and feel
+     * @since 8.0
+     */
+    public void setSurface(boolean surface, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setSurface(surface, override);
+            }
+            return;
+        }
+        if (this.surface != surface) {
+            this.surface = surface;
+            if (!override) {
+                modifiedFlag |= SURFACE_MODIFIED;
+            }
+            firePropertyChanged(SURFACE);
+        }
+    }
+
+    /**
+     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+     * z-indexing of its descendants via their elevation properties.  The surface will render
+     * the shadows of elevated descendants to convey depth.
+     *
+     * @param surface True to enable surface rendering mode.
+     * @since 8.0
+     */
+    public void setSurface(boolean surface) {
+        setSurface(surface, false);
     }
 
     /**
@@ -974,6 +1237,15 @@ public class Style {
      */
     public void setFgColor(int fgColor) {
         setFgColor(fgColor, false);
+    }
+
+    /**
+     * Sets the foreground alpha for the component
+     *
+     * @param fgAlpha foreground alpha
+     */
+    public void setFgAlpha(int fgAlpha) {
+        setFgAlpha(fgAlpha, false);
     }
 
     /**
@@ -1518,7 +1790,8 @@ public class Style {
     
     /**
      * Sets left padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *      {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitLeft(byte unit) {
@@ -1528,7 +1801,8 @@ public class Style {
     
     /**
      * Sets right padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitRight(byte unit) {
@@ -1538,7 +1812,8 @@ public class Style {
     
     /**
      * Sets top padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *    {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitTop(byte unit) {
@@ -1548,7 +1823,8 @@ public class Style {
     
     /**
      * Sets bottom padding unit.
-     * @param unit One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setPaddingUnitBottom(byte unit) {
@@ -2320,6 +2596,29 @@ public class Style {
     }
 
     /**
+     * Sets the foreground alpha for the component
+     *
+     * @param fgAlpha foreground alpha
+     * @param override If set to true allows the look and feel/theme to override
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setFgAlpha(int fgAlpha, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setFgAlpha(fgAlpha, override);
+            }
+            return;
+        }
+        if (this.fgAlpha != fgAlpha) {
+            this.fgAlpha = fgAlpha;
+            if (!override) {
+                modifiedFlag |= FG_ALPHA_MODIFIED;
+            }
+            firePropertyChanged(FG_ALPHA);
+        }
+    }
+
+    /**
      * Sets the font for the component
      * 
      * @param font the font
@@ -2698,8 +2997,8 @@ public class Style {
     
     /**
      * Sets left margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitLeft(byte unit) {
@@ -2709,8 +3008,8 @@ public class Style {
     
     /**
      * Sets right margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitRight(byte unit) {
@@ -2720,8 +3019,8 @@ public class Style {
     
     /**
      * Sets top margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitTop(byte unit) {
@@ -2731,8 +3030,8 @@ public class Style {
     
     /**
      * Sets bottom margin unit.
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *      * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
+     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
+     *       {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
      * @since 7.0
      */
     public void setMarginUnitBottom(byte unit) {
@@ -2750,6 +3049,9 @@ public class Style {
         }
         final Style other = (Style) obj;
         if(this.fgColor != other.fgColor) {
+            return false;
+        }
+        if(this.fgAlpha != other.fgAlpha) {
             return false;
         }
         if(this.bgColor != other.bgColor) {
@@ -2799,6 +3101,12 @@ public class Style {
             return false;
         }
         if(this.textDecoration != other.textDecoration) {
+            return false;
+        }
+        if (this.elevation != other.elevation) {
+            return false;
+        }
+        if (this.surface != other.surface) {
             return false;
         }
         return true;

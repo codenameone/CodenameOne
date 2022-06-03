@@ -5,6 +5,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.sun.nio.file.SensitivityWatchEventModifier;
@@ -12,6 +13,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.net.ssl.HttpsURLConnection;
 import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -22,15 +24,15 @@ import javax.xml.transform.stream.StreamResult;
 import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Method;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.net.URL;
+import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  *
@@ -43,6 +45,7 @@ public class SourceChangeWatcher implements Runnable {
     private List<Watch> watches = new ArrayList<Watch>();
     private boolean stopped;
     private Object app;
+    private final static boolean isWindows = File.separatorChar == '\\';
     
     public void setApp(Object obj) {
         this.app = obj;
@@ -160,10 +163,6 @@ public class SourceChangeWatcher implements Runnable {
             }
         }
 
-
-
-
-
     }
 
     private String parentEntityViewClass = "AbstractEntityView", viewModelType = "Entity" ;
@@ -235,6 +234,8 @@ public class SourceChangeWatcher implements Runnable {
     private String escapeJava(String str) {
         return str.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
+
+
 
     private void generateRADViewClass(File xmlViewFile) throws IOException {
         //getLog().debug("Generating RAD View for XML template "+xmlViewFile);
@@ -322,7 +323,10 @@ public class SourceChangeWatcher implements Runnable {
 
 
 
+
     private boolean recompileWithJavac(Path path) throws IOException, InterruptedException {
+
+
         int hotReloadSetting = Integer.parseInt(System.getProperty("hotReload", "0"));
         if (hotReloadSetting == 0) return false;
 
@@ -348,14 +352,12 @@ public class SourceChangeWatcher implements Runnable {
             return false;
         }
 
-        String mavenHome = System.getProperty("maven.home");
-        if (mavenHome == null) {
-            Log.p("Not recompiling path "+path+" because maven.home system property was not found.");
-            return false;
-        }
 
         String javaHome = System.getProperty("java.home");
-        File javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+        File javac = MavenUtils.findJavac();
+        if (javac == null) {
+            javac = new File(new File(javaHome), "bin" + File.separator + "javac");
+        }
         if (!javac.exists()) {
             javac = new File(javac.getParentFile(), "javac.exe");
 
@@ -379,31 +381,59 @@ public class SourceChangeWatcher implements Runnable {
         classPath.append(classDestination.getAbsolutePath()).append(File.pathSeparator);
         classPath.append(System.getProperty("cn1.maven.compileClasspathElements", ""));
 
-
+        boolean isKotlinFile = path.toFile().getName().endsWith(".kt");
 
         File generatedSources = new File(getCN1ProjectDir(path.toFile()), "target" + File.separator + "generated-sources" + File.separator + "annotations");
         File sourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : new File(getCN1ProjectDir(path.toFile()), "src" + File.separator + "main" + File.separator + "java");
-        String recompilingClass = isRADView ?
+        File kotlinSourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : new File(getCN1ProjectDir(path.toFile()), "src" + File.separator + "main" + File.separator + "kotlin");
+        String recompilingClass = isKotlinFile ?
+                path.toFile().getAbsolutePath().substring(kotlinSourcePath.getAbsolutePath().length()+1) :
+                isRADView ?
                 getDestClassForRADView(path.toFile()).getAbsolutePath().substring(getRADGeneratedSourcesDirectory(path.toFile()).getAbsolutePath().length()+1) :
                 path.toFile().getAbsolutePath().substring(sourcePath.getAbsolutePath().length()+1);
                 ;
+
         System.out.println("Recompiling "+recompilingClass);
         //System.out.println("getestClassForRADView: "+getDestClassForRADView(path.toFile()));
         //System.out.println("getRADGeneratedSourcesDirectory: "+getRADGeneratedSourcesDirectory(path.toFile()));
         //System.out.println("ClassPath: "+classPath);
-        ProcessBuilder pb = new ProcessBuilder(
-                javac.getAbsolutePath(),
-                "-cp" , classPath.toString(),
-                "-d", classDestination.getAbsolutePath(),
-                "-source", "1.8",
-                "-target", "1.8",
-                "-encoding", "utf-8",
-                "-s", generatedSources.getAbsolutePath(),
-                "-sourcepath", sourcePath.getAbsolutePath(),
-                recompilingClass
-                );
-        pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
-        pb.directory(sourcePath);
+
+        ProcessBuilder pb;
+        if (isKotlinFile) {
+            downloadKotlinCompiler();
+            File kotlincDir = findKotlinCompilerDir();
+            File kotlinc = new File(kotlincDir, "bin" + File.separator + "kotlinc");
+            if (isWindows) {
+                kotlinc = new File(kotlincDir, "bin" + File.separator + "kotlinc.bat");
+            }
+            try {
+                kotlinc.setExecutable(true, false);
+            } catch (Exception ex){}
+
+            pb = new ProcessBuilder(
+                    kotlinc.getAbsolutePath(),
+                    "-classpath", classPath.toString(),
+                    "-d", classDestination.getAbsolutePath(),
+                    "-jvm-target", "1.8",
+                    recompilingClass
+            );
+            pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
+            pb.directory(kotlinSourcePath);
+        } else {
+            pb = new ProcessBuilder(
+                    javac.getAbsolutePath(),
+                    "-cp", classPath.toString(),
+                    "-d", classDestination.getAbsolutePath(),
+                    "-source", "1.8",
+                    "-target", "1.8",
+                    "-encoding", "utf-8",
+                    "-s", generatedSources.getAbsolutePath(),
+                    "-sourcepath", sourcePath.getAbsolutePath(),
+                    recompilingClass
+            );
+            pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
+            pb.directory(sourcePath);
+        }
         pb.inheritIO();
         Process p = pb.start();
         int result = p.waitFor();
@@ -476,62 +506,6 @@ public class SourceChangeWatcher implements Runnable {
             System.setProperty("reload.simulator", "true");
             return true;
         }
-
-        /*
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-
-                final Sheet sheet = new Sheet(null, "Source Change Detected");
-                Container contentPane = sheet.getContentPane();
-                contentPane.setLayout(new BorderLayout());
-                contentPane.add(BorderLayout.CENTER, new SpanLabel("Changes were detected to files in the classpath.  Apply these changes now and refresh?"));
-                Container buttons = new Container(BoxLayout.y());
-                Button refreshSimulator = new Button("Refresh Simulator");
-                Button refreshForm = new Button("Refresh Current Form");
-                Button ignore = new Button("Ignore");
-
-                refreshSimulator.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        stopped = true;
-                        System.setProperty("reload.simulator", "true");
-                        sheet.back();
-                    }
-                });
-
-
-                refreshForm.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-
-
-                        try {
-
-                            System.setProperty("restore-to-bookmark", "true");
-                            CN.restoreToBookmark();
-
-                        } catch (Exception ex) {
-                            Log.e(ex);
-                        }
-                    }
-                });
-
-                ignore.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                    }
-                });
-
-                buttons.addAll(refreshForm, refreshSimulator, ignore);
-                contentPane.add(BorderLayout.SOUTH, buttons);
-                sheet.setPosition(BorderLayout.CENTER);
-                sheet.show();
-
-
-
-
-            }
-        });
-        */
         return true;
 
 
@@ -780,8 +754,10 @@ public class SourceChangeWatcher implements Runnable {
                             File changedFile = new File(path.toFile(), evt.context().toString());
                             File cn1ProjectDir = getCN1ProjectDir(changedFile);
                             File commonSrcDir = cn1ProjectDir == null ? null : new File(cn1ProjectDir, "src" + File.separator + "main" + File.separator + "java");
+                            File kotlinSrcDir = cn1ProjectDir == null ? null : new File(cn1ProjectDir, "src" + File.separator + "main" + File.separator + "kotlin");
+                            boolean isEligibleKotlinFile = kotlinSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".kt") && changedFile.toPath().startsWith(kotlinSrcDir.toPath());
                             boolean isEligibleJavaFile = commonSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".java") && changedFile.toPath().startsWith(commonSrcDir.toPath());
-                            if (isRADView(changedFile.toPath()) || isEligibleJavaFile) {
+                            if (isRADView(changedFile.toPath()) || isEligibleJavaFile || isEligibleKotlinFile) {
                                 fileToRecompile = changedFile.toPath();
                             }
                             if (changedFile.isDirectory()) {
@@ -847,5 +823,137 @@ public class SourceChangeWatcher implements Runnable {
     public boolean hasWatchFolder(File path) {
         return watchDirectories.contains(path);
     }
-    
+
+
+    private String findKotlinVersion() {
+        String classPath = System.getProperty("cn1.class.path", null);
+        if (classPath == null) return null;
+
+        Pattern regex = Pattern.compile("kotlin-stdlib-([\\d\\.\\-]+)\\.jar");
+        Matcher matcher = regex.matcher(classPath);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    private void downloadKotlinCompiler() throws IOException {
+
+        String kotlinVersion = findKotlinVersion();
+        if (kotlinVersion == null) {
+            System.out.println("Cannot find kotlin version.  Skipping kotlin compiler download");
+            throw new IOException("Cannot download kotlin compiler because no kotlin version could be found");
+        }
+        String codenameOneHome = System.getProperty("user.home") + File.separator + ".codenameone";
+        String kotlinc = codenameOneHome + File.separator + "kotlinc";
+        String kotlincVersionPath = kotlinc + File.separator + kotlinVersion;
+        File kotlincVersionDir = new File(kotlincVersionPath);
+        if (kotlincVersionDir.exists()) {
+            System.out.println(kotlincVersionDir+" already exists");
+            return;
+        }
+
+        String url = "https://github.com/JetBrains/kotlin/releases/download/v"+kotlinVersion+"/kotlin-compiler-"+kotlinVersion+".zip";
+        URL u = new URL(url);
+        System.out.print("Downloading kotlin command-line compiler from "+url+"...");
+        HttpsURLConnection conn = (HttpsURLConnection)u.openConnection();
+        conn.setInstanceFollowRedirects(true);
+
+
+        unzipFolder(conn.getInputStream(), kotlincVersionDir.toPath());
+        System.out.println("Done.");
+
+    }
+
+    private File findKotlinCompilerDir() throws IOException {
+        String kotlinVersion = findKotlinVersion();
+        if (kotlinVersion == null) {
+            System.out.println("Cannot find kotlin version.  Skipping kotlin compiler download");
+            throw new IOException("Cannot download kotlin compiler because no kotlin version could be found");
+        }
+        String codenameOneHome = System.getProperty("user.home") + File.separator + ".codenameone";
+        String kotlinc = codenameOneHome + File.separator + "kotlinc";
+        String kotlincVersionPath = kotlinc + File.separator + kotlinVersion;
+        File kotlincVersionDir = new File(kotlincVersionPath);
+        return new File(kotlincVersionDir + File.separator + "kotlinc");
+
+
+    }
+
+
+    public static void unzipFolder(InputStream source, Path target) throws IOException {
+        System.out.println("Unzipping folder to "+target.toFile());
+        try (ZipInputStream zis = new ZipInputStream(source)) {
+
+            // list files in zip
+            ZipEntry zipEntry = zis.getNextEntry();
+
+            while (zipEntry != null) {
+                System.out.println("Entry: "+zipEntry);
+                boolean isDirectory = false;
+                // example 1.1
+                // some zip stored files and folders separately
+                // e.g data/
+                //     data/folder/
+                //     data/folder/file.txt
+                if (zipEntry.getName().endsWith(File.separator)) {
+                    isDirectory = true;
+                }
+
+                Path newPath = zipSlipProtect(zipEntry, target);
+
+                if (isDirectory) {
+                    Files.createDirectories(newPath);
+                } else {
+
+                    // example 1.2
+                    // some zip stored file path only, need create parent directories
+                    // e.g data/folder/file.txt
+                    if (newPath.getParent() != null) {
+                        if (Files.notExists(newPath.getParent())) {
+                            Files.createDirectories(newPath.getParent());
+                        }
+                    }
+
+                    // copy files, nio
+                    Files.copy(zis, newPath, StandardCopyOption.REPLACE_EXISTING);
+
+                    // copy files, classic
+                    /*try (FileOutputStream fos = new FileOutputStream(newPath.toFile())) {
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) {
+                            fos.write(buffer, 0, len);
+                        }
+                    }*/
+                }
+
+                zipEntry = zis.getNextEntry();
+
+            }
+            zis.closeEntry();
+
+        }
+
+    }
+
+    public static Path zipSlipProtect(ZipEntry zipEntry, Path targetDir)
+            throws IOException {
+
+        // test zip slip vulnerability
+        // Path targetDirResolved = targetDir.resolve("../../" + zipEntry.getName());
+
+        Path targetDirResolved = targetDir.resolve(zipEntry.getName());
+
+        // make sure normalized file still has targetDir as its prefix
+        // else throws exception
+        Path normalizePath = targetDirResolved.normalize();
+        if (!normalizePath.startsWith(targetDir)) {
+            throw new IOException("Bad zip entry: " + zipEntry.getName());
+        }
+
+        return normalizePath;
+    }
+
+
 }

@@ -1849,7 +1849,7 @@ public class Dialog extends Form {
             super.repaint(cmp);
             return;
         }
-        if (isVisible() && !disposed) {
+        if (isVisible() && !disposed && (isMenu() || CN.getCurrentForm() == this)) {
             Display.getInstance().repaint(cmp);
         }
     }

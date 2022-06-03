@@ -254,6 +254,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public static void setActivity(CodenameOneActivity aActivity) {
         activity = aActivity;
+        if (activity != null) {
+            activityComponentName = activity.getComponentName();
+        }
+        
     }
     CodenameOneSurface myView = null;
     CodenameOneTextPaint defaultFont;
@@ -265,6 +269,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayWidth;
     private int displayHeight;
     static CodenameOneActivity activity;
+    static ComponentName activityComponentName;
+    
     private static Context context;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
@@ -769,7 +775,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return out.toArray(new PushActionCategory[out.size()]);
     }
-    
+
+    public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getActivity(ctx, value, intent, 67108864);
+        } else {
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getService(ctx, value, intent, 67108864);
+        } else {
+            return PendingIntent.getService(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent getBroadcastPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getBroadcast(ctx, value, intent, 67108864);
+        } else {
+            return PendingIntent.getBroadcast(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
     /**
      * Adds actions to a push notification.  This is called by the Push broadcast receiver probably before 
      * Codename One is initialized
@@ -805,7 +838,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (PushAction action : category.getActions()) {
             Intent newIntent = (Intent)targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
-            PendingIntent contentIntent = PendingIntent.getActivity(context, requestCode++, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            PendingIntent contentIntent = createPendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
                 try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
@@ -2703,6 +2736,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
             String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
             if (u == null && intent.getExtras() != null) {
@@ -2740,8 +2774,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 }
                                 tmp.close();
                                 attachment.close();
-                                setAppArg(filePath);
-                                return filePath;
+                                setAppArg(addFile(filePath));
+                                return addFile(filePath);
                             }
                         }
                     } catch (FileNotFoundException e) {
@@ -2814,7 +2848,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
         }
 
-        if ("cellId".equals(key)) {
+        /*if ("cellId".equals(key)) {
             try {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the cellId")){
                     return defaultValue;
@@ -2826,7 +2860,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (Throwable t) {
                 return defaultValue;
             }
-        }
+        }*/
         if ("AppName".equals(key)) {
 
             final PackageManager pm = getContext().getPackageManager();
@@ -2871,7 +2905,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
-        try {
+        /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
                     return "";
@@ -2900,7 +2934,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch(Throwable t) {
             // will be caused by no permissions.
             return defaultValue;
-        }
+        }*/
 
         if (getActivity() != null) {
             android.content.Intent intent = getActivity().getIntent();
@@ -4663,6 +4697,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
+                        wv.getSettings().setAllowFileAccess(true);
+                        wv.getSettings().setAllowContentAccess(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
                         if (android.os.Build.VERSION.SDK_INT >= 17) {
@@ -5846,13 +5882,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
-            if(read){
-                if(timeout > -1) {
-                    c.setReadTimeout(timeout);
-                }else{
-                    c.setReadTimeout(10000);
-                }
-            }
+
             if (android.os.Build.VERSION.SDK_INT > 13) {
                 c.setRequestProperty("Connection", "close");
             }
@@ -6833,7 +6863,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         "android.NotificationChannel.enableLights",
         "android.NotificationChannel.lightColor",
         "android.NotificationChannel.enableVibration",
-        "android.NotificationChannel.vibrationPattern"
+        "android.NotificationChannel.vibrationPattern",
+        "android.NotoficationChannel.soundUri"
     };
     
     /**
@@ -6964,8 +6995,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
+     * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
+        setNotificationChannel(nm, mNotifyBuilder, context, (String)null);
+        
+    }
+    
+    /**
+     * Sets the notification channel on a notification builder.  Uses service properties to 
+     * set properties of channel.
+     * @param nm The notification manager.
+     * @param mNotifyBuilder The notify builder
+     * @param context The context
+     * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
+     *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
+     * @since 8.0
+     */
+    public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
@@ -7019,6 +7066,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     //mChannel.setVibrationPattern(pattern);
                 }
                 
+                String soundUri = getServiceProperty("android.NotificationChannel.soundUri", null, context);
+                if (soundUri != null) {
+                    Uri uri= android.net.Uri.parse(soundUri);
+                    
+                    android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .build();
+                    method = clsNotificationChannel.getMethod("setSound", android.net.Uri.class, android.media.AudioAttributes.class);
+                    method.invoke(mChannel, new Object[]{uri, audioAttributes});
+                }
+                
                 method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);
                 method.invoke(mNotificationManager, new Object[]{mChannel});
                 //mNotificationManager.createNotificationChannel(mChannel);
@@ -7060,8 +7119,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
 
         Intent notificationIntent = new Intent();
-        notificationIntent.setComponent(getActivity().getComponentName());
-        PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
+        notificationIntent.setComponent(activityComponentName);
+        PendingIntent contentIntent = createPendingIntent(getContext(), 0, notificationIntent);
 
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
@@ -9914,8 +9973,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
 
+        ag.drawShadow(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    }
 
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
 
@@ -10350,8 +10423,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
 
         Intent contentIntent = new Intent();
-        if (getActivity() != null) {
-            contentIntent.setComponent(getActivity().getComponentName());
+        if (activityComponentName != null) {
+            contentIntent.setComponent(activityComponentName);
+        } else {
+            try {
+                contentIntent.setComponent(getContext().getPackageManager().getLaunchIntentForPackage(getContext().getApplicationInfo().packageName).getComponent());
+            } catch (Exception ex) {
+                System.err.println("Failed to get the component name for local notification.  Local notification may not work.");
+                ex.printStackTrace();
+            }
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
 
@@ -10363,20 +10443,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
             intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
-            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = getPendingIntent(context, 0,
+                    intent);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
         } else {
             contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
-        PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
 
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
 
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
@@ -10409,7 +10488,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notificationId);
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(pendingIntent);
     }

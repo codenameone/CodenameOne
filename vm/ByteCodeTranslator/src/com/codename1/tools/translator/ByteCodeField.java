@@ -178,4 +178,8 @@ public class ByteCodeField {
     public String getType() {
         return type;
     }
+    
+    public boolean isPrivate() {
+        return privateField;
+    }
 }

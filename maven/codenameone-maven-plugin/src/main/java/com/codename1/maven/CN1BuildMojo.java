@@ -9,8 +9,6 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -18,14 +16,11 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
-import org.apache.tools.ant.types.resources.Sort;
-
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.*;
+
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -42,6 +37,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_XCODE_PROJECT = Executor.BUILD_TARGET_XCODE_PROJECT;
     public static final String BUILD_TARGET_ANDROID_PROJECT = Executor.BUILD_TARGET_ANDROID_PROJECT;
+
+    private String serverMustProvideKotlinVersion;
 
     /**
      * The target platform.  E.g. javase, javascript, ios, android, win
@@ -139,11 +136,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (srcFile.isDirectory()) {
                 FileSet fs = new FileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fs.setExcludes("**/META-INF/versions/**");
                 fs.setProject(this.antProject);
                 fs.setDir(srcFile);
                 task.addFileset(fs);
+
             } else {
                 ZipFileSet fileset = new ZipFileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fileset.setExcludes("**/META-INF/versions/**");
                 fileset.setProject(antProject);
                 fileset.setSrc(srcFile);
                 task.addZipfileset(fileset);
@@ -162,6 +166,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * Artifact IDs that should not be sent to the build server.
      */
     private static String[] BUNDLE_ARTIFACT_ID_BLACKLIST = new String[] {"codenameone-core", "java-runtime"};
+
 
     /**
      * Gets the app extensions jar file that should be included in any iOS builds.
@@ -234,6 +239,81 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return null;
     }
 
+    /**
+     * Gets the  localizations jar file that should be included in any iOS builds.
+     * @return The localizations jar file if it exists.  null otherwise.
+     * @throws IOException
+     */
+    private File getStringsJar() throws IOException {
+
+        if (!project.getProperties().getProperty("codename1.platform", "").equalsIgnoreCase("ios")){
+            // App extensions are only for iOS
+            return null;
+        }
+        if (!project.getBasedir().getName().equalsIgnoreCase("ios")) {
+            // Make sure we're building the ios project
+            return null;
+        }
+
+        File stringsDir = new File(project.getBasedir(), path("src", "main", "strings"));
+
+        if (!stringsDir.isDirectory()) return null;
+
+        File stringsJar = new File(project.getBuild().getDirectory() + File.separator + "codenameone" + File.separator + "strings.jar");
+        if (stringsJar.exists() && stringsJar.lastModified() < lastModifiedRecursive(stringsDir)) {
+            // The app extensions jar is out of date.
+            stringsJar.delete();
+        }
+
+        if (!stringsJar.exists()) {
+            File tmpDir = new File(stringsJar.getParentFile(), "strings");
+            if (tmpDir.exists()) {
+                FileUtils.deleteDirectory(tmpDir);
+            }
+            tmpDir.mkdirs();
+            for (File lproj : stringsDir.listFiles()) {
+                Zip task = (Zip)antProject.createTask("zip");
+                File dest = new File(tmpDir, lproj.getName()+".zip");
+                task.setDestFile(dest);
+                task.setUpdate(false);
+                if (lproj.isDirectory()) {
+                    FileSet fs = new FileSet();
+                    fs.setProject(this.antProject);
+                    fs.setDir(lproj);
+                    task.addFileset(fs);
+                    task.execute();
+                } else if (lproj.getName().endsWith(".zip")) {
+                    ZipFileSet fileset = new ZipFileSet();
+                    fileset.setProject(antProject);
+                    fileset.setSrc(lproj);
+                    task.addZipfileset(fileset);
+                    task.execute();
+                }
+
+
+            }
+            Zip task = (Zip)antProject.createTask("zip");
+            task.setDestFile(stringsJar);
+            task.setUpdate(false);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(tmpDir);
+            task.addFileset(fs);
+            task.execute();
+
+        }
+
+        if (stringsJar.exists()) {
+            return stringsJar;
+        }
+
+        return null;
+    }
+
+    private boolean isLocalBuildTarget(String buildTarget) {
+        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget));
+    }
+
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
         File cn1dir = new File(project.getBuild().getDirectory() + File.separator + "codenameone");
         File antProject = new File(cn1dir, "antProject");
@@ -255,7 +335,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
         // Build a jar with all dependencies that we will send to the build server.
-        File jarWithDependencies = new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-jar-with-dependencies.jar"));
+        File jarWithDependencies = new File(path(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-"+buildTarget+"-jar-with-dependencies.jar"));
         List<String> cpElements;
         try {
             //getLog().info("Classpath Elements: "+ project.getCompileClasspathElements());
@@ -268,6 +348,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         File appExtensionsJar = getAppExtensionsJar();
         if (appExtensionsJar != null) {
             cpElements.add(appExtensionsJar.getAbsolutePath());
+        }
+        File stringsJar = getStringsJar();
+        if (stringsJar != null) {
+            cpElements.add(stringsJar.getAbsolutePath());
         }
         getLog().debug("Classpath Elements: "+cpElements);
         if (jarWithDependencies.exists()) {
@@ -299,6 +383,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
 
+            // Jars that should be stripped out and not sent to the server
             List<String> blackListJars = new ArrayList<String>();
             getLog().info("Project artifacts: "+project.getArtifacts());
             for (Artifact artifact : project.getArtifacts()) {
@@ -306,7 +391,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
                     addToBlacklist = true;
                 }
-                if (!"compile".equals(artifact.getScope())) {
+                if (!addToBlacklist && !isLocalBuildTarget(buildTarget)) {
+                    // When sending to the build server, we'll strip the kotlin-stdlib and the server will provide it
+                    // for local builds, it's easier to just include it.
+                    if (artifact.getGroupId().equals("org.jetbrains.kotlin") && artifact.getArtifactId().equals("kotlin-stdlib")) {
+                        addToBlacklist = true;
+                        serverMustProvideKotlinVersion = artifact.getVersion();
+                        getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
+                    }
+                }
+                if (!addToBlacklist && !"compile".equals(artifact.getScope())) {
                     addToBlacklist = true;
                 }
                 if (addToBlacklist) {
@@ -316,12 +410,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         blackListJars.add(jar.getPath());
                         try {
                             blackListJars.add(jar.getCanonicalPath());
+                            getLog().debug("Added "+jar+" to blacklist");
                         } catch (Exception ex){}
                     }
                 }
 
             }
             getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
+            List<File> jarsToMerge = new ArrayList<File>();
             for (String element : cpElements) {
 
                 String canonicalEl = element;
@@ -330,14 +426,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 } catch (Exception ex){}
 
                 if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
+                    getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
                     continue;
                 }
                 if (!new File(element).exists()) {
                     continue;
                 }
                 getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
-                mergeJars(jarWithDependencies, new File(element));
+                jarsToMerge.add(new File(element));
             }
+            mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
 
         }
 
@@ -348,7 +446,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             throw new IOException("Failed to update Codename One", ex);
         }
         File antDistDir = new File(antProject, "dist");
-        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + "-jar-with-dependencies.jar");
+        File antDistJar = new File(antDistDir, project.getBuild().getFinalName() + "-"+buildTarget+"-jar-with-dependencies.jar");
         antDistDir.mkdirs();
         FileUtils.copyFile(jarWithDependencies, antDistJar);
         Properties p = new Properties();
@@ -364,7 +462,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         try (FileInputStream fis = new FileInputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.load(fis);
         }
-
+        if (serverMustProvideKotlinVersion != null) {
+            cn1SettingsProps.setProperty("codename1.arg.requireKotlinStdlib", serverMustProvideKotlinVersion);
+        }
         FileSystemManager fsManager = VFS.getManager();
         FileObject jarFile = fsManager.resolveFile( "jar:"+jarWithDependencies.getAbsolutePath() + "!/META-INF/codenameone" );
         if (jarFile != null) {
@@ -456,7 +556,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         try {
 
-            if (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+            if (isLocalBuildTarget(buildTarget)) {
                 automated = false;
                 if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
@@ -771,6 +871,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } catch (BuildException ex) {
 
             getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
+            getLog().error(e.getErrorMessage());
             throw new MojoExecutionException("Failed to build android app", ex);
         } finally {
 

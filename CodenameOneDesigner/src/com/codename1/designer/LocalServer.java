@@ -24,7 +24,23 @@ import org.eclipse.jetty.servlet.ServletHolder;
  */
 public class LocalServer {
     private static int port = -1;
-    
+
+    /**
+     * Checks if the local server is supported.  Jetty must be on the classpath
+     * for the server to be supported.
+     * @return
+     */
+    public static boolean isSupported() {
+        try {
+            // On maven, the jetty dependency isn't included
+            // Since this feature isn't really used anymore, we just detect
+            // whether it is available and selectively disable the server.
+            LocalServer.class.getClassLoader().loadClass("org.eclipse.jetty.server.Server");
+            return true;
+        } catch (ClassNotFoundException cnfe) {
+            return false;
+        }
+    }
     
     public static int getPort() {
         if(port == -1) {

@@ -54,6 +54,7 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
                         generateNativeInterface(cls);
                     } catch (Exception ex) {
                         getLog().error("Problem occurred while generating native interface for class "+cls);
+                        getLog().error(ex);
                         failures.add(ex);
                     }
                 }

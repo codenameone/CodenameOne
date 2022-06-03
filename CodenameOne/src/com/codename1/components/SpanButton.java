@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -40,6 +40,7 @@ import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>
@@ -104,7 +105,31 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
         setLeadComponent(actualButton);
         updateGap();
     }
-    
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        if (Style.ICON_GAP.equals(propertyName)) {
+            int gap = source.getIconGap();
+            if (gap >= 0 && gap != getGap()) {
+                setGap(gap);
+                updateGap();
+            }
+        }
+    }
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        if (unselectedStyle.getIconGap() > 0) {
+            int gap = unselectedStyle.getIconGap();
+            if (gap != getGap()) {
+                setGap(unselectedStyle.getIconGap());
+                updateGap();
+            }
+        }
+    }
+
     private void updateGap() {
         if (getIcon() == null) {
             $(actualButton).setMargin(0);
@@ -126,7 +151,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public TextArea getTextComponent() {
         return text;
     }
-    
+
     /**
      * Sets the UIID for the actual text
      *
@@ -144,7 +169,34 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public String getTextUIID() {
         return text.getUIID();
     }
-    
+
+
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        if (id != null && id.length() > 0) {
+            String iconUIID = getUIManager().getIconUIIDFor(id);
+            if (iconUIID != null) {
+                setIconUIID(iconUIID);
+            }
+        }
+    }
+
+    @Override
+    protected void initLaf(UIManager uim) {
+        if(uim == getUIManager() && isInitialized()){
+            return;
+        }
+        super.initLaf(uim);
+        String uiid = getUIID();
+        if (uiid != null && uiid.length() >0) {
+            String iconUiid = uim.getIconUIIDFor(uiid);
+            if (iconUiid != null) {
+                setIconUIID(iconUiid);
+            }
+        }
+    }
+
     /**
      * Gets the component used for styling font icons on this SpanLabel.
      * @return The component used for styling font icons on this SpanLabel.
@@ -241,22 +293,22 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
 
     /**
      * Binds long press listener to button events.
-     * @param l 
+     * @param l
      * @since 7.0
      */
     public void addLongPressListener(ActionListener l) {
         actualButton.addLongPressListener(l);
     }
-    
+
     /**
      * Unbinds long press listener to button events.
-     * @param l 
+     * @param l
      * @since 7.0
      */
     public void removeLongPressListener(ActionListener l) {
         actualButton.removeLongPressListener(l);
     }
-    
+
     /**
      * Binds an action listener to button events
      *
@@ -319,7 +371,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      */
     public String[] getPropertyNames() {
         return new String[]{
-            "text", "icon", "iconPosition", "textUiid", "iconUiid"
+                "text", "icon", "iconPosition", "textUiid", "iconUiid"
         };
     }
 
@@ -328,11 +380,11 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      */
     public Class[] getPropertyTypes() {
         return new Class[]{
-            String.class, // text
-            Image.class, // icon
-            String.class, // iconPosition
-            String.class,
-            String.class
+                String.class, // text
+                Image.class, // icon
+                String.class, // iconPosition
+                String.class,
+                String.class
         };
     }
 
@@ -481,7 +533,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     /**
      * Sets the auto released mode of this button, by default it's not an auto
      * released Button
-     */ 
+     */
     public void setAutoRelease(boolean autoRelease) {
         this.actualButton.setAutoRelease(autoRelease);
     }
@@ -502,9 +554,9 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
             text.setWidth(newTextW);
             super.setWidth(width);
             setShouldCalcPreferredSize(true);
-            
+
         }
-        
+
     }
 
     @Override
@@ -522,7 +574,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
 
     /**
      * {@inheritDoc }
-     * 
+     *
      */
     @Override
     public void setTextPosition(int textPosition) {
@@ -542,12 +594,12 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
             default:
                 setIconPosition(BorderLayout.EAST);
         }
-        
+
     }
 
     /**
      * {@inheritDoc }
-     * 
+     *
      */
     @Override
     public int getTextPosition() {
@@ -565,7 +617,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
             return Component.RIGHT;
         }
         return Component.LEFT;
-        
+
     }
 
     /**
@@ -594,7 +646,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public Image getIconFromState() {
         return actualButton.getIconFromState();
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
@@ -602,15 +654,15 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public void setMaterialIcon(char c) {
         actualButton.setMaterialIcon(c);
     }
-    
-     /**
+
+    /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
      * @param c one of the constants from the font
      */
     public void setFontIcon(Font font, char c) {
         actualButton.setFontIcon(font, c);
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
@@ -619,7 +671,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public void setMaterialIcon(char c, float size) {
         actualButton.setMaterialIcon(c, size);
     }
-    
+
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
      * @param c one of the constants from the font
@@ -628,7 +680,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public void setFontIcon(Font font, char c, float size) {
         actualButton.setFontIcon(font, c, size);
     }
-    
+
     /**
      * Returns the material icon assigned to this component or 0 if not applicable
      * @return the material icon
@@ -636,7 +688,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public char getMaterialIcon() {
         return actualButton.getMaterialIcon();
     }
-    
+
     /**
      * Returns the font icon assigned to this component or 0 if not applicable
      * @return the material icon
@@ -644,25 +696,25 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public char getFontIcon() {
         return actualButton.getFontIcon();
     }
-    
+
     /**
-     * Returns the material icon size assigned to this component or 0/-1 if 
+     * Returns the material icon size assigned to this component or 0/-1 if
      * not applicable
      * @return the material icon size
      */
     public float getMaterialIconSize() {
         return actualButton.getMaterialIconSize();
     }
-    
+
     /**
-     * Returns the icon size assigned to this component or 0/-1 if 
+     * Returns the icon size assigned to this component or 0/-1 if
      * not applicable
      * @return the icon size
      */
     public float getFontIconSize() {
         return actualButton.getFontIconSize();
     }
-    
+
     /**
      * Returns the font for the icon font or null if not font set
      * @return the material icon size
@@ -670,6 +722,6 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
     public Font getIconFont() {
         return actualButton.getIconFont();
     }
-    
-    
+
+
 }

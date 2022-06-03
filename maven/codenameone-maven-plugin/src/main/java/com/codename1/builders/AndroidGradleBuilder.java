@@ -169,6 +169,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.PACKAGE_USAGE_STATS",
             "android.permission.PERSISTENT_ACTIVITY",
             "android.permission.PROCESS_OUTGOING_CALLS",
+            "android.permission.QUERY_ALL_PACKAGES",
             "android.permission.READ_CALENDAR",
             "android.permission.READ_CALL_LOG",
             "android.permission.READ_CONTACTS",
@@ -267,7 +268,7 @@ public class AndroidGradleBuilder extends Executor {
 
     private static final boolean isMac;
 
-    private String playServicesVersion = "12.0.0";
+    private String playServicesVersion = "12.0.1";
 
     private boolean playServicesPlus;
     private boolean playServicesAuth;
@@ -290,7 +291,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean playServicesSafetyNet;
     private boolean playServicesWallet;
     private boolean playServicesWear;
-    private String xPermissions;
+    private String xPermissions, xQueries;
     private int buildToolsVersionInt;
     private String buildToolsVersion;
     private boolean useAndroidX;
@@ -905,7 +906,7 @@ public class AndroidGradleBuilder extends Executor {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
                             debug("Adding location playservice");
-                            request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
+                            request.putArgument("android.location.minPlayServicesVersion", "12.0.1");
                             playServicesLocation = true;
                             playFlag = "false";
                             if (targetSDKVersionInt >= 29) {
@@ -954,7 +955,7 @@ public class AndroidGradleBuilder extends Executor {
                             // If play services are not currently "blanket" enabled
                             // we will enable them here
                             debug("Adding location playservice");
-                            request.putArgument("android.location.minPlayServicesVersion", "12.0.0");
+                            request.putArgument("android.location.minPlayServicesVersion", "12.0.1");
                             playServicesLocation = true;
                             playFlag = "false";
                         }
@@ -1007,7 +1008,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
         if (useFCM) {
-            request.putArgument("android.fcm.minPlayServicesVersion", "12.0.0");
+            request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");
         }
         debug("Starting playServicesVersion "+playServicesVersion);
 
@@ -1284,6 +1285,10 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
         }
+        xQueries = "";
+        if (targetSDKVersionInt >= 30) {
+            xQueries = "<queries>\n" + request.getArg("android.manifest.queries", "") + "</queries>\n";
+        }
 
         //Delete the Facebook implemetation if this app does not use FB.
         if (!facebookSupported) {
@@ -1427,15 +1432,13 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to generate icon files", ex);
         }
 
-        if (purchasePermissions) {
-            File billingPackage = new File(dummyClassesDir, "com/android/vending/billing");
-
-            new File(billingPackage, "IInAppBillingService.java").delete();
-            new File(srcDir, "com/android/vending/billing/IInAppBillingService.java").delete();
-            new File(billingPackage, "IInAppBillingService.class").delete();
-            new File(billingPackage, "IInAppBillingService$Stub$Proxy.class").delete();
-            new File(billingPackage, "IInAppBillingService$Stub.class").delete();
+        if (!purchasePermissions) {
+            File billingSupport = new File(srcDir, path("com", "codename1", "impl", "android", "BillingSupport.java"));
+            if (billingSupport.exists()) {
+                billingSupport.delete();
+            }
         }
+
         try {
             zipDir(new File(libsDir, "userClasses.jar").getAbsolutePath(), dummyClassesDir.getAbsolutePath());
         } catch (Exception ex) {
@@ -1828,27 +1831,11 @@ public class AndroidGradleBuilder extends Executor {
             activityBillingSource
                     = "    protected boolean isBillingEnabled() {\n"
                     + "        return true;\n"
+                    + "    }\n\n"
+                    + "    protected com.codename1.impl.android.IBillingSupport createBillingSupport() {\n"
+                    + "        return new com.codename1.impl.android.BillingSupport(this);\n"
                     + "    }\n\n";
 
-            String aidlFile = "package com.android.vending.billing;\n\n"
-                    + "import android.os.Bundle;\n"
-                    + "interface IInAppBillingService {\n"
-                    + "    int isBillingSupported(int apiVersion, String packageName, String type);\n"
-                    + "    Bundle getSkuDetails(int apiVersion, String packageName, String type, in Bundle skusBundle);\n"
-                    + "    Bundle getBuyIntent(int apiVersion, String packageName, String sku, String type,\n"
-                    + "        String developerPayload);\n"
-                    + "    Bundle getPurchases(int apiVersion, String packageName, String type, String continuationToken);\n"
-                    + "    int consumePurchase(int apiVersion, String packageName, String purchaseToken);\n"
-                    + "}\n\n";
-            File aidlDir = new File(srcDir, "com/android/vending/billing");
-            aidlDir.mkdirs();
-            try {
-                FileOutputStream aidl = new FileOutputStream(new File(aidlDir, "IInAppBillingService.aidl"));
-                aidl.write(aidlFile.getBytes());
-                aidl.close();
-            } catch (IOException ex) {
-                throw new BuildException("Failed to write IInAppBillinService", ex);
-            }
         }
 
 
@@ -2013,6 +2000,7 @@ public class AndroidGradleBuilder extends Executor {
                 + externalStoragePermission
                 + permissions
                 + "  " + xPermissions
+                + "  " + xQueries
                 + "</manifest>\n";
         try {
             OutputStream manifestSourceStream = new FileOutputStream(manifestFile);
@@ -2200,7 +2188,16 @@ public class AndroidGradleBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.lightColor\", \""+notificationChannelLightColor+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.enableVibration\", \""+notificationChannelEnableVibration+"\");\n"
                     + "        Display.getInstance().setProperty(\"android.NotificationChannel.vibrationPattern\", "+notificationChannelVibrationPattern+");\n"
+                    + "        try {\n"
+                    + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION).toString());\n"
+                    + "        } catch (Exception ex){}\n";
             ;
+            if (request.getArg("android.pushSound", null) != null) {
+                pushInitDisplayProperties += "        try {\n"
+                        + "            Display.getInstance().setProperty(\"android.NotificationChannel.soundUri\", \"android.resource://" + request.getPackageName() + "/raw/" + request.getArg("android.pushSound", null)+"\");\n"
+                        + "        } catch (Exception ex){}\n";
+            }
+
         }
 
         String waitingForPermissionsRequest=
@@ -2349,9 +2346,11 @@ public class AndroidGradleBuilder extends Executor {
                             + "        }\n"
                             + localNotificationCode
                             + "        Display.getInstance().callSerially(new Runnable(){\n"
+                            + "            boolean wasStopped = (currentForm == null);\n"
                             + "            Form currForm = currentForm;\n"
                             + "            public void run() {\n"
-                            + "                " + request.getMainClass() + "Stub.this.run(currForm);\n"
+                            + "                Form displayForm = Display.getInstance().getCurrent();\n"
+                            + "                " + request.getMainClass() + "Stub.this.run(displayForm == null ? currForm : displayForm, wasStopped);\n"
                             + "            }\n"
                             + "        });\n"
                             + "        synchronized(LOCK) {\n"
@@ -2365,21 +2364,21 @@ public class AndroidGradleBuilder extends Executor {
                             + "        }\n"
                             + "        running = false;\n"
                             + "    }\n\n"
-                            + "    public void run(Form currentForm) {\n"
+                            + "    public void run(Form currentForm, boolean wasStopped) {\n"
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode
                             + "         } else {\n"
                             + "             synchronized(LOCK) {\n"
-                            + "                 if(currentForm != null) {\n"
+                            + "                 if(!wasStopped) {\n"
                             + "                     if(currentForm instanceof Dialog) {\n"
                             + "                         ((Dialog)currentForm).showModeless();\n"
                             + "                     }else{\n"
                             + "                         currentForm.show();\n"
                             + "                     }\n"
                             + "                     fireIntentResult();\n"
-                            + "                     setWaitingForResult(false);"
+                            + "                     setWaitingForResult(false);\n"
                             + "                     return;\n"
                             + "                 }\n"
                             + "             }\n"
@@ -3029,6 +3028,10 @@ public class AndroidGradleBuilder extends Executor {
             if(playServicesWear){
                 additionalDependencies += " compile 'com.google.android.gms:play-services-wearable:"+playServicesVersion+"'\n";
             }
+        }
+
+        if (purchasePermissions) {
+            additionalDependencies += " implementation 'com.android.billingclient:billing:4.0.0'\n";
         }
 
         String useLegacyApache = "";
@@ -3735,7 +3738,7 @@ public class AndroidGradleBuilder extends Executor {
      * of play services, so we delete all PlayServices_X_X_X classes that we aren't using
      * at build time.  We use the highest version available.
      * @param srcDir The src dir
-     * @param playServicesVersion The target play services version .  E.g. 12.0.0
+     * @param playServicesVersion The target play services version .  E.g. 12.0.1
      * @return The Source file for the class with maximum version less than or equal to playServicesVersion.  Never null
      */
     private File getPlayServicesJavaSourceFile(File srcDir, String playServicesVersion) {

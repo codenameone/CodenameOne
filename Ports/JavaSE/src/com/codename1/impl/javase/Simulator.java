@@ -23,6 +23,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.util.MavenUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -50,7 +51,7 @@ public class Simulator {
      * @param projectDir
      */
     private static void loadSimulatorProperties(File projectDir) {
-       if (System.getProperty("maven.home") == null) {
+       if (!MavenUtils.isRunningInMaven()) {
            // simulator.properties file is only for maven.
            // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder.
            return;
@@ -79,24 +80,6 @@ public class Simulator {
        }
 
    }
-
-
-    private static void setCWD() {
-        try {
-            File currDir = new File(System.getProperty("user.dir")).getCanonicalFile();
-            File codenameOneSettings = new File(currDir, "codenameone_settings.properties");
-            if (codenameOneSettings.exists()) {
-                return;
-            }
-            currDir = new File(currDir, "common");
-            codenameOneSettings = new File(currDir, codenameOneSettings.getName());
-            if (codenameOneSettings.exists()) {
-                System.setProperty("user.dir", currDir.getAbsolutePath());
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
 
     /**
      * Accepts the classname to launch
@@ -127,8 +110,7 @@ public class Simulator {
         if (System.getenv("CN1_SIMULATOR_SKIN") != null) {
             System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
         }
-        
-        
+
         String classPathStr = System.getProperty("java.class.path");
         if (System.getProperty("cn1.class.path") != null) {
             classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");
@@ -159,7 +141,7 @@ public class Simulator {
         if (cn1Props.exists()) {
             File commonClasses = new File(cn1Props.getParentFile(), "target" + File.separator + "classes");
             if (commonClasses.exists()) {
-                files.add(commonClasses);
+                files.add(commonClasses.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
         }
@@ -169,7 +151,7 @@ public class Simulator {
         }
         int len = t.countTokens();
         for (int iter = 0; iter < len; iter++) {
-            files.add(new File(t.nextToken()));
+            files.add(new File(t.nextToken()).getAbsoluteFile());
         }
         File javase = new File("native" + File.separator + "javase");
         File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
@@ -179,7 +161,7 @@ public class Simulator {
                 for (File jar : dir.listFiles()) {
                     if (jar.getName().endsWith(".jar")) {
                         if (!files.contains(jar)) {
-                            files.add(jar);
+                            files.add(jar.getAbsoluteFile());
                             System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());
                         }
                     }
@@ -212,7 +194,7 @@ public class Simulator {
                 System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
                 for (File jar : cef.listFiles()) {
                     if (jar.getName().endsWith(".jar") && !jar.getName().endsWith("-tests.jar")) {
-                        files.add(jar);
+                        files.add(jar.getAbsoluteFile());
                     }
                 }
             }
@@ -221,7 +203,7 @@ public class Simulator {
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
             System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jmf.getAbsolutePath());
-            files.add(jmf);
+            files.add(jmf.getAbsoluteFile());
         }
         
         String implementation = System.getProperty("cn1.javase.implementation", "");
@@ -267,6 +249,7 @@ public class Simulator {
         ((ClassPathLoader)ldr).addExclude("org.cef.");
         
         final ClassLoader fLdr = ldr;
+        Thread.currentThread().setContextClassLoader(fLdr);
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
@@ -469,7 +452,7 @@ public class Simulator {
             List<File> files = new ArrayList<File>();
             for (String part : parts) {
                 part = part.trim();
-                files.add(new File(part));
+                files.add(new File(part).getAbsoluteFile());
             }
             return files;
         }

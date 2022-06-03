@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.annotations.Async;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
@@ -898,12 +899,18 @@ public final class Display extends CN1Constants {
         }
         if(codenameOneRunning) {
             synchronized(lock) {
-                pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
+                scheduleSerialCall(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
             r.run();
         }
+    }
+    
+    // We factor out the scheduling of a serial call so that we can 
+    // use the Schedule annotation for IntelliJ async debugging https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
+    private void scheduleSerialCall(@Async.Schedule Runnable r) {
+        pendingSerialCalls.add(r);
     }
 
     /**
@@ -936,7 +943,7 @@ public final class Display extends CN1Constants {
      * 
      * @param r the task to perform in the background
      */
-    public void scheduleBackgroundTask(Runnable r) {
+    public void scheduleBackgroundTask(@Async.Schedule Runnable r) {
         synchronized(lock) {
             if(backgroundTasks == null) {
                 backgroundTasks = new ArrayList<Runnable>();
@@ -960,7 +967,7 @@ public final class Display extends CN1Constants {
                             //preent a runtime exception to crash the 
                             //backgroundThread
                             try {
-                                nextTask.run();                                
+                                executeBackgroundTaskRunnable(nextTask);
                             } catch (Throwable e) {
                                 Log.e(e);
                             }
@@ -975,6 +982,10 @@ public final class Display extends CN1Constants {
                 backgroundThread.start();
             }
         }
+    }
+    
+    private void executeBackgroundTaskRunnable(@Async.Execute Runnable r) {
+        r.run();
     }
     
 
@@ -1365,7 +1376,7 @@ public final class Display extends CN1Constants {
                 }
             }
             while (!runningSerialCallsQueue.isEmpty()) {
-                runningSerialCallsQueue.remove(0).run();
+                executeSerialCall(runningSerialCallsQueue.remove(0));
             }
 
             // after finishing an event cycle there might be serial calls waiting
@@ -1375,6 +1386,13 @@ public final class Display extends CN1Constants {
             }
         }
         processingSerialCalls = false;
+    }
+    
+    // Executes a Runnable from a pending serial call. We wrap it in its 
+    // own function so we can use the Async.Execute annotation for debugging.
+    // https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
+    private void executeSerialCall(@Async.Execute Runnable r) {
+        r.run();
     }
 
     boolean isProcessingSerialCalls() {
@@ -1472,11 +1490,13 @@ public final class Display extends CN1Constants {
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
                     }
+
+                    while (!runningSerialCallsQueue.isEmpty()) {
+                        pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
+                    }
                 }
                 
-                while (!runningSerialCallsQueue.isEmpty()) {
-                    pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
-                }
+
 
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {
@@ -1568,7 +1588,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidateWithAnimationSafety();
+            current.revalidate();
             current.repaint();
             current.onShowCompletedImpl();
             return;
@@ -1616,11 +1636,11 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
             
         }
 
@@ -5027,15 +5047,19 @@ hi.show();}</pre></noscript>
      * @since 7.0
      * @see #setInterval(int, java.lang.Runnable) 
      */
-    public Timer setTimeout(int timeout, final Runnable r) {
+    public Timer setTimeout(int timeout, @Async.Schedule final Runnable r) {
         
         Timer t = new Timer();
         t.schedule(new TimerTask() {
             public void run() {
-                CN.callSerially(r);
+                executeTimeoutRunnable(r);
             }
         }, (long)timeout);
         return t;
+    }
+    
+    private void executeTimeoutRunnable(@Async.Execute Runnable r) {
+        CN.callSerially(r);
     }
     
     /**
@@ -5047,11 +5071,11 @@ hi.show();}</pre></noscript>
      * @since 7.0
      * @see #setTimeout(int, java.lang.Runnable) 
      */
-    public Timer setInterval(int period, final Runnable r) {
+    public Timer setInterval(int period, @Async.Schedule final Runnable r) {
         Timer t = new Timer();
         t.schedule(new TimerTask(){
             public void run() {
-                CN.callSerially(r);
+                executeTimeoutRunnable(r);
             }
         }, period, period);
         

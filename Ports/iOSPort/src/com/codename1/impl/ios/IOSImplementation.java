@@ -409,12 +409,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void stopTextEditing() {  
+    public void stopTextEditing() {
         if (isAsyncEditMode()) {
             foldKeyboard();
         } else {
             if (currentEditing != null) {
                 editingUpdate(currentEditing.getText(), currentEditing.getCursorPosition(), true);
+                nativeInstance.foldVKB();
             }
         }
     }
@@ -487,10 +488,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
             Form form = cmp.getComponentForm();
-            if (form == null) {
+            if (form == null || form != CN.getCurrentForm() ) {
+                instance.stopTextEditing();
                 return;
             }
-            
+
             int x = cmp.getAbsoluteX() + cmp.getScrollX();
             int y = cmp.getAbsoluteY() + cmp.getScrollY();
             int w = cmp.getWidth();
@@ -544,7 +546,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             */
             Container contentPane = form.getContentPane();
+            if (!contentPane.contains(cmp)) {
+                contentPane = form;
+            }
             Style contentPaneStyle = contentPane.getStyle();
+
             int minY = contentPane.getAbsoluteY() + contentPane.getScrollY() + contentPaneStyle.getPaddingTop();
             int maxH = Display.getInstance().getDisplayHeight() - minY - nativeInstance.getVKBHeight();
             
@@ -565,9 +571,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (h < 0) {
                 // There isn't room for the editor at all.
                 Log.p("No room for text editor.  h="+h);
+                instance.stopTextEditing();
                 return;
             }
-            if (x <= 0 || y <= 0 || w <= 0 || h <= 0) {
+            if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+                instance.stopTextEditing();
                 return;
             }
             nativeInstance.resizeNativeTextView(x,
@@ -671,10 +679,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void setCurrentForm(Form f) {
-        super.setCurrentForm(f);
-        if(isAsyncEditMode() && isEditingText()) {
-            foldKeyboard();
+        if (isEditingText()) {
+            stopTextEditing();
         }
+        super.setCurrentForm(f);
+
     }
 
     @Override
@@ -1019,7 +1028,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.updateNativeEditorText(text);
         }
     }
-    
+
+    @Override
+    public boolean nativeEditorPaintsHint() {
+        return true;
+    }
+
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
@@ -2108,6 +2122,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
     }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        NativeImage ni = (NativeImage)image;
+        if (ng.isDrawShadowSupported()) {
+            ng.checkControl();
+            ng.applyTransform();
+            ng.applyClip();
+            ng.nativeDrawShadow(ni.peer, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+        }
+
+    }
+
     private void drawPath(NativePathRenderer r, int color, int alpha){
         this.nativeInstance.nativeDrawPath(color, alpha, r.ptr);
     }
@@ -2831,6 +2869,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             geofenceListeners().put(gf.getId(), GeofenceListenerClass.getCanonicalName());
             synchronizeGeofenceListeners();
+            long p = getLocation();
+            if (p <= 0) {
+                throw new RuntimeException("Failed to load location manager.  Check that you have included all applicable location permissions.");
+            }
             nativeInstance.addGeofencing(peer, gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius(), gf.getExpiration(), gf.getId());
             super.addGeoFencing(GeofenceListenerClass, gf); //To change body of generated methods, choose Tools | Templates.
         }
@@ -2841,6 +2883,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             geofenceExpirations().remove(id);
             synchronizeGeofenceListeners();
             synchronizeGeofenceExpirations();
+            long p = getLocation();
+            if (p <= 0) {
+                throw new RuntimeException("Failed to load location manager.  Check that you have included all applicable location permissions.");
+            }
             nativeInstance.removeGeofencing(peer, id);
         }
 
@@ -4783,6 +4829,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
             }
         }
+
+        boolean isDrawShadowSupported() {
+            return true;
+        }
+
+        void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+            nativeInstance.nativeDrawShadowMutable(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+        }
         
         boolean isTransformSupported(){
             return true;
@@ -4934,6 +4988,18 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Currently global graphics doesn't support antialiasing.
             return false;
         }
+
+        @Override
+        boolean isDrawShadowSupported() {
+            return false;
+        }
+
+        @Override
+        void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+
+        }
+
+
 
         @Override
         void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
@@ -6171,7 +6237,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             res.complete(value);
         }
     }
-    
+
     
     @Override
     public String getProperty(String key, String defaultValue) {
@@ -6187,6 +6253,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";
         }
+
         if(key.equalsIgnoreCase("User-Agent")) {
             /*if(isTablet()) {
                 return "Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/531.21.10";

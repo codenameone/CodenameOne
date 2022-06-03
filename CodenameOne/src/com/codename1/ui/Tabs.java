@@ -60,6 +60,9 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
  * 
+ * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):
+ * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
+ * 
  * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
  * form and swiping is used to move between pages:</p>
  * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
@@ -82,12 +85,14 @@ public class Tabs extends Container {
     private ButtonGroup radioGroup = new ButtonGroup();
     private Component selectedTab;
     private boolean swipeActivated = true;
+    private boolean swipeOnXAxis = true;
     
     private ActionListener press, drag, release;
     private Motion slideToDestMotion;
     private int initialX = -1;
     private int initialY = -1;
     private int lastX = -1;
+    private int lastY = -1;
     private boolean dragStarted = false;
     private int activeComponent = 0;
     private int active = 0;
@@ -262,21 +267,35 @@ public class Tabs extends Container {
     public boolean animate() {
         boolean b = super.animate();
         if (slideToDestMotion != null) {
-            int motionX = slideToDestMotion.getValue();
-            final int size = contentPane.getComponentCount();
-            int tabWidth = contentPane.getWidth() - tabsGap*2;
-            for (int i = 0; i < size; i++) {
-                int xOffset;
-                if(isRTL()) {
-                    xOffset = (size - i) * tabWidth;
-                    xOffset -= ((size - active) * tabWidth);
-                } else {
-                    xOffset = i * tabWidth;
-                    xOffset -= (active * tabWidth);
+            if (swipeOnXAxis) {
+                int motionX = slideToDestMotion.getValue();
+                final int size = contentPane.getComponentCount();
+                int tabWidth = contentPane.getWidth() - tabsGap * 2;
+                for (int i = 0; i < size; i++) {
+                    int xOffset;
+                    if (isRTL()) {
+                        xOffset = (size - i) * tabWidth;
+                        xOffset -= ((size - active) * tabWidth);
+                    } else {
+                        xOffset = i * tabWidth;
+                        xOffset -= (active * tabWidth);
+                    }
+                    xOffset += motionX;
+                    Component component = contentPane.getComponentAt(i);
+                    component.setX(xOffset);
                 }
-                xOffset += motionX;
-                Component component = contentPane.getComponentAt(i);
-                component.setX(xOffset);
+            } else {
+                int motionY = slideToDestMotion.getValue();
+                final int size = contentPane.getComponentCount();
+                int tabHeight = contentPane.getHeight() - tabsGap * 2;
+                for (int i = 0; i < size; i++) {
+                    int yOffset;
+                    yOffset = i * tabHeight;
+                    yOffset -= (active * tabHeight);
+                    yOffset += motionY;
+                    Component component = contentPane.getComponentAt(i);
+                    component.setY(yOffset);
+                }
             }
             if (slideToDestMotion.isFinished()) {
                 for (int i = 0; i < contentPane.getComponentCount() ; i++) {
@@ -443,12 +462,8 @@ public class Tabs extends Container {
      * @see #removeTabAt
      */
     public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
-        int index = tabsContainer.getComponentCount();
-        FontImage i = FontImage.createMaterial(materialIcon, "Tab", iconSize);
-        insertTab(title, i, component, index);
-        Style sel = getUIManager().getComponentCustomStyle("Tab", "press");
-        i = FontImage.createMaterial(materialIcon, sel, iconSize);
-        setTabSelectedIcon(index, i);
+        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,
+                tabsContainer.getComponentCount());
         return this;
     }
     
@@ -1008,8 +1023,15 @@ public class Tabs extends Container {
         
         Form form = getComponentForm();
         if(slideToSelected && form != null){
-            int end = contentPane.getComponentAt(activeComponent).getX();
-            int start = contentPane.getComponentAt(index).getX();
+            int end;
+            int start;
+            if (swipeOnXAxis) {
+                end = contentPane.getComponentAt(activeComponent).getX();
+                start = contentPane.getComponentAt(index).getX();
+            } else {
+                end = contentPane.getComponentAt(activeComponent).getY();
+                start = contentPane.getComponentAt(index).getY();
+            }
             slideToDestMotion = createTabSlideMotion(start, end);
             slideToDestMotion.start();
             form.registerAnimatedInternal(Tabs.this);
@@ -1262,20 +1284,35 @@ public class Tabs extends Container {
             final int size = parent.getComponentCount();
            
             int tabWidth = parent.getWidth() - tabsGap*2;
-            for (int i = 0; i < size; i++) {
-                int xOffset;
-                if(parent.isRTL()) {
-                    xOffset = (size - i) * tabWidth + tabsGap;
-                    xOffset -= ((size - activeComponent) * tabWidth);
-                } else {
-                    xOffset = i * tabWidth + tabsGap;
-                    xOffset -= (activeComponent * tabWidth);
+            int tabHeight = parent.getHeight() - tabsGap*2;
+            
+            if (swipeOnXAxis) {
+                for (int i = 0; i < size; i++) {
+                    int xOffset;
+                    if (parent.isRTL()) {
+                        xOffset = (size - i) * tabWidth + tabsGap;
+                        xOffset -= ((size - activeComponent) * tabWidth);
+                    } else {
+                        xOffset = i * tabWidth + tabsGap;
+                        xOffset -= (activeComponent * tabWidth);
+                    }
+                    Component component = parent.getComponentAt(i);
+                    component.setX(component.getStyle().getMarginLeftNoRTL() + xOffset);
+                    component.setY(component.getStyle().getMarginTop());
+                    component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());
+                    component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());
                 }
-                Component component = parent.getComponentAt(i);
-                component.setX(component.getStyle().getMarginLeftNoRTL() + xOffset);
-                component.setY(component.getStyle().getMarginTop());
-                component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());
-                component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());
+            } else {
+                for (int i = 0; i < size; i++) {
+                    int yOffset;
+                    yOffset = i * tabHeight + tabsGap;
+                    yOffset -= (activeComponent * tabHeight);
+                    Component component = parent.getComponentAt(i);
+                    component.setX(component.getStyle().getMarginLeftNoRTL());
+                    component.setY(component.getStyle().getMarginTop() + yOffset);
+                    component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());
+                    component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());
+                }
             }
 
         }
@@ -1351,6 +1388,35 @@ public class Tabs extends Container {
         return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
     }
     
+    /**
+     * <p>
+     * It defaults to <code>true</code>; you can set it to <code>false</code> for use cases like the
+     * one discussed here:
+     * <a href="https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/">Realize
+     * a set of Containers that are browsable with a finger, like a deck of
+     * cards</a>
+     * </p>Example of usage (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):</p>
+     * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
+     *
+     * @param b <code>true</code> to set the swipe on the X-Axis, <code>false</code> to set the swipe on the Y-Axis
+     * @since 8.0
+     */
+    public void setSwipeOnXAxis(boolean b) {
+        if (swipeOnXAxis != b) {
+            swipeOnXAxis = b;
+            contentPane.setShouldCalcPreferredSize(true);
+            revalidateLater();
+        }
+    }
+
+    /**
+     * Returns <code>true</code> if the swipe is on the X-Axis, <code>false</code> if the swipe is on the Y-Axis.
+     * @return swipe direction flag
+     */
+    public boolean isSwipeOnXAxis() {
+        return swipeOnXAxis;
+    }
+    
     private boolean blockSwipe;
     private boolean riskySwipe;
     class SwipeListener implements ActionListener{
@@ -1384,23 +1450,40 @@ public class Tabs extends Container {
                                 while(testCmp != null && testCmp != contentPane) {
                                     if(testCmp.shouldBlockSideSwipe()) {
                                         lastX = -1;
+                                        lastY = -1;
                                         initialX = -1;
+                                        initialY = -1;
                                         blockSwipe = true;
                                         return;
                                     }
                                     if(testCmp.isScrollable()) {
-                                        if(testCmp.isScrollableX()) {
-                                            // we need to block swipe since the user is trying to scroll a component
-                                            lastX = -1;
-                                            initialX = -1;
-                                            blockSwipe = true;
-                                            return;
-                                        }
+                                        if (swipeOnXAxis) {
+                                            if (testCmp.isScrollableX()) {
+                                                // we need to block swipe since the user is trying to scroll a component
+                                                lastX = -1;
+                                                initialX = -1;
+                                                blockSwipe = true;
+                                                return;
+                                            }
 
-                                        // scrollable Y component, we want to make side scrolling
-                                        // slightly harder so it doesn't bother the vertical swipe
-                                        riskySwipe = true;
-                                        break;
+                                            // scrollable Y component, we want to make side scrolling
+                                            // slightly harder so it doesn't bother the vertical swipe
+                                            riskySwipe = true;
+                                            break;
+                                        } else {
+                                            if (testCmp.isScrollableY()) {
+                                                // we need to block swipe since the user is trying to scroll a component
+                                                lastY = -1;
+                                                initialY = -1;
+                                                blockSwipe = true;
+                                                return;
+                                            }
+
+                                            // scrollable X component, we want to make side scrolling
+                                            // slightly harder so it doesn't bother the vertical swipe
+                                            riskySwipe = true;
+                                            break;
+                                        }
                                     }
                                     testCmp = testCmp.getParent();
                                 }
@@ -1409,10 +1492,12 @@ public class Tabs extends Container {
                             }
                         }
                         lastX = x;
+                        lastY = y;
                         initialX = x;
                         initialY = y;
                     } else {
                         lastX = -1;
+                        lastY = -1;
                         initialX = -1;
                         initialY = -1;
                         blockSwipe = true;
@@ -1429,16 +1514,27 @@ public class Tabs extends Container {
                             dragStarted = true;
                         } else {
                             if(riskySwipe) {
-                                if(Math.abs(x - initialX) < Math.abs(y - initialY)) {
+                                if(swipeOnXAxis && Math.abs(x - initialX) < Math.abs(y - initialY)) {
+                                    return;
+                                }
+                                if(!swipeOnXAxis && Math.abs(x - initialX) > Math.abs(y - initialY)) {
                                     return;
                                 }
                                 // give heavier weight when we have two axis swipe
-                                dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 5);
+                                if (swipeOnXAxis) {
+                                    dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 5);
+                                } else {
+                                    dragStarted = Math.abs(y - initialY) > (contentPane.getHeight() / 5);
+                                }
                             } else {
                                 // start drag not imediately, giving components some sort
                                 // of weight.
-                                dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
-                                if(dragStarted) {
+                                if (swipeOnXAxis) {
+                                    dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                                } else {
+                                    dragStarted = Math.abs(y - initialY) > (contentPane.getHeight() / 8);
+                                }
+                                if(dragStarted && swipeOnXAxis) {
                                     int diff = x - initialX;
                                     if(shouldBlockSideSwipeLeft() && diff < 0 ||
                                             shouldBlockSideSwipeRight() && diff > 0) {
@@ -1455,7 +1551,7 @@ public class Tabs extends Container {
                             }
                         }
                     } 
-                    if (initialX != -1 && contentPane.contains(x, y)) {
+                    if (swipeOnXAxis && initialX != -1 && contentPane.contains(x, y)) {
                         int diffX = x - lastX;
                         if (diffX != 0 && dragStarted) {
                             lastX += diffX;
@@ -1463,6 +1559,20 @@ public class Tabs extends Container {
                             for (int i = 0; i < size; i++) {
                                 Component component = contentPane.getComponentAt(i);
                                 component.setX(component.getX() + diffX);
+                                component.paintLock(false);
+                            }
+                            enableLayoutOnPaint = false;
+                            repaint();
+                        }
+                    }
+                    if (!swipeOnXAxis && initialY != -1 && contentPane.contains(x, y)) {
+                        int diffY = y - lastY;
+                        if (diffY != 0 && dragStarted) {
+                            lastY += diffY;
+                            final int size = contentPane.getComponentCount();
+                            for (int i = 0; i < size; i++) {
+                                Component component = contentPane.getComponentAt(i);
+                                component.setY(component.getY() + diffY);
                                 component.paintLock(false);
                             }
                             enableLayoutOnPaint = false;
@@ -1480,7 +1590,7 @@ public class Tabs extends Container {
                     if(blockSwipe) {
                         return;
                     }
-                    if (initialX != -1) {
+                    if (swipeOnXAxis && initialX != -1) {
                         int diff = x - initialX;
                         if (diff != 0 && dragStarted) {
                             if (Math.abs(diff) > contentPane.getWidth() / 6) {
@@ -1510,8 +1620,37 @@ public class Tabs extends Container {
                             evt.consume();
                         }
                     }
+                    if (!swipeOnXAxis && initialY != -1) {
+                        int diff = y - initialY;
+                        if (diff != 0 && dragStarted) {
+                            if (Math.abs(diff) > contentPane.getHeight() / 6) {
+                                if (diff > 0) {
+                                    active = activeComponent - 1;
+                                    if (active < 0) {
+                                        active = 0;
+                                    }
+                                } else {
+                                    active = activeComponent + 1;
+                                    if (active >= contentPane.getComponentCount()) {
+                                        active = contentPane.getComponentCount() - 1;
+                                    }
+                                }
+                            }
+                            int start = contentPane.getComponentAt(active).getX();
+                            int end = tabsGap;
+                            slideToDestMotion = createTabSlideMotion(start, end);
+                            slideToDestMotion.start();
+                            Form form = getComponentForm();
+                            if (form != null) {
+                                form.registerAnimatedInternal(Tabs.this);
+                            }
+                            evt.consume();
+                        }
+                    }
                     lastX = -1;
+                    lastY = -1;
                     initialX = -1;
+                    initialY = -1;
                     dragStarted = false;
                     break;
                 }
