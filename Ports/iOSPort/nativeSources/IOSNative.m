@@ -9059,8 +9059,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     }
     
     if (alertBody != NULL) {
-                    
-        tmpStr = [body stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
+        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];     
 #ifndef CN1_USE_ARC
         [body release];
 #endif
@@ -9178,14 +9177,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
 #ifdef __IPHONE_8_0
                 if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
                     [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
-                    //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
-                    //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
-                    //                                           UIUserNotificationTypeSound categories:nil]];
                 }
 #endif
-                
                 [[UIApplication sharedApplication] scheduleLocalNotification: notification];
-                
             });
     }
 #endif
