@@ -2612,7 +2612,7 @@ public class Toolbar extends Container {
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 UIManager uim = UIManager.getInstance();
                 Image i = (Image) uim.getThemeImageConstant("menuImage");
-                if (i == null) {
+                if(uim.getThemeConstant("overflowImageSize", null) != null) {
                     float size = 4.5f;
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
@@ -2627,6 +2627,9 @@ public class Toolbar extends Container {
                         sideMenu.showMenu();
                     }
                 });
+                if(i == null) {
+                    menuButton.setMaterialIcon(FontImage.MATERIAL_MORE_VERT);
+                }
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
                 menuButton.setUIID("TitleCommand");
                 menuButton.setName("OverflowButton");
