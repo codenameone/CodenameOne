@@ -2192,7 +2192,7 @@ public class Toolbar extends Container {
             marginLeft = 0;
         }
         int tint = parent.getTintColor();
-        parent.setTintColor(0x00FFFFFF);
+        parent.setTintColor(manager.getThemeConstant("overflowTintColorInt", 0x00FFFFFF));
         parent.tint = false;
         boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
         int topPadding = 0;
