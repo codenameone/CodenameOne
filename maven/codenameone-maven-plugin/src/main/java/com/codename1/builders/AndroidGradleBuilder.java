@@ -457,13 +457,13 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         if (maxPlatformVersionInt == 0) {
-            maxPlatformVersionInt = 30;
-            maxPlatformVersion = "30";
+            maxPlatformVersionInt = 31;
+            maxPlatformVersion = "31";
         }
 
         if (maxBuildToolsVersionInt == 0) {
-            maxBuildToolsVersionInt = 30;
-            maxBuildToolsVersion = "30";
+            maxBuildToolsVersionInt = 31;
+            maxBuildToolsVersion = "31";
         }
 
 
@@ -814,7 +814,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
             facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"@string/facebook_app_id\"/>\n";
-            facebookActivity = " <activity android:name=\"com.facebook.FacebookActivity\"/>\n";
+            facebookActivity = " <activity android:name=\"com.facebook.FacebookActivity\" android:exported=\"true\"/>\n";
             additionalKeyVals += "<string name=\"facebook_app_id\">" + request.getArg("facebook.appId", "706695982682332") + "</string>";
         }
 
@@ -1943,6 +1943,10 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String launchMode = request.getArg("android.activity.launchMode", "singleTop");
+        String xActivity = request.getArg("android.xactivity", "");
+        if (!xActivity.contains("android:exported")) {
+            xActivity += " android:exported=\"true\"";
+        }
         String manifestSource
                 = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
@@ -1969,7 +1973,7 @@ public class AndroidGradleBuilder extends Executor {
                 + usesLibrary
                 + googlePlayAdsMetaData
                 + "        <activity android:name=\"" + request.getMainClass() + "Stub\"\n"
-                + request.getArg("android.xactivity", "")
+                + xActivity
                 + "                  android:theme=\"@style/CustomTheme\"\n"
                 + "                  android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout\"\n"
                 + "                  android:launchMode=\""+launchMode+"\"\n"
