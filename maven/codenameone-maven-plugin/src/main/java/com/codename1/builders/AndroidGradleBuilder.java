@@ -395,8 +395,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         File sdkmanager = new File(androidSDKDir, path("tools", "bin", "sdkmanager"+bat));
-
-
+        if (!sdkmanager.canExecute()) {
+            sdkmanager = new File(androidSDKDir, path("cmdline-tools", "latest", "bin", "sdkmanager"+bat));
+        }
+        if (!sdkmanager.canExecute()) {
+            Exception ex = new RuntimeException("Android SDK Command-Line Tools not found");
+            error("Cannot find executable sdkmanager"+bat+" in "+androidSDKDir+"; tried tools and cmdline-tools/latest", ex);
+            throw new BuildException("Cannot find executable sdkmanager"+bat+" in "+androidSDKDir+"; tried tools and cmdline-tools/latest", ex);
+        }
 
         String sdkListStr;
         try {
