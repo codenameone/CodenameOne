@@ -98,7 +98,9 @@ public class SwipeBackSupport {
                         if (x - initialDragX > Display.getInstance().convertToPixels(currentForm.getUIManager().getThemeConstant("backGestureThresholdInt", 5), true)) {
                             dragActivated = true;
                             destinationForm = destination.get();
-                            startBackTransition(currentForm, destinationForm);
+                            if(destinationForm!=null) { //allow destination form to be null to disable swipeback, e.g. if conditions to exit Form are not fulfilled
+                                startBackTransition(currentForm, destinationForm);
+                            }
                         }
                     }
                 }
