@@ -274,15 +274,18 @@ public class Executor {
                             Display.init(null);
                             if (CSSWatcher.isSupported()) {
                                 // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
-                                Timer t = new Timer();
-                                TimerTask tt = new TimerTask() {
-                                    @Override
-                                    public void run() {
-                                        CSSWatcher cssWatcher = new CSSWatcher();
-                                        cssWatcher.start();
-                                    }
-                                };
-                                t.schedule(tt, 2000);
+                                for (final String themePrefix : CSSWatcher.scanForThemePrefixes()) {
+                                    Timer t = new Timer();
+                                    TimerTask tt = new TimerTask() {
+                                        @Override
+                                        public void run() {
+                                            System.out.println("Starting CSS Watcher for prefix " + themePrefix);
+                                            CSSWatcher cssWatcher = new CSSWatcher(themePrefix);
+                                            cssWatcher.start();
+                                        }
+                                    };
+                                    t.schedule(tt, 2000);
+                                }
 
                             }
                             

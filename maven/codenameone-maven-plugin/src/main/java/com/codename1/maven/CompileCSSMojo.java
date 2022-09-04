@@ -43,8 +43,39 @@ import static com.codename1.maven.PathUtil.path;
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class CompileCSSMojo extends AbstractCN1Mojo {
 
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        File cssDirectory = findCSSDirectory();
+        int themeCssLen = "theme.css".length();
+        if (cssDirectory != null && cssDirectory.isDirectory()) {
+            for (File file : cssDirectory.listFiles()) {
+                String fileName = file.getName();
+                if (fileName.endsWith("theme.css")) {
+                    executeImpl(fileName.substring(0, fileName.length() - themeCssLen));
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the source CSS directory (src/main/css).  The theme.css file should be inside this directory.
+     * @return
+     */
+    protected File findCSSDirectory() {
+        for (String dir : project.getCompileSourceRoots()) {
+            File dirFile = new File(dir);
+            File cssSibling = new File(dirFile.getParentFile(), "css");
+            File themeCss = new File(cssSibling, "theme.css");
+            if (themeCss.exists()) {
+                return cssSibling;
+            }
+            
+        }
+        return null;
+    }
+
+    private void executeImpl(String themePrefix) throws MojoExecutionException, MojoFailureException {
         if (!isCN1ProjectDir()) {
             return;
         }
@@ -52,19 +83,19 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
             getLog().info("CSS themes not activated for this project.  Skipping CSS compilation");
             return;
         }
-        
+
         File cssDirectory = findCSSDirectory(); // src/main/css
         if (cssDirectory == null || !cssDirectory.exists()) {
             getLog().warn("CSS compilation skipped because no CSS theme was found");
             return;
         }
-        File themeResOutput = new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res");
+        File themeResOutput = new File(project.getBuild().getOutputDirectory() + File.separator + themePrefix + "theme.res");
         // target/css
         File cssBuildDir = new File(project.getBuild().getDirectory() + File.separator + "css");
         cssBuildDir.mkdirs();
 
         // target/css/theme.css - the merged CSS file
-        File mergeFile = new File(cssBuildDir, "theme.css");
+        File mergeFile = new File(cssBuildDir, themePrefix + "theme.css");
         mergeFile.getParentFile().mkdirs();
         try {
             if (themeResOutput.exists() && getCSSSourcesModificationTime() < themeResOutput.lastModified()) {
@@ -80,14 +111,14 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         // theme.css to the input list.  (Codename One Library projects will include such an
         // artifact if they have CSS files).
         final StringBuilder inputs = new StringBuilder();
-        
+
         project.getArtifacts().forEach(artifact->{
             if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
                 File zip = findArtifactFile(artifact);
                 if (zip == null || !zip.exists()) {
                     return;
                 }
-                
+
                 File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
                 getLog().debug("Checking for extracted CSS bundle "+extracted);
                 if (extracted.exists() && artifact.isSnapshot() && getLastModified(artifact) > extracted.lastModified()) {
@@ -112,7 +143,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                     if (extractedCssDir.exists()) {
                         // We expect that the cn1css artifact has a theme.css file at its root
                         // If found, we add it to the list of inputs.
-                        File theme = new File(extractedCssDir, "theme.css");
+                        File theme = new File(extractedCssDir, themePrefix + "theme.css");
                         if (theme.exists()) {
                             if (inputs.length() > 0) {
                                 inputs.append(",");
@@ -130,18 +161,18 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         // The project's theme.css file is added to the input list last so that it will result in it
         // being last in the merged theme.css file (i.e. the application project CSS can override the
         // CSS in dependent libraries.
-        File cssTheme = new File(cssDirectory, "theme.css");
+        File cssTheme = new File(cssDirectory, themePrefix + "theme.css");
         if (cssTheme.exists()) {
             if (inputs.length() > 0) {
                 inputs.append(",");
             }
             inputs.append(cssTheme.getAbsolutePath());
         } else {
-            if (inputs.length() > 0) {
-                throw new MojoFailureException("Cannot compile CSS for this project.  The project does not include a theme.css file in "+cssTheme+", but it includes dependencies that require CSS.  Please add a CSS file at "+cssTheme);
+            if (themePrefix.isEmpty() && inputs.length() > 0) {
+                throw new MojoFailureException("Cannot compile CSS for this project.  The project does not include a "+themePrefix+"-theme.css file in "+cssTheme+", but it includes dependencies that require CSS.  Please add a CSS file at "+cssTheme);
 
             }
-            getLog().info("Skipping CSS compilation because "+cssTheme+" does not exist");
+            getLog().info("Skipping CSS compilation for because "+themePrefix + cssTheme+" does not exist");
             return;
         }
 
@@ -164,36 +195,17 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         java.createArg().setValue("-css");
         java.createArg().setValue("-input");
         java.createArg().setValue(inputs.toString());
-        
+
         java.createArg().setValue("-output");
         java.createArg().setFile(themeResOutput);
-        
+
         java.createArg().setValue("-merge");
         java.createArg().setFile(mergeFile);
         int res = java.executeJava();
         if (res != 0) {
-            throw new MojoExecutionException("An error occurred while compiling the CSS files.  Inputs: "+inputs+", output: " + new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res") +", merge file: "+mergeFile);
+            throw new MojoExecutionException("An error occurred while compiling the CSS files.  Inputs: "+inputs+", output: " + new File(project.getBuild().getOutputDirectory() + File.separator + themePrefix + "theme.res") +", merge file: "+mergeFile);
         }
     }
-
-    /**
-     * Gets the source CSS directory (src/main/css).  The theme.css file should be inside this directory.
-     * @return
-     */
-    protected File findCSSDirectory() {
-        for (String dir : project.getCompileSourceRoots()) {
-            File dirFile = new File(dir);
-            File cssSibling = new File(dirFile.getParentFile(), "css");
-            File themeCss = new File(cssSibling, "theme.css");
-            if (themeCss.exists()) {
-                return cssSibling;
-            }
-            
-        }
-        return null;
-    }
-
-    
     
     
     
