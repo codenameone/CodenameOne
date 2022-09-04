@@ -832,7 +832,7 @@ public class AndroidGradleBuilder extends Executor {
         if (googleAdUnitId != null && googleAdUnitId.length() > 0) {
             minSDK = maxInt("9", minSDK);
             googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
-            googlePlayAdsActivity = "<activity android:name=\"com.google.android.gms.ads.AdActivity\" android:configChanges=\"keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize\"/>";
+            googlePlayAdsActivity = "<activity android:name=\"com.google.android.gms.ads.AdActivity\" android:configChanges=\"keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize\" android:exported=\"false\"/>";
             accessNetworkStatePermission = true;
 
             String testDevice = request.getArg("android.googleAdUnitTestDevice", "C6783E2486F0931D9D09FABC65094FDF");
@@ -1659,11 +1659,11 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Throwable thrown) {
         }
 
-        String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" />\n"
+        String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n"
                 + "<service android:name=\"com.codename1.location.BackgroundLocationHandler\" android:exported=\"false\" />\n"
                 + "<service android:name=\"com.codename1.location.GeofenceHandler\" android:exported=\"false\" />\n";
         String mediaService = "<service android:name=\"com.codename1.media.AudioService\" android:exported=\"false\" />";
-        String remoteControlService = "<service android:name=\"com.codename1.media.BackgroundAudioService\">\n" +
+        String remoteControlService = "<service android:name=\"com.codename1.media.BackgroundAudioService\"  android:exported=\"true\">\n" +
                 "            <intent-filter>\n" +
                 "                <action android:name=\"android.intent.action.MEDIA_BUTTON\" />\n" +
                 "                <action android:name=\"android.media.AUDIO_BECOMING_NOISY\" />\n" +
@@ -1671,7 +1671,7 @@ public class AndroidGradleBuilder extends Executor {
                 "            </intent-filter>\n" +
                 "        </service>";
 
-        String mediabuttonReceiver = "<receiver android:name=\""+xclass("android.support.v4.media.session.MediaButtonReceiver")+"\">\n" +
+        String mediabuttonReceiver = "<receiver android:name=\""+xclass("android.support.v4.media.session.MediaButtonReceiver")+"\" android:exported=\"true\">\n" +
                 "            <intent-filter>\n" +
                 "                <action android:name=\"android.intent.action.MEDIA_BUTTON\" />\n" +
                 "                <action android:name=\"android.media.AUDIO_BECOMING_NOISY\" />\n" +
@@ -1681,13 +1681,13 @@ public class AndroidGradleBuilder extends Executor {
             remoteControlService = "";
             mediabuttonReceiver = "";
         }
-        String alarmRecevier = "<receiver android:name=\"com.codename1.impl.android.LocalNotificationPublisher\" ></receiver>\n";
-        String backgroundLocationReceiver = "<receiver android:name=\"com.codename1.location.BackgroundLocationBroadcastReceiver\" ></receiver>\n";
+        String alarmRecevier = "<receiver android:name=\"com.codename1.impl.android.LocalNotificationPublisher\" android:exported=\"false\"></receiver>\n";
+        String backgroundLocationReceiver = "<receiver android:name=\"com.codename1.location.BackgroundLocationBroadcastReceiver\" android:exported=\"true\"></receiver>\n";
         if (!playServicesLocation) {
             backgroundLocationReceiver = "";
         }
         String backgroundFetchService = "<service android:name=\"com.codename1.impl.android.BackgroundFetchHandler\" android:exported=\"false\" />\n"+
-                "<activity android:name=\"com.codename1.impl.android.CodenameOneBackgroundFetchActivity\" android:theme=\"@android:style/Theme.NoDisplay\" />\n";
+                "<activity android:name=\"com.codename1.impl.android.CodenameOneBackgroundFetchActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n";
 
 
         if (foregroundServicePermission) {
@@ -1921,12 +1921,12 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        String pushManifestEntries = "        <service android:name=\"PushNotificationService\">\n"
+        String pushManifestEntries = "        <service android:name=\"PushNotificationService\" android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"" + request.getPackageName() + ".PushNotificationService\" />\n"
                 + "            </intent-filter>\n"
                 + "        </service>\n"
-                + "        <receiver android:name=\".PushReceiver\" android:permission=\"com.google.android.c2dm.permission.SEND\">\n"
+                + "        <receiver android:name=\".PushReceiver\" android:permission=\"com.google.android.c2dm.permission.SEND\" android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"com.google.android.c2dm.intent.RECEIVE\" />\n"
                 + "                <category android:name=\"" + request.getPackageName() + "\" />\n"
@@ -1941,7 +1941,7 @@ public class AndroidGradleBuilder extends Executor {
             pushManifestEntries = "";
         } else if (useFCM) {
             pushManifestEntries = "<service\n" +
-                    "          android:name=\"com.codename1.impl.android.CN1FirebaseMessagingService\">\n" +
+                    "          android:name=\"com.codename1.impl.android.CN1FirebaseMessagingService\" android:exported=\"true\">\n" +
                     "          <intent-filter>\n" +
                     "              <action android:name=\"com.google.firebase.MESSAGING_EVENT\" />\n" +
                     "          </intent-filter>\n" +
@@ -1983,7 +1983,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "                  android:theme=\"@style/CustomTheme\"\n"
                 + "                  android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout\"\n"
                 + "                  android:launchMode=\""+launchMode+"\"\n"
-                + "                  android:label=\"" + xmlizedDisplayName + "\">\n"
+                + "                  android:label=\"" + xmlizedDisplayName + "\" >\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"
                 + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
@@ -3180,7 +3180,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "android {\n"
                 + request.getArg("android.gradle.androidx", "") + "\n"
                 + "    compileSdkVersion " + compileSdkVersion + "\n"
-                + "    buildToolsVersion " + quotedBuildToolsVersion + "\n"
+                // For maven builder explicitly specifying buildtools version caused some problems
+                // leave it out and just let Android studio choose the version installed.
+                //+ "    buildToolsVersion " + quotedBuildToolsVersion + "\n"
                 + useLegacyApache
                 + "\n"
                 + "    dexOptions {\n"
