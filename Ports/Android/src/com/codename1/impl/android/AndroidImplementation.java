@@ -5287,6 +5287,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
             web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
+            }
 
             web.setWebViewClient(new WebViewClient() {
                 
