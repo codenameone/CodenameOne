@@ -1031,6 +1031,10 @@ public class AndroidGradleBuilder extends Executor {
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
         if (useFCM) {
+            String compile = "compile";
+            if (useAndroidX) {
+                compile = "implementation";
+            }
             if (!googleServicesJson.exists()) {
                 error("google-services.json not found.  When using FCM for push notifications (i.e. android.messagingService=fcm), you must include valid google-services.json file.  Use the Firebase console to add Firebase messaging to your app.  https://console.firebase.google.com/u/0/ Then download the google-services.json file and place it in the native/android directory of your project. If you still want to use GCM (which no longer works) define the build hint android.messagingService=gcm", new RuntimeException());
                 return false;
@@ -1050,11 +1054,11 @@ public class AndroidGradleBuilder extends Executor {
                 debug("Adding firebase core to gradle dependencies.");
                 debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
                 debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\ncompile \"com.google.firebase:firebase-core:${var.android.playServicesVersion}\"\n");
+                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-core:${var.android.playServicesVersion}\"\n");
                 debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
             }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\ncompile \"com.google.firebase:firebase-messaging:${var.android.playServicesVersion}\"\n");
+                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-messaging:${var.android.playServicesVersion}\"\n");
             }
         }
 
@@ -2960,83 +2964,91 @@ public class AndroidGradleBuilder extends Executor {
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
         if (facebookSupported) {
+            String compile = "compile";
+            if (useAndroidX) {
+                compile = "implementation";
+            }
             minSDK = maxInt("15", minSDK);
             String facebookSdkVersion = request.getArg("android.facebookSdkVersion", "4.39.0");;
             if(request.getArg("android.excludeBolts", "false").equals("true")) {
                 additionalDependencies +=
-                        " compile ('com.facebook.android:facebook-android-sdk:" +
+                        " "+compile+" ('com.facebook.android:facebook-android-sdk:" +
                                 facebookSdkVersion + "'){ exclude module: 'bolts-android' }\n";
             } else {
                 additionalDependencies +=
-                        " compile 'com.facebook.android:facebook-android-sdk:" +
+                        " "+compile+" 'com.facebook.android:facebook-android-sdk:" +
                                 facebookSdkVersion + "'\n";
             }
         }
+        String compile = "compile";
+        if (useAndroidX) {
+            compile = "implementation";
+        }
         if (legacyGplayServicesMode) {
-            additionalDependencies += " compile 'com.google.android.gms:play-services:6.5.87'\n";
+            additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
         } else {
             if(playServicesPlus){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-plus:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+playServicesVersion+"'\n";
             }
             if(playServicesAuth){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-auth:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-auth:"+playServicesVersion+"'\n";
             }
             if(playServicesBase){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-base:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-base:"+playServicesVersion+"'\n";
             }
             if(playServicesIdentity){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-identity:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-identity:"+playServicesVersion+"'\n";
             }
             if(playServicesIndexing){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-appindexing:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appindexing:"+playServicesVersion+"'\n";
             }
             if(playServicesInvite){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-appinvite:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appinvite:"+playServicesVersion+"'\n";
             }
             if(playServicesAnalytics){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-analytics:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-analytics:"+playServicesVersion+"'\n";
             }
             if(playServicesCast){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-cast:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-cast:"+playServicesVersion+"'\n";
             }
             if(playServicesGcm){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-gcm:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-gcm:"+playServicesVersion+"'\n";
             }
             if(playServicesDrive){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-drive:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-drive:"+playServicesVersion+"'\n";
             }
             if(playServicesFit){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-fitness:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-fitness:"+playServicesVersion+"'\n";
             }
             if(playServicesLocation){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-location:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-location:"+playServicesVersion+"'\n";
             }
             if(playServicesMaps){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-maps:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-maps:"+playServicesVersion+"'\n";
             }
             if(playServicesAds){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-ads:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-ads:"+playServicesVersion+"'\n";
             }
             if(playServicesVision){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-vision:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-vision:"+playServicesVersion+"'\n";
             }
             if(playServicesNearBy){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-nearby:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-nearby:"+playServicesVersion+"'\n";
             }
             if(playServicesSafetyPanorama){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-panaroma:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-panaroma:"+playServicesVersion+"'\n";
             }
             if(playServicesGames){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-games:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-games:"+playServicesVersion+"'\n";
             }
             if(playServicesSafetyNet){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-safenet:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-safenet:"+playServicesVersion+"'\n";
             }
             if(playServicesWallet){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-wallet:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wallet:"+playServicesVersion+"'\n";
             }
             if(playServicesWear){
-                additionalDependencies += " compile 'com.google.android.gms:play-services-wearable:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wearable:"+playServicesVersion+"'\n";
             }
         }
 
@@ -3156,13 +3168,6 @@ public class AndroidGradleBuilder extends Executor {
         } else {
             supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
         }
-
-        String compile = "compile";
-        if (useAndroidX) {
-            compile = "implementation";
-        }
-
-
 
         String gradleProps = "apply plugin: 'com.android.application'\n"
                 + request.getArg("android.gradlePlugin", "")
