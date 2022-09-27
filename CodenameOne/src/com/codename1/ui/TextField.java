@@ -1088,7 +1088,7 @@ public class TextField extends TextArea {
                 return false;
             }
         } else if (getConstraint() == TextArea.DECIMAL) {
-            if ((c.charAt(0) < '0' || c.charAt(0) > '9') && c.charAt(0) != '+' && c.charAt(0) != '-' && c.charAt(0) != '.') {
+            if ((c.charAt(0) < '0' || c.charAt(0) > '9') && c.charAt(0) != '+' && c.charAt(0) != '-' && c.charAt(0) != '.' && c.charAt(0) != ',') {
                 return false;
             }
         }
