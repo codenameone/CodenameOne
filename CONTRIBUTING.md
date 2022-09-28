@@ -20,11 +20,11 @@ Once we have a sense of what needs doing we suggest filing an issue so we can tr
 
 This is probably one of the most important things you can do as a contributor and probably one of the easiest things you can do. There are two big pieces of documentation you can edit right here on github!
 
-The first is the [JavaDoc](https://www.codenameone.com/javadoc/) which you can edit directly in the source code, if there is an ommission or a mistake you can just press the edit button on the file and make the change directly even without an IDE. These pull requests are highly appreciaed and will help future generations of developers!
+The first is the [JavaDoc](https://www.codenameone.com/javadoc/) which you can edit directly in the source code, if there is an ommission or a mistake you can just press the edit button on the file and make the change directly even without an IDE. These pull requests are highly appreciated and will help future generations of developers!
 
-The [Codename One developer guide](https://www.codenameone.com/manual/) is genenrated from [the wiki pages of this project](https://github.com/codenameone/CodenameOne/wiki/) you can just [edit the wiki directly](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html) and your changes propogate into the developers guide. Don't forget to edit the authors section and add some credit!
+The [Codename One developer guide](https://www.codenameone.com/manual/) is generated from [the wiki pages of this project](https://github.com/codenameone/CodenameOne/wiki/). You can just [edit the wiki directly](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html), and your changes will reflect in the developers guide. Don't forget to edit the authors section and add some credit!
 
-The wiki uses the asciidoc format to generate HTML & PDF versions. There are plenty of guides on the internet to asciidoc but the syntax is pretty simple. Please try to maintin the convention for the guide as we automate many pieces in the guide generation and conversion.
+The wiki uses the asciidoc format to generate HTML & PDF versions. There are plenty of guides on the internet to asciidoc but the syntax is pretty simple. Please try to maintain the convention for the guide as we automate many pieces in the guide generation and conversion.
 
 ## Working with the Source
 
@@ -32,4 +32,4 @@ We have a blog post that covers forking, running the simulator and submitting a 
 
 ## Ownership
 
-By contributing code you are granting Codename One shared ownership of your work. You still own it but Codename One will have the right to relicense your work based on our needs & treat this work as if it was developed by a Codename One engineer. This is important as we might need to provide propriatery licenses for commercial companies and we might want to change the general project license in the future to attract more developers.
+By contributing code you are granting Codename One shared ownership of your work. You still own it but Codename One will have the right to relicense your work based on our needs & treat this work as if it was developed by a Codename One engineer. This is important as we might need to provide proprietary licenses for commercial companies and we might want to change the general project license in the future to attract more developers.
