@@ -74,6 +74,20 @@ public final class StringBuilder implements CharSequence, Appendable {
 
     public StringBuilder(CharSequence str){
         this(str.toString());
+    }
+
+    /*
+     * Allocates new array with characters from 'data', starting at 'offset', and with length charCount.
+     * Pretty much the same implementation as String(char[] data, int offset, int charCount) in ./String.java
+     * throws failedBundsCheck() if the new string tries to take characters outside the range of 'data'
+     */
+    private StringBuilder(char[] data, int offset, int charCount) {
+        if((offset | charCount) < 0 || charCount > data.length - offset) {
+            throw failedBoundsCheck(data.length, offset, charCount);
+        }
+        this.value = new char[charCount];
+        this.count = charCount;
+        System.arraycopy(data, offset, value, 0, charCount);
     }    
     
     private void enlargeBuffer(int min) {
@@ -617,6 +631,10 @@ public final class StringBuilder implements CharSequence, Appendable {
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return toString().substring(start, end);
+        return substring(start,end);
+    }
+
+    public StringBuilder subString(int start, int end) {
+        return new StringBuilder(value, start, end-start);
     }
 }
