@@ -76,6 +76,10 @@ public final class StringBuilder implements CharSequence, Appendable {
         this(str.toString());
     }
 
+    private StringIndexOutOfBoundsException failedBoundsCheck(int arrayLength, int offset, int count) {
+	    throw new StringIndexOutOfBoundsException(count);
+    }
+
     /*
      * Allocates new array with characters from 'data', starting at 'offset', and with length charCount.
      * Pretty much the same implementation as String(char[] data, int offset, int charCount) in ./String.java
@@ -634,7 +638,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         return substring(start,end);
     }
 
-    public StringBuilder subString(int start, int end) {
+    public StringBuilder substring(int start, int end) {
         return new StringBuilder(value, start, end-start);
     }
 }
