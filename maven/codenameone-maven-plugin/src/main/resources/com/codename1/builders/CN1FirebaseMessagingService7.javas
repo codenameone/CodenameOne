@@ -106,7 +106,7 @@ public class CN1FirebaseMessagingService extends com.google.firebase.messaging.F
                 }
                 NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
                 Intent newIntent = new Intent(context, getAppStubClass());
-                PendingIntent contentIntent = PendingIntent.getActivity(context, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+                PendingIntent contentIntent = com.codename1.impl.android.AndroidImplementation.createPendingIntent(context, 0, newIntent);
                 Drawable myIcon = getDrawable("icon", context);
                 Bitmap icon = ((BitmapDrawable) myIcon).getBitmap();
                 int notifyID = 1;
