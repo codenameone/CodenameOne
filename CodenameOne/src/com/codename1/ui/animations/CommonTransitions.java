@@ -43,7 +43,7 @@ import com.codename1.util.LazyValue;
  * <li>Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal). </li>
  * <li>Slide Fade - slides the content pane while fading the title. This is the default iOS transition. </li>
  * <li>Cover/Uncover - like slide only one of the forms remains in place while the other moves. </li>
- * <li>Fade - components fade into/out of the screen<li>
+ * <li>Fade - components fade into/out of the screen</li>
  * <li>Timeline - uses an animation image as an alpha mask between the source/destination</li>
  * </ol>
  * 
