@@ -79,9 +79,9 @@ public abstract class DeviceRunner {
         } catch(IOException err) {
             TestReporting.getInstance().logException(err);
         }
-        TestReporting.getInstance().testExecutionFinished();
+        TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if(failedTests > 0) {
-            Log.p("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
+            Log.p("Test execution finished, some failed tests occurred. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
         } else {
             Log.p("All tests passed. Total " + passedTests + " tests passed");
         }
@@ -128,7 +128,7 @@ public abstract class DeviceRunner {
                             TestReporting.getInstance().finishedTestCase(t, false);
                         }
                     }
-                };
+                }
                 RunTestImpl runTest = new RunTestImpl();
                 if (t.shouldExecuteOnEDT() && !CN.isEdt()) {
                     CN.callSeriallyAndWait(runTest);

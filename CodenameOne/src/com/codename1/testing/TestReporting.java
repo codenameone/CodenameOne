@@ -37,7 +37,7 @@ import java.util.Hashtable;
  */
 public class TestReporting {
     private static TestReporting instance;
-    private Hashtable testsExecuted = new Hashtable();
+    private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
     
     
     /**
@@ -99,14 +99,15 @@ public class TestReporting {
     
     /**
      * Writes a test report to the given stream
-     * @param os the destination stream
+     *
+     * @param testSuiteName the name of the test suite
+     * @param os            the destination stream
      */
-    public void writeReport(OutputStream os) throws IOException {
-        Enumeration e = testsExecuted.elements();
+    public void writeReport(String testSuiteName, OutputStream os) throws IOException {
+        Enumeration<String> e = testsExecuted.keys();
         while(e.hasMoreElements()) {
-            String key = (String)e.nextElement();
-            Boolean v = (Boolean)testsExecuted.get(key);
-            if(v.booleanValue()) {
+            String key = e.nextElement();
+            if(testsExecuted.get(key)) {
                 os.write((key + " passed\n").getBytes());
             } else {
                 os.write((key + " failed\n").getBytes());
@@ -118,6 +119,6 @@ public class TestReporting {
      * Callback to indicate the test execution has finished allowing
      * for a report to be generated if appropriate
      */
-    public void testExecutionFinished() {
+    public void testExecutionFinished(String testSuiteName) {
     }
 }

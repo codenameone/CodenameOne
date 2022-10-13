@@ -35,9 +35,9 @@ import java.util.TimerTask;
  */
 public class TestExecuter {
     private static boolean failed;
-    public static boolean runTest(final String mainClass, final String testClass, boolean quiteMode) {
+    public static boolean runTest(final String mainClass, final String testClass, boolean quietMode) {
         try {
-            if(quiteMode) {
+            if(quietMode) {
                 Display.init(new java.awt.Container());
             } else {
                 //Simulator.loadFXRuntime();
@@ -69,10 +69,11 @@ public class TestExecuter {
                                 TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
                                 failed = !test.runTest();
                                 test.cleanup();
-                                TestReporting.getInstance().finishedTestCase(test, !failed);
                             } catch(Exception err) {
                                 failed = true;
                                 TestReporting.getInstance().logException(err);
+                            } finally {
+                                TestReporting.getInstance().finishedTestCase(test, !failed);
                             }
                         }
                     }, timeout);
@@ -86,14 +87,20 @@ public class TestExecuter {
                             currentThread.stop();
                         }
                     };
-                    timeoutKiller.schedule(timeoutTask, timeout);
-                    TestReporting.getInstance().startingTestCase(test);
-                    test.prepare();
-                    TestReporting.getInstance().logMessage("Test prepared for execution off the EDT");
-                    failed = !test.runTest();
-                    test.cleanup();
-                    TestReporting.getInstance().finishedTestCase(test, !failed);
-                    timeoutTask.cancel();
+                    try {
+                        timeoutKiller.schedule(timeoutTask, timeout);
+                        TestReporting.getInstance().startingTestCase(test);
+                        test.prepare();
+                        TestReporting.getInstance().logMessage("Test prepared for execution off the EDT");
+                        failed = !test.runTest();
+                        test.cleanup();
+                    } catch(Exception err) {
+                        failed = true;
+                        TestReporting.getInstance().logException(err);
+                    } finally {
+                        TestReporting.getInstance().finishedTestCase(test, !failed);
+                        timeoutTask.cancel();
+                    }
                 }
             } catch(Exception err) {
                 failed = true;
