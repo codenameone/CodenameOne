@@ -108,7 +108,7 @@ public abstract class DeviceRunner {
         try {
             final UnitTest t = (UnitTest)Class.forName(testClassName).newInstance();
             try {
-                TestReporting.getInstance().startingTestCase(t);
+                TestReporting.getInstance().startingTestCase(t.getClass().getName());
                 startApplicationInstance();
                 class RunTestImpl implements Runnable {
                     boolean result;
@@ -125,7 +125,7 @@ public abstract class DeviceRunner {
                         } catch (Throwable err) {
                             failedTests++;
                             TestReporting.getInstance().logException(err);
-                            TestReporting.getInstance().finishedTestCase(t, false);
+                            TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);
                         }
                     }
                 }
@@ -138,11 +138,11 @@ public abstract class DeviceRunner {
                     runTest.run();
                 }
                 stopApplicationInstance();
-                TestReporting.getInstance().finishedTestCase(t, runTest.result);
+                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), runTest.result);
             } catch(Throwable err) {
                 failedTests++;
                 TestReporting.getInstance().logException(err);
-                TestReporting.getInstance().finishedTestCase(t, false);
+                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);
             }
         } catch(Throwable t) {
             TestReporting.getInstance().logMessage("Failed to create instance of " + testClassName);

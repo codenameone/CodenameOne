@@ -64,7 +64,7 @@ public class TestExecuter {
                     Display.getInstance().callSeriallyAndWait(new Runnable() {
                         public void run() {
                             try {
-                                TestReporting.getInstance().startingTestCase(test);
+                                TestReporting.getInstance().startingTestCase(test.getClass().getName());
                                 test.prepare();
                                 TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
                                 failed = !test.runTest();
@@ -73,7 +73,7 @@ public class TestExecuter {
                                 failed = true;
                                 TestReporting.getInstance().logException(err);
                             } finally {
-                                TestReporting.getInstance().finishedTestCase(test, !failed);
+                                TestReporting.getInstance().finishedTestCase(test.getClass().getName(), !failed);
                             }
                         }
                     }, timeout);
@@ -89,7 +89,7 @@ public class TestExecuter {
                     };
                     try {
                         timeoutKiller.schedule(timeoutTask, timeout);
-                        TestReporting.getInstance().startingTestCase(test);
+                        TestReporting.getInstance().startingTestCase(test.getClass().getName());
                         test.prepare();
                         TestReporting.getInstance().logMessage("Test prepared for execution off the EDT");
                         failed = !test.runTest();
@@ -98,7 +98,7 @@ public class TestExecuter {
                         failed = true;
                         TestReporting.getInstance().logException(err);
                     } finally {
-                        TestReporting.getInstance().finishedTestCase(test, !failed);
+                        TestReporting.getInstance().finishedTestCase(test.getClass().getName(), !failed);
                         timeoutTask.cancel();
                     }
                 }

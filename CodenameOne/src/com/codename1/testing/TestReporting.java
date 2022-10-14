@@ -60,10 +60,9 @@ public class TestReporting {
     
     /**
      * Invoked when a unit test is started
-     * @param test the test case
      */
-    public void startingTestCase(UnitTest test) {
-        Log.p("Starting test case " + test.getClass().getName());
+    public void startingTestCase(String testName) {
+        Log.p("Starting test case " + testName);
     }
 
     /**
@@ -84,16 +83,17 @@ public class TestReporting {
     
     /**
      * Invoked when a unit test has completed
-     * @param test the test case
-     * @param passed true if the test passed and false otherwise
+     *
+     * @param testName
+     * @param passed   true if the test passed and false otherwise
      */
-    public void finishedTestCase(UnitTest test, boolean passed) {
+    public void finishedTestCase(String testName, boolean passed) {
         if(passed) {
-            Log.p(test.getClass().getName() + " passed");
-            testsExecuted.put(test.getClass().getName(), Boolean.TRUE);
+            Log.p(testName + " passed");
+            testsExecuted.put(testName, Boolean.TRUE);
         } else {
-            Log.p(test.getClass().getName() + " failed");
-            testsExecuted.put(test.getClass().getName(), Boolean.FALSE);
+            Log.p(testName + " failed");
+            testsExecuted.put(testName, Boolean.FALSE);
         }
     }
     

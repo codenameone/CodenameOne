@@ -23,7 +23,6 @@
 package com.codename1.impl.javase;
 
 import com.codename1.testing.TestReporting;
-import com.codename1.testing.UnitTest;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -50,10 +49,10 @@ public class JUnitXMLReporting extends TestReporting {
     /**
      * {@inheritDoc}
      */
-    public void startingTestCase(UnitTest test) {
-        testCases += "<testcase classname=\"" + test.getClass().getName() + "\">\n";
+    public void startingTestCase(String testName) {
+        testCases += "<testcase classname=\"" + testName + "\">\n";
         output = "";
-        super.startingTestCase(test);
+        super.startingTestCase(testName);
     }
 
     /**
@@ -81,7 +80,7 @@ public class JUnitXMLReporting extends TestReporting {
     /**
      * {@inheritDoc}
      */
-    public void finishedTestCase(UnitTest test, boolean passed) {
+    public void finishedTestCase(String testName, boolean passed) {
         if(passed) {
             this.passed++;
             testCases += "<system-out>\n" + output + "</system-out>\n"
@@ -91,7 +90,7 @@ public class JUnitXMLReporting extends TestReporting {
             testCases += "<system-out>\n" + output + "</system-out>\n"
                     + "</testcase>";
         }
-        super.finishedTestCase(test, passed);
+        super.finishedTestCase(testName, passed);
     }
     
     /**
