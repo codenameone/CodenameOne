@@ -20,14 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.testing;
+package com.codename1.impl.javase;
+
+import com.codename1.testing.TestReporting;
+import com.codename1.testing.UnitTest;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.nio.file.Files;
 
 /**
  * Produces test reporting in the format of JUnit XML for compatibility with
@@ -66,7 +69,7 @@ public class JUnitXMLReporting extends TestReporting {
      */
     public void logException(Throwable err) {
         errors++;
-        testCases += "<error type=\"" + err.getClass().getName() + "\">" + err.toString() + "</error>\n";
+        testCases += "<error type=\"" + err.getClass().getName() + "\">" + err + "</error>\n";
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         err.printStackTrace(pw);
@@ -112,19 +115,11 @@ public class JUnitXMLReporting extends TestReporting {
         //noinspection ResultOfMethodCallIgnored
         reportFile.delete();
 
-        OutputStream fos = null;
-        try {
-            fos = new FileOutputStream(reportFile);
+        try (OutputStream fos = Files.newOutputStream(reportFile.toPath())) {
             writeReport(testSuiteName, fos);
         } catch (IOException ex) {
-            System.err.println("Failed to write JUnit XML report: " + ex.toString());
+            System.err.println("Failed to write JUnit XML report: " + ex);
             ex.printStackTrace();
-        } finally {
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException ignored) {}
-            }
         }
         super.testExecutionFinished(testSuiteName);
     }

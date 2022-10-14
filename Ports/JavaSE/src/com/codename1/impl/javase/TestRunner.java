@@ -22,7 +22,6 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.testing.JUnitXMLReporting;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.Display;
 
