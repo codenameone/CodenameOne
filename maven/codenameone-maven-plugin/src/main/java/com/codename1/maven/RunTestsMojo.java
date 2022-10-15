@@ -233,7 +233,13 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         java.setClassname("com.codename1.impl.javase.TestRunner");
         java.createArg().setValue(properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
         //java.createArg().setValue("-quietMode");
+        java.createArg().setValue("-junitXML");
+        File reportsDir = new File(project.getBuild().getDirectory(), "cn1-reports");
+        //noinspection ResultOfMethodCallIgnored
+        reportsDir.mkdirs();
+        java.setDir(reportsDir);
         java.setFork(true);
+        getLog().debug("Executing Test Runner: " + java.getCommandLine());
         int result = java.executeJava();
         if (result != 0) {
             throw new MojoExecutionException("Tests failed");
