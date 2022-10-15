@@ -313,6 +313,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center"><a href="https://davidday.tw/"><img src="https://avatars.githubusercontent.com/u/47077427?v=4?s=100" width="100px;" alt="David Day"/><br /><sub><b>David Day</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=dj6082013" title="Code">💻</a></td>
       <td align="center"><a href="https://github.com/Rocketeer007"><img src="https://avatars.githubusercontent.com/u/11492464?v=4?s=100" width="100px;" alt="Nick Price"/><br /><sub><b>Nick Price</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Rocketeer007" title="Code">💻</a></td>
     </tr>
+    <tr>
+      <td align="center"><a href="https://github.com/ahnafbinazad"><img src="https://avatars.githubusercontent.com/u/66205903?v=4?s=100" width="100px;" alt="Ahnaf Bin Azad"/><br /><sub><b>Ahnaf Bin Azad</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ahnafbinazad" title="Code">💻</a></td>
+    </tr>
   </tbody>
 </table>
 
