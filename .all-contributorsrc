@@ -310,6 +310,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "Rocketeer007",
+      "name": "Nick Price",
+      "avatar_url": "https://avatars.githubusercontent.com/u/11492464?v=4",
+      "profile": "https://github.com/Rocketeer007",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
@@ -317,5 +326,6 @@
   "projectOwner": "codenameone",
   "repoType": "github",
   "repoHost": "https://github.com",
-  "skipCi": true
+  "skipCi": true,
+  "commitConvention": "angular"
 }
