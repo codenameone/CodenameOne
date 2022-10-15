@@ -315,6 +315,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
     <tr>
       <td align="center"><a href="https://github.com/ahnafbinazad"><img src="https://avatars.githubusercontent.com/u/66205903?v=4?s=100" width="100px;" alt="Ahnaf Bin Azad"/><br /><sub><b>Ahnaf Bin Azad</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ahnafbinazad" title="Code">💻</a></td>
+      <td align="center"><a href="https://github.com/OctavioAnino"><img src="https://avatars.githubusercontent.com/u/114261436?v=4?s=100" width="100px;" alt="Octavio E Anino"/><br /><sub><b>Octavio E Anino</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=OctavioAnino" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
