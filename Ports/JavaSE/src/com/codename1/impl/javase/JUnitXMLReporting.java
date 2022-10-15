@@ -20,16 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.testing;
+package com.codename1.impl.javase;
 
-import com.codename1.ui.Display;
+import com.codename1.testing.TestReporting;
+
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.File;
+import java.nio.file.Files;
 
 /**
  * Produces test reporting in the format of JUnit XML for compatibility with
  * tools that consume JUnit test case results see http://code.google.com/p/codenameone/issues/detail?id=446
  * for more details.<br>
+ * See https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd for the schema
  *
  * @author Shai Almog
  */
@@ -38,13 +44,15 @@ public class JUnitXMLReporting extends TestReporting {
     private String output;
     private int passed;
     private int failed;
+    private int errors;
     
     /**
      * {@inheritDoc}
      */
-    public void startingTestCase(UnitTest test) {
-        testCases += "<testcase classname=\"" + test.getClass().getName() + "\" >";
+    public void startingTestCase(String testName) {
+        testCases += "<testcase classname=\"" + testName + "\">\n";
         output = "";
+        super.startingTestCase(testName);
     }
 
     /**
@@ -52,37 +60,47 @@ public class JUnitXMLReporting extends TestReporting {
      */
     public void logMessage(String message) {
         output += message + "\n";
+        super.logMessage(message);
     }
     
     /**
      * {@inheritDoc}
      */
     public void logException(Throwable err) {
-        testCases += "<error type=\"" + err.getClass().getName() + "\">" + err.toString() + "</error>\n";
+        errors++;
+        testCases += "<error type=\"" + err.getClass().getName() + "\">" + err + "</error>\n";
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        err.printStackTrace(pw);
+        pw.close();
+        output += sw.toString();
+        super.logException(err);
     }
     
     /**
      * {@inheritDoc}
      */
-    public void finishedTestCase(UnitTest test, boolean passed) {
+    public void finishedTestCase(String testName, boolean passed) {
         if(passed) {
             this.passed++;
             testCases += "<system-out>\n" + output + "</system-out>\n"
                     + "</testcase>";
         } else {
             failed++;
-            testCases += "<system-out>\n" + output + "</system-out><error/>\n"
+            testCases += "<system-out>\n" + output + "</system-out>\n"
                     + "</testcase>";
         }
+        super.finishedTestCase(testName, passed);
     }
     
     /**
      * {@inheritDoc}
      */
-    public void writeReport(OutputStream os) throws IOException {
+    public void writeReport(String testSuiteName, OutputStream os) throws IOException {
         os.write(("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n"
-                + "<testsuite failures=\"" + failed + "\"  "
-                + "skipped=\"0\" tests=\"" + (passed + failed) + "\" name=\"" + Display.getInstance().getProperty("AppName", "Unnamed")
+                + "<testsuite failures=\"" + (failed - errors) + "\" "
+                + "errors=\"" + errors + "\" "
+                + "skipped=\"0\" tests=\"" + (passed + failed) + "\" name=\"" + testSuiteName
                 + "\">\n" + testCases + 
                 "\n</testsuite>").getBytes());
     }
@@ -90,6 +108,18 @@ public class JUnitXMLReporting extends TestReporting {
     /**
      * {@inheritDoc}
      */
-    public void testExecutionFinished() {
+    public void testExecutionFinished(String testSuiteName) {
+        String reportFilename = "TEST-" + testSuiteName + ".xml";
+        File reportFile = new File(reportFilename);
+        //noinspection ResultOfMethodCallIgnored
+        reportFile.delete();
+
+        try (OutputStream fos = Files.newOutputStream(reportFile.toPath())) {
+            writeReport(testSuiteName, fos);
+        } catch (IOException ex) {
+            System.err.println("Failed to write JUnit XML report: " + ex);
+            ex.printStackTrace();
+        }
+        super.testExecutionFinished(testSuiteName);
     }
 }
