@@ -66,6 +66,13 @@ public class TestReporting {
     }
 
     /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #startingTestCase(String)}
+     */
+    public void startingTestCase(UnitTest test) {
+        startingTestCase(test.getClass().getName());
+    }
+
+    /**
      * Indicates a message from the current test case
      * @param message the message
      */
@@ -84,7 +91,7 @@ public class TestReporting {
     /**
      * Invoked when a unit test has completed
      *
-     * @param testName
+     * @param testName the name of the test case
      * @param passed   true if the test passed and false otherwise
      */
     public void finishedTestCase(String testName, boolean passed) {
@@ -95,6 +102,13 @@ public class TestReporting {
             Log.p(testName + " failed");
             testsExecuted.put(testName, Boolean.FALSE);
         }
+    }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #finishedTestCase(String, boolean)}
+     */
+    public void finishedTestCase(UnitTest test, boolean passed) {
+        finishedTestCase(test.getClass().getName(), passed);
     }
     
     /**
@@ -114,11 +128,26 @@ public class TestReporting {
             }
         }
     }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #writeReport(String, OutputStream)}
+     */
+    public void writeReport(OutputStream os) throws IOException {
+    }
     
     /**
      * Callback to indicate the test execution has finished allowing
      * for a report to be generated if appropriate
      */
     public void testExecutionFinished(String testSuiteName) {
+        // Call the legacy method in case it has been overridden by a subclass
+        testExecutionFinished();
+    }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #testExecutionFinished(String)}
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    public void testExecutionFinished() {
     }
 }
