@@ -207,6 +207,17 @@ public class L10NManager {
     }
 
     /**
+     * Formats the time in a default form e.g. 10:00AM
+     * @param d the date time object
+     * @return the time as a String
+     */
+    public String formatTimeMedium(Date d) {
+        String s = formatDateTimeMedium(d);
+        s = s.substring(s.lastIndexOf(" ") + 1;
+        return s;
+    }
+    
+    /**
      * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
      * @param d the date
      * @return the date and time
