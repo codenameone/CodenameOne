@@ -211,9 +211,9 @@ public class L10NManager {
      * @param d the date time object
      * @return the time as a String
      */
-    public String formatTimeMedium(Date d) {
+    public String formatTime(Date d) {
         String s = formatDateTimeMedium(d);
-        s = s.substring(s.lastIndexOf(" ") + 1;
+        s = s.substring(s.lastIndexOf(" ") + 1);
         return s;
     }
     
