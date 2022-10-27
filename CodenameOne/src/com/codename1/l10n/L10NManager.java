@@ -213,7 +213,13 @@ public class L10NManager {
      */
     public String formatTime(Date d) {
         String s = formatDateTimeMedium(d);
-        s = s.substring(s.lastIndexOf(" ") + 1);
+        int pos = s.lastIndexOf(" ");
+        
+        // this can be just the AM or PM
+        if(s.length() - pos < 4) {
+            pos = s.lastIndexOf(" ", pos - 1);
+        }
+        s = s.substring(pos + 1);
         return s;
     }
     
