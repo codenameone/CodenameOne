@@ -1431,6 +1431,8 @@ public class Tabs extends Container {
             this.type = type;
         }
 
+
+
         public void actionPerformed(ActionEvent evt) {
             
             if (getComponentCount() == 0 || !swipeActivated ||slideToDestMotion != null) {
@@ -1442,7 +1444,7 @@ public class Tabs extends Container {
                 case PRESS: {
                     blockSwipe = false;
                     riskySwipe = false;
-                    if (contentPane.visibleBoundsContains(x, y)) {
+                    if (!isEventBlockedByHigherComponent(evt) && contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
                         if(testCmp != null && testCmp != contentPane) {
                             doNotBlockSideSwipe = true;
@@ -1655,6 +1657,24 @@ public class Tabs extends Container {
                     break;
                 }
             }
+        }
+
+        private boolean isEventBlockedByHigherComponent(ActionEvent evt) {
+            final int x = evt.getX();
+            final int y = evt.getY();
+            final Form currentForm = Display.INSTANCE.getCurrent();
+            if (currentForm == null) {
+                return false;
+            }
+            final Component targetComponent = currentForm.getComponentAt(x, y);
+            if (targetComponent == null) {
+                return false;
+            }
+            if (contentPane.equals(targetComponent) || contentPane.contains(targetComponent)) {
+                return false;
+            }
+
+            return true;
         }
     }
 
