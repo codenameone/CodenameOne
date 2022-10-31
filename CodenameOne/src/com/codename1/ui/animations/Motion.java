@@ -265,6 +265,24 @@ public class Motion {
         deceleration.motionType = DECELERATION;
         return  deceleration;
     }
+
+    /**
+     * Creates a deceleration motion starting from the current position of another motion.
+     *
+     * @param motion the number from which we are starting (usually indicating animation start position)
+     * @param maxDestinationValue The farthest position to allow motion to go.
+     * @param maxDuration The longest that the duration is allowed to proceed for.
+     * @return new motion object
+     */
+    public static Motion createDecelerationMotionFrom(Motion motion, int maxDestinationValue, int maxDuration) {
+        return createDecelerationMotion(
+                motion.lastReturnedValue,
+                motion.destinationValue < motion.sourceValue
+                        ? Math.min(motion.destinationValue, maxDestinationValue)
+                        : Math.max(motion.destinationValue, maxDestinationValue),
+                (int)Math.min(maxDuration, motion.duration - (System.currentTimeMillis() - motion.startTime))
+        );
+    }
     
     /**
      * Creates a friction motion starting from source with initial speed and the friction
@@ -325,6 +343,10 @@ public class Motion {
         if(lastReturnedValue == destinationValue) {
             lastReturnedValue = sourceValue;
         }
+    }
+
+    public boolean isDecayMotion() {
+        return motionType == EXPONENTIAL_DECAY;
     }
 
     /**
@@ -413,69 +435,6 @@ public class Motion {
         }
         return current;        
     }
-
-//    private int[] values = new int[1000];
-//    private int[] times = new int[1000];
-//    private int vOff;
-//    
-//    /**
-//     * Returns the value for the motion for the current clock time. 
-//     * The value is dependent on the Motion type.
-//     * 
-//     * @return a value that is relative to the source value
-//     */
-//    public int getValue() {
-//        int v = getValueImpl();
-//        if(isFinished() && vOff > 0) {
-//            System.out.println("initVelocity:\t"+initVelocity + "\tfriction:\t" + friction + "\tdestinationValue:\t" + destinationValue + "\tsourceValue:\t" + sourceValue);
-//            System.out.println("Value\tTime");
-//            for(int iter = 0 ; iter < vOff ; iter++) {
-//                System.out.println("" + values[iter] + "\t" + times[iter]);
-//            }
-//            vOff = 0;
-//        } else {
-//            values[vOff] = v;
-//            int time = (int) getCurrentMotionTime();
-//            times[vOff] = time;
-//
-//            vOff++;
-//        }
-//        
-//        return v;
-//    }
-//    
-//    /**
-//     * Returns the value for the motion for the current clock time. 
-//     * The value is dependent on the Motion type.
-//     * 
-//     * @return a value that is relative to the source value
-//     */
-//    private int getValueImpl() {
-//        if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
-//            return sourceValue;
-//        }
-//        switch(motionType) {
-//            case SPLINE:
-//                lastReturnedValue = getSplineValue();
-//                break;
-//            case CUBIC:
-//                lastReturnedValue = getCubicValue();
-//                break;
-//            case FRICTION:
-//                lastReturnedValue = getFriction();
-//                break;
-//            case DECELERATION:
-//                lastReturnedValue = getRubber();
-//                break;
-//            case COLOR_LINEAR:
-//                lastReturnedValue = getColorLinear();
-//                break;
-//            default:
-//                lastReturnedValue = getLinear();
-//                break;
-//        }
-//        return lastReturnedValue;
-//    }
 
     /**
      * Returns the value for the motion for the current clock time. 
@@ -600,9 +559,6 @@ public class Motion {
     }
     
     private int getExponentialDecay() {
-        //amplitude = initialVelocity * scaleFactor;
-        //targetPosition = position + amplitude;
-        //timestamp = Date.now();
         double elapsed = getCurrentMotionTime();
         double timeConstant = friction;
         double amplitude = targetPosition - sourceValue;
@@ -612,9 +568,7 @@ public class Motion {
         } else {
             return Math.max(position, destinationValue);
         }
-        
     }
-
     private int getRubber() {
         if(isFinished()){
             return destinationValue;
