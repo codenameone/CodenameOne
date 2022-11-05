@@ -211,6 +211,7 @@ public class AndroidGradleBuilder extends Executor {
             "com.android.launcher.permission.UNINSTALL_SHORTCUT",
             "android.permission.UPDATE_DEVICE_STATS",
             "android.permission.USE_FINGERPRINT",
+            "android.permission.USE_BIOMETRIC",
             "android.permission.USE_SIP",
             "android.permission.VIBRATE",
             "android.permission.WAKE_LOCK",
