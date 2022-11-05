@@ -211,6 +211,7 @@ public class AndroidGradleBuilder extends Executor {
             "com.android.launcher.permission.UNINSTALL_SHORTCUT",
             "android.permission.UPDATE_DEVICE_STATS",
             "android.permission.USE_FINGERPRINT",
+            "android.permission.USE_BIOMETRIC",
             "android.permission.USE_SIP",
             "android.permission.VIBRATE",
             "android.permission.WAKE_LOCK",
@@ -499,7 +500,6 @@ public class AndroidGradleBuilder extends Executor {
         debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
             String permName = xPerm.substring(xPerm.lastIndexOf(".")+1);
-
             if (request.getArg("android.permission."+permName, "false").equals("true")) {
                 debug("Found permission "+permName);
                 String maxSdk = request.getArg("android.permission."+permName+".maxSdkVersion", "");
@@ -516,9 +516,58 @@ public class AndroidGradleBuilder extends Executor {
 
                 xPermissions += permissionAdd(request, xPerm, addString);
             }
-
         }
 
+        final String usesFeaturePrefix = "android.uses_feature.";
+        final int usesFeaturePrefixLen = usesFeaturePrefix.length();
+        for (final String arg : request.getArgs()) {
+            if (!arg.startsWith(usesFeaturePrefix)) {
+                continue;
+            }
+            final String featureName = arg.substring(usesFeaturePrefixLen);
+            final String rawArgValue = request.getArg(arg, "false");
+            if (rawArgValue.equals("false")) {
+                continue;
+            }
+            final boolean requiredFlag = rawArgValue.equals("required");
+            String addString =  "    <uses-feature android:name=\""+featureName+"\" ";
+            if (requiredFlag) {
+                addString += "android:required=\"true\" ";
+            }
+            addString += "/>\n";
+            xPermissions += permissionAdd(request, featureName, addString);
+        }
+
+        final String usesPermissionPrefix = "android.uses_permission.";
+        final int usesPermissionPrefixLen = usesPermissionPrefix.length();
+        final String maxSdkVersionPrefix = "maxSdkVersion:";
+        final int maxSdkVersionPrefixLen = maxSdkVersionPrefix.length();
+        for (final String arg : request.getArgs()) {
+            if (!arg.startsWith(usesPermissionPrefix)) {
+                continue;
+            }
+            final String permissionName = arg.substring(usesPermissionPrefixLen);
+            final String rawArgValue = request.getArg(arg, "false");
+            if (rawArgValue.equals("false")) {
+                continue;
+            }
+            final boolean requiredFlag = rawArgValue.contains("required");
+            final int maxSdkVersionPos = rawArgValue.indexOf(maxSdkVersionPrefix);
+            String maxSdkVersion = maxSdkVersionPos >= 0 ? rawArgValue.substring(maxSdkVersionPos + maxSdkVersionPrefixLen) : "";
+            if (!maxSdkVersion.isEmpty() && maxSdkVersion.contains(" ")) {
+                maxSdkVersion = maxSdkVersion.substring(0, maxSdkVersion.indexOf(" "));
+            }
+
+            String addString =  "    <uses-permission android:name=\""+permissionName+"\" ";
+            if (requiredFlag) {
+                addString += "android:required=\"true\" ";
+            }
+            if (!"".equals(maxSdkVersion)) {
+                addString += "android:maxSdkVersion=\""+maxSdkVersion+"\" ";
+            }
+            addString += "/>\n";
+            xPermissions += permissionAdd(request, permissionName, addString);
+        }
 
         File tmpFile = getBuildDirectory();
         if (tmpFile == null) {
@@ -528,11 +577,7 @@ public class AndroidGradleBuilder extends Executor {
             delTree(tmpFile);
         }
         tmpFile.mkdirs();
-
-
-
         File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle"));
-
         String gradleHome = System.getenv("GRADLE_HOME");
         if (gradleHome == null && managedGradleHome.exists()) {
             gradleHome = managedGradleHome.getAbsolutePath();
