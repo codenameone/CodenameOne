@@ -6342,7 +6342,34 @@ public class Component implements Animation, StyleListener, Editable {
             int dragVal = draggedMotionY.getValue();
             int iv = getInvisibleAreaUnderVKB();
             int edge = (getScrollDimension().getHeight() - getHeight() + iv);
-
+            if (!draggedMotionY.isFinished()
+                    && draggedMotionY.isDecayMotion()
+                    && draggedMotionY.countAvailableVelocitySamplingPoints() > 1) {
+                final Motion origDraggedMotionY = draggedMotionY;
+                if (dragVal < 0) {
+                    // Once past 0, decay motion is too slow.  We need to hit it with heavy friction.
+                    draggedMotionY = Motion.createFrictionMotion(
+                            dragVal,
+                            -getTensileLength(),
+                            (int)origDraggedMotionY.getVelocity(),
+                            0.01f
+                    );
+                    draggedMotionY.start();
+                    origDraggedMotionY.finish();
+                } else if (snapToGrid
+                        && Math.abs(origDraggedMotionY.getVelocity()) * 1000 < CN.convertToPixels(5)) {
+                    // If snapToGrid is enabled, the grid snap should take precendent if the drag is slower
+                    // than some threshold.
+                    draggedMotionY = Motion.createFrictionMotion(
+                            dragVal,
+                            origDraggedMotionY.getDestinationValue(),
+                            (int)origDraggedMotionY.getVelocity(),
+                            0.1f
+                    );
+                    draggedMotionY.start();
+                    origDraggedMotionY.finish();
+                }
+            }
             // this can't be a part of the parent if since we need the last value to arrive
             if (draggedMotionY.isFinished()) {
                 if (dragVal < 0) {
@@ -6376,32 +6403,7 @@ public class Component implements Animation, StyleListener, Editable {
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
                 updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);            
-            } else if (dragVal < 0 && draggedMotionY.getSourceValue() > dragVal && draggedMotionY.isDecayMotion()) {
-                draggedMotionY = Motion.createDecelerationMotionFrom(draggedMotionY, -1* getTensileLength(), 100);
-                draggedMotionY.start();
-            } else if (dragVal > edge && edge > 0 && draggedMotionY.isDecayMotion()) {
-                draggedMotionY = Motion.createDecelerationMotionFrom(draggedMotionY, edge + getTensileLength(), 100);
-                draggedMotionY.start();
-            } else if (snapToGrid && draggedMotionY.isDecayMotion() && draggedMotionY.getCurrentMotionTime() > draggedMotionY.getDuration()) {
-                boolean tVal = tensileDragEnabled;
-                tensileDragEnabled = true;
-                int dest = getGridPosY();
-                int scroll = getScrollY();
-                if (Math.abs(dest-scroll) == 1) {
-                    // Fixes issue with exponential decay where it never actually reaches destination
-                    // so it creates infinite loop
-                    setScrollY(dest);
-                    draggedMotionY = null;
-                }
-                else if (dest != scroll) {
-                    startTensile(scroll, dest, true);
-                } else {
-                    draggedMotionY = null;
-                }
-                tensileDragEnabled = tVal;
             }
-
-
 
             if(scrollListeners != null){
                 scrollListeners.fireScrollEvent(this.scrollX, dragVal, this.scrollX, this.scrollY);

@@ -77,7 +77,9 @@ public class Motion {
     private double initVelocity,  friction;
     private int lastReturnedValue;
     private int [] previousLastReturnedValue = new int[3];
+    private long[] previousLastReturnedValueTime = new long[3];
     private long currentMotionTime = -1;
+    private long previousCurrentMotionTime = -1;
     private float p0, p1, p2, p3;
     
     /**
@@ -95,7 +97,8 @@ public class Motion {
         if(slowMotion) {
             this.duration *= 50;
         }
-        previousLastReturnedValue[0] = -1;        
+        previousLastReturnedValue[0] = -1;
+        previousLastReturnedValueTime[0] = -1;
     }
 
     /**
@@ -105,6 +108,7 @@ public class Motion {
         if(!isFinished()) {
             startTime = System.currentTimeMillis() - duration;
             currentMotionTime = -1;
+            previousCurrentMotionTime = -1;
         }
     }
     
@@ -120,7 +124,8 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
-        previousLastReturnedValue[0] = -1;        
+        previousLastReturnedValue[0] = -1;
+        previousLastReturnedValueTime[0] = -1;
     }
     
     protected Motion(int sourceValue, double initVelocity, double friction) {
@@ -128,7 +133,8 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
-        previousLastReturnedValue[0] = -1;        
+        previousLastReturnedValue[0] = -1;
+        previousLastReturnedValueTime[0] = -1;
     }
 
     
@@ -337,6 +343,7 @@ public class Motion {
      * @param currentMotionTime the time in milliseconds for the motion.
      */
     public void setCurrentMotionTime(long currentMotionTime) {
+        this.previousCurrentMotionTime = this.currentMotionTime;
         this.currentMotionTime = currentMotionTime;
         
         // workaround allowing the motion to be restarted when manually setting the current time
@@ -448,8 +455,14 @@ public class Motion {
         }
         
         previousLastReturnedValue[0] = previousLastReturnedValue[1];
+        previousLastReturnedValueTime[0] = previousLastReturnedValueTime[1];
         previousLastReturnedValue[1] = previousLastReturnedValue[2];
+        previousLastReturnedValueTime[1] = previousLastReturnedValueTime[2];
         previousLastReturnedValue[2] = lastReturnedValue;
+        previousLastReturnedValueTime[2] = previousCurrentMotionTime;
+        if (previousCurrentMotionTime < 0) {
+            previousCurrentMotionTime = getCurrentMotionTime();
+        }
         switch(motionType) {
             case SPLINE:
                 lastReturnedValue = getSplineValue();
@@ -474,6 +487,55 @@ public class Motion {
                 break;
         }
         return lastReturnedValue;
+    }
+
+    /**
+     * Gets an approximation of the current velocity in pixels per millisecond.
+     *
+     * <p>NOTE: If {@link #countAvailableVelocitySamplingPoints()} <= 1, then this method will always output {@literal 0}.
+     * Therefore the output of this method only has meaning if {@link #countAvailableVelocitySamplingPoints()} > {@literal 0}</p>
+     *
+     * @return Current velocity in pixels per millisecond.
+     * @since 8.0
+     */
+    public double getVelocity() {
+        final long localCurrentMotionTime = getCurrentMotionTime();
+        final int lastReturnedValueLocal = lastReturnedValue;
+        double velocity = 0;
+        boolean firstIteration = true;
+        for (int i=2; i>= 0; i--) {
+            final long t = previousLastReturnedValueTime[i];
+            if (t <= 0 || localCurrentMotionTime == t) {
+                break;
+            }
+            final int valueAtT = previousLastReturnedValue[i];
+            final double spotVelocity = (lastReturnedValueLocal - valueAtT) / (double)(localCurrentMotionTime - t);
+            velocity = firstIteration ? spotVelocity : (velocity + spotVelocity)/2.0;
+            firstIteration = false;
+        }
+
+        return velocity;
+    }
+
+    /**
+     * Gets the number of sampling points that can be used by {@link #getVelocity()}.  A minimum of 2 sampling
+     * points are required for the result of {@link #getVelocity()} to have any meaning.
+     *
+     * @since 8.0
+     * @return The number of sampling points that can be used by {@link #getVelocity()}.
+     */
+    public int countAvailableVelocitySamplingPoints() {
+        int count = 1;
+        final long localCurrentMotionTime = getCurrentMotionTime();
+        for (int i=2; i>= 0; i--) {
+            final long t = previousLastReturnedValueTime[i];
+            if (t <= 0 || localCurrentMotionTime == t) {
+                break;
+            }
+            count++;
+        }
+
+        return count;
     }
     
     private int getLinear() {
