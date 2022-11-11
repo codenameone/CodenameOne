@@ -2022,7 +2022,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             // right click dragging means a pinch to zoom
-            if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
+            if (!releaseLock && isPinchZoom(e)) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
@@ -2032,6 +2032,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } 
                 return;
             }  
+        }
+
+        private boolean isPinchZoom(MouseEvent e) {
+            return ((e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0)
+                    || ((e.getModifiers() & MouseEvent.SHIFT_MASK) != 0);
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
         private Cursor defaultCursor = Cursor.getDefaultCursor();        
