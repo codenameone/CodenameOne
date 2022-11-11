@@ -565,7 +565,8 @@ public class Picker extends Button {
                 DurationSpinner3D out = new DurationSpinner3D(
                         type == Display.PICKER_TYPE_DURATION_MINUTES ? DurationSpinner3D.FIELD_MINUTE :
                         type == Display.PICKER_TYPE_DURATION_HOURS ? DurationSpinner3D.FIELD_HOUR :
-                                DurationSpinner3D.FIELD_HOUR | DurationSpinner3D.FIELD_MINUTE
+                                DurationSpinner3D.FIELD_HOUR | DurationSpinner3D.FIELD_MINUTE,
+                        minuteStep
                 );
                 if (value != null) {
                     out.setValue(value);
