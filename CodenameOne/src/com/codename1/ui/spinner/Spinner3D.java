@@ -101,9 +101,12 @@ class Spinner3D extends Container implements InternalPickerWidget {
 
             @Override
             protected Dimension calcScrollSize() {
+                final int viewportHeight = (int)root.calcViewportHeight();
+                final int listHeight = (int)root.calcFlatListHeight();
+                final int rowHeight = (int)root.calcRowHeight();
                 return new Dimension(
-                        500, 
-                        (int)root.calcFlatListHeight() - (int) root.calcRowHeight()
+                        500, // Width doesn't matter - only doing Y scroll.
+                        Math.max(viewportHeight, listHeight + (int)(6 * rowHeight) )
                 );
             }
 

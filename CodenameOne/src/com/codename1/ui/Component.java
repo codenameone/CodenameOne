@@ -5354,7 +5354,9 @@ public class Component implements Animation, StyleListener, Editable {
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
-            draggedMotion = Motion.createDecelerationMotion(offset, dest, 300);
+            final int distance = Math.abs(offset - dest);
+            final int duration = Math.max(300, (int)Math.round(1000 * distance / (double)CN.getDisplayHeight()));
+            draggedMotion = Motion.createDecelerationMotion(offset, dest, duration);
             draggedMotion.start();
         } else {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
