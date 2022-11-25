@@ -44,18 +44,13 @@ class SpinnerNumberModel implements ListModel {
     private double step;
     boolean realValues;
 
-    private boolean setSelectedIndexReentrantLock;
-
     void setValue(Object value) {
-        int oldIndex = getSelectedIndex();
         if(value instanceof Integer) {
             currentValue = ((Integer)value).doubleValue();
         } else {
             currentValue = ((Double)value).doubleValue();
         }
-        if (oldIndex != getSelectedIndex()) {
-            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
-        }
+        selectionListener.fireSelectionEvent(-1, -1);
     }
 
     Object getValue() {
@@ -111,7 +106,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / step) + 1;
+        return (int)((max - min) / step);
     }
 
 
@@ -120,7 +115,7 @@ class SpinnerNumberModel implements ListModel {
      */
     public int getSelectedIndex() {
         // equivalent to round
-        double d = Math.floor((max - currentValue) / step);
+        double d = Math.floor((max - currentValue) / step + 0.5);
         int v = getSize() - (int)d;
         return v;
     }
@@ -130,20 +125,10 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
-        if (setSelectedIndexReentrantLock) {
-            return;
-        }
-        setSelectedIndexReentrantLock = true;
-        try {
-            int oldIndex = getSelectedIndex();
-            currentValue = min + index * step;
-            int newIndex = getSelectedIndex();
-            if (oldIndex != newIndex) {
-                selectionListener.fireSelectionEvent(oldIndex, newIndex);
-            }
-        } finally {
-            setSelectedIndexReentrantLock = false;
-        }
+        int oldIndex = getSelectedIndex();
+        currentValue = min + index * step;
+        int newIndex = getSelectedIndex();
+        selectionListener.fireSelectionEvent(oldIndex, newIndex);
     }
 
     /**

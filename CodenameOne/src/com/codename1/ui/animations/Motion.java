@@ -77,9 +77,7 @@ public class Motion {
     private double initVelocity,  friction;
     private int lastReturnedValue;
     private int [] previousLastReturnedValue = new int[3];
-    private long[] previousLastReturnedValueTime = new long[3];
     private long currentMotionTime = -1;
-    private long previousCurrentMotionTime = -1;
     private float p0, p1, p2, p3;
     
     /**
@@ -97,8 +95,7 @@ public class Motion {
         if(slowMotion) {
             this.duration *= 50;
         }
-        previousLastReturnedValue[0] = -1;
-        previousLastReturnedValueTime[0] = -1;
+        previousLastReturnedValue[0] = -1;        
     }
 
     /**
@@ -108,7 +105,6 @@ public class Motion {
         if(!isFinished()) {
             startTime = System.currentTimeMillis() - duration;
             currentMotionTime = -1;
-            previousCurrentMotionTime = -1;
         }
     }
     
@@ -124,8 +120,7 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
-        previousLastReturnedValue[0] = -1;
-        previousLastReturnedValueTime[0] = -1;
+        previousLastReturnedValue[0] = -1;        
     }
     
     protected Motion(int sourceValue, double initVelocity, double friction) {
@@ -133,8 +128,7 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
-        previousLastReturnedValue[0] = -1;
-        previousLastReturnedValueTime[0] = -1;
+        previousLastReturnedValue[0] = -1;        
     }
 
     
@@ -271,24 +265,6 @@ public class Motion {
         deceleration.motionType = DECELERATION;
         return  deceleration;
     }
-
-    /**
-     * Creates a deceleration motion starting from the current position of another motion.
-     *
-     * @param motion the number from which we are starting (usually indicating animation start position)
-     * @param maxDestinationValue The farthest position to allow motion to go.
-     * @param maxDuration The longest that the duration is allowed to proceed for.
-     * @return new motion object
-     */
-    public static Motion createDecelerationMotionFrom(Motion motion, int maxDestinationValue, int maxDuration) {
-        return createDecelerationMotion(
-                motion.lastReturnedValue,
-                motion.destinationValue < motion.sourceValue
-                        ? Math.min(motion.destinationValue, maxDestinationValue)
-                        : Math.max(motion.destinationValue, maxDestinationValue),
-                (int)Math.min(maxDuration, motion.duration - (System.currentTimeMillis() - motion.startTime))
-        );
-    }
     
     /**
      * Creates a friction motion starting from source with initial speed and the friction
@@ -343,17 +319,12 @@ public class Motion {
      * @param currentMotionTime the time in milliseconds for the motion.
      */
     public void setCurrentMotionTime(long currentMotionTime) {
-        this.previousCurrentMotionTime = this.currentMotionTime;
         this.currentMotionTime = currentMotionTime;
         
         // workaround allowing the motion to be restarted when manually setting the current time
         if(lastReturnedValue == destinationValue) {
             lastReturnedValue = sourceValue;
         }
-    }
-
-    public boolean isDecayMotion() {
-        return motionType == EXPONENTIAL_DECAY;
     }
 
     /**
@@ -443,6 +414,69 @@ public class Motion {
         return current;        
     }
 
+//    private int[] values = new int[1000];
+//    private int[] times = new int[1000];
+//    private int vOff;
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    public int getValue() {
+//        int v = getValueImpl();
+//        if(isFinished() && vOff > 0) {
+//            System.out.println("initVelocity:\t"+initVelocity + "\tfriction:\t" + friction + "\tdestinationValue:\t" + destinationValue + "\tsourceValue:\t" + sourceValue);
+//            System.out.println("Value\tTime");
+//            for(int iter = 0 ; iter < vOff ; iter++) {
+//                System.out.println("" + values[iter] + "\t" + times[iter]);
+//            }
+//            vOff = 0;
+//        } else {
+//            values[vOff] = v;
+//            int time = (int) getCurrentMotionTime();
+//            times[vOff] = time;
+//
+//            vOff++;
+//        }
+//        
+//        return v;
+//    }
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    private int getValueImpl() {
+//        if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
+//            return sourceValue;
+//        }
+//        switch(motionType) {
+//            case SPLINE:
+//                lastReturnedValue = getSplineValue();
+//                break;
+//            case CUBIC:
+//                lastReturnedValue = getCubicValue();
+//                break;
+//            case FRICTION:
+//                lastReturnedValue = getFriction();
+//                break;
+//            case DECELERATION:
+//                lastReturnedValue = getRubber();
+//                break;
+//            case COLOR_LINEAR:
+//                lastReturnedValue = getColorLinear();
+//                break;
+//            default:
+//                lastReturnedValue = getLinear();
+//                break;
+//        }
+//        return lastReturnedValue;
+//    }
+
     /**
      * Returns the value for the motion for the current clock time. 
      * The value is dependent on the Motion type.
@@ -455,14 +489,8 @@ public class Motion {
         }
         
         previousLastReturnedValue[0] = previousLastReturnedValue[1];
-        previousLastReturnedValueTime[0] = previousLastReturnedValueTime[1];
         previousLastReturnedValue[1] = previousLastReturnedValue[2];
-        previousLastReturnedValueTime[1] = previousLastReturnedValueTime[2];
         previousLastReturnedValue[2] = lastReturnedValue;
-        previousLastReturnedValueTime[2] = previousCurrentMotionTime;
-        if (previousCurrentMotionTime < 0) {
-            previousCurrentMotionTime = getCurrentMotionTime();
-        }
         switch(motionType) {
             case SPLINE:
                 lastReturnedValue = getSplineValue();
@@ -487,55 +515,6 @@ public class Motion {
                 break;
         }
         return lastReturnedValue;
-    }
-
-    /**
-     * Gets an approximation of the current velocity in pixels per millisecond.
-     *
-     * <p>NOTE: If {@link #countAvailableVelocitySamplingPoints()} <= 1, then this method will always output {@literal 0}.
-     * Therefore the output of this method only has meaning if {@link #countAvailableVelocitySamplingPoints()} > {@literal 0}</p>
-     *
-     * @return Current velocity in pixels per millisecond.
-     * @since 8.0
-     */
-    public double getVelocity() {
-        final long localCurrentMotionTime = getCurrentMotionTime();
-        final int lastReturnedValueLocal = lastReturnedValue;
-        double velocity = 0;
-        boolean firstIteration = true;
-        for (int i=2; i>= 0; i--) {
-            final long t = previousLastReturnedValueTime[i];
-            if (t <= 0 || localCurrentMotionTime == t) {
-                break;
-            }
-            final int valueAtT = previousLastReturnedValue[i];
-            final double spotVelocity = (lastReturnedValueLocal - valueAtT) / (double)(localCurrentMotionTime - t);
-            velocity = firstIteration ? spotVelocity : (velocity + spotVelocity)/2.0;
-            firstIteration = false;
-        }
-
-        return velocity;
-    }
-
-    /**
-     * Gets the number of sampling points that can be used by {@link #getVelocity()}.  A minimum of 2 sampling
-     * points are required for the result of {@link #getVelocity()} to have any meaning.
-     *
-     * @since 8.0
-     * @return The number of sampling points that can be used by {@link #getVelocity()}.
-     */
-    public int countAvailableVelocitySamplingPoints() {
-        int count = 1;
-        final long localCurrentMotionTime = getCurrentMotionTime();
-        for (int i=2; i>= 0; i--) {
-            final long t = previousLastReturnedValueTime[i];
-            if (t <= 0 || localCurrentMotionTime == t) {
-                break;
-            }
-            count++;
-        }
-
-        return count;
     }
     
     private int getLinear() {
@@ -621,6 +600,9 @@ public class Motion {
     }
     
     private int getExponentialDecay() {
+        //amplitude = initialVelocity * scaleFactor;
+        //targetPosition = position + amplitude;
+        //timestamp = Date.now();
         double elapsed = getCurrentMotionTime();
         double timeConstant = friction;
         double amplitude = targetPosition - sourceValue;
@@ -630,7 +612,9 @@ public class Motion {
         } else {
             return Math.max(position, destinationValue);
         }
+        
     }
+
     private int getRubber() {
         if(isFinished()){
             return destinationValue;
