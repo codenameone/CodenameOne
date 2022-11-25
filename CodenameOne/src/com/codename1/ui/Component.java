@@ -34,6 +34,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.*;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.*;
 import com.codename1.ui.util.EventDispatcher;
@@ -3285,7 +3286,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     /**
      * Indicates the Y position of the scrolling, this number is relative to the
-     * component position and so a position of 0 would indicate the y position
+     * component position and so a position of 0 would indicate the x position
      * of the component.
      * 
      * @return the Y position of the scrolling
@@ -4596,7 +4597,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         draggedMotionX = null;
-        draggedMotionY = null;
+        draggedMotionY = null;        
         
         Component parent = getParent();
         if(parent != null){
@@ -5354,7 +5355,7 @@ public class Component implements Animation, StyleListener, Editable {
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
-            draggedMotion = Motion.createDecelerationMotion(offset, dest, 300);
+            draggedMotion = Motion.createDecelerationMotion(offset, dest, 500);
             draggedMotion.start();
         } else {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
@@ -5687,6 +5688,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
     
     private void pointerReleaseImpl(Component lead, int x, int y) {
+        
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
@@ -6309,7 +6311,7 @@ public class Component implements Animation, StyleListener, Editable {
     boolean isTensileMotionInProgress() {
         return draggedMotionY != null && !draggedMotionY.isFinished();
     }
-
+    
     /**
      * {@inheritDoc}
      */
@@ -6340,45 +6342,18 @@ public class Component implements Animation, StyleListener, Editable {
             // change the variable directly for efficiency both in removing redundant
             // repaints and scroll checks
             int dragVal = draggedMotionY.getValue();
-            int iv = getInvisibleAreaUnderVKB();
-            int edge = (getScrollDimension().getHeight() - getHeight() + iv);
-            if (!draggedMotionY.isFinished()
-                    && draggedMotionY.isDecayMotion()
-                    && draggedMotionY.countAvailableVelocitySamplingPoints() > 1) {
-                final Motion origDraggedMotionY = draggedMotionY;
-                if (dragVal < 0) {
-                    // Once past 0, decay motion is too slow.  We need to hit it with heavy friction.
-                    draggedMotionY = Motion.createFrictionMotion(
-                            dragVal,
-                            -getTensileLength(),
-                            (int)origDraggedMotionY.getVelocity(),
-                            0.01f
-                    );
-                    draggedMotionY.start();
-                    origDraggedMotionY.finish();
-                } else if (snapToGrid
-                        && Math.abs(origDraggedMotionY.getVelocity()) * 1000 < CN.convertToPixels(5)) {
-                    // If snapToGrid is enabled, the grid snap should take precendent if the drag is slower
-                    // than some threshold.
-                    draggedMotionY = Motion.createFrictionMotion(
-                            dragVal,
-                            origDraggedMotionY.getDestinationValue(),
-                            (int)origDraggedMotionY.getVelocity(),
-                            0.1f
-                    );
-                    draggedMotionY.start();
-                    origDraggedMotionY.finish();
-                }
-            }
+
             // this can't be a part of the parent if since we need the last value to arrive
             if (draggedMotionY.isFinished()) {
                 if (dragVal < 0) {
                     startTensile(dragVal, 0, true);
                 } else {
+                    int iv = getInvisibleAreaUnderVKB();
+                    int edge = (getScrollDimension().getHeight() - getHeight() + iv);
                     if (dragVal > edge && edge > 0) {
                         startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
                     } else {
-                        if (snapToGrid) {
+                        if (snapToGrid && getScrollY() < edge && getScrollY() > 0) {
                             boolean tVal = tensileDragEnabled;
                             tensileDragEnabled = true;
                             int dest = getGridPosY();
@@ -6400,6 +6375,7 @@ public class Component implements Animation, StyleListener, Editable {
                         }
                     }
                 }
+                
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
                 updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);            

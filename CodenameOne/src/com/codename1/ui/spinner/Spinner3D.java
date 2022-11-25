@@ -38,8 +38,6 @@ class Spinner3D extends Container implements InternalPickerWidget {
     
     private Scene scene; 
     private ScrollingContainer scroller;
-
-    private boolean gridPosDirty = true;
     
     
     private static class ScrollingContainer extends Container {
@@ -68,8 +66,11 @@ class Spinner3D extends Container implements InternalPickerWidget {
     public Spinner3D(ListModel<String> listModel) {
         super(BoxLayout.y());
         setScrollableY(false);
+        //getUnselectedStyle().setMargin(3f, 3f, 0, 0);
+        //getUnselectedStyle().setMarginUnit(Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS);
         root = new SpinnerNode();
         scene = new Scene() {
+
             @Override
             public void setWidth(int width) {
                 super.setWidth(width);
@@ -81,12 +82,20 @@ class Spinner3D extends Container implements InternalPickerWidget {
                 super.setHeight(height);
                 root.boundsInLocal.get().setHeight(height);
             }
+            
+            
+            
         };
-
         scene.setName("Scene");
+        //getAllStyles().setBgColor(root.getRowStyle().getBgColor());
+        //getUnselectedStyle().setBgTransparency(255);
+        
+        
         root.boundsInLocal.get().setWidth(Display.getInstance().getDisplayWidth());
         root.boundsInLocal.get().setHeight(1000);
         setModel(listModel);
+        //root.setRenderAsImage(true);
+        
         scene.setRoot(root);
         
         if (usePerspective()) {
@@ -94,6 +103,9 @@ class Spinner3D extends Container implements InternalPickerWidget {
         }
         
         scroller = new ScrollingContainer() {
+            
+            
+
             @Override
             protected Dimension calcPreferredSize() {
                 return new Dimension(500, (int)root.calcViewportHeight());
@@ -101,60 +113,90 @@ class Spinner3D extends Container implements InternalPickerWidget {
 
             @Override
             protected Dimension calcScrollSize() {
-                return new Dimension(
+                Dimension out = new Dimension(
                         500, 
-                        (int)root.calcFlatListHeight() - (int) root.calcRowHeight()
+                        (int)root.calcFlatListHeight() + getHeight() - (int)root.calcRowHeight()
                 );
+                return out;
             }
 
             @Override
             protected int getGridPosY() {
-                final int rowHeight = (int)root.calcRowHeight();
-                final int scrollY = getScrollY();
-                final int rowOffsetY = scrollY % rowHeight;
-                final boolean roundUp = rowOffsetY > rowHeight - rowOffsetY;
-                return (int)Math.min(
-                        root.calcFlatListHeight() - rowHeight,
-                        Math.max(
-                                0,
-                                roundUp
-                                        ? (scrollY + rowHeight - rowOffsetY)
-                                        : (scrollY - rowOffsetY)
-                        )
-                );
+                //Log.p("In "+super.getScrollY());
+                int rowHeight = (int)root.calcRowHeight();
+                int scrollY = getScrollY();
+                int out = scrollY;
+                if (scrollY % rowHeight < rowHeight - scrollY % rowHeight) {
+                    out = scrollY - (scrollY % rowHeight);
+                } else {
+                    out = scrollY + rowHeight - scrollY % rowHeight;
+                }
+                if (out > root.calcFlatListHeight() - rowHeight) {
+                    out -= rowHeight;
+                }
+                if (out < 0) {
+                    out = 0;
+                }
+                
+                //Log.p("Out "+out);
+                return out;
             }
 
             @Override
-            protected void onScrollY(int scrollY) {
-                super.onScrollY(scrollY);
+            public void pointerPressed(int x, int y) {
+                super.pointerPressed(x, y);
+                if (root.getSelectedRowOverlay().contains(x, y)) {
+                    //Log.p("Hit on selectedRowOverlay");
+                }
             }
+
+            
+            
+            
         };
         scroller.setSnapToGrid(true);
         scroller.setScrollVisible(false);
         scroller.setScrollableY(true);
         scroller.setName("Scroller");
+        
         scroller.addScrollListener(new ScrollListener() {
+
+            @Override
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                //Log.p(""+scrollY);
                 root.setScrollY(scrollY);
             }
+            
         });
         root.addScrollListener(new ScrollListener() {
-            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                scroller.setScrollY(scrollY);
-            }
-        });
 
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                if (Math.abs(scroller.getScrollY()-scrollY) > 2) {
+                    scroller.setScrollY(scrollY);
+                }
+            }
+            
+        });
         $(scroller, scene).setMargin(0).setPadding(0);
         scroller.setScrollY((int)root.getScrollY());
         Container wrapper = LayeredLayout.encloseIn(scene, scroller);
         $(wrapper).setBorder(Border.createEmpty()).setMargin(0).setPadding(0).setBgTransparency(0);
         wrapper.setName("Wrapper");
         LayeredLayout ll = (LayeredLayout)wrapper.getLayout();
+        //wrapper.add(scene).add(scroller);
         ll.setInsets(scroller, "0 0 auto 0")
                 .setInsets(scene, "0 0 auto 0");
         add(wrapper);
     }
 
+   
+
+   
+    
+    
+    
+    
     public void setModel(ListModel model) {
         if (model instanceof SpinnerNumberModel) {
             model = new NumberModelAdapter((SpinnerNumberModel)model);
@@ -168,7 +210,8 @@ class Spinner3D extends Container implements InternalPickerWidget {
         }
         
     }
-
+    
+    @Override
     public Object getValue() {
         ListModel lm = root.getListModel();
         if (lm instanceof NumberModelAdapter) {
@@ -210,12 +253,15 @@ class Spinner3D extends Container implements InternalPickerWidget {
      * @param min lowest value allowed
      * @param max maximum value allowed
      * @param currentValue the starting value for the mode
+     * @param separatorChar character to separate the entries during rendering
+     * @param format formatting type for the field
      * @return new spinner instance
      */
     public static Spinner3D createDate(long min, long max, long currentValue) {
         Spinner3D s = new Spinner3D(new SpinnerDateModel(min, max, currentValue));
         return s;
     }
+    
     
     private static class DateModelAdapter implements ListModel<String> {
         final SpinnerDateModel inner;
@@ -224,7 +270,8 @@ class Spinner3D extends Container implements InternalPickerWidget {
         DateModelAdapter(SpinnerDateModel inner) {
             this.inner = inner;
         }
-
+        
+        @Override
         public String getItemAt(int index) {
             Date dt = (Date)inner.getItemAt(index);
             Calendar startToday = Calendar.getInstance();
@@ -244,38 +291,47 @@ class Spinner3D extends Container implements InternalPickerWidget {
             return fmt.format(dt);
         }
 
+        @Override
         public int getSize() {
             return inner.getSize();
         }
 
+        @Override
         public int getSelectedIndex() {
             return inner.getSelectedIndex();
         }
 
+        @Override
         public void setSelectedIndex(int index) {
             inner.setSelectedIndex(index);
         }
 
+        @Override
         public void addDataChangedListener(DataChangedListener l) {
             inner.addDataChangedListener(l);
         }
 
+        @Override
         public void removeDataChangedListener(DataChangedListener l) {
             inner.removeDataChangedListener(l);
         }
 
+        @Override
         public void addSelectionListener(SelectionListener l) {
             inner.addSelectionListener(l);
         }
 
+        @Override
         public void removeSelectionListener(SelectionListener l) {
             inner.removeSelectionListener(l);
         }
 
+        @Override
         public void addItem(String item) {
             inner.addItem(item);
         }
 
+        @Override
         public void removeItem(int index) {
             inner.removeItem(index);
         }
@@ -288,43 +344,52 @@ class Spinner3D extends Container implements InternalPickerWidget {
         NumberModelAdapter(SpinnerNumberModel inner) {
             this.inner = inner;
         }
-
+        @Override
         public String getItemAt(int index) {
             return inner.getItemAt(index).toString();
         }
 
+        @Override
         public int getSize() {
             return inner.getSize();
         }
 
+        @Override
         public int getSelectedIndex() {
             return inner.getSelectedIndex();
         }
 
+        @Override
         public void setSelectedIndex(int index) {
             inner.setSelectedIndex(index);
         }
 
+        @Override
         public void addDataChangedListener(DataChangedListener l) {
             inner.addDataChangedListener(l);
         }
 
+        @Override
         public void removeDataChangedListener(DataChangedListener l) {
             inner.removeDataChangedListener(l);
         }
 
+        @Override
         public void addSelectionListener(SelectionListener l) {
             inner.addSelectionListener(l);
         }
 
+        @Override
         public void removeSelectionListener(SelectionListener l) {
             inner.removeSelectionListener(l);
         }
 
+        @Override
         public void addItem(String item) {
             inner.addItem(item);
         }
 
+        @Override
         public void removeItem(int index) {
             inner.removeItem(index);
         }
@@ -343,11 +408,17 @@ class Spinner3D extends Container implements InternalPickerWidget {
     public Style getSelectedOverlayStyle() {
         return root.getSelectedOverlayStyle();
     }
-
+    
+    //public void refreshStyles() {
+    //    root.refreshStyles();
+    //}
+    
+    
     void setRowFormatter(SpinnerNode.RowFormatter formatter) {
         root.setRowFormatter(formatter);
     }
-
+    
+    @Override
     public void setValue(Object value) {
         ListModel lm = root.getListModel();
         if (lm instanceof NumberModelAdapter) {
@@ -378,6 +449,9 @@ class Spinner3D extends Container implements InternalPickerWidget {
         g.fillRect(getX(), getY(), getWidth(), getHeight());
         g.setAlpha(alpha);
         super.paint(g);
+        
     }
-}
 
+   
+    
+}
