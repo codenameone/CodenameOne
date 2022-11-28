@@ -4260,6 +4260,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             scrollToLocation = maxHeight;
                                         }
                                         myView.getAndroidView().scrollTo((int) currentX, scrollToLocation);
+                                        return true;
                                     }
                                     return false;
                                 }
