@@ -4245,15 +4245,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     if (AndroidImplementation.this.myView == null) {
                                         return false;
                                     }
-                                    if (me.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
-                                        switch (me.getAction()) {
-                                            case MotionEvent.ACTION_SCROLL:
-                                                int currentX = (int) me.getX();
-                                                int scrollDistance = (int) me.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                                                int scrollToLocation = (int) (scrollDistance * 5d);
-                                                myView.getAndroidView().scrollTo(currentX, scrollToLocation);
-                                                return true;
+                                    if (me.isFromSource(InputDevice.SOURCE_CLASS_POINTER) &&
+                                            me.getAction() == MotionEvent.ACTION_SCROLL) {
+                                        double currentX = me.getX();
+                                        double currentY = me.getY();
+                                        int maxHeight = myView.getViewHeight();
+                                        double scrollOffSet = me.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                                        int scrollToLocation = (int) (scrollOffSet * 5d + currentY);
+                                        // determine the location that the view should scroll to
+                                        // the 5d is a scroll speed factor
+                                        if (scrollToLocation <= 0) {
+                                            scrollToLocation = 0;
+                                        } else if (scrollToLocation >= maxHeight) {
+                                            scrollToLocation = maxHeight;
                                         }
+                                        myView.getAndroidView().scrollTo((int) currentX, scrollToLocation);
                                     }
                                     return false;
                                 }
