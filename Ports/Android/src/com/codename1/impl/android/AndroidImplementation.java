@@ -4235,6 +4235,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     return myView.getAndroidView().onTouchEvent(me);
                                 }
                             });
+                            /**
+                             * Mouse Event Listener used to handle mouse wheel events
+                             * The mouse wheel can be used to scroll the page up or down
+                             */
+                            layoutWrapper.setOnGenericMotionListener(new View.OnGenericMotionListener() {
+                                @Override
+                                public boolean onGenericMotion(View view, MotionEvent me) {
+                                    if (AndroidImplementation.this.myView == null) {
+                                        return false;
+                                    }
+                                    if (me.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
+                                        switch (me.getAction()) {
+                                            case MotionEvent.ACTION_SCROLL:
+                                                int currentX = (int) me.getX();
+                                                int scrollDistance = (int) me.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                                                int scrollToLocation = (int) (scrollDistance * 5d);
+                                                myView.getAndroidView().scrollTo(currentX, scrollToLocation);
+                                                return true;
+                                        }
+                                    }
+                                    return false;
+                                }
+                            });
                         }
                         if(AndroidImplementation.this.relativeLayout != null){
                             // not sure why this happens but we got an exception where add view was called with
