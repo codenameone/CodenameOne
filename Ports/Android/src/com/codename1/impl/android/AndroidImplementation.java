@@ -4235,6 +4235,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     return myView.getAndroidView().onTouchEvent(me);
                                 }
                             });
+                            /**
+                             * Mouse Event Listener used to handle mouse wheel events
+                             * The mouse wheel can be used to scroll the page up or down
+                             */
+                            layoutWrapper.setOnGenericMotionListener(new View.OnGenericMotionListener() {
+                                @Override
+                                public boolean onGenericMotion(View view, MotionEvent me) {
+                                    if (AndroidImplementation.this.myView == null) {
+                                        return false;
+                                    }
+                                    if (me.isFromSource(InputDevice.SOURCE_CLASS_POINTER) &&
+                                            me.getAction() == MotionEvent.ACTION_SCROLL) {
+                                        double currentX = me.getX();
+                                        double currentY = me.getY();
+                                        int maxHeight = myView.getViewHeight();
+                                        double scrollOffSet = me.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                                        int scrollToLocation = (int) (scrollOffSet * 5d + currentY);
+                                        // determine the location that the view should scroll to
+                                        // the 5d is a scroll speed factor
+                                        if (scrollToLocation <= 0) {
+                                            scrollToLocation = 0;
+                                        } else if (scrollToLocation >= maxHeight) {
+                                            scrollToLocation = maxHeight;
+                                        }
+                                        myView.getAndroidView().scrollTo((int) currentX, scrollToLocation);
+                                        return true;
+                                    }
+                                    return false;
+                                }
+                            });
                         }
                         if(AndroidImplementation.this.relativeLayout != null){
                             // not sure why this happens but we got an exception where add view was called with
