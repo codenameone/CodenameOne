@@ -119,10 +119,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
-        // equivalent to round
-        double d = Math.floor((max - currentValue) / step);
-        int v = getSize() - (int)d;
-        return v;
+        return (int)((currentValue - min) / step);
     }
 
 
