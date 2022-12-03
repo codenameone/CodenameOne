@@ -2522,10 +2522,10 @@ public class Container extends Component implements Iterable<Component>{
         private void set(Style style){
             //boolean suppressEvents = style.isSuppressChangeEvents();
             //style.setSuppressChangeEvents(true);
-            top = style.getPaddingValue(false, TOP);
-            left = style.getPaddingValue(false, LEFT);
-            bottom = style.getPaddingValue(false, BOTTOM);
-            right = style.getPaddingValue(false, RIGHT);
+            top = style.getPaddingFloatValue(false, TOP);
+            left = style.getPaddingFloatValue(false, LEFT);
+            bottom = style.getPaddingFloatValue(false, BOTTOM);
+            right = style.getPaddingFloatValue(false, RIGHT);
             byte[] units = style.getPaddingUnit();
             if (units != null) {
                 topUnit = units[TOP];

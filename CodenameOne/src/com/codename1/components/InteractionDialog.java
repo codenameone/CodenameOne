@@ -861,7 +861,7 @@ public class InteractionDialog extends Container {
         if(unit != Style.UNIT_TYPE_DIPS) {
             padding = Display.getInstance().convertToPixels(padding);
         }
-        s.setPadding(orientation, s.getPaddingValue(isRTL(), 
+        s.setPadding(orientation, s.getPaddingFloatValue(isRTL(),
                 orientation) + padding);
     }
 
