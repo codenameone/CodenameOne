@@ -979,7 +979,8 @@ public abstract class CodenameOneImplementation {
         
         for(int y = 0 ; y < height ; y++) {
             for(int x = 0 ; x < width ; x++) {
-                newRGB[y + (width - x) * height] = rgb[x + y * width];
+                newRGB[y + x * height] = rgb[x + y * width];
+                newRGB[y + (width - x - 1) * height] = rgb[x + y * width];
             }
         }
         
