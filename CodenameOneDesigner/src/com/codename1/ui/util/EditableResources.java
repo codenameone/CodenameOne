@@ -3559,7 +3559,7 @@ public class EditableResources extends Resources implements TreeModel {
     private File getEditorTTFFontFileIfExistsOrNull(com.codename1.ui.Font f) {
         if (f instanceof EditorTTFFont) {
             final File file = ((EditorTTFFont)f).getFontFile();
-            if (file.exists()) {
+            if (file != null && file.exists()) {
                 return file;
             }
         }
