@@ -50,7 +50,6 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
-import com.codename1.ui.Form;
 import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
@@ -65,7 +64,7 @@ import com.codename1.ui.util.xml.Ui;
 import com.codename1.ui.util.xml.Val;
 import com.codename1.ui.util.xml.comps.ComponentEntry;
 import com.codename1.util.StringUtil;
-import java.awt.Frame;
+
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.BufferedWriter;
@@ -91,7 +90,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -2040,7 +2038,7 @@ public class EditableResources extends Resources implements TreeModel {
                     output.writeByte(f.getFace());
                     output.writeByte(f.getStyle());
                     output.writeByte(f.getSize());
-                    if(f instanceof EditorTTFFont && (((EditorTTFFont)f).getFontFile() != null || ((EditorTTFFont)f).getNativeFontName() != null)) {
+                    if(f instanceof EditorTTFFont && (getEditorTTFFontFileIfExistsOrNull(f) != null || ((EditorTTFFont)f).getNativeFontName() != null)) {
                         output.writeBoolean(true);
                         EditorTTFFont ed = (EditorTTFFont)f;
                         if(ed.getNativeFontName() != null) {
@@ -3556,6 +3554,16 @@ public class EditableResources extends Resources implements TreeModel {
         if(!listeners.contains(l)) {
             listeners.add(l);
         }
+    }
+
+    private File getEditorTTFFontFileIfExistsOrNull(com.codename1.ui.Font f) {
+        if (f instanceof EditorTTFFont) {
+            final File file = ((EditorTTFFont)f).getFontFile();
+            if (file.exists()) {
+                return file;
+            }
+        }
+        return null;
     }
 
     public void removeTreeModelListener(TreeModelListener l) {
