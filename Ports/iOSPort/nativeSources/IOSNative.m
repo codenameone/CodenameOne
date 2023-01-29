@@ -2448,6 +2448,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
         dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
             if (@available(iOS 10, *)) {
@@ -2462,15 +2463,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             };";
             WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
             [userContentController addUserScript:bootstrapScript];
+            [bootstrapScript release];
             [userContentController addScriptMessageHandler:del name:@"cn1"];
+            [del release];
             config.userContentController = userContentController;
+            [userContentController release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
+            [config release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
             
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
+            POOL_END();
             
         });
         id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
@@ -6800,6 +6806,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setMinute:timeOfDayMillis/60000];
     NSCalendar* cal = [NSCalendar currentCalendar];
     NSDate *date = [cal dateFromComponents:comps];
+    [comps release];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
     POOL_END();
     return result;
