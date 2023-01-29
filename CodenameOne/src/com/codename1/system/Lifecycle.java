@@ -23,7 +23,6 @@
 package com.codename1.system;
 
 import static com.codename1.ui.CN.addNetworkErrorListener;
-import static com.codename1.ui.CN.getCurrentForm;
 import static com.codename1.ui.CN.updateNetworkThreadCount;
 
 import com.codename1.io.Log;
@@ -145,10 +144,10 @@ public class Lifecycle {
      * Callback when the app is suspended
      */
     public void stop() {
-        current = getCurrentForm();
+        current = CN.getCurrentForm();
         if(current instanceof Dialog) {
             ((Dialog)current).dispose();
-            current = getCurrentForm();
+            current = CN.getCurrentForm();
         }
     }
 
