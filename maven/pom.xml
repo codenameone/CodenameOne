@@ -376,6 +376,7 @@
 
                 <plugin>
                     <artifactId>maven-antrun-plugin</artifactId>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <version>3.1.0</version>
                 </plugin>
                 <plugin>
