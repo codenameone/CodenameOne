@@ -7325,7 +7325,17 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
                 dataToShare = [NSArray arrayWithObjects:i, nil];
             }
         } else {
-            dataToShare = [NSArray arrayWithObjects:someText, nil];
+            BOOL shareFile = NO;
+            if (someText != nil && [someText hasPrefix:@"file:"]) {
+                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+                    shareFile = YES;
+                    dataToShare = [NSArray arrayWithObjects:fileURL, nil];
+                }
+            }
+            if (!shareFile) {
+                dataToShare = [NSArray arrayWithObjects:someText, nil];
+            }
         }
         
         UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare

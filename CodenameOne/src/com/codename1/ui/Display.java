@@ -4405,16 +4405,19 @@ hi.show();}</pre></noscript>
      * 
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
-     * @param text String to share.
+     *
+     * <p>Since 8.0, you can share files using using the file path in the text parameter.  The file must exist in file system storage, and
+    * you must define the appropriate mimeType in the mimeType parameter.  E.g. {@code share("file:/.../myfile.pdf", null, "application.pdf") }</p>
+    *
+     * @param textOrPath String to share, or path to file to share.
      * @param image file path to the image or null
-     * @param mimeType type of the image or null if no image to share
+     * @param mimeType type of the image or file.  null if just sharing text
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
      * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
      * on the iPad with iOS 8 and higher.
      */
-    public void share(String text, String image, String mimeType, Rectangle sourceRect){
-        impl.share(text, image, mimeType, sourceRect);
+    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect){
+        impl.share(textOrPath, image, mimeType, sourceRect);
     }
     
     
