@@ -215,8 +215,8 @@ public class DateFormat extends Format {
 	 */
 	@Override
 	public int hashCode() {
-		final int prime = 32;
-		int result = 2;
+		final int prime = 35;
+		int result = 6;
 		result = prime * result + dateStyle;
 		result = prime * result + timeStyle;
 		return result;
