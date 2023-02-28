@@ -271,7 +271,7 @@ public class AndroidGradleBuilder extends Executor {
 
     private static final boolean isMac;
 
-    private String playServicesVersion = "16.0.0";
+    private String playServicesVersion = "12.0.1";
     private static final Map<String,String> defaultPlayServiceVersions = new HashMap<>();
     static {
         // Defaults obtained from https://developers.google.com/android/guides/setup
@@ -325,6 +325,12 @@ public class AndroidGradleBuilder extends Executor {
         defaultPlayServiceVersions.put("vision", "20.1.3");
         defaultPlayServiceVersions.put("wallet", "19.1.0");
         defaultPlayServiceVersions.put("wearable", "18.0.0");
+
+        // TODO: See what an appropriate default version is for firebase
+        // Setting to 12.0.1 for now only to match the previous google play services default.
+        defaultPlayServiceVersions.put("firebase-core", "12.0.1");
+        defaultPlayServiceVersions.put("firebase-messaging", "12.0.1");
+        defaultPlayServiceVersions.put("gcm", "12.0.1");
     }
 
     private Map<String,String> playServiceVersions = new HashMap<>();
@@ -1129,6 +1135,8 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         request.putArgument("android.playServicesVersion", playServicesVersion);
+        request.putArgument("android.firebaseCoreVersion", request.getArg("android.firebaseCoreVersion", getDefaultPlayServiceVersion("firebase-core")));
+        request.putArgument("android.firebaseMessagingVersion", request.getArg("android.firebaseMessagingVersion", getDefaultPlayServiceVersion("firebase-messaging")));
 
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
@@ -1156,11 +1164,11 @@ public class AndroidGradleBuilder extends Executor {
                 debug("Adding firebase core to gradle dependencies.");
                 debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
                 debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-core:${var.android.playServicesVersion}\"\n");
+                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-core:${var.android.firebaseCoreVersion}\"\n");
                 debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
             }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-messaging:${var.android.playServicesVersion}\"\n");
+                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-messaging:${var.android.firebaseMessagingVersion}\"\n");
             }
         }
 
@@ -4090,6 +4098,10 @@ public class AndroidGradleBuilder extends Executor {
                 String playServiceKey = arg.substring("android.playService.".length());
                 if (playServiceKey.equals("appInvite")) {
                     playServiceKey = "app-invite";
+                } else if (playServiceKey.equals("firebaseCore")) {
+                    playServiceKey = "firebase-core";
+                } else if (playServiceKey.equals("firebaseMessaging")) {
+                    playServiceKey = "firebase-messaging";
                 }
                 String playServiceValue = request.getArg(arg, null);
                 if (playServiceValue == null || "true".equals(playServiceValue) || "false".equals(playServiceValue)) {
