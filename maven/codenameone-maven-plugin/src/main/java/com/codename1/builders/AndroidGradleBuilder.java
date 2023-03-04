@@ -88,6 +88,8 @@ public class AndroidGradleBuilder extends Executor {
         return gradleProjectDirectory;
     }
 
+    private boolean decouplePlayServiceVersions = false;
+
     public static final String[] ANDROID_PERMISSIONS = new String[]{
             "android.permission.ACCESS_BACKGROUND_LOCATION",
             "android.permission.ACCESS_CHECKIN_PROPERTIES",
@@ -435,6 +437,8 @@ public class AndroidGradleBuilder extends Executor {
         }
         debug("-------------------");
 
+        decouplePlayServiceVersions = request.getArg("android.decouplePlayServiceVersions", "false").equals("true");
+
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
                 : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
                 : path(System.getProperty("user.home"), "Android", "Sdk"); // linux
@@ -538,7 +542,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
 
-        useAndroidX = request.getArg("android.useAndroidX", "false").equals("true");
+        useAndroidX = request.getArg("android.useAndroidX", decouplePlayServiceVersions ? "true" : "false").equals("true");
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
         buildToolsVersionInt = maxBuildToolsVersionInt;
@@ -4083,7 +4087,7 @@ public class AndroidGradleBuilder extends Executor {
         if (playServiceVersions.containsKey(playService)) {
             return playServiceVersions.get(playService);
         }
-        if (!playServicesVersionSetInBuildHint) {
+        if (decouplePlayServiceVersions) {
             if (defaultPlayServiceVersions.containsKey(playService)) {
                 return defaultPlayServiceVersions.get(playService);
             }
