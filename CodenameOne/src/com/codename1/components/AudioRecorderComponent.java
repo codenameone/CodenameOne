@@ -189,7 +189,6 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                     setState(RecorderState.Initialized);
                     setState(RecorderState.Paused);
                 } catch (IOException ex) {
-                    Log.e(ex);
                     setState(RecorderState.NotInitialized);
                 }
             }

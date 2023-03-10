@@ -355,7 +355,7 @@ public class CloudListModel implements ListModel {
      * @param err the exception representing the error in cloud communications
      */
     protected void onError(CloudException err) {
-        Log.e(err);
+
     }
     
     /**

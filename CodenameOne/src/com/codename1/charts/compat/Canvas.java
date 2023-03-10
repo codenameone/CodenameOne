@@ -82,7 +82,7 @@ public class Canvas  {
     
     
     private void applyPaint(Paint paint, boolean forText){
-        //Log.p("Applyingn paint : "+paint);
+
         g.setColor(paint.getColor());
         int alpha = ColorUtil.alpha(paint.getColor());
         g.concatenateAlpha(alpha);
@@ -111,7 +111,7 @@ public class Canvas  {
         applyPaint(paint);
         Paint.Style style = paint.getStyle();
         if ( Paint.Style.FILL.equals(style)){
-            //Log.p("Filling it");
+
             g.fillRect((int)left, (int)top, (int)right-(int)left, (int)bottom-(int)top);
         } else if ( Paint.Style.STROKE.equals(style)){
             g.drawRect((int)left, (int)top, (int)right-(int)left, (int)bottom-(int)top);
@@ -187,7 +187,7 @@ public class Canvas  {
     }
 
     public void rotate(float angle, float x, float y) {
-        //Log.p("Rotating by angle "+angle);
+
         Transform t = g.getTransform();
         t.rotate((float)(angle*Math.PI/180.0), x+absoluteX-bounds.getX(), y+absoluteY-bounds.getY());
         g.setTransform(t);

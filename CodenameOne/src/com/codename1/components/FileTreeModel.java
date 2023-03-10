@@ -80,6 +80,7 @@ public class FileTreeModel implements TreeModel {
     public Vector getChildren(Object parent) {
         Vector response = new Vector();
         try {
+            Log.i("Successful")
             if(parent == null) {
                 String[] roots = FileSystemStorage.getInstance().getRoots();
                 for(int iter = 0 ; iter < roots.length ; iter++) {

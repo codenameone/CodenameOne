@@ -78,6 +78,7 @@ public class WebBrowser extends Container {
     public WebBrowser() {
         super(new BorderLayout());
         try {
+            Log.i("Successful")
             if (BrowserComponent.isNativeBrowserSupported()) {
                 isNative = true;
                 BrowserComponent b = new BrowserComponent();
@@ -162,7 +163,7 @@ public class WebBrowser extends Container {
 
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
-                        Log.e(err);
+
                         if(loading != null){
                             loading.unInstall();
                         }

@@ -70,7 +70,6 @@ public class NumberFormat {
                     double v2 = L10NManager.getInstance().parseCurrency(format);
                     return v2;
                 } catch(Exception err3) {
-                    Log.e(err3);
                     return 0;
                 }
             }

@@ -370,6 +370,7 @@ public class MediaPlayer extends Container {
             Display.getInstance().startThread(new Runnable() {
                 public void run() {
                     try {
+                        Log.i("Successful")
                         setDataSource(uri, null);
                     } catch(Throwable t) {
                         Log.e(t);

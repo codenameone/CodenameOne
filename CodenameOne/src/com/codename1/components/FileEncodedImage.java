@@ -67,7 +67,6 @@ public class FileEncodedImage extends EncodedImage {
             }
             return imageData;
         } catch (IOException ex) {
-            Log.e(ex);
             return null;
         } finally {
             Util.cleanup(i);

@@ -157,6 +157,7 @@ public class Capture {
             ImageIO scale = Display.getInstance().getImageIO();
             if(scale != null) {
                 try {
+                    Log.i("Successful")
                     String path = c.url.substring(0, c.url.indexOf(".")) + "s" + c.url.substring(c.url.indexOf("."));
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
                     scale.save(c.url, os, ImageIO.FORMAT_JPEG, width, height, 1);
@@ -273,7 +274,7 @@ public class Capture {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if(scale != null) {
                     try {
-                        
+                        Log.i("Successful")
                         String path = url.substring(0, url.indexOf(".")) + "s" + url.substring(url.indexOf("."));
                         OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
                         scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);

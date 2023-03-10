@@ -114,7 +114,7 @@ public class FileEncodedImageAsync extends EncodedImage {
                             }
                         });
                     } catch (Throwable ex) {
-                        Log.e(ex);
+
                     } finally {
                         queued = false;
                         Util.cleanup(i);
