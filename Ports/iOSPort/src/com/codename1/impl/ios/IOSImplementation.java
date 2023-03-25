@@ -6879,7 +6879,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         protected Dimension calcPreferredSize() {
-            if(nativePeer != 0) {
+            if(nativePeer == 0) {
                 return new Dimension();
             }
             int[] p = widthHeight;
