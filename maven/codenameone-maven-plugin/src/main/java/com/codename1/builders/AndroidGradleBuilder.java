@@ -1989,7 +1989,7 @@ public class AndroidGradleBuilder extends Executor {
         if (request.getArg("android.removeBasePermissions", "false").equals("true")) {
             basePermissions = "";
         }
-        String externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" />\n";
+        String externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" android:maxSdkVersion=\"32\" />\n";
         if (request.getArg("android.blockExternalStoragePermission", "false").equals("true")) {
             externalStoragePermission = "";
         }
@@ -3275,6 +3275,22 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (buildToolsVersion.startsWith("29")) {
             compileSdkVersion = "29";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("30")) {
+            compileSdkVersion = "30";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("31")) {
+            compileSdkVersion = "31";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("32")) {
+            compileSdkVersion = "32";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("33")) {
+            compileSdkVersion = "33";
             supportLibVersion = "28";
         }
         jcenter =
