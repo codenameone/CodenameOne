@@ -282,10 +282,15 @@ public class GridLayout extends Layout{
         int height = 0;
         
         int numOfcomponents = parent.getComponentCount();
+        int totalComponentCount = numOfcomponents;
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
-            width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL()+ cmp.getStyle().getMarginRightNoRTL());
-            height = Math.max(height, cmp.getPreferredH()+ cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
+            if(hideZeroSized && cmp.isHidden()) {
+                totalComponentCount--;
+            } else {
+                width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
+                height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+            }
         }
 
         boolean landscapeMode = isLandscapeMode();        
@@ -304,8 +309,8 @@ public class GridLayout extends Layout{
         }
         
         if(rows > 1){
-            if(numOfcomponents>rows*columns){ //if there are more components than planned
-               height =  height * (numOfcomponents/columns + (numOfcomponents%columns == 0 ? 0 : 1));
+            if(totalComponentCount>rows*columns){ //if there are more components than planned
+               height =  height * (totalComponentCount/columns + (totalComponentCount%columns == 0 ? 0 : 1));
             }else{
                 height = height*rows;
             }
