@@ -67,10 +67,8 @@ public class GridLayout extends Layout{
     private boolean fillLastRow;
     private int portraitRows;
     private int portraitColumns;
-
     private int landscapeRows = -1;
     private int landscapeColumns = -1;
-    
     /**
      * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This 
      * makes animating a grid layout component MUCH easier.
@@ -161,30 +159,35 @@ public class GridLayout extends Layout{
     private boolean isLandscapeMode() {
         return landscapeRows > -1 && (!Display.getInstance().isPortrait());
     }
-    
-    private void autoSizeCols(Container parent, int width, boolean landscapeMode) {
+
+    private int autoSizeCols(Container parent, int width, boolean landscapeMode) {
+        int numOfcomponents = parent.getComponentCount();
+        int totalComponentCount = numOfcomponents;
         if(isAutoFit()) {
-            int numOfcomponents = parent.getComponentCount();
             int maxWidth = 0;
             for(int iter = 0 ; iter < numOfcomponents ; iter++) {
                 Component cmp = parent.getComponentAt(iter);
-                Style s = cmp.getStyle();
-                maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
+                if(hideZeroSized && cmp.isHidden()) {
+                    totalComponentCount--;
+                } else {
+                    Style s = cmp.getStyle();
+                    maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
+                }
             }
             if(width < maxWidth) {
                 width = Display.getInstance().getDisplayWidth();
             }
             if(landscapeMode) {
-                // prevent arithmentic exception
+                // prevent arithmetic exception
                 if(maxWidth <= 0) {
                     landscapeColumns = 1;
                 } else {
                     landscapeColumns = Math.max(width / maxWidth, 1);
                 }
-                landscapeRows = Math.max(1, numOfcomponents / landscapeColumns);
-                if(numOfcomponents % landscapeColumns > 0 && numOfcomponents > landscapeColumns) {
+                landscapeRows = Math.max(1, totalComponentCount / landscapeColumns);
+                if(totalComponentCount % landscapeColumns > 0 && totalComponentCount > landscapeColumns) {
                     landscapeRows++;
-                } 
+                }
             } else {
                 // prevent arithmentic exception
                 if(maxWidth <= 0) {
@@ -192,66 +195,80 @@ public class GridLayout extends Layout{
                 } else {
                     portraitColumns = Math.max(width / maxWidth, 1);
                 }
-                portraitRows = Math.max(1, numOfcomponents / portraitColumns);
-                if(numOfcomponents % portraitColumns > 0 && numOfcomponents > portraitColumns) {
+                portraitRows = Math.max(1, totalComponentCount / portraitColumns);
+                if(totalComponentCount % portraitColumns > 0 && totalComponentCount > portraitColumns) {
                     portraitRows++;
-                } 
+                }
             }
         }
+        return totalComponentCount;
     }
 
     /**
      * {@inheritDoc}
      */    
+    @Override
     public void layoutContainer(Container parent) {
-        Style s = parent.getStyle();
-        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
-        int height = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();
+        Style s             = parent.getStyle();
+        int width           = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
+        int height          = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();
         int numOfcomponents = parent.getComponentCount();
 
         boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, width, landscapeMode);
-        
-        int rows, columns;
-        if(landscapeMode) {
-            rows = landscapeRows;
-            columns = landscapeColumns;
-        } else {
-            rows = portraitRows;
-            columns = portraitColumns;
+        //-----------------------------------------------------
+        //Checking the hidden components to recalculate rows.
+        //-----------------------------------------------------
+        int totalComponentCountVisible = numOfcomponents;
+        for (int i = 0; i < numOfcomponents; i++) {
+            Component cmp = parent.getComponentAt(i);
+            if (hideZeroSized && cmp.isHidden()) {
+                totalComponentCountVisible--;
+            }
         }
-        
+        //--------------------------
+        //Calculating dinamic rows
+        // Solution to issue : https://github.com/codenameone/CodenameOne/issues/3692
+        // Date: 12-04-23
+        //--------------------------
+        CalculateDinamicRowsLayout rc = new CalculateDinamicRowsLayout(totalComponentCountVisible, (landscapeMode ? landscapeColumns : portraitColumns));
+        int rows = rc.getRows();
+        int columns = rc.getColumns();
+        //--------------------------
         int x = s.getPaddingLeft(parent.isRTL());
         int y = s.getPaddingTop();
 
         boolean rtl = parent.isRTL();
         if (rtl) {
-        	x += parent.getSideGap();
+            x += parent.getSideGap();
         }
         int localColumns = columns;
         int cmpWidth = width / columns;
-        int cmpHeight;
-        if (numOfcomponents > rows * columns) {
-            // actual rows number
-            cmpHeight  = height / (numOfcomponents / columns + (numOfcomponents % columns == 0 ? 0 : 1));
-        } else {
-            cmpHeight  = height / rows;
-        }
-        int row = 0;        
-        
+        int cmpHeight= cmpHeight = height / rows;
+ 
+        int row = 0;
         int offset = 0;
         for(int iter = 0 ; iter < numOfcomponents ; iter++){
-            Component cmp = parent.getComponentAt(iter);
-            Style cmpStyle = cmp.getStyle();
-            int marginLeft = cmpStyle.getMarginLeft(parent.isRTL());
-            int marginTop = cmpStyle.getMarginTop();
+            Component cmp   = parent.getComponentAt(iter);
+            Style cmpStyle  = cmp.getStyle();
+            int marginLeft  = cmpStyle.getMarginLeft(parent.isRTL());
+            int marginTop   = cmpStyle.getMarginTop();
+            int marginRight = cmpStyle.getMarginRight(parent.isRTL());
+            int marginBottom = cmpStyle.getMarginBottom();
+            
             if(hideZeroSized) {
                 if(cmp.isHidden()) {
                     continue;
                 }
             }
-            cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMarginRight(parent.isRTL()));
-            cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMarginBottom());
+            //---------------------------------------------------
+            //Setting component size
+            //---------------------------------------------------
+            cmp.setWidth(cmpWidth - marginLeft - marginRight);
+            cmp.setHeight(cmpHeight - marginTop - marginBottom);
+            //---------------------------------------------------
+            //Setting component position
+            //---------------------------------------------------
             if (rtl) {
             	cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
             } else {
@@ -260,7 +277,6 @@ public class GridLayout extends Layout{
             cmp.setY(y + row * cmpHeight + marginTop);
             if((offset + 1) % columns == 0){
                 row++;
-                
                 // check if we need to recalculate component widths
                 if(fillLastRow && row == rows - 1) {
                     localColumns = numOfcomponents % columns;
@@ -276,44 +292,51 @@ public class GridLayout extends Layout{
 
     /**
      * {@inheritDoc}
-     */    
+     */ 
+    @Override
     public Dimension getPreferredSize(Container parent) {        
         int width = 0;
         int height = 0;
-        
         int numOfcomponents = parent.getComponentCount();
+        int totalComponentCountVisible = numOfcomponents;
+        //-----------------------------------------------------
+        //Checking the hidden components to recalculate rows.
+        //-----------------------------------------------------
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
-            width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL()+ cmp.getStyle().getMarginRightNoRTL());
-            height = Math.max(height, cmp.getPreferredH()+ cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
+            if(hideZeroSized && cmp.isHidden()) {
+                totalComponentCountVisible--;
+            } else {
+                width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
+                height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+            }
         }
+        //-----------------------------------------------------
 
         boolean landscapeMode = isLandscapeMode();        
         autoSizeCols(parent, parent.getWidth(), landscapeMode);
-        int rows, columns;
-        if(landscapeMode) {
-            rows = landscapeRows;
-            columns = landscapeColumns;
-        } else {
-            rows = portraitRows;
-            columns = portraitColumns;
-        }
-
+        //--------------------------
+        //Calculating dinamic rows
+        // Solution to issue : https://github.com/codenameone/CodenameOne/issues/3692
+        // Date: 12-04-23
+        //--------------------------
+        CalculateDinamicRowsLayout rc = new CalculateDinamicRowsLayout(totalComponentCountVisible, (landscapeMode ? landscapeColumns : portraitColumns));
+        int rows = rc.getRows();
+        int columns = rc.getColumns();
+        //--------------------------
         if(columns > 1){
             width = width*columns;
         }
-        
         if(rows > 1){
-            if(numOfcomponents>rows*columns){ //if there are more components than planned
-               height =  height * (numOfcomponents/columns + (numOfcomponents%columns == 0 ? 0 : 1));
+            if(totalComponentCountVisible>rows*columns){ //if there are more components than planned
+               height =  height * (totalComponentCountVisible/columns + (totalComponentCountVisible%columns == 0 ? 0 : 1));
             }else{
                 height = height*rows;
             }
         }
         
         Style s = parent.getStyle();
-        return new Dimension(width + s.getHorizontalPadding(),
-            height + s.getVerticalPadding());
+        return new Dimension(width + s.getHorizontalPadding(),height + s.getVerticalPadding());
     }
     
     /**
@@ -405,4 +428,36 @@ public class GridLayout extends Layout{
     public void setHideZeroSized(boolean hideZeroSized) {
         this.hideZeroSized = hideZeroSized;
     }
+    
+    /**
+     * used to calculate the dinamic rows
+     */
+    public class CalculateDinamicRowsLayout {
+        int rows = 1;
+        int columns = 1;
+        /**
+         * 
+         * @param qtyComponents quantity of components in layout
+         * @param maxColums max columns
+         */
+        //-------------------------------
+        public CalculateDinamicRowsLayout(int qtyComponents, int maxColums) {
+            if (qtyComponents > maxColums) {
+                rows = qtyComponents / maxColums;
+                if (!(qtyComponents % maxColums == 0)) {
+                    rows++;
+                }
+            }
+            columns = maxColums;
+        }
+        //-------------------------------
+        public int getRows() {
+            return rows;
+        }
+        //-------------------------------
+        public int getColumns() {
+            return columns;
+        }
+        //-------------------------------
+    }//endClass
 }
