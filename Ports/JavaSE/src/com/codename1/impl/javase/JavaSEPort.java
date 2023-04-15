@@ -35,6 +35,7 @@ import com.codename1.impl.javase.simulator.*;
 import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.impl.javase.util.SwingUtils;
 import com.codename1.messaging.Message;
+import com.codename1.payment.PromotionalOffer;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -1845,7 +1846,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean showContextMenu(final MouseEvent me) {
-            if (componentTreeInspector == null || !componentTreeInspector.isSimulatorRightClickEnabled()) return false;
+            if (componentTreeInspector == null ||
+                    !componentTreeInspector.isSimulatorRightClickEnabled() ||
+                    !CN.isSimulator()) {
+                return false;
+            }
+
+            Form f = Display.getInstance().getCurrent();
+            if (f != null) {
+                int x = scaleCoordinateX(me.getX());
+                int y = scaleCoordinateY(me.getY());
+                Component cmp = f.getComponentAt(x, y);
+                if (cmp == null || cmp instanceof PeerComponent) {
+                    return false;
+                }
+            }
+
             JPopupMenu menu = new JPopupMenu();
             registerMenuWithBlit(menu);
             JMenuItem inspectElement = new JMenuItem("Inspect Component");
@@ -12145,6 +12161,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             @Override
+            public void purchase(String sku, PromotionalOffer promotionalOffer) {
+                purchase(sku);
+            }
+
+            @Override
             public void refund(final String sku) {
                 if (refundSupported) {
                     Display.getInstance().callSerially(new Runnable() {
@@ -12184,6 +12205,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     });
                 }
+            }
+
+            @Override
+            public void subscribe(String sku, PromotionalOffer promotionalOffer) {
+                subscribe(sku);
             }
 
             @Override
