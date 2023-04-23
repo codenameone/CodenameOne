@@ -1012,6 +1012,9 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/push") > -1) {
                         pushPermission = true;
+                        if (targetSDKVersionInt >= 28) {
+                            foregroundServicePermission = true;
+                        }
                     }
                     if (cls.indexOf("com/codename1/contacts") > -1) {
                         contactsReadPermission = true;
