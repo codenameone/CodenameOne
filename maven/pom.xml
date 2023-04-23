@@ -375,15 +375,15 @@
 
 
                 <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.0.0</version>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <version>3.1.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>1.7</version>
             </plugin>
-            <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>build-helper-maven-plugin</artifactId>
-            <version>1.7</version>
-
-        </plugin>
 
             </plugins>
         </pluginManagement>

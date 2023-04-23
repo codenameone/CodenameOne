@@ -24,6 +24,8 @@ package com.codename1.impl.android;
 
 import android.Manifest;
 import android.annotation.TargetApi;
+import com.codename1.impl.android.permissions.DevicePermission;
+import com.codename1.impl.android.permissions.PermissionsHelper;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -3097,9 +3099,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
                 if(url.startsWith("/") || url.startsWith("file:")) {
-                    if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                        return null;
+                    if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+                        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                            return null;
+                        }
                     }
+
                 }
                 intent = new Intent();
                 intent.setAction(Intent.ACTION_VIEW);
@@ -3478,7 +3483,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return null;
         }
         if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
-            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+            if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
                 return null;
             }
         }
@@ -7233,8 +7238,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
+            if (text.startsWith("file:") && mimeType != null && new com.codename1.io.File(text).exists()) {
+                shareIntent.setType(mimeType);
+                shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(text)));
+            } else {
+                shareIntent.setType("text/plain");
+                shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
+            }
         }else{
             shareIntent.setType(mimeType);
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(image)));
@@ -8136,14 +8146,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+
+
     @Override
     public void capturePhoto(ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture photo in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
+                return;
+            }
         }
+
         if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
             // Normally we don't need to request the CAMERA permission since we use
             // the ACTION_IMAGE_CAPTURE intent, which handles permissions itself.
@@ -8193,9 +8208,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture video in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
+                return;
+            }
         }
+
         if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
             // Normally we don't need to request the CAMERA permission since we use
             // the ACTION_VIDEO_CAPTURE intent, which handles permissions itself.
@@ -8409,8 +8427,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open galery in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
+                return;
+            }
         }
         if(editInProgress()) {
             stopEditing(true);

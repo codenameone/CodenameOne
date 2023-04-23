@@ -6853,19 +6853,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     class NativeIPhoneView extends PeerComponent {
-        private long[] nativePeer;
+
+        private long nativePeer;
+
         private boolean lightweightMode; 
        
         public NativeIPhoneView(Object nativePeer) {
             super(nativePeer);
-            this.nativePeer = (long[])nativePeer;
-            nativeInstance.retainPeer(this.nativePeer[0]);
+            this.nativePeer = ((long[])nativePeer)[0];
+            nativeInstance.retainPeer(this.nativePeer);
         }
         
         public void finalize() {
-            if(nativePeer != null && nativePeer[0] != 0) {
-                nativeInstance.releasePeer(nativePeer[0]);            
-                nativePeer = null;
+            if(nativePeer != 0) {
+                nativeInstance.releasePeer(nativePeer);
+                nativePeer = 0;
             }
         }
         
@@ -6877,40 +6879,40 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         protected Dimension calcPreferredSize() {
-            if(nativePeer == null || nativePeer[0] == 0) {
+            if(nativePeer == 0) {
                 return new Dimension();
             }
             int[] p = widthHeight;
-            nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
+            nativeInstance.calcPreferredSize(nativePeer, getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
 
         protected void onPositionSizeChange() {
-            if(nativePeer != null && nativePeer[0] != 0) {
-                nativeInstance.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+            if(nativePeer != 0) {
+                nativeInstance.updatePeerPositionSize(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void initComponent() {
             super.initComponent();
-            if(nativePeer != null && nativePeer[0] != 0) {
-                nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+            if(nativePeer != 0) {
+                nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
         protected void deinitialize() {
-            if(nativePeer != null && nativePeer[0] != 0) {
+            if(nativePeer != 0) {
                 setPeerImage(generatePeerImage());
-                nativeInstance.peerDeinitialized(nativePeer[0]);
+                nativeInstance.peerDeinitialized(nativePeer);
             }
             super.deinitialize();
         }
         
         protected void setLightweightMode(boolean l) {
-            if(nativePeer != null && nativePeer[0] != 0) {
+            if(nativePeer != 0) {
                 if(lightweightMode != l) {
                     lightweightMode = l;
-                    nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
+                    nativeInstance.peerSetVisible(nativePeer, !lightweightMode);
                     // fix for https://groups.google.com/d/msg/codenameone-discussions/LKxy16PhYEY/bvusdq-ICwAJ
                     Form f = getComponentForm();
                     if(f != null) {
@@ -6922,7 +6924,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         protected Image generatePeerImage() {
             int[] wh = widthHeight;
-            long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
+            long imagePeer = nativeInstance.createPeerImage(this.nativePeer, wh);
             if(imagePeer == 0) {
                 return null;
             }

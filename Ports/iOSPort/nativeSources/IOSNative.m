@@ -2448,6 +2448,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
         dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
             if (@available(iOS 10, *)) {
@@ -2462,15 +2463,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             };";
             WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
             [userContentController addUserScript:bootstrapScript];
+            [bootstrapScript release];
             [userContentController addScriptMessageHandler:del name:@"cn1"];
+            [del release];
             config.userContentController = userContentController;
+            [userContentController release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
+            [config release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
             
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
+            POOL_END();
             
         });
         id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
@@ -6148,12 +6154,68 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
 }
 #ifdef CN1_USE_STOREKIT
 SKPayment *paymentInstance = nil;
+NSObject *paymentDiscountInstance = nil;
 #endif
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
 #ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
+    paymentDiscountInstance = nil;
+    if ([nsSku hasPrefix:@"{"] && [nsSku hasSuffix:@"}"]) {
+        NSError *error = nil;
+        NSDictionary *dict = [NSJSONSerialization
+                              JSONObjectWithData:[nsSku dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO]
+                              options:0 error:&error
+        ];
+        if (error != nil) {
+            JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [error localizedDescription]));
+            throwException(threadStateData, ex);
+            return;
+        }
+        nsSku = [dict valueForKey:@"sku"];
+        NSDictionary *promoDict = [dict valueForKey: @"promotionalOffer"];
+        if (@available(iOS 12.2, *)) {
+            for (NSString* stringKey in @[@"offerIdentifier", @"keyIdentifier", @"signature", @"nonce"]) {
+                if (!promoDict[stringKey] || ! [promoDict[stringKey] isKindOfClass:[NSString class]] ) {
+                    JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                    java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [NSString stringWithFormat: @"Promo offer requires string %@", stringKey]));
+                    throwException(threadStateData, ex);
+                    return;
+                }
+            }
+            
+            if (!promoDict[@"timestamp"] || ![promoDict[@"timestamp"] isKindOfClass:[NSNumber class]]) {
+                JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [NSString stringWithFormat: @"Promo offer requires timestamp"]));
+                throwException(threadStateData, ex);
+                return;
+            }
+            NSString* offerIdentifier = promoDict[@"offerIdentifier"];
+            NSString* keyIdentifier = promoDict[@"keyIdentifier"];
+            NSUUID* nonce = [[NSUUID UUID] initWithUUIDString:promoDict[@"nonce"]];
+            NSString* signature = promoDict[@"signature"];
+            NSNumber* timestamp = promoDict[@"timestamp"];
+            paymentDiscountInstance = [[SKPaymentDiscount alloc] initWithIdentifier:offerIdentifier keyIdentifier:keyIdentifier nonce:nonce signature:signature timestamp:timestamp];
+        } else {
+            // Silently do not add discount if iOS version is too old.
+            NSLog(@"iOS version 12.2 or later is required for promotional discounts");
+            
+        }
+        
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
-        paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
+        if (paymentDiscountInstance != nil) {
+            paymentInstance = [SKMutablePayment paymentWithProductIdentifier:nsSku];
+            if (@available(iOS 12.2, *)) {
+                ((SKMutablePayment*)paymentInstance).paymentDiscount = (SKPaymentDiscount*) paymentDiscountInstance;
+            } else {
+                // Fallback on earlier versions
+                NSLog(@"Log error: Attempt to set payment discount instance on unsupported version of iOS.  This branch should never be reached");
+            }
+        } else {
+            paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
+        }
+        
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
 #endif
@@ -6800,6 +6862,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setMinute:timeOfDayMillis/60000];
     NSCalendar* cal = [NSCalendar currentCalendar];
     NSDate *date = [cal dateFromComponents:comps];
+    [comps release];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
     POOL_END();
     return result;
@@ -7318,7 +7381,17 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
                 dataToShare = [NSArray arrayWithObjects:i, nil];
             }
         } else {
-            dataToShare = [NSArray arrayWithObjects:someText, nil];
+            BOOL shareFile = NO;
+            if (someText != nil && [someText hasPrefix:@"file:"]) {
+                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+                    shareFile = YES;
+                    dataToShare = [NSArray arrayWithObjects:fileURL, nil];
+                }
+            }
+            if (!shareFile) {
+                dataToShare = [NSArray arrayWithObjects:someText, nil];
+            }
         }
         
         UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare

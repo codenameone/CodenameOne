@@ -82,9 +82,13 @@ public class AndroidGradleBuilder extends Executor {
 
     private File gradleProjectDirectory;
 
+    private boolean playServicesVersionSetInBuildHint = false;
+
     public File getGradleProjectDirectory() {
         return gradleProjectDirectory;
     }
+
+    private boolean decouplePlayServiceVersions = false;
 
     public static final String[] ANDROID_PERMISSIONS = new String[]{
             "android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -270,7 +274,68 @@ public class AndroidGradleBuilder extends Executor {
     private static final boolean isMac;
 
     private String playServicesVersion = "12.0.1";
+    private static final Map<String,String> defaultPlayServiceVersions = new HashMap<>();
+    static {
+        // Defaults obtained from https://developers.google.com/android/guides/setup
+        defaultPlayServiceVersions.put("ads", "19.8.0");
+        defaultPlayServiceVersions.put("ads-identifier", "18.0.1");
+        defaultPlayServiceVersions.put("ads-lite", "21.5.0");
+        defaultPlayServiceVersions.put("afs-native", "19.0.3");
+        defaultPlayServiceVersions.put("analytics", "18.0.2");
+        defaultPlayServiceVersions.put("appindex", "16.1.0");
+        defaultPlayServiceVersions.put("appset", "16.0.2");
+        defaultPlayServiceVersions.put("auth", "20.4.1");
+        defaultPlayServiceVersions.put("auth-api-phone", "18.0.1");
+        defaultPlayServiceVersions.put("auth-blockstore", "16.1.0");
+        defaultPlayServiceVersions.put("awareness", "19.0.1");
+        defaultPlayServiceVersions.put("base", "18.2.0");
+        defaultPlayServiceVersions.put("base-testing", "16.0.0");
+        defaultPlayServiceVersions.put("basement", "18.1.0");
+        defaultPlayServiceVersions.put("cast", "21.2.0");
+        defaultPlayServiceVersions.put("cast-framework", "21.2.0");
+        defaultPlayServiceVersions.put("code-scanner", "16.0.0-beta3");
+        defaultPlayServiceVersions.put("cronet", "18.0.1");
+        defaultPlayServiceVersions.put("dtdi", "16.0.0-beta01");
+        defaultPlayServiceVersions.put("fido", "19.0.1");
+        defaultPlayServiceVersions.put("fitness", "21.1.0");
+        defaultPlayServiceVersions.put("games-v2", "17.0.0");
+        defaultPlayServiceVersions.put("games-v2-native-c", "17.0.0-beta1");
+        defaultPlayServiceVersions.put("games", "23.1.0");
+        defaultPlayServiceVersions.put("home", "16.0.0");
+        defaultPlayServiceVersions.put("instantapps", "18.0.1");
+        defaultPlayServiceVersions.put("location", "21.0.1");
+        defaultPlayServiceVersions.put("maps", "18.1.0");
+        defaultPlayServiceVersions.put("mlkit-barcode-scanning", "18.1.0");
+        defaultPlayServiceVersions.put("mlkit-face-detection", "17.1.0");
+        defaultPlayServiceVersions.put("mlkit-image-labeling", "16.0.8");
+        defaultPlayServiceVersions.put("mlkit-image-labeling-custom", "16.0.0-beta4");
+        defaultPlayServiceVersions.put("mlkit-language-id", "17.0.0");
+        defaultPlayServiceVersions.put("mlkit-smart-reply", "16.0.0-beta1");
+        defaultPlayServiceVersions.put("mlkit-text-recognition", "18.0.2");
+        defaultPlayServiceVersions.put("nearby", "18.4.0");
+        defaultPlayServiceVersions.put("oss-licenses", "17.0.0");
+        defaultPlayServiceVersions.put("password-complexity", "18.0.1");
+        defaultPlayServiceVersions.put("pay", "16.1.0");
+        defaultPlayServiceVersions.put("recaptcha", "17.0.1");
+        defaultPlayServiceVersions.put("safetynet", "18.0.1");
+        defaultPlayServiceVersions.put("tagmanager", "18.0.2");
+        defaultPlayServiceVersions.put("tasks", "18.0.2");
+        defaultPlayServiceVersions.put("tflite-gpu", "16.1.0");
+        defaultPlayServiceVersions.put("tflite-java", "16.0.1");
+        defaultPlayServiceVersions.put("tflite-support", "16.0.1");
+        defaultPlayServiceVersions.put("threadnetwork", "16.0.0-beta02");
+        defaultPlayServiceVersions.put("vision", "20.1.3");
+        defaultPlayServiceVersions.put("wallet", "19.1.0");
+        defaultPlayServiceVersions.put("wearable", "18.0.0");
 
+        // TODO: See what an appropriate default version is for firebase
+        // Setting to 12.0.1 for now only to match the previous google play services default.
+        defaultPlayServiceVersions.put("firebase-core", "12.0.1");
+        defaultPlayServiceVersions.put("firebase-messaging", "12.0.1");
+        defaultPlayServiceVersions.put("gcm", "12.0.1");
+    }
+
+    private Map<String,String> playServiceVersions = new HashMap<>();
     private boolean playServicesPlus;
     private boolean playServicesAuth;
     private boolean playServicesBase;
@@ -371,6 +436,8 @@ public class AndroidGradleBuilder extends Executor {
             debug(arg+"="+request.getArg(arg, null));
         }
         debug("-------------------");
+
+        decouplePlayServiceVersions = request.getArg("android.decouplePlayServiceVersions", "false").equals("true");
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
                 : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
@@ -475,7 +542,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
 
-        useAndroidX = request.getArg("android.useAndroidX", "false").equals("true");
+        useAndroidX = request.getArg("android.useAndroidX", decouplePlayServiceVersions ? "true" : "false").equals("true");
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
         buildToolsVersionInt = maxBuildToolsVersionInt;
@@ -826,7 +893,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        String minSDK = request.getArg("android.min_sdk_version", "15");
+        String minSDK = request.getArg("android.min_sdk_version", "19");
         String facebookSupport = "";
         String facebookProguard = "";
         String facebookActivityMetaData = "";
@@ -914,7 +981,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
         playServicesVersion = request.getArg("android.playServicesVersion", playServicesVersion);
-
+        playServicesVersionSetInBuildHint = request.getArg("android.playServicesVersion", null) != null;
 
         final String playServicesValue = request.getArg("android.includeGPlayServices", null);
         playFlag = "true";
@@ -1072,6 +1139,8 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         request.putArgument("android.playServicesVersion", playServicesVersion);
+        request.putArgument("android.firebaseCoreVersion", request.getArg("android.firebaseCoreVersion", getDefaultPlayServiceVersion("firebase-core")));
+        request.putArgument("android.firebaseMessagingVersion", request.getArg("android.firebaseMessagingVersion", getDefaultPlayServiceVersion("firebase-messaging")));
 
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
@@ -1099,11 +1168,22 @@ public class AndroidGradleBuilder extends Executor {
                 debug("Adding firebase core to gradle dependencies.");
                 debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
                 debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-core:${var.android.playServicesVersion}\"\n");
+
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.firebase:firebase-core:" +
+                                request.getArg("android.firebaseCoreVersion", playServicesVersion) + "\"\n"
+                );
                 debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
             }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
-                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "") + "\n"+compile+" \"com.google.firebase:firebase-messaging:${var.android.playServicesVersion}\"\n");
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.firebase:firebase-messaging:" +
+                                request.getArg("android.firebaseMessagingVersion", playServicesVersion) + "\"\n"
+                );
             }
         }
 
@@ -1134,6 +1214,7 @@ public class AndroidGradleBuilder extends Executor {
                 request.getArg("android.playService.ads", null)  != null) {
             playFlag = "false";
         }
+        initPlayServiceVersions(request);
 
 
         boolean legacyGplayServicesMode = false;
@@ -1157,31 +1238,31 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
-        playServicesPlus = request.getArg("android.playService.plus", "false" ).equals("true");
-        playServicesAuth = request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("true");
-        playServicesBase = request.getArg("android.playService.base", playFlag).equals("true");
-        playServicesIdentity = request.getArg("android.playService.identity", "false").equals("true");
-        playServicesIndexing = request.getArg("android.playService.indexing", "false").equals("true");
-        playServicesInvite = request.getArg("android.playService.appInvite", "false").equals("true");
-        playServicesAnalytics = request.getArg("android.playService.analytics", playFlag).equals("true");
-        playServicesCast = request.getArg("android.playService.cast", "false").equals("true");
-        playServicesGcm = request.getArg("android.playService.gcm", playFlag).equals("true") ||
+        playServicesPlus = !request.getArg("android.playService.plus", "false" ).equals("false");
+        playServicesAuth = !request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("false");
+        playServicesBase = !request.getArg("android.playService.base", playFlag).equals("false");
+        playServicesIdentity = !request.getArg("android.playService.identity", "false").equals("false");
+        playServicesIndexing = !request.getArg("android.playService.indexing", "false").equals("false");
+        playServicesInvite = !request.getArg("android.playService.appInvite", "false").equals("false");
+        playServicesAnalytics = !request.getArg("android.playService.analytics", playFlag).equals("false");
+        playServicesCast = !request.getArg("android.playService.cast", "false").equals("false");
+        playServicesGcm = !request.getArg("android.playService.gcm", playFlag).equals("false") ||
                 request.getArg("gcm.sender_id", null) != null;
-        playServicesDrive = request.getArg("android.playService.drive", "false").equals("true");
-        playServicesFit= request.getArg("android.playService.fitness", "false").equals("true");
-        playServicesLocation = playServicesLocation || request.getArg("android.playService.location", playFlag).equals("true");
-        playServicesMaps = request.getArg("android.playService.maps", playFlag).equals("true");
-        playServicesAds = request.getArg("android.playService.ads", playFlag).equals("true");
+        playServicesDrive = !request.getArg("android.playService.drive", "false").equals("false");
+        playServicesFit= !request.getArg("android.playService.fitness", "false").equals("false");
+        playServicesLocation = playServicesLocation || !request.getArg("android.playService.location", playFlag).equals("false");
+        playServicesMaps = !request.getArg("android.playService.maps", playFlag).equals("false");
+        playServicesAds = !request.getArg("android.playService.ads", "false").equals("false");
         if(request.getArg("android.googleAdUnitId", request.getArg("google.adUnitId", null)) != null) {
             playServicesAds = true;
         }
-        playServicesVision = request.getArg("android.playService.vision", "false").equals("true");
-        playServicesNearBy = request.getArg("android.playService.nearby", "false").equals("true");
-        playServicesSafetyPanorama = request.getArg("android.playService.panorama", "false").equals("true");
-        playServicesGames = request.getArg("android.playService.games", "false").equals("true");
-        playServicesSafetyNet = request.getArg("android.playService.safetynet", "false").equals("true");
-        playServicesWallet = request.getArg("android.playService.wallet", "false").equals("true");
-        playServicesWear = request.getArg("android.playService.wearable", "false").equals("true");
+        playServicesVision = !request.getArg("android.playService.vision", "false").equals("false");
+        playServicesNearBy = !request.getArg("android.playService.nearby", "false").equals("false");
+        playServicesSafetyPanorama = !request.getArg("android.playService.panorama", "false").equals("false");
+        playServicesGames = !request.getArg("android.playService.games", "false").equals("false");
+        playServicesSafetyNet = !request.getArg("android.playService.safetynet", "false").equals("false");
+        playServicesWallet = !request.getArg("android.playService.wallet", "false").equals("false");
+        playServicesWear = !request.getArg("android.playService.wearable", "false").equals("false");
 
 
 
@@ -1908,7 +1989,7 @@ public class AndroidGradleBuilder extends Executor {
         if (request.getArg("android.removeBasePermissions", "false").equals("true")) {
             basePermissions = "";
         }
-        String externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" />\n";
+        String externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" android:maxSdkVersion=\"32\" />\n";
         if (request.getArg("android.blockExternalStoragePermission", "false").equals("true")) {
             externalStoragePermission = "";
         }
@@ -1928,7 +2009,7 @@ public class AndroidGradleBuilder extends Executor {
         if (!applicationAttr.contains("android:icon")) {
             applicationNode += " android:icon=\"@drawable/icon\" ";
         }
-        if (request.getArg("android.multidex", "false").equals("true") && Integer.parseInt(minSDK) < 21) {
+        if (request.getArg("android.multidex", "true").equals("true") && Integer.parseInt(minSDK) < 21) {
             debug("Setting Application node to MultiDexApplication because minSDK="+minSDK+" < 21");
             applicationNode += " android:name=\""+xclass("android.support.multidex.MultiDexApplication")+"\" ";
         }
@@ -3033,67 +3114,67 @@ public class AndroidGradleBuilder extends Executor {
             additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
         } else {
             if(playServicesPlus){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+getDefaultPlayServiceVersion("plus")+"'\n";
             }
             if(playServicesAuth){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-auth:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-auth:"+getDefaultPlayServiceVersion("auth")+"'\n";
             }
             if(playServicesBase){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-base:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-base:"+getDefaultPlayServiceVersion("base")+"'\n";
             }
             if(playServicesIdentity){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-identity:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-identity:"+getDefaultPlayServiceVersion("identity")+"'\n";
             }
             if(playServicesIndexing){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appindexing:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appindexing:"+getDefaultPlayServiceVersion("appindexing")+"'\n";
             }
             if(playServicesInvite){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appinvite:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appinvite:"+getDefaultPlayServiceVersion("appinvite")+"'\n";
             }
             if(playServicesAnalytics){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-analytics:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-analytics:"+getDefaultPlayServiceVersion("analytics")+"'\n";
             }
             if(playServicesCast){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-cast:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-cast:"+getDefaultPlayServiceVersion("cast")+"'\n";
             }
             if(playServicesGcm){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-gcm:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-gcm:"+getDefaultPlayServiceVersion("gcm")+"'\n";
             }
             if(playServicesDrive){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-drive:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-drive:"+getDefaultPlayServiceVersion("drive")+"'\n";
             }
             if(playServicesFit){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-fitness:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-fitness:"+getDefaultPlayServiceVersion("fit")+"'\n";
             }
             if(playServicesLocation){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-location:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-location:"+getDefaultPlayServiceVersion("location")+"'\n";
             }
             if(playServicesMaps){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-maps:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-maps:"+getDefaultPlayServiceVersion("maps")+"'\n";
             }
             if(playServicesAds){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-ads:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-ads:"+getDefaultPlayServiceVersion("ads")+"'\n";
             }
             if(playServicesVision){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-vision:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-vision:"+getDefaultPlayServiceVersion("vision")+"'\n";
             }
             if(playServicesNearBy){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-nearby:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-nearby:"+getDefaultPlayServiceVersion("nearby")+"'\n";
             }
             if(playServicesSafetyPanorama){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-panaroma:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-panaroma:"+getDefaultPlayServiceVersion("panorama")+"'\n";
             }
             if(playServicesGames){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-games:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-games:"+getDefaultPlayServiceVersion("games")+"'\n";
             }
             if(playServicesSafetyNet){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-safenet:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-safenet:"+getDefaultPlayServiceVersion("safenet")+"'\n";
             }
             if(playServicesWallet){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wallet:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wallet:"+getDefaultPlayServiceVersion("wallet")+"'\n";
             }
             if(playServicesWear){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wearable:"+playServicesVersion+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wearable:"+getDefaultPlayServiceVersion("wearable")+"'\n";
             }
         }
 
@@ -3107,7 +3188,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String multidex = "";
-        if (request.getArg("android.multidex", "false").equals("true")) {
+        if (request.getArg("android.multidex", "true").equals("true")) {
             multidex = "        multiDexEnabled true\n";
             if (Integer.parseInt(minSDK) < 21) {
                 if (useAndroidX) {
@@ -3194,6 +3275,22 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (buildToolsVersion.startsWith("29")) {
             compileSdkVersion = "29";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("30")) {
+            compileSdkVersion = "30";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("31")) {
+            compileSdkVersion = "31";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("32")) {
+            compileSdkVersion = "32";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("33")) {
+            compileSdkVersion = "33";
             supportLibVersion = "28";
         }
         jcenter =
@@ -4012,4 +4109,37 @@ public class AndroidGradleBuilder extends Executor {
 
     }
 
+
+    private String getDefaultPlayServiceVersion(String playService) {
+        if (playServiceVersions.containsKey(playService)) {
+            return playServiceVersions.get(playService);
+        }
+        if (decouplePlayServiceVersions) {
+            if (defaultPlayServiceVersions.containsKey(playService)) {
+                return defaultPlayServiceVersions.get(playService);
+            }
+        }
+
+        return playServicesVersion;
+    }
+
+    private void initPlayServiceVersions(BuildRequest request) {
+        for (String arg : request.getArgs()) {
+            if (arg.startsWith("android.playService.")) {
+                String playServiceKey = arg.substring("android.playService.".length());
+                if (playServiceKey.equals("appInvite")) {
+                    playServiceKey = "app-invite";
+                } else if (playServiceKey.equals("firebaseCore")) {
+                    playServiceKey = "firebase-core";
+                } else if (playServiceKey.equals("firebaseMessaging")) {
+                    playServiceKey = "firebase-messaging";
+                }
+                String playServiceValue = request.getArg(arg, null);
+                if (playServiceValue == null || "true".equals(playServiceValue) || "false".equals(playServiceValue)) {
+                    continue;
+                }
+                playServiceVersions.put(playServiceKey, playServiceValue);
+            }
+        }
+    }
 }
