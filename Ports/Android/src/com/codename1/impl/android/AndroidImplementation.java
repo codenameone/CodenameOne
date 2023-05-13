@@ -2825,8 +2825,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
+    // taken from https://stackoverflow.com/a/70380413/756809
+    private boolean isRunningOnAndroidStudioEmulator() {
+        return Build.FINGERPRINT.startsWith("google/sdk_gphone")
+                && Build.FINGERPRINT.endsWith(":user/release-keys")
+                && Build.MANUFACTURER == "Google" && Build.PRODUCT.startsWith("sdk_gphone") && Build.BRAND == "google"
+                && Build.MODEL.startsWith("sdk_gphone");
+    }
 
-
+    // taken from https://stackoverflow.com/a/57960169/756809
+    private boolean isEmulator() {
+        return isRunningOnAndroidStudioEmulator() ||
+                ((Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || Build.FINGERPRINT.startsWith("generic")
+                || Build.FINGERPRINT.startsWith("unknown")
+                || Build.HARDWARE.contains("goldfish")
+                || Build.HARDWARE.contains("ranchu")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MODEL.contains("VirtualBox")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.PRODUCT.contains("sdk_google")
+                || Build.PRODUCT.contains("google_sdk")
+                || Build.PRODUCT.contains("sdk")
+                || Build.PRODUCT.contains("sdk_x86")
+                || Build.PRODUCT.contains("vbox86p")
+                || Build.PRODUCT.contains("emulator")
+                || Build.PRODUCT.contains("simulator"));
+    }
 
 
     /**
@@ -2906,6 +2934,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
+        }
+        if("Emulator".equals(key)) {
+            return "" + isEmulator();
         }
         /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
