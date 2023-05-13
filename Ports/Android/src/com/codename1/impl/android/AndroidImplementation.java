@@ -2831,7 +2831,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Build.FINGERPRINT.startsWith("google/sdk_gphone")
                 && Build.FINGERPRINT.endsWith(":user/release-keys")
                 && Build.MANUFACTURER == "Google" && Build.PRODUCT.startsWith("sdk_gphone") && Build.BRAND == "google"
-                && Build.MODEL.startsWith("sdk_gphone")
+                && Build.MODEL.startsWith("sdk_gphone");
     }
 
     // taken from https://stackoverflow.com/a/57960169/756809
