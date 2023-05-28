@@ -390,10 +390,14 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private String getGradleVersion(String gradleExe) throws Exception {
+        Map<String,String> env = defaultEnvironment;
+        env.put("JAVA_HOME", System.getProperty("java.home"));
+
         String result = execString(new File(System.getProperty("user.dir")), gradleExe, "--version");
         Scanner scanner = new Scanner(result);
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
+            log("Gradle version line: "+line);
             if (line.startsWith("Gradle ")) {
                 return line.substring(line.indexOf(" ")+1).trim();
             }
@@ -711,7 +715,19 @@ public class AndroidGradleBuilder extends Executor {
 
                     for (File extractedChild : extracted.listFiles()) {
                         if (extractedChild.getName().startsWith("gradle") && extractedChild.isDirectory()) {
-                            extractedChild.renameTo(managedGradleHome);
+                            try {
+                                if (managedGradleHome.exists()) {
+                                    if (managedGradleHome.isDirectory()) {
+                                        FileUtils.deleteDirectory(managedGradleHome);
+                                    } else {
+                                        managedGradleHome.delete();
+                                    }
+                                }
+                                FileUtils.moveDirectory(extractedChild, managedGradleHome);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+
                             break;
                         }
                     }
