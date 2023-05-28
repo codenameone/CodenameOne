@@ -224,6 +224,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     };
 
+    public static final int FLAG_ONE_SHOT = 0x40000000;
+    public static final int FLAG_MUTABLE = 0x02000000;
+
+    public static final int FLAG_IMMUTABLE = 0x04000000;
+
     /**
      * make sure these important keys have a negative value when passed to
      * Codename One or they might be interpreted as characters.
@@ -780,8 +785,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
-            // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_MUTABLE);
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_IMMUTABLE);
+        } else {
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent createMutablePendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_MUTABLE);
         } else {
             return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
@@ -789,8 +801,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
-            // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getService(ctx, value, intent, 67108864);
+            return PendingIntent.getService(ctx, value, intent, FLAG_IMMUTABLE);
         } else {
             return PendingIntent.getService(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
@@ -840,13 +851,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (PushAction action : category.getActions()) {
             Intent newIntent = (Intent)targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
-            PendingIntent contentIntent = createPendingIntent(context, requestCode++, newIntent);
+            PendingIntent contentIntent = createMutablePendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
                 try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
-                //android.app.Notification.Action.Builder actionBuilder = new android.app.Notification.Action.Builder(iconId, action.getTitle(), contentIntent);
-
-                System.out.println("Adding action "+action.getId()+", "+action.getTitle()+", icon="+iconId);
                 if (ActionWrapper.BuilderWrapper.isSupported()) {
                     // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
                     // aren't available until API 22.
@@ -8592,6 +8600,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive push notifications")){
+                return;
+            }
+        }
+
         boolean has = hasAndroidMarket();
         if (!has) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
