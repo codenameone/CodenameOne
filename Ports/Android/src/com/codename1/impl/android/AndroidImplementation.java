@@ -781,7 +781,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
             // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getActivity(ctx, value, intent, 67108864);
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_MUTABLE);
         } else {
             return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
