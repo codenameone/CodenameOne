@@ -3015,6 +3015,7 @@ public class AndroidGradleBuilder extends Executor {
             dontObfuscate = "-dontobfuscate\n";
         }
 
+        String keepOverride = request.getArg("android.proguardKeepOverride", "Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod");
 
 
         // workaround broken optimizer in proguard
@@ -3086,7 +3087,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontwarn android.support.**\n"
                 + "-dontwarn androidx.**\n"
                 + "-dontwarn com.google.ads.**\n"
-                + "-keepattributes Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod";
+                + "-keepattributes " + keepOverride;
 
         String gradleObfuscate = "";
         File proguardConfigOverrideFile = new File(projectDir, "proguard.cfg");
