@@ -6862,8 +6862,8 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setMinute:timeOfDayMillis/60000];
     NSCalendar* cal = [NSCalendar currentCalendar];
     NSDate *date = [cal dateFromComponents:comps];
-    [comps release];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
+    [comps release];
     POOL_END();
     return result;
 }
