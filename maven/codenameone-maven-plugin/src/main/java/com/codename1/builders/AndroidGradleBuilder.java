@@ -3328,7 +3328,7 @@ public class AndroidGradleBuilder extends Executor {
         if (!useAndroidX) {
             supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
         } else {
-            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:1.0.0'\n";
+            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:" + request.getArg("androidx.appcompat.version", "1.0.0")+"'\n";
         }
 
         String gradleProps = "apply plugin: 'com.android.application'\n"
