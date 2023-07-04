@@ -356,8 +356,13 @@ public final class StringBuffer implements CharSequence, Appendable {
         return this;
     }
 
-    public CharSequence subSequence(int start, int end) {
-        return internal.substring(start, end);
+    public static String substring(StringBuilder str, int start, int end) {
+
+        StringBuilder result = new StringBuilder(end - start);
+        for (int i = start; i < end; i++) {
+            result.append(str.charAt(i));
+        }
+        return result.toString();
     }
 
 
