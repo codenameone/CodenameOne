@@ -8106,15 +8106,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public static void localNotificationReceived(final String notificationId) {
         if (localNotificationCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
-
-                @Override
-                public void run() {
-                    if (getLocalNotificationCallback() != null) {
-                        getLocalNotificationCallback().localNotificationReceived(notificationId);
-                    }
-                }
-            });
+            // this should be invoked off the EDT...
+            localNotificationCallback.localNotificationReceived(notificationId);
         } else { // could be a race condition against the native code... Retry in 2 seconds
             new Thread() {
                 public void run() {
