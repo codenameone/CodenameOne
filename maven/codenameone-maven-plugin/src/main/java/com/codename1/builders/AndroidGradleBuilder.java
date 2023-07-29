@@ -3199,7 +3199,8 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         if (purchasePermissions) {
-            additionalDependencies += " implementation 'com.android.billingclient:billing:4.0.0'\n";
+            String billingClientVersion = request.getArg("android.billingclient.version", "4.0.0");
+            additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
         }
 
         String useLegacyApache = "";
