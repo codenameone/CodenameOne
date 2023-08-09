@@ -482,7 +482,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     AndroidNativeUtil.getContext().getApplicationContext(),
                     0,
                     intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
             return geofencePendingIntent;
         } else {
