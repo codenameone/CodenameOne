@@ -528,9 +528,9 @@ JAVA_BOOLEAN hasAgressiveAllocator;
 // the thread just died, mark its remaining resources
 void collectThreadResources(struct ThreadLocalData *current)
 {
-    if(threadStateData->utf8Buffer != 0) {
-        free(threadStateData->utf8Buffer);
-        threadStateData->utf8Buffer = 0;
+    if(current->utf8Buffer != 0) {
+        free(current->utf8Buffer);
+        current->utf8Buffer = 0;
     } 
     for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
         JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
