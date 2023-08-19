@@ -84,6 +84,8 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean playServicesVersionSetInBuildHint = false;
 
+    private String facebookSdkVersion;
+
     public File getGradleProjectDirectory() {
         return gradleProjectDirectory;
     }
@@ -441,6 +443,21 @@ public class AndroidGradleBuilder extends Executor {
         }
         debug("-------------------");
 
+        facebookSdkVersion = request.getArg("android.facebookSdkVersion", "16.2.0");
+        String facebookSupport = "";
+        String facebookProguard = "";
+        String facebookActivityMetaData = "";
+        String facebookActivity = "";
+        String facebookHashCode = "";
+        String facebookClientToken = null;
+        boolean facebookSupported = request.getArg("facebook.appId", null) != null;
+
+        if (facebookSupported && compareVersions(facebookSdkVersion, "16.0.0") >= 0) {
+            facebookClientToken = request.getArg("facebook.clientToken", null);
+            if (facebookClientToken == null) {
+                throw new BuildException("You must specify a facebook.clientToken when using facebookSdkVersion "+facebookSdkVersion);
+            }
+        }
         decouplePlayServiceVersions = request.getArg("android.decouplePlayServiceVersions", "false").equals("true");
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
@@ -546,7 +563,15 @@ public class AndroidGradleBuilder extends Executor {
 
 
 
-        useAndroidX = request.getArg("android.useAndroidX", decouplePlayServiceVersions ? "true" : "false").equals("true");
+        useAndroidX = request.getArg(
+                "android.useAndroidX",
+                (decouplePlayServiceVersions || (facebookSupported && compareVersions(facebookSdkVersion, "16.0.0") >= 0))
+                        ? "true"
+                        : "false"
+        ).equals("true");
+        log("useAndroidX: "+useAndroidX);
+        log("Compare facebookSdkVersion to 16.0.0: " + (compareVersions(facebookSdkVersion, "16.0.0") >= 0));
+        log("Facebook supported: " + facebookSupported);
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
         buildToolsVersionInt = maxBuildToolsVersionInt;
@@ -910,12 +935,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
         String minSDK = request.getArg("android.min_sdk_version", "19");
-        String facebookSupport = "";
-        String facebookProguard = "";
-        String facebookActivityMetaData = "";
-        String facebookActivity = "";
-        String facebookHashCode = "";
-        boolean facebookSupported = request.getArg("facebook.appId", null) != null;
+
         if (facebookSupported) {
             facebookHashCode = "        try {\n"
                     + "            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(\n"
@@ -948,6 +968,9 @@ public class AndroidGradleBuilder extends Executor {
 
 
             facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"@string/facebook_app_id\"/>\n";
+            if (facebookClientToken != null) {
+                facebookActivityMetaData += " <meta-data android:name=\"com.facebook.sdk.ClientToken\" android:value=\"" + facebookClientToken + "\"/>\n";
+            }
             facebookActivity = " <activity android:name=\"com.facebook.FacebookActivity\" android:exported=\"true\"/>\n";
             additionalKeyVals += "<string name=\"facebook_app_id\">" + request.getArg("facebook.appId", "706695982682332") + "</string>";
         }
@@ -3115,7 +3138,7 @@ public class AndroidGradleBuilder extends Executor {
                 compile = "implementation";
             }
             minSDK = maxInt("15", minSDK);
-            String facebookSdkVersion = request.getArg("android.facebookSdkVersion", "4.39.0");;
+
             if(request.getArg("android.excludeBolts", "false").equals("true")) {
                 additionalDependencies +=
                         " "+compile+" ('com.facebook.android:facebook-android-sdk:" +
@@ -3275,7 +3298,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         Properties gradlePropertiesObject = new Properties();
-        File gradlePropertiesFile = new File(projectDir, "gradle.properties");
+        File gradlePropertiesFile = new File(projectDir.getParentFile(), "gradle.properties");
         if (gradlePropertiesFile.exists()) {
             try {
                 FileInputStream fi = new FileInputStream(gradlePropertiesFile);
