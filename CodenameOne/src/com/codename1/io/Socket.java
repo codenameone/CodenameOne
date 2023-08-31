@@ -87,6 +87,55 @@ public class Socket {
         }, "Connection to " + host).start();
     }
 
+    interface Close {
+        void close() throws IOException;
+    }
+
+    /**
+     * Connect to a remote host
+     * @param host the host
+     * @param port the connection port
+     * @param sc callback for when the connection is established or fails
+     */
+    public static Close connectWithClose(final String host, final int port, final SocketConnection sc) {
+        if(host.indexOf('.') > -1 && host.indexOf(':') > -1) {
+            throw new IllegalArgumentException("Port should be provided separately");
+        }
+        final Object[] connection = new Object[1];
+        Display.getInstance().startThread(new Runnable() {
+            public void run() {
+                connection[0] = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
+                if(connection[0] != null) {
+                    sc.setConnected(true);
+                    sc.connectionEstablished(new SocketInputStream(connection[0], sc),
+                            new SocketOutputStream(connection[0], sc));
+                } else {
+                    sc.setConnected(false);
+                    if(connection[0] == null) {
+                        sc.connectionError(-1, "Failed to connect");
+                    } else {
+                        sc.connectionError(Util.getImplementation().getSocketErrorCode(connection[0]),
+                                Util.getImplementation().getSocketErrorMessage(connection[0]));
+                    }
+                }
+            }
+        }, "Connection to " + host).start();
+        return new Close() {
+            public void close() throws IOException {
+                while (connection[0] == null) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                if(Util.getImplementation().isSocketConnected(connection[0])) {
+                    Util.getImplementation().disconnectSocket(connection[0]);
+                }
+            }
+        };
+    }
+
     /**
      * Listen to incoming connections on port
      * @param port the device port
@@ -139,7 +188,7 @@ public class Socket {
     public static String getHostOrIP() {
         return Util.getImplementation().getHostOrIP();
     }
-    
+
     static class SocketInputStream extends InputStream {
         private Object impl;
         private byte[] buffer;
@@ -281,7 +330,15 @@ public class Socket {
             }
             return b[0] & 0xff;
         }
-        
+
+        @Override
+        protected void finalize() throws Throwable {
+            try {
+                close();
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
     }
     
     static class SocketOutputStream extends OutputStream {
@@ -336,7 +393,15 @@ public class Socket {
             Util.getImplementation().writeToSocketStream(impl, new byte[] {(byte)b});
             handleSocketError();
         }
-        
+
+        @Override
+        protected void finalize() throws Throwable {
+            try {
+                close();
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
     }
     
     /**

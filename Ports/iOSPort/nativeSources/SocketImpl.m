@@ -140,6 +140,8 @@ static void _resume() {
         [outputStream removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
         [inputStream close];
         [inputStream removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+        [outputStream release];
+        [inputStream release];
         inputStream = nil;
         outputStream = nil;
     }
