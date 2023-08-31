@@ -126,7 +126,8 @@ public class Socket {
                     try {
                         Thread.sleep(200);
                     } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+                        Log.e(e);
+                        throw new RuntimeException(e.getMessage());
                     }
                 }
                 if(Util.getImplementation().isSocketConnected(connection[0])) {
@@ -331,7 +332,6 @@ public class Socket {
             return b[0] & 0xff;
         }
 
-        @Override
         protected void finalize() throws Throwable {
             try {
                 close();
@@ -394,7 +394,6 @@ public class Socket {
             handleSocketError();
         }
 
-        @Override
         protected void finalize() throws Throwable {
             try {
                 close();
