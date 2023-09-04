@@ -76,9 +76,18 @@ import org.xeustechnologies.jtar.TarOutputStream;
  * @author Steve Hannah
  */
 public class AndroidGradleBuilder extends Executor {
-    private static final float MIN_GRADLE_VERSION=6;
-    private static final String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
-    public static final boolean PREFER_MANAGED_GRADLE=true;
+
+    private float MIN_GRADLE_VERSION=6;
+
+    private float MIN_JDK_VERSION=8;
+
+    private String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
+
+    private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
+    public boolean PREFER_MANAGED_GRADLE=true;
+
+    private boolean useGradle8 = true;
+    private boolean useJava8SourceLevel = true;
 
     private File gradleProjectDirectory;
 
@@ -91,6 +100,10 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private boolean decouplePlayServiceVersions = false;
+
+    // Temporary flag to update firebase messaging to version 23.2.1
+    // which is necessary to support Push on the latest Android devices.
+    private boolean newFirebaseMessaging = false;
 
     public static final String[] ANDROID_PERMISSIONS = new String[]{
             "android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -393,7 +406,7 @@ public class AndroidGradleBuilder extends Executor {
 
     private String getGradleVersion(String gradleExe) throws Exception {
         Map<String,String> env = defaultEnvironment;
-        env.put("JAVA_HOME", System.getProperty("java.home"));
+        env.put("JAVA_HOME", getGradleJavaHome());
 
         String result = execString(new File(System.getProperty("user.dir")), gradleExe, "--version");
         Scanner scanner = new Scanner(result);
@@ -405,6 +418,22 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         throw new RuntimeException("Failed to get gradle version for "+gradleExe);
+    }
+
+    private String getGradleJavaHome() throws BuildException {
+        if (useGradle8) {
+            String home =  System.getenv("JAVA17_HOME");
+            if (home == null) {
+                throw new BuildException("When using gradle 8, you must set the JAVA17_HOME environment variable to the location of a Java 17 JDK");
+            }
+
+            if (!(new File(home).isDirectory())) {
+                throw new BuildException("The JAVA17_HOME environment variable is not set to a valid directory");
+            }
+
+            return home;
+        }
+        return System.getProperty("java.home");
     }
 
     private int parseVersionStringAsInt(String versionString) {
@@ -436,6 +465,22 @@ public class AndroidGradleBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
+        boolean facebookSupported = request.getArg("facebook.appId", null) != null;
+        newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "false").equals("true");
+        useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
+        useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
+        if (useGradle8) {
+            getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
+            MIN_GRADLE_VERSION = 8;
+            gradleDistributionUrl = gradle8DistributionUrl;
+            if (!useJava8SourceLevel) {
+                log("NOTICE: Enabling Java 8 source level for Gradle 8 build because RetroLambda is not supported on Java 17, which is required for gradle 8.");
+                useJava8SourceLevel = true;
+            }
+        }
+        if (newFirebaseMessaging && !useGradle8) {
+            throw new BuildException("android.newFirebaseMessaging requires gradle version 8.1 or higher.  Please remove the android.gradleVersion build hint");
+        }
         debug("Request Args: ");
         debug("-----------------");
         for (String arg : request.getArgs()) {
@@ -450,7 +495,6 @@ public class AndroidGradleBuilder extends Executor {
         String facebookActivity = "";
         String facebookHashCode = "";
         String facebookClientToken = null;
-        boolean facebookSupported = request.getArg("facebook.appId", null) != null;
 
         if (facebookSupported && compareVersions(facebookSdkVersion, "16.0.0") >= 0) {
             facebookClientToken = request.getArg("facebook.clientToken", null);
@@ -458,7 +502,12 @@ public class AndroidGradleBuilder extends Executor {
                 throw new BuildException("You must specify a facebook.clientToken when using facebookSdkVersion "+facebookSdkVersion);
             }
         }
-        decouplePlayServiceVersions = request.getArg("android.decouplePlayServiceVersions", "false").equals("true");
+        decouplePlayServiceVersions = request.getArg("android.decouplePlayServiceVersions", newFirebaseMessaging ? "true" : "false").equals("true");
+        if (!decouplePlayServiceVersions && newFirebaseMessaging) {
+            throw new BuildException(
+                    "android.newFirebaseMessaging=true is not compatible with android.decouplePlayServiceVersions=false.  Please remove one of these build hints."
+            );
+        }
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
                 : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
@@ -561,26 +610,39 @@ public class AndroidGradleBuilder extends Executor {
             maxBuildToolsVersion = "31";
         }
 
+        if (useGradle8) {
+            maxBuildToolsVersionInt = Math.max(33, maxBuildToolsVersionInt);
+            maxBuildToolsVersion = "" + maxBuildToolsVersionInt;
 
+            maxPlatformVersionInt = Math.max(33, maxPlatformVersionInt);
+            maxPlatformVersion = "" + maxPlatformVersionInt;
+        }
 
         useAndroidX = request.getArg(
                 "android.useAndroidX",
-                (decouplePlayServiceVersions || (facebookSupported && compareVersions(facebookSdkVersion, "16.0.0") >= 0))
+                ((newFirebaseMessaging || decouplePlayServiceVersions || useGradle8) || (facebookSupported && compareVersions(facebookSdkVersion, "16.0.0") >= 0))
                         ? "true"
                         : "false"
         ).equals("true");
+        if (!useAndroidX && newFirebaseMessaging) {
+            throw new BuildException("android.newFirebaseMessaging requires useAndroidX to be true.  Please remove the android.useAndroidX build hint");
+        }
         log("useAndroidX: "+useAndroidX);
         log("Compare facebookSdkVersion to 16.0.0: " + (compareVersions(facebookSdkVersion, "16.0.0") >= 0));
         log("Facebook supported: " + facebookSupported);
         migrateToAndroidX = useAndroidX && request.getArg("android.migrateToAndroidX", "true").equals("true");
 
         buildToolsVersionInt = maxBuildToolsVersionInt;
+
         this.buildToolsVersion = request.getArg("android.buildToolsVersion", ""+maxBuildToolsVersion);
         String buildToolsVersionIntStr = this.buildToolsVersion;
         if (buildToolsVersionIntStr.indexOf(".") > 1) {
             buildToolsVersionIntStr = buildToolsVersionIntStr.substring(0, buildToolsVersionIntStr.indexOf("."));
         }
         buildToolsVersionInt = Integer.parseInt(buildToolsVersionIntStr.replaceAll("[^0-9]", ""));
+        if (newFirebaseMessaging) {
+            buildToolsVersionInt = 33;
+        }
         if (useAndroidX && buildToolsVersionInt < 29) {
             buildToolsVersionInt = 29;
             this.buildToolsVersion = "29";
@@ -897,14 +959,17 @@ public class AndroidGradleBuilder extends Executor {
         File googleServicesJson = new File(appDir, "google-services.json");
 
         googleServicesJson = new File(libsDir.getParentFile(), "google-services.json");
-
-        try {
-            if (!retrolambda(new File(System.getProperty("user.dir")), request, dummyClassesDir)) {
-                return false;
+        if (!useJava8SourceLevel) {
+            log("Running retrolambda on classes to support Java 6 source level.  Use the android.java8=true build hint to use Java 8 source level directly on Android, and avoid this step.");
+            try {
+                if (!retrolambda(new File(System.getProperty("user.dir")), request, dummyClassesDir)) {
+                    return false;
+                }
+            } catch (Exception ex) {
+                throw new BuildException("Failed to run retrolambda on classes", ex);
             }
-        } catch (Exception ex) {
-            throw new BuildException("Failed to run retrolambda on classes", ex);
         }
+
         String additionalImports = request.getArg("android.activityClassImports", "");
         String additionalMembers = request.getArg("android.activityClassBody", "");
         String additionalKeyVals = "";
@@ -1181,8 +1246,23 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         request.putArgument("android.playServicesVersion", playServicesVersion);
-        request.putArgument("android.firebaseCoreVersion", request.getArg("android.firebaseCoreVersion", getDefaultPlayServiceVersion("firebase-core")));
-        request.putArgument("android.firebaseMessagingVersion", request.getArg("android.firebaseMessagingVersion", getDefaultPlayServiceVersion("firebase-messaging")));
+        request.putArgument(
+                "android.firebaseCoreVersion",
+                request.getArg("android.firebaseCoreVersion",
+                        newFirebaseMessaging
+                                ? "21.1.1"
+                                : getDefaultPlayServiceVersion("firebase-core")
+                )
+        );
+        request.putArgument(
+                "android.firebaseMessagingVersion",
+                request.getArg(
+                        "android.firebaseMessagingVersion",
+                        newFirebaseMessaging
+                                ? "23.2.1"
+                                : getDefaultPlayServiceVersion("firebase-messaging")
+                )
+        );
 
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
@@ -1201,7 +1281,11 @@ public class AndroidGradleBuilder extends Executor {
             }
 
             if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
-                request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
+                if (gradleVersionInt >= 8) {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                } else {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
+                }
             }
             if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
                 request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
@@ -2441,7 +2525,12 @@ public class AndroidGradleBuilder extends Executor {
                     + facebookHashCode
                     + facebookSupport
                     + streamMode
-                    + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), srcDir, dummyClassesDir)
+                    + registerNativeImplementationsAndCreateStubs(
+                            new URLClassLoader(
+                                    new URL[]{
+                                            dummyClassesDir.toURI().toURL(),
+                                            codenameOneJar.toURI().toURL()
+                                    }), srcDir, dummyClassesDir)
                     + oncreate + "\n"
                     + createOnCreateCode(request)
                     + "    }\n"
@@ -2486,39 +2575,71 @@ public class AndroidGradleBuilder extends Executor {
 
         String fcmRegisterPushCode = "";
         if (useFCM) {
-            fcmRegisterPushCode = "try {\n" +
-                    "\n" +
-                    "                String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
-                    "                if (token != null) {\n" +
-                    "                    com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\"+token);\n" +
-                    "                    if (i instanceof PushCallback) {\n" +
-                    "                        ((PushCallback)i).registeredForPush(\"cn1-fcm-\"+token);\n" +
-                    "                    }\n" +
-                    "                } else {\n" +
-                    "                    java.util.Timer timer = new java.util.Timer();\n" +
-                    "                    timer.schedule(new java.util.TimerTask() {\n" +
-                    "                        public void run() {\n" +
-                    "                            runOnUiThread(new Runnable() {\n" +
-                    "                                public void run() {\n" +
-                    "                                    String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
-                    "                                    if (token != null) {\n" +
-                    "                                        com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\" + token);\n" +
-                    "                                        if (i instanceof PushCallback) {\n" +
-                    "                                            ((PushCallback) i).registeredForPush(\"cn1-fcm-\" + token);\n" +
-                    "                                        }\n" +
-                    "                                    }\n" +
-                    "                                }\n" +
-                    "                            });\n" +
-                    "                        }\n" +
-                    "                    }, 2000);\n" +
-                    "                }\n" +
-                    "            } catch (Exception ex) {\n" +
-                    "                if (i instanceof PushCallback) {\n" +
-                    "                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
-                    "                }\n" +
-                    "                System.out.println(\"Failed to get fcm token.\");\n" +
-                    "                ex.printStackTrace();\n" +
-                    "            }";
+            if (newFirebaseMessaging) {
+                // The old FirebaseInstanceId class was deprecated in version 20.1.0,
+                // and can no longer be used so we need to update our callback to use newer APIs.
+                fcmRegisterPushCode = "com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()\n" +
+                        "                    .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<String>() {\n" +
+                        "                        @Override\n" +
+                        "                        public void onComplete(com.google.android.gms.tasks.Task<String> task) {\n" +
+                        "                            if (!task.isSuccessful()) {\n" +
+                        "                                if (i instanceof PushCallback) {\n" +
+                        "                                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+task.getException().getMessage(), 0);\n" +
+                        "                                }\n" +
+                        "                                return;\n" +
+                        "                            }\n" +
+                        "                            // Get the token\n" +
+                        "                            String token = task.getResult();\n" +
+                        "                            try {\n" +
+                        "                                com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\"+token);\n" +
+                        "                                if (i instanceof PushCallback) {\n" +
+                        "                                    ((PushCallback)i).registeredForPush(\"cn1-fcm-\"+token);\n" +
+                        "                                }\n" +
+                        "\n" +
+                        "                            } catch (Exception ex) {\n" +
+                        "                                if (i instanceof PushCallback) {\n" +
+                        "                                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
+                        "                                }\n" +
+                        "                                System.out.println(\"Failed to get fcm token.\");\n" +
+                        "                                ex.printStackTrace();\n" +
+                        "                            }\n" +
+                        "                        }\n" +
+                        "                    });";
+            } else {
+                fcmRegisterPushCode = "try {\n" +
+                        "\n" +
+                        "                String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
+                        "                if (token != null) {\n" +
+                        "                    com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\"+token);\n" +
+                        "                    if (i instanceof PushCallback) {\n" +
+                        "                        ((PushCallback)i).registeredForPush(\"cn1-fcm-\"+token);\n" +
+                        "                    }\n" +
+                        "                } else {\n" +
+                        "                    java.util.Timer timer = new java.util.Timer();\n" +
+                        "                    timer.schedule(new java.util.TimerTask() {\n" +
+                        "                        public void run() {\n" +
+                        "                            runOnUiThread(new Runnable() {\n" +
+                        "                                public void run() {\n" +
+                        "                                    String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
+                        "                                    if (token != null) {\n" +
+                        "                                        com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\" + token);\n" +
+                        "                                        if (i instanceof PushCallback) {\n" +
+                        "                                            ((PushCallback) i).registeredForPush(\"cn1-fcm-\" + token);\n" +
+                        "                                        }\n" +
+                        "                                    }\n" +
+                        "                                }\n" +
+                        "                            });\n" +
+                        "                        }\n" +
+                        "                    }, 2000);\n" +
+                        "                }\n" +
+                        "            } catch (Exception ex) {\n" +
+                        "                if (i instanceof PushCallback) {\n" +
+                        "                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
+                        "                }\n" +
+                        "                System.out.println(\"Failed to get fcm token.\");\n" +
+                        "                ex.printStackTrace();\n" +
+                        "            }";
+            }
         }
         try {
             stubSourceCode +=
@@ -3040,7 +3161,11 @@ public class AndroidGradleBuilder extends Executor {
 
         String keepOverride = request.getArg("android.proguardKeepOverride", "Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod");
 
-
+        String keepFirebase = "";
+        if (newFirebaseMessaging) {
+            keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
+                    "-keep class com.google.firebase.** { *; }\n\n";
+        }
         // workaround broken optimizer in proguard
         String proguardConfigOverride = "-dontusemixedcaseclassnames\n"
                 + "-dontskipnonpubliclibraryclasses\n"
@@ -3050,6 +3175,7 @@ public class AndroidGradleBuilder extends Executor {
                 + dontObfuscate
                 + "\n"
                 + "-dontwarn com.google.android.gms.**\n"
+                + keepFirebase
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
                 + "}\n\n"
@@ -3130,6 +3256,8 @@ public class AndroidGradleBuilder extends Executor {
         HashMap<String, String> env = new HashMap<String, String>();
         env.put("ANDROID_HOME", androidSDKDir.getAbsolutePath());
         env.put("SLAVE_AAPT_TIMEOUT", "20");
+        env.put("JAVA_HOME", getGradleJavaHome());
+
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
         if (facebookSupported) {
@@ -3160,7 +3288,11 @@ public class AndroidGradleBuilder extends Executor {
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+getDefaultPlayServiceVersion("plus")+"'\n";
             }
             if(playServicesAuth){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-auth:"+getDefaultPlayServiceVersion("auth")+"'\n";
+                String playServiceAuthVersion = newFirebaseMessaging
+                        ? "20.6.0"
+                        : getDefaultPlayServiceVersion("auth");
+
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-auth:"+playServiceAuthVersion+"'\n";
             }
             if(playServicesBase){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-base:"+getDefaultPlayServiceVersion("base")+"'\n";
@@ -3234,17 +3366,17 @@ public class AndroidGradleBuilder extends Executor {
         String multidex = "";
         if (request.getArg("android.multidex", "true").equals("true")) {
             multidex = "        multiDexEnabled true\n";
+            String multidexVersion = newFirebaseMessaging || useGradle8 ? "2.0.1" : "1.0.3";
             if (Integer.parseInt(minSDK) < 21) {
                 if (useAndroidX) {
                     if (!additionalDependencies.contains("androidx.multidex:multidex") && !request.getArg("android.gradleDep", "").contains("androidx.multidex:multidex")) {
-                        additionalDependencies += " implementation 'androidx.multidex:multidex:1.0.3'\n";
+                        additionalDependencies += " implementation 'androidx.multidex:multidex:" + multidexVersion + "'\n";
                     }
                 } else {
                     if (!additionalDependencies.contains("com.android.support:multidex") && !request.getArg("android.gradleDep", "").contains("com.android.support:multidex")) {
-                        additionalDependencies += " implementation 'com.android.support:multidex:1.0.3'\n";
+                        additionalDependencies += " implementation 'com.android.support:multidex:" + multidexVersion + "'\n";
                     }
                 }
-
             }
         }
 
@@ -3258,23 +3390,18 @@ public class AndroidGradleBuilder extends Executor {
                 } else {
                     gradleDependency = "classpath 'com.android.tools.build:gradle:3.0.1'\n";
                 }
-            }else {
+            }else if (gradleVersionInt < 8) {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:4.1.1'\n";
+            } else {
+                gradleDependency = "classpath 'com.android.tools.build:gradle:8.1.0'\n";
             }
         }
         gradleDependency += request.getArg("android.topDependency", "");
 
         String compileSdkVersion = "'android-21'";
-        String quotedBuildToolsVersion = "'23.0.1'";
-
-            compileSdkVersion = "'android-" + request.getArg("android.sdkVersion", "23") + "'";
-            quotedBuildToolsVersion = "'" +buildToolsVersion + "'";
-
-
-
 
         String java8P2 = "";
-        if(request.getArg("android.java8", "false").equals("true")) {
+        if(useJava8SourceLevel) {
             java8P2 = "    compileOptions {\n" +
                     "        sourceCompatibility JavaVersion.VERSION_1_8\n" +
                     "        targetCompatibility JavaVersion.VERSION_1_8\n" +
@@ -3296,6 +3423,8 @@ public class AndroidGradleBuilder extends Executor {
                 injectRepo += "    " + s + "\n";
             }
         }
+
+
 
         Properties gradlePropertiesObject = new Properties();
         File gradlePropertiesFile = new File(projectDir.getParentFile(), "gradle.properties");
@@ -3352,7 +3481,24 @@ public class AndroidGradleBuilder extends Executor {
         if (!useAndroidX) {
             supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
         } else {
-            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:" + request.getArg("androidx.appcompat.version", "1.0.0")+"'\n";
+            String appCompatVersionDefault = "1.0.0";
+            if (useGradle8) {
+                appCompatVersionDefault = "1.6.1";
+            }
+            supportV4Default = "    implementation 'androidx.legacy:legacy-support-v4:1.0.0'\n     implementation 'androidx.appcompat:appcompat:" + request.getArg("androidx.appcompat.version", appCompatVersionDefault)+"'\n";
+
+        }
+
+        String buildFeatures = "";
+        if (useGradle8) {
+            buildFeatures = "buildFeatures {\n" +
+                    "        aidl true\n" +
+                    "    }\n";
+        }
+
+        String namespace = "";
+        if (useGradle8) {
+            namespace = "namespace '"+request.getPackageName()+"'\n";
         }
 
         String gradleProps = "apply plugin: 'com.android.application'\n"
@@ -3422,6 +3568,8 @@ public class AndroidGradleBuilder extends Executor {
                         + "            signingConfig signingConfigs.release\n"
                         + "        }\n"):"")
                 + "    }\n"
+                + buildFeatures
+                + namespace
                 + "}\n"
                 + "\n"
                 + "repositories {\n"
@@ -3464,10 +3612,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         gradlePropertiesObject.setProperty("org.gradle.daemon", "true");
-        if(request.getArg("android.forceJava8Builder", "false").equals("true")) {
-            gradlePropertiesObject.setProperty("org.gradle.java.home", System.getProperty("java.home"));
+        if(useGradle8 || request.getArg("android.forceJava8Builder", "false").equals("true")) {
+            gradlePropertiesObject.setProperty("org.gradle.java.home", getGradleJavaHome());
         }
-        gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
+        if (useGradle8) {
+            gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
+        } else {
+            gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
+        }
         if (useAndroidX) {
             gradlePropertiesObject.setProperty("android.useAndroidX", "true");
             gradlePropertiesObject.setProperty("android.enableJetifier", "true");
