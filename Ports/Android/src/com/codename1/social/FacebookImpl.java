@@ -200,7 +200,7 @@ public class FacebookImpl extends FacebookConnect {
 
     @Override
     public boolean isInviteFriendsSupported() {
-        return true;
+        return false;
     }
 
     class FBCallback implements FacebookCallback {
