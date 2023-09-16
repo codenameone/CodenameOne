@@ -86,7 +86,7 @@ public class AndroidGradleBuilder extends Executor {
     private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
     public boolean PREFER_MANAGED_GRADLE=true;
 
-    private boolean useGradle8 = true;
+    private boolean useGradle8 = false;
     private boolean useJava8SourceLevel = true;
 
     private File gradleProjectDirectory;
@@ -276,6 +276,8 @@ public class AndroidGradleBuilder extends Executor {
     private boolean purchasePermissions;
     private boolean accessNetworkStatePermission;
     private boolean recieveBootCompletedPermission;
+
+    private boolean postNotificationsPermission;
     private boolean getAccountsPermission;
     private boolean credentialsPermission;
     private boolean backgroundLocationPermission;
@@ -735,7 +737,9 @@ public class AndroidGradleBuilder extends Executor {
             delTree(tmpFile);
         }
         tmpFile.mkdirs();
-        File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle"));
+        String gradleHomeVersion = useGradle8 ? "8" : "6_5";
+        File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle" + gradleHomeVersion));
+
         String gradleHome = System.getenv("GRADLE_HOME");
         if (gradleHome == null && managedGradleHome.exists()) {
             gradleHome = managedGradleHome.getAbsolutePath();
@@ -1099,6 +1103,9 @@ public class AndroidGradleBuilder extends Executor {
                 public void usesClass(String cls) {
                     if (cls.indexOf("com/codename1/notifications") == 0) {
                         recieveBootCompletedPermission = true;
+                        if (targetSDKVersionInt >= 33) {
+                            postNotificationsPermission = true;
+                        }
                     }
                     if (cls.indexOf("com/codename1/capture") == 0) {
                         capturePermission = true;
@@ -1949,6 +1956,11 @@ public class AndroidGradleBuilder extends Executor {
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
+        }
+
+        if (postNotificationsPermission) {
+            permissions += permissionAdd(request, "\"android.permission.POST_NOTIFICATIONS\"",
+                    "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n");
         }
 
         if (capturePermission) {
@@ -3013,13 +3025,7 @@ public class AndroidGradleBuilder extends Executor {
                             "                     mNotifyBuilder.setCategory(\"Notification\");\n" +
                             "                 }\n";
             if (buildToolsVersionInt >= 26 && Integer.parseInt(targetNumber) >= 26) {
-
-
-
-
-
                 pushReceiverSourceCode += "                com.codename1.impl.android.AndroidImplementation.setNotificationChannel(nm, mNotifyBuilder, context);\n";
-
             }
             pushReceiverSourceCode +=
                     "                 String[] messages = com.codename1.impl.android.AndroidImplementation.getPendingPush(messageType, context);\n"
