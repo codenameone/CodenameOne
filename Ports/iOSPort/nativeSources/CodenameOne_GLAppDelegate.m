@@ -435,8 +435,16 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler {
-
-
+    if (@available(iOS 10, *)) {
+        if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
+        {
+            CN1Log(@"Received local notification while in background: %@", response.notification);
+            // Note:  We currently don't do anything at this point.  THe local notification callback
+            // will be triggered when the user clicks on the notification.
+            completionHandler();
+            return;
+        }
+    }
 #ifdef INCLUDE_CN1_PUSH
     NSLog( @"Handle push from background or closed" );
     // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background
