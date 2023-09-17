@@ -10472,7 +10472,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
-
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
+                com.codename1.io.Log.e(new RuntimeException("Local notification was prevented the POST_NOTIFICATIONS permission was not granted by the user."));
+                return;
+            }
+        }
         final Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notif.getId());
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
