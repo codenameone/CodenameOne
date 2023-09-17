@@ -2333,80 +2333,80 @@ public class IOSImplementation extends CodenameOneImplementation {
          * @return The string ID used in the map.
          */
         long getShapeID(Shape shape, Stroke stroke){
-            long id = 0;
-            
-            
-            //float[] bounds = shape.getBounds2D();
-            float x = 0;
-            float y = 0;//bounds[1];
+            long result = 17; // Prime number to start the hash computation
+
+            float referenceX = 0;
+            float referenceY = 0;
             boolean referencePointSet = false;
-            
-            
-            int ctr = 0;
-            //StringBuilder sb = new StringBuilder();
+
             PathIterator it = shape.getPathIterator();
             float[] buf = new float[6];
-            float tx, ty, tx2, ty2, tx3, ty3;
-            
-            //sb.append(it.getWindingRule());
-            id = id ^ it.getWindingRule();
-            //sb.append(";");
-            while ( !it.isDone() ){
-                ctr++;
+
+            result = 31 * result + it.getWindingRule();
+
+            while (!it.isDone()){
                 int type = it.currentSegment(buf);
+
                 if (!referencePointSet && type != PathIterator.SEG_CLOSE) {
                     referencePointSet = true;
-                    x = buf[0];
-                    y = buf[1];
+                    referenceX = buf[0];
+                    referenceY = buf[1];
                 }
-                switch ( type ){
+
+                float tx, ty, tx2, ty2, tx3, ty3;
+
+                switch (type) {
                     case PathIterator.SEG_MOVETO:
-                       tx = buf[0]-x;
-                       ty = buf[1]-y;
-                        //sb.append("M:").append((int)tx).append(",").append((int)ty);
-                       id = id ^ (ctr * (int)tx * (int)ty * type);
+                        tx = buf[0] - referenceX;
+                        ty = buf[1] - referenceY;
+                        result = 31 * result + Float.floatToIntBits(tx);
+                        result = 31 * result + Float.floatToIntBits(ty);
                         break;
                     case PathIterator.SEG_LINETO:
-                       tx = buf[0]-x;
-                       ty = buf[1]-y;
-                        //sb.append("L:").append((int)tx).append(",").append((int)ty);
-                       id = id ^ (ctr * (int)tx * (int)ty * type);
-                       
+                        tx = buf[0] - referenceX;
+                        ty = buf[1] - referenceY;
+                        result = 31 * result + Float.floatToIntBits(tx);
+                        result = 31 * result + Float.floatToIntBits(ty);
                         break;
                     case PathIterator.SEG_QUADTO:
-                        tx = buf[0]-x;
-                        ty = buf[1]-y;
-                        tx2 = buf[2]-x;
-                        ty2 = buf[3]-y;
-                        //sb.append("Q:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2);
-                        id = id ^ (ctr * (int)tx * (int)ty * type + 10 * (int)tx2 * (int)ty2);
+                        tx = buf[0] - referenceX;
+                        ty = buf[1] - referenceY;
+                        tx2 = buf[2] - referenceX;
+                        ty2 = buf[3] - referenceY;
+                        result = 31 * result + Float.floatToIntBits(tx);
+                        result = 31 * result + Float.floatToIntBits(ty);
+                        result = 31 * result + Float.floatToIntBits(tx2);
+                        result = 31 * result + Float.floatToIntBits(ty2);
                         break;
                     case PathIterator.SEG_CUBICTO:
-                        tx = buf[0]-x;
-                        ty = buf[1]-y;
-                        tx2 = buf[2]-x;
-                        ty2 = buf[3]-y;
-                        tx3 = buf[4]-x;
-                        ty3= buf[5]-y;
-                        //sb.append("C:").append((int)tx).append(",").append((int)ty).append(",").append((int)tx2).append(",").append((int)ty2)
-                        //        .append(",").append((int)tx3).append(",").append((int)ty3);
-                        id = id ^ (ctr * (int)tx * (int)ty * type  + 10 * (int)tx2 * (int)ty2 + 100 *  (int)tx3  * (int)ty3 );
+                        tx = buf[0] - referenceX;
+                        ty = buf[1] - referenceY;
+                        tx2 = buf[2] - referenceX;
+                        ty2 = buf[3] - referenceY;
+                        tx3 = buf[4] - referenceX;
+                        ty3 = buf[5] - referenceY;
+                        result = 31 * result + Float.floatToIntBits(tx);
+                        result = 31 * result + Float.floatToIntBits(ty);
+                        result = 31 * result + Float.floatToIntBits(tx2);
+                        result = 31 * result + Float.floatToIntBits(ty2);
+                        result = 31 * result + Float.floatToIntBits(tx3);
+                        result = 31 * result + Float.floatToIntBits(ty3);
                         break;
-                        
                     case PathIterator.SEG_CLOSE:
-                        id = id ^ ctr;
-                        
+                        result = 31 * result + type;
+                        break;
                 }
+
                 it.next();
             }
-            if ( stroke != null ){
-                id = id ^ stroke.hashCode();
-                
-                //sb.append(stroke.hashCode()).append(":");
+
+            if (stroke != null) {
+                result = 31 * result + stroke.hashCode();
             }
-            return id;
-            
+
+            return result;
         }
+
     }
     
     
