@@ -634,9 +634,21 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
 
     @Override
-    public CharSequence subSequence(int start, int end) {
-        return substring(start,end);
+    public static String substring(StringBuilder str, int from, int to)
+    {
+        int len = to-from;
+        char seq[] = new char[len];
+        for (int x = 0; x < len; x++)
+        {
+            seq[i] = str.charAt(from++);
+        }
+        return(new String(seq));
     }
+    /*public CharSequence subSequence(int start, int end) {
+        return substring(start,end);
+    }*/
+
+    
 
     public StringBuilder substring(int start, int end) {
         return new StringBuilder(value, start, end-start);
