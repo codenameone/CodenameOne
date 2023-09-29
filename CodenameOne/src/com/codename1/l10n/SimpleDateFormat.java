@@ -757,8 +757,8 @@ public class SimpleDateFormat extends DateFormat {
             if (year > (thisYear + 20)) {
                 year -= 100;
             }
+            validateNumber(year, ofs, "year", 1000, thisYear + 1000);
         }
-        validateNumber(year, ofs, "year", 1000, thisYear + 1000);
         return year;
     }
 
