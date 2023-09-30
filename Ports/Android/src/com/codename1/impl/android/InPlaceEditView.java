@@ -2178,9 +2178,14 @@ public class InPlaceEditView extends FrameLayout{
             public int length() {
                 return mSource.length(); // Return default
             }
-
+           
             public CharSequence subSequence(int start, int end) {
-                return mSource.subSequence(start, end); // Return default
+                int length = end - start;
+                char seq[] =  new char[length];
+                for (int i = 0; i < length; i++) {
+                    seq[i] = str.charAt(start++);
+                }
+                return (new CharSequence(seq));
             }
         }
     };

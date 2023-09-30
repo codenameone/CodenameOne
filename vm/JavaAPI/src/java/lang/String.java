@@ -885,7 +885,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return substring(start, end);
+        int length = end - start;
+        char seq[] =  new char[length];
+        for (int i = 0; i < length; i++) {
+            seq[i] = str.charAt(start++);
+        }
+        return (new CharSequence(seq));
     }
 
     protected void finalize() {
