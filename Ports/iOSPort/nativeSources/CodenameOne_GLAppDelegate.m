@@ -439,9 +439,10 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
         if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
         {
             CN1Log(@"Received local notification while in background: %@", response.notification);
-            // Note:  We currently don't do anything at this point.  THe local notification callback
-            // will be triggered when the user clicks on the notification.
+            NSString* alertValue = [response.notification.request.content.userInfo valueForKey:@"__ios_id__"];
+            com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
             completionHandler();
+
             return;
         }
     }
