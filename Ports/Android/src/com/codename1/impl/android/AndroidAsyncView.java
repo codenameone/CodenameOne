@@ -332,22 +332,24 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         if(children > 0) {
             for (int iter = 0; iter < children; iter++) {
                 final View v = getChildAt(iter);
-                final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
-                if (lp.dirty) {
-                    lp.dirty = false;
-                    v.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            v.requestLayout();
-
-                            Display.getInstance().getInstance().callSerially(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Display.getInstance().getCurrent().repaint();
-                                }
-                            });
-                        }
-                    });
+                if(v != null) {
+                    final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
+                    if (lp.dirty) {
+                        lp.dirty = false;
+                        v.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                v.requestLayout();
+    
+                                Display.getInstance().getInstance().callSerially(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Display.getInstance().getCurrent().repaint();
+                                    }
+                                });
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -426,47 +428,6 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         }
 
         int children = getChildCount();
-        if(children > 0) {
-            com.codename1.ui.Form c = Display.getInstance().getCurrent();
-            for (int iter = 0; iter < children; iter++) {
-                final View v = getChildAt(iter);
-                final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
-                //if (lp != null && c == lp.pc.getComponentForm()) {
-                    //v.postInvalidate();
-
-                    /*if(lp.dirty) {
-                        lp.dirty = false;
-                        v.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (v.getVisibility() == View.INVISIBLE) {
-                                    v.setVisibility(View.VISIBLE);
-                                }
-                                v.requestLayout();
-                            }
-                        });
-                    } else {
-                        if (v.getVisibility() == View.INVISIBLE) {
-                            v.post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    v.setVisibility(View.VISIBLE);
-                                }
-                            });
-                        }
-                    }*/
-                //} else {
-                    /*if(v.getVisibility() == View.VISIBLE) {
-                        v.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                v.setVisibility(View.INVISIBLE);
-                            }
-                        });
-                    }*/
-                //}
-            }
-        }
         if (rect == null) {
             postInvalidate();
         } else {
