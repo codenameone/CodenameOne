@@ -3233,6 +3233,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "-keepclassmembers public class "+xclass("android.support.v4.app.NotificationCompat")+"$Builder {\n"
                 + "    public "+xclass("android.support.v4.app.NotificationCompat")+"$Builder setChannelId(java.lang.String);\n"
                 + "}\n\n"
+                + "-keep class **Stub { *; }\n\n" // Because there have been cases where release builds were stripping out native interfaces
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 + googlePlayObfuscation
