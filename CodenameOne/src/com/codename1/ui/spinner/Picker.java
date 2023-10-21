@@ -527,8 +527,7 @@ public class Picker extends Button {
             }
             
             private TimeSpinner3D createTimePicker3D() {
-                TimeSpinner3D out = new TimeSpinner3D();
-                out.setMinuteStep(minuteStep);
+                TimeSpinner3D out = new TimeSpinner3D(minuteStep);
                 out.setShowMeridiem(showMeridiem);
                 if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
                     out.setHourRange(minHour, maxHour);
@@ -542,7 +541,7 @@ public class Picker extends Button {
             }
             
             private DateTimeSpinner3D createDateTimePicker3D() {
-                DateTimeSpinner3D out = new DateTimeSpinner3D();
+                DateTimeSpinner3D out = new DateTimeSpinner3D(minuteStep);
                 out.setShowMeridiem(showMeridiem);
                 if (startDate != null) {
                     out.setStartDate(startDate);
