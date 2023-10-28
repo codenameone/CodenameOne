@@ -211,11 +211,13 @@ public class Socket {
         }
 
         @Override
-        public void close() throws IOException {
-            closed = true;
-            if(Util.getImplementation().isSocketConnected(impl)) {
-                Util.getImplementation().disconnectSocket(impl);
-                con.setConnected(false);
+        public synchronized void close() throws IOException {
+            if(!closed) {
+                closed = true;
+                if (Util.getImplementation().isSocketConnected(impl)) {
+                    Util.getImplementation().disconnectSocket(impl);
+                    con.setConnected(false);
+                }
             }
         }
 
@@ -335,7 +337,7 @@ public class Socket {
         protected void finalize() throws Throwable {
             try {
                 close();
-            } catch (IOException err) {
+            } catch (Throwable err) {
                 Log.e(err);
             }
         }
@@ -350,8 +352,8 @@ public class Socket {
         }
         
         @Override
-        public void close() throws IOException {
-            if(Util.getImplementation().isSocketConnected(impl)) {
+        public synchronized void close() throws IOException {
+            if (con.isConnected() && Util.getImplementation().isSocketConnected(impl)) {
                 Util.getImplementation().disconnectSocket(impl);
                 con.setConnected(false);
             }
@@ -397,7 +399,7 @@ public class Socket {
         protected void finalize() throws Throwable {
             try {
                 close();
-            } catch (IOException err) {
+            } catch (Throwable err) {
                 Log.e(err);
             }
         }
