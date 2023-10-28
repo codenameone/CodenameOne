@@ -81,7 +81,10 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
             URLClassLoader cl = new URLClassLoader(new URL[]{
                     new File(project.getBuild().getOutputDirectory()).toURI().toURL(),
                     cn1CoreJar.toURI().toURL()});
-            String classPath = relativePath.replace(File.separator, ".");
+            String classPath = relativePath
+                    .replace("\\", ".")
+                    .replace("/", ".")
+                    .replace(File.separator, ".");
             classPath = classPath.substring(0, classPath.lastIndexOf("."));
             c = cl.loadClass(classPath);
 
