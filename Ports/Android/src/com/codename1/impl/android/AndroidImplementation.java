@@ -2610,7 +2610,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void vibrate(int duration) {
         if (!this.vibrateInitialized) {
             try {
-                v = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+                /**
+                 * Implementation takes into account for retrocompatability if the
+                 * SDK ever needs to be reverted to pre 31 for some reason?
+                 */
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // SDK >= 31
+                    VibratorManager vibratorManager = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                    v = vibratorManager.getDefaultVibrator();
+                } else {
+                    // Backward compatability for SDK < 31
+                    v = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+                }
             } catch (Throwable e) {
                 Log.e("Codename One", "problem with virbrator(0)", e);
             } finally {
