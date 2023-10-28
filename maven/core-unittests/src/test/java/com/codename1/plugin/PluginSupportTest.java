@@ -1,7 +1,5 @@
-package com.codenameone.plugin;
+package com.codename1.plugin;
 
-import com.codename1.plugin.Plugin;
-import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.PluginEvent;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
