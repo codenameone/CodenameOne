@@ -30,6 +30,9 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
+import com.codename1.plugin.Plugin;
+import com.codename1.plugin.PluginSupport;
+import com.codename1.plugin.event.PluginEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
@@ -1623,6 +1626,37 @@ public class CN extends  CN1Constants {
      */
     public static BrowserComponent getSharedJavascriptContext() {
         return Display.impl.getSharedJavscriptContext();
+    }
+
+    /**
+     * Registers a plugin with the runtime so that specific functionality can be overridden by the plugin.
+     * @param plugin The plugin to register.
+     * @since 8.0
+     * @see PluginSupport#registerPlugin(Plugin)
+     */
+    public static void registerPlugin(Plugin plugin) {
+        PluginSupport.getInstance().registerPlugin(plugin);
+    }
+
+    /**
+     * Deregisters a plugin from the runtime.
+     * @param plugin The plugin to deregister
+     * @see PluginSupport#deregisterPlugin(Plugin)
+     * @since 8.0
+     */
+    public static void deregisterPlugin(Plugin plugin) {
+        PluginSupport.getInstance().deregisterPlugin(plugin);
+    }
+
+    /**
+     * Fires a plugin event to all registered plugins to give them an opportunity to handle the event.
+     *
+     * @param event The event to fire.
+     * @see PluginSupport#firePluginEvent(PluginEvent)
+     * @since 8.0
+     */
+    public static <T extends PluginEvent> T firePluginEvent(T event) {
+        return PluginSupport.getInstance().firePluginEvent(event);
     }
 
 }

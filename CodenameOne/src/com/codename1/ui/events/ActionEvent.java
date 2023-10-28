@@ -163,7 +163,11 @@ public class ActionEvent {
             
             Change,
             
-            LongPointerPress
+            LongPointerPress,
+
+            OpenGallery,
+
+            IsGalleryTypeSupported,
             } ;
     private Type trigger;
     

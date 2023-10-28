@@ -74,6 +74,7 @@
         <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
+        <module>core-unittests</module>
 
 
     </modules>
