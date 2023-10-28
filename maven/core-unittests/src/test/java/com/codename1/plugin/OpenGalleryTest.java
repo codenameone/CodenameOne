@@ -1,20 +1,20 @@
-package com.codenameone.plugin;
+package com.codename1.plugin;
 
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.plugin.Plugin;
-import com.codename1.plugin.PluginSupport;
+import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
 import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.plugin.event.PluginEvent;
+import com.codename1.test.helpers.DisplayContext;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
@@ -29,29 +29,15 @@ public class OpenGalleryTest {
 
     @BeforeEach
     public void beforeEach() throws Exception {
-        Constructor<Display> constructor = Display.class.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        display = constructor.newInstance();
-
-        CodenameOneImplementation impl = mock(CodenameOneImplementation.class);
-        this.impl = impl;
+        DisplayContext context = new DisplayContext();
+        display = context.makeDisplay();
+        pluginSupport = context.getPluginSupport();
+        impl = context.getImpl();
         doAnswer((i) -> {
             ActionListener response = i.getArgument(0);
             int type = i.getArgument(1);
             return null;
         }).when(impl).openGallery(any(ActionListener.class), anyInt());
-
-        PluginSupport pluginSupport = new PluginSupport();
-        PluginSupport pluginSupportSpy = spy(pluginSupport);
-        this.pluginSupport = pluginSupportSpy;
-        Field implField = Display.class.getDeclaredField("impl");
-        implField.setAccessible(true);
-        implField.set(display, impl);
-
-        Field pluginSupportField = Display.class.getDeclaredField("pluginSupport");
-        pluginSupportField.setAccessible(true);
-        pluginSupportField.set(display, pluginSupportSpy);
-
     }
 
     @Test
@@ -84,7 +70,7 @@ public class OpenGalleryTest {
         display.openGallery(response, type);
         verify(impl, times(0)).openGallery(response, type);
         verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
+        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(OpenGalleryEvent.class));
 
         OpenGalleryEvent capturedEvent = captor.getValue();
         assertEquals(type, capturedEvent.getType());
@@ -121,10 +107,62 @@ public class OpenGalleryTest {
         display.openImageGallery(response);
         verify(impl, times(0)).openImageGallery(response);
         verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
+        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(OpenGalleryEvent.class));
 
         OpenGalleryEvent capturedEvent = captor.getValue();
         assertEquals(type, capturedEvent.getType());
         assertEquals(response, capturedEvent.getResponse());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testIsGalleryTypeSupportedSupportedByPlugin(final boolean supported) throws Exception {
+        ArgumentCaptor<IsGalleryTypeSupportedEvent> captor = ArgumentCaptor.forClass(IsGalleryTypeSupportedEvent.class);
+        Plugin openGalleryPlugin = new Plugin() {
+            @Override
+            public void actionPerformed(PluginEvent evt) {
+                if (evt.getEventType() == ActionEvent.Type.IsGalleryTypeSupported) {
+                    evt.setPluginEventResponse(supported);
+                }
+            }
+        };
+        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
+        pluginSupport.registerPlugin(openGalleryPluginSpy);
+
+        int type = Display.GALLERY_IMAGE;
+        boolean actual = display.isGalleryTypeSupported(type);
+        verify(impl, times(0)).isGalleryTypeSupported(type);
+        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
+        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
+
+        IsGalleryTypeSupportedEvent capturedEvent = captor.getValue();
+        assertEquals(type, capturedEvent.getType());
+        assertEquals(supported, actual);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testIsGalleryTypeSupportedSupportedByImplementation(final boolean supported) throws Exception {
+        ArgumentCaptor<IsGalleryTypeSupportedEvent> captor = ArgumentCaptor.forClass(IsGalleryTypeSupportedEvent.class);
+        Plugin openGalleryPlugin = new Plugin() {
+            @Override
+            public void actionPerformed(PluginEvent evt) {
+
+            }
+        };
+        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
+        pluginSupport.registerPlugin(openGalleryPluginSpy);
+
+        doReturn( supported).when(impl).isGalleryTypeSupported(anyInt());
+
+        int type = Display.GALLERY_IMAGE;
+        boolean actual = display.isGalleryTypeSupported(type);
+        verify(impl, times(1)).isGalleryTypeSupported(type);
+        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
+        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
+
+        IsGalleryTypeSupportedEvent capturedEvent = captor.getValue();
+        assertEquals(type, capturedEvent.getType());
+        assertEquals(supported, actual);
     }
 }
