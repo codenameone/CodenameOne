@@ -33,6 +33,9 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.MediaManager;
 import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
+import com.codename1.plugin.PluginSupport;
+import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
+import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -418,6 +421,8 @@ public final class Display extends CN1Constants {
     
     private Boolean darkMode;
 
+    private PluginSupport pluginSupport;
+
      /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
      * events with an integer timestamp (System.currentTimeMillis() - displayInitTime)
@@ -518,6 +523,7 @@ public final class Display extends CN1Constants {
     public static void init(Object m) {
         if(!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
+            INSTANCE.pluginSupport = PluginSupport.getInstance();
             INSTANCE.displayInitTime = System.currentTimeMillis();
             
             //restore menu state from previous run if exists
@@ -3997,6 +4003,9 @@ hi.show();}</pre></noscript>
      * @deprecated see openGallery instead
      */
     public void openImageGallery(ActionListener response){
+        if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, Display.GALLERY_IMAGE)).isConsumed()) {
+            return;
+        }
         impl.openImageGallery(response);
     }
     
@@ -4027,6 +4036,10 @@ hi.show();}</pre></noscript>
      * @see #isGalleryTypeSupported(int) To see if a type is supported on the current platform.
      */
     public void openGallery(ActionListener response, int type){
+        if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, type)).isConsumed()) {
+            return;
+        }
+
         impl.openGallery(response, type);
     }
     
@@ -4038,6 +4051,10 @@ hi.show();}</pre></noscript>
      * @see #openGallery(com.codename1.ui.events.ActionListener, int) 
      */
     public boolean isGalleryTypeSupported(int type) {
+        IsGalleryTypeSupportedEvent evt = new IsGalleryTypeSupportedEvent(type);
+        if (pluginSupport.firePluginEvent(evt).isConsumed()) {
+            return evt.getPluginEventResponse();
+        }
         return impl.isGalleryTypeSupported(type);
     }
 
