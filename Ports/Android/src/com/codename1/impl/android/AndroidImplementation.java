@@ -52,6 +52,7 @@ import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -2614,7 +2615,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                  * Implementation takes into account for retrocompatability if the
                  * SDK ever needs to be reverted to pre 31 for some reason?
                  */
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (Build.VERSION.SDK_INT >= 31) {
                     // SDK >= 31
                     VibratorManager vibratorManager = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
                     v = vibratorManager.getDefaultVibrator();
@@ -2623,7 +2624,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     v = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
                 }
             } catch (Throwable e) {
-                Log.e("Codename One", "problem with virbrator(0)", e);
+                Log.e("Codename One", "problem with vibrator(0)", e);
             } finally {
                 this.vibrateInitialized = true;
             }
