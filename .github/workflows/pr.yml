@@ -20,6 +20,11 @@ jobs:
       with:
         java-version: 1.8
         java-package: jdk+fx
+    - name: Run Unit Tests
+      run: |
+        cd maven
+        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true
+        cd ..
     - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install xvfb
@@ -28,11 +33,6 @@ jobs:
         mv ../cn1-binaries-master ../cn1-binaries
     - name: Build with Ant
       run: xvfb-run ant test-javase
-    - name: Run Unit Tests
-      run: |
-        cd CodenameOne/maven
-        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true
-        cd ../..
     - name: Build CLDC11 JAR
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
       
