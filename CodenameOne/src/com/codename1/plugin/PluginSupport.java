@@ -36,27 +36,6 @@ import java.util.List;
 public class PluginSupport {
     private final List<Plugin> plugins = new ArrayList<Plugin>();
 
-    private static PluginSupport instance;
-
-    private static final Object instanceLock = new Object();
-
-    /**
-     * Gets shared instance of PluginSupport class.
-     *
-     * @return Singleton instance
-     */
-    public static PluginSupport getInstance() {
-        if (instance == null) {
-            synchronized (instanceLock){
-                if (instance == null) {
-                    instance = new PluginSupport();
-                }
-            }
-        }
-
-        return instance;
-    }
-
     /**
      * Registers a plugin with the Codename One runtime.
      * @param plugin The plugin to register.

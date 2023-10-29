@@ -1629,34 +1629,11 @@ public class CN extends  CN1Constants {
     }
 
     /**
-     * Registers a plugin with the runtime so that specific functionality can be overridden by the plugin.
-     * @param plugin The plugin to register.
-     * @since 8.0
-     * @see PluginSupport#registerPlugin(Plugin)
-     */
-    public static void registerPlugin(Plugin plugin) {
-        PluginSupport.getInstance().registerPlugin(plugin);
-    }
-
-    /**
-     * Deregisters a plugin from the runtime.
-     * @param plugin The plugin to deregister
-     * @see PluginSupport#deregisterPlugin(Plugin)
+     * Returns the plugin support object for the current platform.  Use this object for registering plugins.
+     * @return The plugin support object.
      * @since 8.0
      */
-    public static void deregisterPlugin(Plugin plugin) {
-        PluginSupport.getInstance().deregisterPlugin(plugin);
+    public static PluginSupport getPluginSupport() {
+        return Display.INSTANCE.getPluginSupport();
     }
-
-    /**
-     * Fires a plugin event to all registered plugins to give them an opportunity to handle the event.
-     *
-     * @param event The event to fire.
-     * @see PluginSupport#firePluginEvent(PluginEvent)
-     * @since 8.0
-     */
-    public static <T extends PluginEvent> T firePluginEvent(T event) {
-        return PluginSupport.getInstance().firePluginEvent(event);
-    }
-
 }

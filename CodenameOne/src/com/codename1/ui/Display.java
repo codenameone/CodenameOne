@@ -523,7 +523,7 @@ public final class Display extends CN1Constants {
     public static void init(Object m) {
         if(!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
-            INSTANCE.pluginSupport = PluginSupport.getInstance();
+            INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
             
             //restore menu state from previous run if exists
@@ -611,6 +611,15 @@ public final class Display extends CN1Constants {
      */
     public static Display getInstance(){
         return INSTANCE;
+    }
+
+    /**
+     * Gets reference to plugin support object.
+     * @return The plugin support object.
+     * @since 8.0
+     */
+    public PluginSupport getPluginSupport() {
+        return pluginSupport;
     }
 
     /**
