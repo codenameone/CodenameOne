@@ -20,6 +20,13 @@ jobs:
       with:
         java-version: 1.8
         java-package: jdk+fx
+    - name: Cache Maven dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-m2
     - name: Run Unit Tests
       run: |
         cd maven
