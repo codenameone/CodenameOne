@@ -34,8 +34,6 @@ import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
 import com.facebook.login.LoginManager;
-import com.facebook.share.model.AppInviteContent;
-import com.facebook.share.widget.AppInviteDialog;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,10 +69,7 @@ public class FacebookImpl extends FacebookConnect {
             } catch (Exception e) {
                 //the pattern is not valid
             }
-
         }
-        FacebookSdk.sdkInitialize(AndroidNativeUtil.getContext().getApplicationContext());
-
     }
 
     @Override
@@ -200,71 +195,12 @@ public class FacebookImpl extends FacebookConnect {
     
     @Override
     public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
-        if (AndroidNativeUtil.getActivity() == null) {
-            throw new RuntimeException("Cannot invite friends while running in the background.");
-        }
-        if (AppInviteDialog.canShow()) {
-            AppInviteContent content = new AppInviteContent.Builder()
-                    .setApplinkUrl(appLinkUrl)
-                    .setPreviewImageUrl(previewImageUrl)
-                    .build();
-            final CodenameOneActivity activity = (CodenameOneActivity) AndroidNativeUtil.getActivity();
-            if(cb == null){
-                AppInviteDialog.show(activity, content);
-            }else{
-                AppInviteDialog appInviteDialog = new AppInviteDialog(activity);
-                final CallbackManager mCallbackManager = CallbackManager.Factory.create();
-                activity.setIntentResultListener(new IntentResultListener() {
-
-                    @Override
-                    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                        mCallbackManager.onActivityResult(requestCode, resultCode, data);
-                        activity.restoreIntentResultListener();
-                    }
-                });
-                appInviteDialog.registerCallback(mCallbackManager, new FacebookCallback<AppInviteDialog.Result>() {
-                    @Override
-                    public void onSuccess(AppInviteDialog.Result result) {
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                cb.onSucess(null);
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onCancel() {
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                cb.onError(null, null, -1, "User Cancelled");
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onError(final FacebookException e) {
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                cb.onError(null, e, 0, e.getMessage());
-                            }
-                        });
-                    }
-                });
-                appInviteDialog.show(content);
-            }
-        }
-
+        throw new RuntimeException("The Facebook App Invite feature is no longer supported by the Facebook SDK. See https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/");
     }
 
     @Override
     public boolean isInviteFriendsSupported() {
-        return true;
+        return false;
     }
 
     class FBCallback implements FacebookCallback {

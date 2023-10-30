@@ -74,8 +74,6 @@
         <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
-
-
     </modules>
 
 
@@ -426,7 +424,6 @@
     </repositories>
 
     <profiles>
-
         <profile>
             <id>sign-artifacts</id>
             <build>
@@ -463,11 +460,14 @@
             <id>download-cn1-binaries</id>
             <activation>
                 <file><missing>${cn1.binaries}</missing></file>
+                <property>
+                    <name>!unitTests</name>
+                </property>
             </activation>
             <build>
                 <plugins>
                     <plugin>
-
+                        <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-antrun-plugin</artifactId>
 
                         <executions>
@@ -499,7 +499,6 @@
                 <file>
                     <missing>${basedir}/../../BuildClient</missing>
                 </file>
-
             </activation>
             <dependencyManagement>
                 <dependencies>
@@ -527,7 +526,9 @@
                 <file>
                     <missing>${user.home}/.codenameone/CodeNameOneBuildClient.jar</missing>
                 </file>
-
+                <property>
+                    <name>!unitTests</name>
+                </property>
             </activation>
             <build>
                 <plugins>
@@ -600,6 +601,17 @@
                 </plugins>
 
             </build>
+        </profile>
+        <profile>
+            <id>unittests</id>
+            <activation>
+                <property>
+                    <name>unitTests</name>
+                </property>
+            </activation>
+            <modules>
+                <module>core-unittests</module>
+            </modules>
         </profile>
     </profiles>
     

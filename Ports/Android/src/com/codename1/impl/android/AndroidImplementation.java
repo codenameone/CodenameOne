@@ -224,6 +224,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     };
 
+    public static final int FLAG_ONE_SHOT = 0x40000000;
+    public static final int FLAG_MUTABLE = 0x02000000;
+
+    public static final int FLAG_IMMUTABLE = 0x04000000;
+
     /**
      * make sure these important keys have a negative value when passed to
      * Codename One or they might be interpreted as characters.
@@ -780,8 +785,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
-            // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getActivity(ctx, value, intent, 67108864);
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_IMMUTABLE);
+        } else {
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent createMutablePendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_MUTABLE);
         } else {
             return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
@@ -789,8 +801,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
         if (android.os.Build.VERSION.SDK_INT >= 23) {
-            // PendingIntent.FLAG_IMMUTABLE
-            return PendingIntent.getService(ctx, value, intent, 67108864);
+            return PendingIntent.getService(ctx, value, intent, FLAG_IMMUTABLE);
         } else {
             return PendingIntent.getService(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         }
@@ -840,13 +851,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (PushAction action : category.getActions()) {
             Intent newIntent = (Intent)targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
-            PendingIntent contentIntent = createPendingIntent(context, requestCode++, newIntent);
+            PendingIntent contentIntent = createMutablePendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
                 try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
-                //android.app.Notification.Action.Builder actionBuilder = new android.app.Notification.Action.Builder(iconId, action.getTitle(), contentIntent);
-
-                System.out.println("Adding action "+action.getId()+", "+action.getTitle()+", icon="+iconId);
                 if (ActionWrapper.BuilderWrapper.isSupported()) {
                     // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
                     // aren't available until API 22.
@@ -2825,8 +2833,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
+    // taken from https://stackoverflow.com/a/70380413/756809
+    private boolean isRunningOnAndroidStudioEmulator() {
+        return Build.FINGERPRINT.startsWith("google/sdk_gphone")
+                && Build.FINGERPRINT.endsWith(":user/release-keys")
+                && Build.MANUFACTURER == "Google" && Build.PRODUCT.startsWith("sdk_gphone") && Build.BRAND == "google"
+                && Build.MODEL.startsWith("sdk_gphone");
+    }
 
-
+    // taken from https://stackoverflow.com/a/57960169/756809
+    private boolean isEmulator() {
+        return isRunningOnAndroidStudioEmulator() ||
+                ((Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || Build.FINGERPRINT.startsWith("generic")
+                || Build.FINGERPRINT.startsWith("unknown")
+                || Build.HARDWARE.contains("goldfish")
+                || Build.HARDWARE.contains("ranchu")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MODEL.contains("VirtualBox")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.PRODUCT.contains("sdk_google")
+                || Build.PRODUCT.contains("google_sdk")
+                || Build.PRODUCT.contains("sdk")
+                || Build.PRODUCT.contains("sdk_x86")
+                || Build.PRODUCT.contains("vbox86p")
+                || Build.PRODUCT.contains("emulator")
+                || Build.PRODUCT.contains("simulator"));
+    }
 
 
     /**
@@ -2906,6 +2942,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
+        }
+        if("Emulator".equals(key)) {
+            return "" + isEmulator();
         }
         /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
@@ -6494,20 +6533,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String removeFilePrefix(String file) {
-        if (file.contains("/files//storage/emulated/")) {
-            // TODO: Find a better fix for issue https://github.com/codenameone/CodenameOne/issues/3204
-            // The gallery is returning files inside the directory /storage/emulated/0/DCIM/Camera/...
-            // The path is translated wrong because this path is not listed in any of the root
-            // paths of the file system.
-            // This issue is related to scoped storage. in API 29.
-            // https://stackoverflow.com/questions/56992682/android-9-api-29-storage-emulated-0-pictures-mypic-png-open-failed-eacces
-            // 
-            // This hack works around the problem (and seems to fix it for my test device) by simply
-            // looking for this pattern in the path, and stripping everything before
-            // the /storage/emulated/...
-            // Not good.  Needs to be revisited. - SJH Sept 25, 2020
-            return file.substring(file.indexOf("/files//storage/emulated/")+ 7);
-        }
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -8575,6 +8600,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive push notifications")){
+                return;
+            }
+        }
+
         boolean has = hasAndroidMarket();
         if (!has) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
@@ -10440,7 +10472,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
-
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
+                com.codename1.io.Log.e(new RuntimeException("Local notification was prevented the POST_NOTIFICATIONS permission was not granted by the user."));
+                return;
+            }
+        }
         final Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notif.getId());
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
