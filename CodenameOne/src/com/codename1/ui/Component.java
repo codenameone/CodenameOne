@@ -4662,11 +4662,42 @@ public class Component implements Animation, StyleListener, Editable {
     protected void pinchReleased(int x, int y) {
         
     }
-    
+
+    /**
+     * Invoked by subclasses interested in handling pinch to do their own actions based on the position of the two fingers, if true is returned
+     * other drag events will not be broadcast
+     *
+     * @param x the pointer x coordinate
+     * @param y the pointer y coordinate
+     * @return false by default, true if pinch is handled
+     */
+    protected boolean pinch(int[] x, int[] y) {
+        return false;
+    }
+
+    private boolean pinchBlocksDragAndDrop;
+
+    /**
+     * If a component supports pinch as well as drag and drop the two may conflict (if one finger is placed a bit before the other, the drag
+     * timer will be initiated and may trigger drag even if the second finger has been placed before).
+     * Setting setPinchBlocksDragAndDrop to true will prevent drag from triggering.
+     * @param block if true will prevent drag and drop to trigger if two fingers are placed to pinch before the drag is initiated
+     */
+    public void setPinchBlocksDragAndDrop(boolean block) {
+        pinchBlocksDragAndDrop = block;
+    }
+
+    /**
+     * returns true if pinch will block drag and drop
+     */
+    public boolean isPinchBlocksDragAndDrop() {
+        return pinchBlocksDragAndDrop;
+    }
+
     /**
      * If this Component is focused, the pointer dragged event
      * will call this method
-     * 
+     *
      * @param x the pointer x coordinate
      * @param y the pointer y coordinate
      */
@@ -4679,8 +4710,11 @@ public class Component implements Animation, StyleListener, Editable {
                 pinchDistance = currentDis;
             }
             double scale = currentDis / pinchDistance;
-            if (pinch((float)scale)) {
+            boolean pinchXY = pinch(x, y); // ensure that both pinch(scale) and pinch(x,y) are called
+            if (pinch((float) scale) || pinchXY) {
                 inPinch = true;
+                if (pinchBlocksDragAndDrop)
+                    dragActivated = false;
                 return;
             }
         } else {
