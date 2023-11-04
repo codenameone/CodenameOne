@@ -133,11 +133,10 @@ public class Socket {
                         throw new RuntimeException(e.getMessage());
                     }
                 }
-                input = null;
-                output = null;
                 if(Util.getImplementation().isSocketConnected(connection[0])) {
                     Util.getImplementation().disconnectSocket(connection[0]);
                 }
+                connection[0] = null;
             }
         };
     }
