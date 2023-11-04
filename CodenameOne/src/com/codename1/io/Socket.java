@@ -37,14 +37,7 @@ import java.util.TimerTask;
  *
  * @author Shai Almog
  */
-public class Socket {
-    /**
-     * Keeping member field so the GC won't collect these objects before the socket itself is collected.
-     * This can cause a problem since there's native reliance on these objects.
-     */
-    private SocketInputStream input;
-    private SocketOutputStream output;
-    
+public class Socket {    
     private Socket() {}
         
     /**
