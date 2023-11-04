@@ -38,6 +38,13 @@ import java.util.TimerTask;
  * @author Shai Almog
  */
 public class Socket {
+    /**
+     * Keeping member field so the GC won't collect these objects before the socket itself is collected.
+     * This can cause a problem since there's native reliance on these objects.
+     */
+    private SocketInputStream input;
+    private SocketOutputStream output;
+    
     private Socket() {}
         
     /**
@@ -74,7 +81,9 @@ public class Socket {
                 Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
                 if(connection != null) {
                     sc.setConnected(true);
-                    sc.connectionEstablished(new SocketInputStream(connection, sc), new SocketOutputStream(connection, sc));
+                    sc.input = new SocketInputStream(connection, sc);
+                    sc.output = new SocketOutputStream(connection, sc);
+                    sc.connectionEstablished(sc.input, sc.output);
                 } else {
                     sc.setConnected(false);
                     if(connection == null) {
@@ -107,8 +116,9 @@ public class Socket {
                 connection[0] = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
                 if(connection[0] != null) {
                     sc.setConnected(true);
-                    sc.connectionEstablished(new SocketInputStream(connection[0], sc),
-                            new SocketOutputStream(connection[0], sc));
+                    sc.input = new SocketInputStream(connection[0], sc);
+                    sc.output = new SocketOutputStream(connection[0], sc);
+                    sc.connectionEstablished(sc.input, sc.output);
                 } else {
                     sc.setConnected(false);
                     if(connection[0] == null) {
@@ -130,6 +140,8 @@ public class Socket {
                         throw new RuntimeException(e.getMessage());
                     }
                 }
+                input = null;
+                output = null;
                 if(Util.getImplementation().isSocketConnected(connection[0])) {
                     Util.getImplementation().disconnectSocket(connection[0]);
                 }
@@ -158,7 +170,9 @@ public class Socket {
                             sc.setConnected(true);
                             Display.getInstance().startThread(new Runnable() {
                                 public void run() {
-                                    sc.connectionEstablished(new SocketInputStream(connection, sc), new SocketOutputStream(connection, sc));
+                                    sc.input = new SocketInputStream(connection, sc);
+                                    sc.output = new SocketOutputStream(connection, sc);
+                                    sc.connectionEstablished(sc.input, sc.output);
                                     sc.setConnected(false);
                                 }
                             }, "Connection " + port).start();
