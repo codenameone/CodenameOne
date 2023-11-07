@@ -46,19 +46,23 @@ static void _resume() {
          });
         
     }
-    [inputStream open];
-    [outputStream open];
-    while ([outputStream streamStatus] == NSStreamStatusOpening) {
+    if (inputStream != nil) {
+        [inputStream open];
+    }
+    if (outputStream != nil) {
+        [outputStream open];
+    }
+    while (outputStream != nil && [outputStream streamStatus] == NSStreamStatusOpening) {
         _yield();
         usleep(100000);
         _resume();
     }
-    while ([inputStream streamStatus] == NSStreamStatusOpening) {
+    while (inputStream != nil && [inputStream streamStatus] == NSStreamStatusOpening) {
         _yield();
         usleep(100000);
         _resume();
     }
-    if ([self isInputShutdown] || [self isOutputShutdown]) {
+    if (outputStream == nil || inputStream == nil || [self isInputShutdown] || [self isOutputShutdown]) {
         connected = NO;
     } else {
         connected = YES;
