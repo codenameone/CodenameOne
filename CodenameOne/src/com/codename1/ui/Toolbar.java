@@ -33,6 +33,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -227,7 +228,6 @@ public class Toolbar extends Container {
                 && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
             setTitleCentered(true);
         }
-        //setSafeArea(true);
     }
 
     /**
@@ -2238,6 +2238,7 @@ public class Toolbar extends Container {
     protected void initTitleBarStatus() {
         Form f = getComponentForm();
         if (f != null && !f.shouldPaintStatusBar()) {
+            setSafeArea(true);
             return;
         }
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
@@ -2249,10 +2250,31 @@ public class Toolbar extends Container {
                 } else {
                     bar.setUIID("StatusBar");
                 }
+                bar.setSafeArea(true);
+                // Safe areas will be applied to the top padding, so we would prefer if all of the status
+                // bar margins and padding were on the the top, so that they will be adjusted correctly
+                // by safe areas.
+                // And we don't want any additional spacing at the bottom of the status bar.
+                reallocateVerticalPaddingAndMarginsToTop(bar);
                 addComponent(BorderLayout.NORTH, bar);
             }
+        } else {
+            setSafeArea(true);
         }
     }
+    private void reallocateVerticalPaddingAndMarginsToTop(Component cmp) {
+        Style allStyles = cmp.getAllStyles();
+        Style style = cmp.getStyle();
+        int topPadding = style.getPaddingTop();
+        int topMargin = style.getMarginTop();
+        int bottomPadding = style.getPaddingBottom();
+        int bottomMargin = style.getMarginBottom();
+        allStyles.setPaddingTop(topPadding + bottomPadding);
+        allStyles.setMarginTop(topMargin + bottomMargin);
+        allStyles.setPaddingBottom(0);
+        allStyles.setMarginBottom(0);
+    }
+
 
     private void checkIfInitialized() {
         if (!initialized) {
