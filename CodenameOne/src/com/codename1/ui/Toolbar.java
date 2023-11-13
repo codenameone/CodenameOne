@@ -2250,18 +2250,24 @@ public class Toolbar extends Container {
                 } else {
                     bar.setUIID("StatusBar");
                 }
-                bar.setSafeArea(true);
-                // Safe areas will be applied to the top padding, so we would prefer if all of the status
-                // bar margins and padding were on the the top, so that they will be adjusted correctly
-                // by safe areas.
-                // And we don't want any additional spacing at the bottom of the status bar.
                 reallocateVerticalPaddingAndMarginsToTop(bar);
+                bar.setSafeArea(true);
                 addComponent(BorderLayout.NORTH, bar);
             }
         } else {
             setSafeArea(true);
         }
     }
+
+    /**
+     * Reallocates vertical padding and margins to be all on top, so that bottom padding/margin
+     * is zero, but the total padding/margin is the same.
+     *
+     * This is helpful for the status bar so that, when the padding is adjusted by the safeArea
+     * we don't end up with extra padding at the bottom of the component, which would increase
+     * the height of the status bar.
+     * @param cmp
+     */
     private void reallocateVerticalPaddingAndMarginsToTop(Component cmp) {
         Style allStyles = cmp.getAllStyles();
         Style style = cmp.getStyle();
@@ -2269,6 +2275,10 @@ public class Toolbar extends Container {
         int topMargin = style.getMarginTop();
         int bottomPadding = style.getPaddingBottom();
         int bottomMargin = style.getMarginBottom();
+        allStyles.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+        allStyles.setMarginUnitTop(Style.UNIT_TYPE_PIXELS);
+        allStyles.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+        allStyles.setMarginUnitBottom(Style.UNIT_TYPE_PIXELS);
         allStyles.setPaddingTop(topPadding + bottomPadding);
         allStyles.setMarginTop(topMargin + bottomMargin);
         allStyles.setPaddingBottom(0);

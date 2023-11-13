@@ -1809,6 +1809,12 @@ public class Style {
      * @since 7.0
      */
     public void setPaddingUnitLeft(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingUnitLeft(unit);
+            }
+            return;
+        }
         initPaddingUnits();
         paddingUnit[Component.LEFT] = unit;
     }
@@ -1820,6 +1826,12 @@ public class Style {
      * @since 7.0
      */
     public void setPaddingUnitRight(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingUnitRight(unit);
+            }
+            return;
+        }
         initPaddingUnits();
         paddingUnit[Component.RIGHT] = unit;
     }
@@ -1831,6 +1843,12 @@ public class Style {
      * @since 7.0
      */
     public void setPaddingUnitTop(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingUnitTop(unit);
+            }
+            return;
+        }
         initPaddingUnits();
         paddingUnit[Component.TOP] = unit;
     }
@@ -1842,6 +1860,12 @@ public class Style {
      * @since 7.0
      */
     public void setPaddingUnitBottom(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingUnitBottom(unit);
+            }
+            return;
+        }
         initPaddingUnits();
         paddingUnit[Component.BOTTOM] = unit;
     }
@@ -3027,6 +3051,12 @@ public class Style {
      * @since 7.0
      */
     public void setMarginUnitLeft(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginUnitLeft(unit);
+            }
+            return;
+        }
         initMarginUnits();
         marginUnit[Component.LEFT] = unit;
     }
@@ -3038,6 +3068,12 @@ public class Style {
      * @since 7.0
      */
     public void setMarginUnitRight(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginUnitRight(unit);
+            }
+            return;
+        }
         initMarginUnits();
         marginUnit[Component.RIGHT] = unit;
     }
@@ -3049,6 +3085,12 @@ public class Style {
      * @since 7.0
      */
     public void setMarginUnitTop(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginUnitTop(unit);
+            }
+            return;
+        }
         initMarginUnits();
         marginUnit[Component.TOP] = unit;
     }
@@ -3060,6 +3102,12 @@ public class Style {
      * @since 7.0
      */
     public void setMarginUnitBottom(byte unit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginUnitBottom(unit);
+            }
+            return;
+        }
         initMarginUnits();
         marginUnit[Component.BOTTOM] = unit;
     }
