@@ -8286,7 +8286,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetLeft___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     if (@available(iOS 11.0, *)) {
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil && window.safeAreaInsets != nil) {
+        if(window != nil) {
             return (JAVA_INT)(window.safeAreaInsets.left * scaleValue);
         }
     }
@@ -8296,7 +8296,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetLeft___R_int(CN1_TH
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetTop___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     if (@available(iOS 11.0, *)) {
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil && window.safeAreaInsets != nil) {
+        if(window != nil) {
             return (JAVA_INT)(window.safeAreaInsets.top * scaleValue);
         }
     }
@@ -8306,7 +8306,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetTop___R_int(CN1_THR
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     if (@available(iOS 11.0, *)) {
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil && window.safeAreaInsets != nil) {
+        if(window != nil) {
             return (JAVA_INT)(window.safeAreaInsets.right * scaleValue);
         }
     }
@@ -8316,7 +8316,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_T
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     if (@available(iOS 11.0, *)) {
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil && window.safeAreaInsets != nil) {
+        if(window != nil) {
             return (JAVA_INT)(window.safeAreaInsets.bottom * scaleValue);
         }
     }
