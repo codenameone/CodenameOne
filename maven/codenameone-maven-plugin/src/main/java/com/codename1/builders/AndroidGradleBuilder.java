@@ -3167,11 +3167,8 @@ public class AndroidGradleBuilder extends Executor {
 
         String keepOverride = request.getArg("android.proguardKeepOverride", "Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod");
 
-        String keepFirebase = "";
-        if (newFirebaseMessaging) {
-            keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
-                    "-keep class com.google.firebase.** { *; }\n\n";
-        }
+        String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
+                "-keep class com.google.firebase.** { *; }\n\n";
         // workaround broken optimizer in proguard
         String proguardConfigOverride = "-dontusemixedcaseclassnames\n"
                 + "-dontskipnonpubliclibraryclasses\n"
