@@ -1033,7 +1033,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "-keepattributes Signature\n"
                     + "-dontwarn bolts.**\n"
                     + "-dontnote android.support.**\n"
-                    + "-dontnote androidx.**";
+                    + "-dontnote androidx.**\n";
 
 
             facebookActivityMetaData = " <meta-data android:name=\"com.facebook.sdk.ApplicationId\" android:value=\"@string/facebook_app_id\"/>\n";
