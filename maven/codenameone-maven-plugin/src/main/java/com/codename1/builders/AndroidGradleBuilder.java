@@ -105,6 +105,9 @@ public class AndroidGradleBuilder extends Executor {
     // which is necessary to support Push on the latest Android devices.
     private boolean newFirebaseMessaging = false;
 
+    // A flag to indicate whether we should use 'implementation' or 'compile' for dependencies
+    private boolean useArrImplementation = false;
+
     public static final String[] ANDROID_PERMISSIONS = new String[]{
             "android.permission.ACCESS_BACKGROUND_LOCATION",
             "android.permission.ACCESS_CHECKIN_PROPERTIES",
@@ -895,6 +898,7 @@ public class AndroidGradleBuilder extends Executor {
                     gradlePluginVersion = "3.0.1";
                 }
             } else  {
+                useArrImplementation = true;
                 gradlePluginVersion = "4.1.1";
             }
         }
@@ -992,8 +996,11 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (file.getName().endsWith(".aar")) {
                 String name = file.getName().substring(0, file.getName().lastIndexOf("."));
-                if(request.getArg("android.arrimplementation", "").contains(
-                        name)) {
+                boolean arrCompileLib = request.getArg("android.arrcompile", "").contains(
+                        name);
+                boolean arrImplementationLib = request.getArg("android.arrimplementation", "").contains(
+                        name);
+                if(!arrCompileLib && (useArrImplementation || arrImplementationLib)) {
                     aarDependencies += "    implementation(name:'" + name + "', ext:'aar')\n";
                 } else {
                     aarDependencies += "    compile(name:'" + name + "', ext:'aar')\n";
@@ -1275,7 +1282,7 @@ public class AndroidGradleBuilder extends Executor {
 
         if (useFCM) {
             String compile = "compile";
-            if (useAndroidX) {
+            if (useAndroidX || useArrImplementation) {
                 compile = "implementation";
             }
             if (!googleServicesJson.exists()) {
@@ -3266,7 +3273,7 @@ public class AndroidGradleBuilder extends Executor {
         String additionalDependencies = request.getArg("gradleDependencies", "");
         if (facebookSupported) {
             String compile = "compile";
-            if (useAndroidX) {
+            if (useAndroidX || useArrImplementation) {
                 compile = "implementation";
             }
             minSDK = maxInt("15", minSDK);
@@ -3282,7 +3289,7 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         String compile = "compile";
-        if (useAndroidX) {
+        if (useAndroidX || useArrImplementation) {
             compile = "implementation";
         }
         if (legacyGplayServicesMode) {
@@ -3442,7 +3449,7 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        String supportV4Default = "    compile 'com.android.support:support-v4:23.+'";
+        String supportV4Default;
 
         compileSdkVersion = maxPlatformVersion;
         String supportLibVersion = maxPlatformVersion;
@@ -3483,7 +3490,7 @@ public class AndroidGradleBuilder extends Executor {
             gradlePropertiesObject.put("android.enableAapt2", "false");
         }
         if (!useAndroidX) {
-            supportV4Default = "    compile 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
+            supportV4Default = "    " + compile + " 'com.android.support:support-v4:"+supportLibVersion+".+'\n     implementation 'com.android.support:appcompat-v7:"+supportLibVersion+".+'\n";
         } else {
             String appCompatVersionDefault = "1.0.0";
             if (useGradle8) {
