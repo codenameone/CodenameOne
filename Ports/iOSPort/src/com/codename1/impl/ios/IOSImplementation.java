@@ -253,11 +253,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (rect == null) {
             rect = new Rectangle();
         }
-        int x = nativeInstance.getDisplaySafeInsetLeft();
-        int y = nativeInstance.getDisplaySafeInsetTop();
-        int w = getDisplayWidth() - nativeInstance.getDisplaySafeInsetRight() - x;
-        int h = getDisplayHeight() - nativeInstance.getDisplaySafeInsetBottom() - y;
-        rect.setBounds(x, y, w, h);
+        try {
+            int x = nativeInstance.getDisplaySafeInsetLeft();
+            int y = nativeInstance.getDisplaySafeInsetTop();
+            int w = getDisplayWidth() - nativeInstance.getDisplaySafeInsetRight() - x;
+            int h = getDisplayHeight() - nativeInstance.getDisplaySafeInsetBottom() - y;
+            rect.setBounds(x, y, w, h);
+        } catch (NullPointerException err) {
+            Log.p("Invalid bounds in getDisplaySafeArea, if this message repeats frequently please let us know...");
+        }
         
         return rect;
     }
