@@ -1330,7 +1330,8 @@ public class AndroidGradleBuilder extends Executor {
 
 
         // if a flag is declared we don't want the default play flag to be true
-        if(request.getArg("android.playService.plus", null)  != null ||
+        if(useGradle8 ||
+                request.getArg("android.playService.plus", null)  != null ||
                 request.getArg("android.playService.auth", (googleServicesJson.exists()) ? "true":null)  != null ||
                 request.getArg("android.playService.base", null)  != null ||
                 request.getArg("android.playService.identity", null)  != null ||
