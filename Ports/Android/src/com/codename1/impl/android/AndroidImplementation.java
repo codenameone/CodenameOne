@@ -5241,7 +5241,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     private static CookieManager cookieManager;
     private static CookieManager getCookieManager() {
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
+        if (android.os.Build.VERSION.SDK_INT > 28) {
             return CookieManager.getInstance();
         }
         if (cookieManager == null) {
