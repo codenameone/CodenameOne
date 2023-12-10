@@ -42,7 +42,7 @@ It's a complete mobile platform featuring virtual machines, simulator, design to
 
 <img align="right" src="https://www.codenameone.com/img/github/content/runs-instantly.png" height="200">
 
-### Codename One's Simulator Runs Instantly
+### Codename One's Simulator Runs Instantly 
 
 Unlike emulators which you can see in Android etc. Codename One uses a simulator. This means it starts up fast even when debugging. You can enjoy IDE features such as live code reload to modify code in runtime etc.
 
@@ -88,7 +88,7 @@ Note that this is often superior to the interactive console but there are limita
 
 When you make changes to your app’s CSS stylesheet, the changes are reflected instantly in the simulator. This includes changing your theme, images, fonts etc. All changes are instantly refreshed on save, no need to reload/refresh or anything of the sort!
 
-This makes the process of styling an application remarkably easy and fast.
+This makes the process of styling an application remarkably easy and fast. To learn more about how to use CSS, click this link: https://www.w3schools.com/css/ This link will show you the different ways to enhance the way you present your app, along with tutorials.
 
 <br>
 
