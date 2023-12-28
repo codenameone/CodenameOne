@@ -601,8 +601,9 @@ public class InPlaceEditView extends FrameLayout{
      * @param show Show the keyboard if true, hide it otherwise
      */
     private void showVirtualKeyboard(boolean show) {
+        show = Boolean.parseBoolean(Display.getInstance().getProperty("showVkb", "" + show));
         Log.i(TAG, "showVirtualKeyboard show=" + show);
-
+        
         boolean result = false;
         if (show) {
             // If we're in landscape, Android will not show the soft
