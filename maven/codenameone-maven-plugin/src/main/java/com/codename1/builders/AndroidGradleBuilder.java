@@ -87,6 +87,9 @@ public class AndroidGradleBuilder extends Executor {
     public boolean PREFER_MANAGED_GRADLE=true;
 
     private boolean useGradle8 = false;
+
+    private boolean extendAppCompatActivity = false;
+
     private boolean useJava8SourceLevel = true;
 
     private File gradleProjectDirectory;
@@ -473,6 +476,7 @@ public class AndroidGradleBuilder extends Executor {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "false").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
+        extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
@@ -1590,6 +1594,24 @@ public class AndroidGradleBuilder extends Executor {
                 delTree(json);
             }
         }
+
+        if (extendAppCompatActivity) {
+            try {
+                replaceInFile(
+                        new File(srcDir, "com/codename1/impl/android/CodenameOneActivity.java"),
+                        "extends Activity",
+                        "extends AppCompatActivity"
+                );
+                replaceInFile(
+                        new File(srcDir, "com/codename1/impl/android/CodenameOneActivity.java"),
+                        "import android.app.Activity;",
+                        "import android.support.v7.app.AppCompatActivity;"
+                );
+            } catch (IOException ex) {
+                throw new BuildException("Failed to extend AppCompatActivity", ex);
+            }
+
+        }
         if (!playServicesLocation) {
             File fb = new File(srcDir, "com/codename1/location/AndroidLocationPlayServiceManager.java");
             fb.delete();
@@ -2241,6 +2263,10 @@ public class AndroidGradleBuilder extends Executor {
         if (!xActivity.contains("android:exported")) {
             xActivity += " android:exported=\"true\"";
         }
+        String activityTheme = "@style/CustomTheme";
+        if (extendAppCompatActivity) {
+            activityTheme = "@@style/Theme.AppCompat.NoActionBar";
+        }
         String manifestSource
                 = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
@@ -2268,7 +2294,7 @@ public class AndroidGradleBuilder extends Executor {
                 + googlePlayAdsMetaData
                 + "        <activity android:name=\"" + request.getMainClass() + "Stub\"\n"
                 + xActivity
-                + "                  android:theme=\"@style/CustomTheme\"\n"
+                + "                  android:theme=\""+activityTheme+"\"\n"
                 + "                  android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout\"\n"
                 + "                  android:launchMode=\""+launchMode+"\"\n"
                 + "                  android:label=\"" + xmlizedDisplayName + "\" >\n"
