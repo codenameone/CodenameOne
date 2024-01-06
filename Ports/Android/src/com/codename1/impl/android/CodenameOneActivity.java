@@ -155,7 +155,9 @@ public class CodenameOneActivity extends Activity {
 
         if (android.os.Build.VERSION.SDK_INT >= 11) {
             getWindow().requestFeature(Window.FEATURE_ACTION_BAR);
-            getActionBar().hide();
+            if (getActionBar() != null) {
+                getActionBar().hide();
+            }
         }
 
         try {

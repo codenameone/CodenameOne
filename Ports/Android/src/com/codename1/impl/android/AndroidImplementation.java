@@ -2723,6 +2723,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void run() {
             activity.invalidateOptionsMenu();
+            if (activity.getActionBar() == null) {
+                return;
+            }
             if (show) {
                 activity.getActionBar().show();
             } else {
