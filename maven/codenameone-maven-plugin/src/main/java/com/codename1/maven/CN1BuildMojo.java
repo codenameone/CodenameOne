@@ -893,7 +893,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         } else if (isWindows) {
             getLog().info("Trying to open project in Android studio");
-            ProcessBuilder pb = new ProcessBuilder("start", "", "C:\\Program Files\\Android\\Android Studio\\bin\\studio64.exe", generatedProject.getAbsolutePath());
+            ProcessBuilder pb = new ProcessBuilder("C:\\Program Files\\Android\\Android Studio\\bin\\studio.bat", generatedProject.getAbsolutePath());
             try {
                 pb.start();
             } catch (Exception ex) {

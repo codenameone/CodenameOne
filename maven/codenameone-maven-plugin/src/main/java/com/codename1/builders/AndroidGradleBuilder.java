@@ -515,12 +515,15 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String defaultAndroidHome = isMac ? path(System.getProperty("user.home"), "Library", "Android", "sdk")
-                : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "sdk")
+                : is_windows ? path(System.getProperty("user.home"), "AppData", "Local", "Android", "Sdk")
                 : path(System.getProperty("user.home"), "Android", "Sdk"); // linux
 
         String androidHome = System.getenv("ANDROID_HOME");
         if (androidHome == null) {
+            log("Using default ANDROID_HOME of "+defaultAndroidHome);
             androidHome = defaultAndroidHome;
+        } else {
+            log("Using ANDROID_HOME of "+androidHome);
         }
 
 
@@ -536,13 +539,22 @@ public class AndroidGradleBuilder extends Executor {
         if (!androidSDKDir.exists()) {
             throw new BuildException("Cannot find Android SDK at "+androidHome+".  Please install Android studio, or set the ANDROID_HOME environment variable to point to your android sdk directory.");
         }
+        if (!androidSDKDir.getName().equalsIgnoreCase("sdk")) {
+            androidSDKDir = new File(androidSDKDir, "Sdk");
+            if (!androidSDKDir.isDirectory()) {
+                androidSDKDir = new File(androidSDKDir.getParentFile(), "sdk");
+            }
+        }
 
         File sdkmanager = new File(androidSDKDir, path("tools", "bin", "sdkmanager"+bat));
         if (!sdkmanager.canExecute()) {
             sdkmanager = new File(androidSDKDir, path("cmdline-tools", "latest", "bin", "sdkmanager"+bat));
         }
         if (!sdkmanager.canExecute()) {
-            Exception ex = new RuntimeException("Android SDK Command-Line Tools not found");
+            Exception ex = new RuntimeException(
+                    "Android SDK Command-Line Tools not found at "+sdkmanager.getAbsolutePath()+".  " +
+                            "Please install the Android SDK Command-Line Tools from the Android Studio SDK Manager." +
+                            "Note: Set the ANDROID_HOME environment variable to the location of your Android SDK, or set the android.sdk.path build hint to the location of your Android SDK.");
             error("Cannot find executable sdkmanager"+bat+" in "+androidSDKDir+"; tried tools and cmdline-tools/latest", ex);
             throw new BuildException("Cannot find executable sdkmanager"+bat+" in "+androidSDKDir+"; tried tools and cmdline-tools/latest", ex);
         }
