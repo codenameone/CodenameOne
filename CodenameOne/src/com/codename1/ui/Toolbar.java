@@ -348,6 +348,15 @@ public class Toolbar extends Container {
     }
 
     /**
+     * Returns true if the left or right side menu is open which is useful for walk through
+     * tours etc.
+     */
+    public boolean isSideMenuShowing() {
+        return (sidemenuDialog != null && sidemenuDialog.isShowing()) ||
+            (rightSidemenuDialog != null && rightSidemenuDialog.isShowing());
+    }
+
+    /**
      * This is a convenience method to open the right side menu bar. It's useful
      * for cases where we want to place the menu button in a "creative way" in
      * which case we can bind the side menu to this
