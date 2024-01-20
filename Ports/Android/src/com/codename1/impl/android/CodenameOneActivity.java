@@ -361,7 +361,9 @@ public class CodenameOneActivity extends Activity {
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-
+        if (this instanceof android.support.v7.app.AppCompatActivity) {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
         IntentResult response = new IntentResult(requestCode, resultCode, data);
         intentResult.add(response);
     }
