@@ -59,6 +59,7 @@ public class IPhoneBuilder extends Executor {
     private File tmpFile;
     private File icon57;
     private File icon512;
+    private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "12.0";
 
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
@@ -209,6 +210,7 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
@@ -1154,9 +1156,15 @@ public class IPhoneBuilder extends Executor {
                 }
             }
         }
-
+        String javacPath = System.getProperty("java.home") + "/../bin/javac";
+        if (!new File(javacPath).exists()) {
+            javacPath = System.getProperty("java.home") + "/bin/javac";
+        }
+        if (!new File(javacPath).exists()) {
+            javacPath = "javac";
+        }
         try {
-            if (!execWithFiles(stubSource, stubSource, ".java", "javac", "-source", "1.6", "-target", "1.6", "-classpath",
+            if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", "1.6", "-target", "1.6", "-classpath",
                     classesDir.getAbsolutePath(),
                     "-d", classesDir.getAbsolutePath())) {
                 return false;
