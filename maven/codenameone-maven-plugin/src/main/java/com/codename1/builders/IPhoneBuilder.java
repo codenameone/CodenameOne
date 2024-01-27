@@ -1154,9 +1154,15 @@ public class IPhoneBuilder extends Executor {
                 }
             }
         }
-
+        String javacPath = System.getProperty("java.home") + "/../bin/javac";
+        if (!new File(javacPath).exists()) {
+            javacPath = System.getProperty("java.home") + "/bin/javac";
+        }
+        if (!new File(javacPath).exists()) {
+            javacPath = "javac";
+        }
         try {
-            if (!execWithFiles(stubSource, stubSource, ".java", "javac", "-source", "1.6", "-target", "1.6", "-classpath",
+            if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", "1.6", "-target", "1.6", "-classpath",
                     classesDir.getAbsolutePath(),
                     "-d", classesDir.getAbsolutePath())) {
                 return false;
