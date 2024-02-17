@@ -38,28 +38,28 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
-/**
- *
- * @author Chen
- */
 public class CodenameOneView {
 
-    int width = 1;
-    int height = 1;
-    Bitmap bitmap;
-    AndroidGraphics buffy = null;
+    private int width = 1;
+    private int height = 1;
+    private Bitmap bitmap;
+    private AndroidGraphics buffy = null;
     private Canvas canvas;
     private AndroidImplementation implementation = null;
     private final KeyCharacterMap keyCharacterMap;
     private final Rect bounds = new Rect();
     private boolean fireKeyDown = false;
-    //private volatile boolean created = false;
     private boolean drawing;
 
     public CodenameOneView(Activity activity, View androidView, AndroidImplementation implementation, boolean drawing) {
-
         this.implementation = implementation;
         this.drawing = drawing;
+        initializeView(androidView);
+        this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
+        initializeDisplay(activity);
+    }
+
+    private void initializeView(View androidView) {
         androidView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.FILL_PARENT,
                 ViewGroup.LayoutParams.FILL_PARENT));
@@ -68,29 +68,17 @@ public class CodenameOneView {
         androidView.setEnabled(true);
         androidView.setClickable(true);
         androidView.setLongClickable(false);
-        
-        /**
-         * tell the system that we do our own caching and it does not need to
-         * use an extra offscreen bitmap.
-         */
+
         if(!drawing) {
             androidView.setWillNotCacheDrawing(false);
             androidView.setWillNotDraw(true);
             this.buffy = new AndroidGraphics(implementation, null, false);
         }
 
-        this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
-
-
-        /**
-         * From the docs: "Change whether this view is one of the set of
-         * scrollable containers in its window. This will be used to determine
-         * whether the window can resize or must pan when a soft input area is
-         * open -- scrollable containers allow the window to use resize mode
-         * since the container will appropriately shrink. "
-         */
         androidView.setScrollContainer(true);
+    }
 
+    private void initializeDisplay(Activity activity) {
         android.view.Display androidDisplay = ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         width = androidDisplay.getWidth();
         height = androidDisplay.getHeight();
@@ -105,22 +93,17 @@ public class CodenameOneView {
         if(!Display.isInitialized()) {
             return;
         }
-        Display.getInstance().callSerially(new Runnable() {
-
-            public void run() {
-                handleSizeChange(w, h);
-            }
-        });
+        Display.getInstance().callSerially(() -> handleSizeChange(w, h));
     }
-    
+
     public void onSurfaceCreated() {
         this.visibilityChangedTo(true);
     }
-    
+
     public void onSurfaceDestroyed() {
         this.visibilityChangedTo(false);
     }
-    
+
     private void initBitmaps(int w, int h) {
         if(!drawing) {
             this.bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -134,22 +117,14 @@ public class CodenameOneView {
         if (this.implementation.getCurrentForm() != null && changed) {
             if (visible) {
                 this.implementation.showNotifyPublic();
-                /**
-                 * request a full repaint as our surfaceview is most likely
-                 * black if this app comes back from the background.
-                 */
                 this.implementation.getCurrentForm().repaint();
-                //android.os.Debug.startMethodTracing("calc");
             } else {
                 this.implementation.hideNotifyPublic();
-                //android.os.Debug.stopMethodTracing();
             }
         }
-        //flushGraphics();
     }
 
     public void handleSizeChange(int w, int h) {
-
         if(!drawing) {
             if ((this.width != w && (this.width < w || this.height < h))
                     || (bitmap.getHeight() < h)) {
@@ -163,11 +138,6 @@ public class CodenameOneView {
         this.height = h;
         Log.d("Codename One", "sizechanged: " + width + " " + height + " " + this);
         if (this.implementation.getCurrentForm() == null) {
-            /**
-             * make sure a form has been set before we can send events to the
-             * EDT. if we send events before the form has been set we might
-             * deadlock!
-             */
             return;
         }
 
@@ -177,14 +147,9 @@ public class CodenameOneView {
 
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    CodenameOneView.this.implementation.getActivity().runOnUiThread(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            InPlaceEditView.reLayoutEdit();
-                            InPlaceEditView.scrollActiveTextfieldToVisible();
-                            
-                        }
+                    CodenameOneView.this.implementation.getActivity().runOnUiThread(() -> {
+                        InPlaceEditView.reLayoutEdit();
+                        InPlaceEditView.scrollActiveTextfieldToVisible();
                     });
                     f.removeSizeChangedListener(this);
                 }
@@ -194,12 +159,10 @@ public class CodenameOneView {
         Display.getInstance().sizeChanged(w, h);
     }
 
-    //@Override
     protected void d(Canvas canvas) {
         if(!drawing) {
             boolean empty = canvas.getClipBounds(bounds);
             if (empty) {
-                // ??
                 canvas.drawBitmap(bitmap, 0, 0, null);
             } else {
                 bounds.intersect(0, 0, width, height);
@@ -208,37 +171,7 @@ public class CodenameOneView {
         }
     }
 
-    /**
-     * some info from the MIDP docs about keycodes:
-     *
-     * "Applications receive keystroke events in which the individual keys are
-     * named within a space of key codes. Every key for which events are
-     * reported to MIDP applications is assigned a key code. The key code values
-     * are unique for each hardware key unless two keys are obvious synonyms for
-     * each other. MIDP defines the following key codes: KEY_NUM0, KEY_NUM1,
-     * KEY_NUM2, KEY_NUM3, KEY_NUM4, KEY_NUM5, KEY_NUM6, KEY_NUM7, KEY_NUM8,
-     * KEY_NUM9, KEY_STAR, and KEY_POUND. (These key codes correspond to keys on
-     * a ITU-T standard telephone keypad.) Other keys may be present on the
-     * keyboard, and they will generally have key codes distinct from those list
-     * above. In order to guarantee portability, applications should use only
-     * the standard key codes.
-     *
-     * The standard key codes' values are equal to the Unicode encoding for the
-     * character that represents the key. If the device includes any other keys
-     * that have an obvious correspondence to a Unicode character, their key
-     * code values should equal the Unicode encoding for that character. For
-     * keys that have no corresponding Unicode character, the implementation
-     * must use negative values. Zero is defined to be an invalid key code."
-     *
-     * Because the MIDP implementation is our reference and that implementation
-     * does not interpret the given keycodes we behave alike and pass on the
-     * unicode values.
-     */
     final static int internalKeyCodeTranslate(int keyCode) {
-        /**
-         * make sure these important keys have a negative value when passed to
-         * Codename One or they might be interpreted as characters.
-         */
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 return AndroidImplementation.DROID_IMPL_KEY_DOWN;
@@ -277,28 +210,21 @@ public class CodenameOneView {
             case KeyEvent.KEYCODE_SYM:
             return false;
             case KeyEvent.KEYCODE_ENTER:
-            	if (down) {
+              if (down) {
                     Display.getInstance().keyPressed(keyCode);
                 } else {
                     Display.getInstance().keyReleased(keyCode);
                 }
-            	return false;
+              return false;
             default:
         }
 
         if (event.getRepeatCount() > 0) {
-            // skip repeats
             return true;
         }
         if (this.implementation.getCurrentForm() == null) {
-            /**
-             * make sure a form has been set before we can send events to the
-             * EDT. if we send events before the form has been set we might
-             * deadlock!
-             */
             return true;
         }
-
 
         if (keyCode == AndroidImplementation.DROID_IMPL_KEY_FIRE) {
             this.fireKeyDown = down;
@@ -307,12 +233,6 @@ public class CodenameOneView {
                 || keyCode == AndroidImplementation.DROID_IMPL_KEY_LEFT
                 || keyCode == AndroidImplementation.DROID_IMPL_KEY_RIGHT) {
             if (this.fireKeyDown) {
-                /**
-                 * we keep track of trackball press/release. while it is pressed
-                 * we drop directional movements. these movements are most
-                 * likely not intended. if the device has no trackball i see no
-                 * situation where this additional behavior could hurt.
-                 */
                 return true;
             }
         }
@@ -320,7 +240,6 @@ public class CodenameOneView {
         switch (keyCode) {
 
             case AndroidImplementation.DROID_IMPL_KEY_MENU:
-                //if the native commands are used don't handle the keycode
                 if (Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
                     return false;
                 }
@@ -332,7 +251,6 @@ public class CodenameOneView {
             case AndroidImplementation.DROID_IMPL_KEY_FIRE:
             case AndroidImplementation.DROID_IMPL_KEY_CLEAR:
             case AndroidImplementation.DROID_IMPL_KEY_BACKSPACE:
-                // directly pass to display.
                 if (down) {
                     Display.getInstance().keyPressed(keyCode);
                 } else {
@@ -341,16 +259,6 @@ public class CodenameOneView {
                 return true;
 
             default:
-
-                /**
-                 * Codename One's TextField does not seem to work well if two
-                 * keyup-keydown sequences of different keys are not strictly
-                 * sequential. so we pass the up event of a character right
-                 * after the down event. this is exactly the behavior of the
-                 * BlackBerry implementation from this repository and has worked
-                 * well for me. i guess this should be changed as soon as the
-                 * TextField changes.
-                 */
                 int meta = 0;
                 if (event.isShiftPressed()) {
                     meta |= KeyEvent.META_SHIFT_ON;
@@ -373,20 +281,12 @@ public class CodenameOneView {
     }
 
     private boolean cn1GrabbedPointer = false;
-    //private boolean nativePeerGrabbedPointer = false;
-    
+
     public boolean onTouchEvent(MotionEvent event) {
 
         if (this.implementation.getCurrentForm() == null) {
-            /**
-             * make sure a form has been set before we can send events to the
-             * EDT. if we send events before the form has been set we might
-             * deadlock!
-             */
             return true;
         }
-        
-        
 
         int[] x = null;
         int[] y = null;
@@ -399,38 +299,7 @@ public class CodenameOneView {
                 y[i] = (int) event.getY(i);
             }
         }
-       /*
-        if (!cn1GrabbedPointer) {
-            
-            if (x == null) {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
-                if (componentAt != null && (componentAt instanceof PeerComponent)) {
-                    
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        //nativePeerGrabbedPointer = true;
-                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                        //nativePeerGrabbedPointer = false;
-                    }
-                    return false;
-                }
 
-            } else {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
-                if (componentAt != null && (componentAt instanceof PeerComponent)) {
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        nativePeerGrabbedPointer = true;
-                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                        nativePeerGrabbedPointer = false;
-                    }
-                    return false;
-                }
-            }
-        }
-        */
-        
-        //if (nativePeerGrabbedPointer) {
-        //    return false;
-        //}
         Component componentAt;
         try {
             if (x == null) {
@@ -439,13 +308,11 @@ public class CodenameOneView {
                 componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
             }
         } catch (Throwable t) {
-            // Since this is is an EDT violation, we may get an exception
-            // Just consume it
             componentAt = null;
         }
         boolean isPeer = (componentAt instanceof PeerComponent);
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
-    
+
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (x == null) {
@@ -491,11 +358,6 @@ public class CodenameOneView {
     }
 
     public void setInputType(EditorInfo editorInfo) {
-
-        /**
-         * do not use the enter key to fire some kind of action!
-         */
-//        editorInfo.imeOptions |= EditorInfo.IME_ACTION_NONE;
         Component txtCmp = Display.getInstance().getCurrent().getFocused();
         if (txtCmp != null && txtCmp instanceof TextArea) {
             TextArea txt = (TextArea) txtCmp;
@@ -535,6 +397,4 @@ public class CodenameOneView {
             editorInfo.inputType = inputType;
         }
     }
-
-    
 }
