@@ -44,6 +44,13 @@ class SpinnerNumberModel implements ListModel {
     private double step;
     boolean realValues;
 
+    /**
+     * The old DateSpinner relies on behavior that was broken in this commit:
+     * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf
+     * This is a workaround to preserve compatibility
+     */
+    private int maxOffset = 1;
+
     private boolean setSelectedIndexReentrantLock;
 
     void setValue(Object value) {
@@ -80,6 +87,14 @@ class SpinnerNumberModel implements ListModel {
         this.step = step;
     }
 
+    SpinnerNumberModel(int min, int max, int currentValue, int step, int maxOffset) {
+        this.max = max;
+        this.min = min;
+        this.currentValue = currentValue;
+        this.step = step;
+        this.maxOffset = maxOffset;
+    }
+
     /**
      * Indicates the range of the spinner
      *
@@ -111,7 +126,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / step) + 1;
+        return (int)((max - min) / step) + maxOffset;
     }
 
 
