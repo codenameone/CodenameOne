@@ -7982,10 +7982,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 if (requestCode == REQUEST_SELECT_FILE) {
-                    if (uploadMessage == null) {
-                        return;
+                    if (uploadMessage == null) return;
+                    Uri[] results = null;
+
+                    // Check that the response is a good one
+                    if (resultCode == Activity.RESULT_OK) {
+                        if (intent != null) {
+                            // If there is not data, then we may have taken a photo
+                            String dataString = intent.getDataString();
+                            ClipData clipData = intent.getClipData();
+
+                            if (clipData != null) {
+                                results = new Uri[clipData.getItemCount()];
+                                for (int i = 0; i < clipData.getItemCount(); i++) {
+                                    ClipData.Item item = clipData.getItemAt(i);
+                                    results[i] = item.getUri();
+                                }
+                            } else if (dataString != null) {
+                                results = new Uri[]{Uri.parse(dataString)};
+                            }
+                        }
                     }
-                    uploadMessage.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, intent));
+
+                    uploadMessage.onReceiveValue(results);
                     uploadMessage = null;
                 }
             }
