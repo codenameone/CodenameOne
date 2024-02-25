@@ -86,7 +86,7 @@ public class AndroidGradleBuilder extends Executor {
     private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
     public boolean PREFER_MANAGED_GRADLE=true;
 
-    private boolean useGradle8 = false;
+    private boolean useGradle8 = true;
 
     private boolean extendAppCompatActivity = false;
 
@@ -474,7 +474,7 @@ public class AndroidGradleBuilder extends Executor {
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
-        newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "false").equals("true");
+        newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
