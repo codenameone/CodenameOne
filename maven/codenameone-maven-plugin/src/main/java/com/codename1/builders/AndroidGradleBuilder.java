@@ -88,6 +88,11 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean useGradle8 = true;
 
+    // Flag to indicate whether we should strip kotlin from user classes
+    // Necessary for using gradle 8 because kotlin seems to be included by default,
+    // so we get duplicate class errors.
+    private boolean stripKotlinFromUserClasses = true;
+
     private boolean extendAppCompatActivity = false;
 
     private boolean useJava8SourceLevel = true;
@@ -477,6 +482,8 @@ public class AndroidGradleBuilder extends Executor {
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
+        // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
+        stripKotlinFromUserClasses = useGradle8;
         useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
@@ -975,6 +982,9 @@ public class AndroidGradleBuilder extends Executor {
             unzip(sourceZip, dummyClassesDir, assetsDir, srcDir, libsDir, xmlDir);
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
+        }
+        if (stripKotlinFromUserClasses) {
+            stripKotlin(dummyClassesDir);
         }
 
         File appDir = buildToolsVersionInt >= 27 ?
@@ -4442,6 +4452,21 @@ public class AndroidGradleBuilder extends Executor {
                     continue;
                 }
                 playServiceVersions.put(playServiceKey, playServiceValue);
+            }
+        }
+    }
+
+    private void stripKotlin(File dummyClassesDir) {
+        String[] skipDirectories = new String[] {
+                "org" + File.separator + "jetbrains" + File.separator + "annotations",
+                "org" + File.separator + "intellij" + File.separator + "lang" + File.separator + "annotations",
+                "kotlin"
+        };
+        for (String path : skipDirectories) {
+            File directory = new File(dummyClassesDir, path);
+            if (directory.isDirectory()) {
+                log("Deleting directory " + directory);
+                delTree(directory, true);
             }
         }
     }
