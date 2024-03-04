@@ -1330,19 +1330,7 @@ public class AndroidGradleBuilder extends Executor {
             if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
                 request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
             }
-            if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-core")) {
-                debug("Adding firebase core to gradle dependencies.");
-                debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
-                debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
 
-                request.putArgument(
-                        "gradleDependencies",
-                        request.getArg("gradleDependencies", "") +
-                                "\n"+compile+" \"com.google.firebase:firebase-core:" +
-                                request.getArg("android.firebaseCoreVersion", playServicesVersion) + "\"\n"
-                );
-                debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
-            }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
                 request.putArgument(
                         "gradleDependencies",
