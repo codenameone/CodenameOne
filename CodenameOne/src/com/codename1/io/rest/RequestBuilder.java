@@ -895,7 +895,7 @@ public class RequestBuilder {
             if(parseJSON) {
                 JSONParser parser = new JSONParser();
                 if(useBoolean != null) {
-                    jp.setUseBoolean(useBoolean);
+                    parser.setUseBoolean(useBoolean);
                 }
                 json = parser.parseJSON(new InputStreamReader(input, "UTF-8"));
                 if(hasResponseListeners() && !isKilled()) {
