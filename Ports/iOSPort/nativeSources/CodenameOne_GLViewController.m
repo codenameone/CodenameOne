@@ -124,6 +124,26 @@ int displayHeight = -1;
 BOOL CN1_blockPaste=NO;
 BOOL CN1_blockCut=NO;
 BOOL CN1_blockCopy=NO;
+JAVA_INT safeLeft = 0;
+JAVA_INT safeRight = 0;
+JAVA_INT safeTop = 0;
+JAVA_INT safeBottom = 0;
+
+JAVA_INT getSafeLeft() {
+    return safeLeft;
+}
+
+JAVA_INT getSafeRight() {
+    return safeRight;
+}
+
+JAVA_INT getSafeBottom() {
+    return safeBottom;
+}
+
+JAVA_INT getSafeTop() {
+    return safeTop;
+}
 
 UIView *editingComponent;
 
@@ -2642,6 +2662,17 @@ BOOL prefersStatusBarHidden = NO;
     CGFloat bottomAlignedY =size.height - size.height;
     self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
 #endif
+}
+
+- (void)viewSafeAreaInsetsDidChange {
+    [super viewSafeAreaInsetsDidChange];
+    safeLeft = (JAVA_INT)self.view.window.safeAreaInsets.left * scaleValue;
+    safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
+    safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
+    safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
+
+    lockDrawing = NO;
+    repaintUI();
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
