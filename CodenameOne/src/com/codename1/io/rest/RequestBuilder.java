@@ -32,7 +32,6 @@ import com.codename1.io.gzip.GZConnectionRequest;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.FailureCallback;
@@ -88,6 +87,7 @@ public class RequestBuilder {
     private Byte priority;
     private boolean insecure;
     private Boolean useBoolean;
+    private Boolean useLongs;
 
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -119,6 +119,18 @@ public class RequestBuilder {
      */
     public RequestBuilder useBoolean(boolean useBoolean) {
         this.useBoolean = useBoolean;
+        return this;
+    }
+
+    /**
+     * Indicates if JSON should treat non-decimal numeric values as Long. If not set, uses the current default
+     * from the static value in JSONParser.isUseLongs
+     *
+     * @param useLongs true to return Long objects in JSON Maps
+     * @return this request builder
+     */
+    public RequestBuilder useLongs(boolean useLongs) {
+        this.useLongs = useLongs;
         return this;
     }
     
@@ -863,20 +875,14 @@ public class RequestBuilder {
                     return;
                 }
                 if(jsonErrorCallback != null) {
-                    JSONParser jp = new JSONParser();
-                    if(useBoolean != null) {
-                        jp.setUseBoolean(useBoolean);
-                    }
+                    JSONParser jp = createJSONParser();
                     errorObject = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
                     errorHandler = jsonErrorCallback;
                     return;
                 }
                 if(propertyErrorCallback != null) {
                     try {
-                        JSONParser jp = new JSONParser();
-                        if(useBoolean != null) {
-                            jp.setUseBoolean(useBoolean);
-                        }
+                        JSONParser jp = createJSONParser();
                         Map m = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
                         PropertyBusinessObject pb = (PropertyBusinessObject)errorHandlerPropertyType.newInstance();
                         pb.getPropertyIndex().populateFromMap(m);
@@ -893,10 +899,7 @@ public class RequestBuilder {
                 return;
             }
             if(parseJSON) {
-                JSONParser parser = new JSONParser();
-                if(useBoolean != null) {
-                    parser.setUseBoolean(useBoolean);
-                }
+                JSONParser parser = createJSONParser();
                 json = parser.parseJSON(new InputStreamReader(input, "UTF-8"));
                 if(hasResponseListeners() && !isKilled()) {
                     fireResponseListener(new NetworkEvent(this, json));
@@ -913,6 +916,17 @@ public class RequestBuilder {
             }
         }
 
+    }
+
+    private JSONParser createJSONParser() {
+        JSONParser jp = new JSONParser();
+        if (useBoolean != null) {
+            jp.setUseBooleanInstance(useBoolean);
+        }
+        if (useLongs != null) {
+            jp.setUseLongsInstance(useLongs);
+        }
+        return jp;
     }
 
     private Connection createRequest(boolean parseJson) {
