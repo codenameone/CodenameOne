@@ -701,8 +701,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public <X extends PropertyBusinessObject> List<X> loadJSONList(InputStream stream)
         throws IOException {
         JSONParser jp = new JSONParser();
-        JSONParser.setUseBoolean(true);
-        JSONParser.setUseLongs(true);
+        jp.setUseBooleanInstance(true);
+        jp.setUseLongsInstance(true);
         List<X> response = new ArrayList<X>();
         Map<String, Object> result = jp.parseJSON(new InputStreamReader(stream, "UTF-8"));
         List<Map> entries = (List<Map>)result.get("root");
@@ -735,8 +735,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         try {
             StringReader r = new StringReader(jsonString);
             JSONParser jp = new JSONParser();
-            JSONParser.setUseBoolean(true);
-            JSONParser.setUseLongs(true);
+            jp.setUseBooleanInstance(true);
+            jp.setUseLongsInstance(true);
             populateFromMap(jp.parseJSON(r), parent.getClass());
         } catch(IOException err) {
             Log.e(err);
@@ -774,8 +774,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public void loadJSON(InputStream stream) throws IOException {
         JSONParser jp = new JSONParser();
-        JSONParser.setUseBoolean(true);
-        JSONParser.setUseLongs(true);
+        jp.setUseBooleanInstance(true);
+        jp.setUseLongsInstance(true);
         populateFromMap(jp.parseJSON(new InputStreamReader(stream, "UTF-8")), parent.getClass());
     }
 
