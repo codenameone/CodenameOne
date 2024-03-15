@@ -32,7 +32,6 @@ import com.codename1.io.gzip.GZConnectionRequest;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.FailureCallback;
@@ -87,6 +86,8 @@ public class RequestBuilder {
     private Boolean postParameters;
     private Byte priority;
     private boolean insecure;
+    private Boolean useBoolean;
+    private Boolean useLongs;
 
     RequestBuilder(String method, String url) {
         this.method = method;
@@ -110,6 +111,29 @@ public class RequestBuilder {
         return this;
     }
 
+    /**
+     * Indicates if JSON should treat boolean values as Boolean. This values is set implicitly to true when reading property business objects
+     *
+     * @param useBoolean true to return Boolean objects in JSON Maps
+     * @return this request builder
+     */
+    public RequestBuilder useBoolean(boolean useBoolean) {
+        this.useBoolean = useBoolean;
+        return this;
+    }
+
+    /**
+     * Indicates if JSON should treat non-decimal numeric values as Long. If not set, uses the current default
+     * from the static value in JSONParser.isUseLongs
+     *
+     * @param useLongs true to return Long objects in JSON Maps
+     * @return this request builder
+     */
+    public RequestBuilder useLongs(boolean useLongs) {
+        this.useLongs = useLongs;
+        return this;
+    }
+    
     /**
      * Sets the caching mode for this request, see {@link com.codename1.io.ConnectionRequest#getCacheMode()}
      * @param cache the cache mode
@@ -584,6 +608,7 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */
     public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
+        useBoolean(true);
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -702,6 +727,7 @@ public class RequestBuilder {
      * @return Response Object
      */
     public Response<PropertyBusinessObject> getAsProperties(Class type) {
+        useBoolean(true);
         ConnectionRequest request = createRequest(true);
         fetched = true;
         CN.addToQueueAndWait(request);
@@ -725,6 +751,7 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */
     public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type, final String root) {
+        useBoolean(true);
         final Connection request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -777,6 +804,7 @@ public class RequestBuilder {
      * @return Response Object
      */
     public Response<List<PropertyBusinessObject>> getAsPropertyList(Class type, String root) {
+        useBoolean(true);
         ConnectionRequest request = createRequest(true);
         fetched = true;
         CN.addToQueueAndWait(request);
@@ -847,14 +875,14 @@ public class RequestBuilder {
                     return;
                 }
                 if(jsonErrorCallback != null) {
-                    JSONParser jp = new JSONParser();
+                    JSONParser jp = createJSONParser();
                     errorObject = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
                     errorHandler = jsonErrorCallback;
                     return;
                 }
                 if(propertyErrorCallback != null) {
                     try {
-                        JSONParser jp = new JSONParser();
+                        JSONParser jp = createJSONParser();
                         Map m = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
                         PropertyBusinessObject pb = (PropertyBusinessObject)errorHandlerPropertyType.newInstance();
                         pb.getPropertyIndex().populateFromMap(m);
@@ -871,7 +899,7 @@ public class RequestBuilder {
                 return;
             }
             if(parseJSON) {
-                JSONParser parser = new JSONParser();
+                JSONParser parser = createJSONParser();
                 json = parser.parseJSON(new InputStreamReader(input, "UTF-8"));
                 if(hasResponseListeners() && !isKilled()) {
                     fireResponseListener(new NetworkEvent(this, json));
@@ -888,6 +916,17 @@ public class RequestBuilder {
             }
         }
 
+    }
+
+    private JSONParser createJSONParser() {
+        JSONParser jp = new JSONParser();
+        if (useBoolean != null) {
+            jp.setUseBooleanInstance(useBoolean);
+        }
+        if (useLongs != null) {
+            jp.setUseLongsInstance(useLongs);
+        }
+        return jp;
     }
 
     private Connection createRequest(boolean parseJson) {

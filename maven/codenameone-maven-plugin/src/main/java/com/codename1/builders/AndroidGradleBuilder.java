@@ -86,7 +86,12 @@ public class AndroidGradleBuilder extends Executor {
     private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
     public boolean PREFER_MANAGED_GRADLE=true;
 
-    private boolean useGradle8 = false;
+    private boolean useGradle8 = true;
+
+    // Flag to indicate whether we should strip kotlin from user classes
+    // Necessary for using gradle 8 because kotlin seems to be included by default,
+    // so we get duplicate class errors.
+    private boolean stripKotlinFromUserClasses = true;
 
     private boolean extendAppCompatActivity = false;
 
@@ -474,9 +479,11 @@ public class AndroidGradleBuilder extends Executor {
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
-        newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "false").equals("true");
+        newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
+        // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
+        stripKotlinFromUserClasses = useGradle8;
         useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
@@ -976,6 +983,9 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
         }
+        if (stripKotlinFromUserClasses) {
+            stripKotlin(dummyClassesDir);
+        }
 
         File appDir = buildToolsVersionInt >= 27 ?
                 new File(srcDir.getParentFile(), "app") :
@@ -1320,19 +1330,7 @@ public class AndroidGradleBuilder extends Executor {
             if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
                 request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
             }
-            if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-core")) {
-                debug("Adding firebase core to gradle dependencies.");
-                debug("Play services version: " + request.getArg("var.android.playServicesVersion", ""));
-                debug("gradleDependencies before: "+request.getArg("gradleDependencies", ""));
 
-                request.putArgument(
-                        "gradleDependencies",
-                        request.getArg("gradleDependencies", "") +
-                                "\n"+compile+" \"com.google.firebase:firebase-core:" +
-                                request.getArg("android.firebaseCoreVersion", playServicesVersion) + "\"\n"
-                );
-                debug("gradleDependencies after: "+request.getArg("gradleDependencies", ""));
-            }
             if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-messaging")) {
                 request.putArgument(
                         "gradleDependencies",
@@ -4442,6 +4440,21 @@ public class AndroidGradleBuilder extends Executor {
                     continue;
                 }
                 playServiceVersions.put(playServiceKey, playServiceValue);
+            }
+        }
+    }
+
+    private void stripKotlin(File dummyClassesDir) {
+        String[] skipDirectories = new String[] {
+                "org" + File.separator + "jetbrains" + File.separator + "annotations",
+                "org" + File.separator + "intellij" + File.separator + "lang" + File.separator + "annotations",
+                "kotlin"
+        };
+        for (String path : skipDirectories) {
+            File directory = new File(dummyClassesDir, path);
+            if (directory.isDirectory()) {
+                log("Deleting directory " + directory);
+                delTree(directory, true);
             }
         }
     }

@@ -136,6 +136,11 @@ extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
 
+extern JAVA_INT getSafeTop();
+extern JAVA_INT getSafeLeft();
+extern JAVA_INT getSafeBottom();
+extern JAVA_INT getSafeRight();
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 (void* peer, int x, int y, int width, int height);
 
@@ -8284,43 +8289,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetLeft___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil) {
-            return (JAVA_INT)(window.safeAreaInsets.left * scaleValue);
-        }
-    }
-    return 0;
+    return getSafeLeft();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetTop___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil) {
-            return (JAVA_INT)(window.safeAreaInsets.top * scaleValue);
-        }
-    }
-    return 0;
+    return getSafeTop();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil) {
-            return (JAVA_INT)(window.safeAreaInsets.right * scaleValue);
-        }
-    }
-    return 0;
+    return getSafeRight();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        if(window != nil) {
-            return (JAVA_INT)(window.safeAreaInsets.bottom * scaleValue);
-        }
-    }
-    return 0;
+    return getSafeBottom();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

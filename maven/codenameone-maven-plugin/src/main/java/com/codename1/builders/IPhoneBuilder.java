@@ -427,7 +427,7 @@ public class IPhoneBuilder extends Executor {
             if (child.getName().endsWith(".framework.zip")) {
                 log("Found framework "+child+". Attempting extract it and generate podspec for it");
                 try {
-                    if (!exec(resDir, "unzip", child.getName(), "-d", new File(tmpDir, "dist").getAbsolutePath())) {
+                    if (!exec(resDir, "ditto", "-x", "-k", child.getAbsolutePath(), new File(tmpDir, "dist").getAbsolutePath())) {
                         log("Failed to unzip " + child.getName());
                         return false;
                     }
