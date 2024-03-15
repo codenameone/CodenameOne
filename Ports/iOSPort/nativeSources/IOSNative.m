@@ -6246,7 +6246,7 @@ NSLocale* cn1DeviceLocale() {
     return deviceLocale;
 }
 
-void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG instanceObject, JAVA_OBJECT localeStr) {
+void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT localeStr) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
     if (currentLocale != NULL) {
