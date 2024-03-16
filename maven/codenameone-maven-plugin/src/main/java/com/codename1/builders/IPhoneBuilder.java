@@ -166,7 +166,7 @@ public class IPhoneBuilder extends Executor {
         return new File(tmpFile, "btres");
     }
     
-    private String minDeploymentTargets = "6.0";
+    private String minDeploymentTargets = "12.0";
     private void addMinDeploymentTarget(String target) {
         minDeploymentTargets += ","+target;
     }
@@ -1867,6 +1867,7 @@ public class IPhoneBuilder extends Executor {
                     podFileContents += "\n\npost_install do |installer|\n" +
                             "  installer.pods_project.targets.each do |target|\n" +
                             "    target.build_configurations.each do |config|\n" +
+                            "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = \"" + getDeploymentTarget(request) + "\"\n" +
                             "      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = \"\"\n" +
                             "      config.build_settings['CODE_SIGNING_REQUIRED'] = \"NO\"\n" +
                             "      config.build_settings['CODE_SIGNING_ALLOWED'] = \"NO\"\n" +
