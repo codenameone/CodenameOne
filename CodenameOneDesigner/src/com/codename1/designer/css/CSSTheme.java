@@ -1922,7 +1922,7 @@ public class CSSTheme {
             }
             
         }
-
+        res.setThemeProperty(themeName, "@PopupDialogArrowBool", "false");
         for (String constantKey : constants.keySet()) {
             try {
                 LexicalUnit lu = constants.get(constantKey);
