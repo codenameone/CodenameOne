@@ -334,7 +334,9 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean isScrollVisible = true;
     private boolean repaintPending;
     private boolean snapToGrid;
-    
+    private static byte defaultDragTransparency = 55;
+    private byte dragTransparency = defaultDragTransparency;
+
     /**
      * A flag to dictate whether style changes should trigger a revalidate() call
      * on the component's parent.  Eventually we would like to phase this to be {@literal false}
@@ -4747,9 +4749,49 @@ public class Component implements Animation, StyleListener, Editable {
         }
         g.translate(getX(), getY());
 
-        // remove all occurences of the rare color
-        draggedImage = draggedImage.modifyAlpha((byte)0x55, 0xff7777);
+        if(dragTransparency < 255) {
+            // remove all occurrences of the rare color
+            draggedImage = draggedImage.modifyAlpha(dragTransparency, 0xff7777);
+        }
         return draggedImage;
+    }
+
+    /**
+     * Sets the translucency of the {@link #getDragImage()} method.
+     *
+     * @param dragTransparency a number between 0 and 255 where 255
+     *                         indicates an opaque image.
+     */
+    public void setDragTransparency(byte dragTransparency) {
+        this.dragTransparency = dragTransparency;
+    }
+
+    /**
+     * Returns the translucency used in the {@link #getDragImage()} method.
+     *
+     * @return a number between 0 and 255 where 255 indicates an opaque image.
+     */
+    public byte getDragTransparency() {
+        return dragTransparency;
+    }
+
+    /**
+     * Sets the default translucency of the {@link #getDragImage()} method.
+     *
+     * @param defaultDragTransparency a number between 0 and 255 where 255
+     *                         indicates an opaque image.
+     */
+    public static void setDefaultDragTransparency(byte defaultDragTransparency) {
+        Component.defaultDragTransparency = defaultDragTransparency;
+    }
+
+    /**
+     * Returns the default translucency used in the {@link #getDragImage()} method.
+     *
+     * @return a number between 0 and 255 where 255 indicates an opaque image.
+     */
+    public static byte getDefaultDragTransparency() {
+        return defaultDragTransparency;
     }
 
     /**
