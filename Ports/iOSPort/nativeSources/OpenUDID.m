@@ -124,8 +124,8 @@ static int const kOpenUDIDRedundancySlots = 100;
     // Next we generate a UUID.
     // UUIDs (Universally Unique Identifiers), also known as GUIDs (Globally Unique Identifiers) or IIDs 
     // (Interface Identifiers), are 128-bit values guaranteed to be unique. A UUID is made unique over 
-    // both space and time by combining a value unique to the computer on which it was generated—usually the
-    // Ethernet hardware address—and a value representing the number of 100-nanosecond intervals since 
+    // both space and time by combining a value unique to the computer on which it was generatedï¿½usually the
+    // Ethernet hardware addressï¿½and a value representing the number of 100-nanosecond intervals since 
     // October 15, 1582 at 00:00:00.
     // We then hash this UUID with md5 to get 32 bytes, and then add 4 extra random bytes
     // Collision is possible of course, but unlikely and suitable for most industry needs (e.g. aggregate tracking)
@@ -176,20 +176,8 @@ static int const kOpenUDIDRedundancySlots = 100;
                                      userInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"OpenUDID in cache from first call",@"description", nil]];
         return kOpenUDIDSessionCache;
     }
-    
-  	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    
-    // The AppUID will uniquely identify this app within the pastebins
-    //
-    NSString * appUID = (NSString *) [defaults objectForKey:kOpenUDIDAppUIDKey];
-    if(appUID == nil)
-    {
-      // generate a new uuid and store it in user defaults
-      CFUUIDRef uuid = CFUUIDCreate(NULL);
-      appUID = (NSString *) CFUUIDCreateString(NULL, uuid);
-      CFRelease(uuid);
-    }
-  
+
+
     NSString* openUDID = nil;
     NSString* myRedundancySlotPBid = nil;
     NSDate* optedOutDate = nil;
@@ -197,19 +185,7 @@ static int const kOpenUDIDRedundancySlots = 100;
     BOOL saveLocalDictToDefaults = NO;
     BOOL isCompromised = NO;
     
-    // Do we have a local copy of the OpenUDID dictionary?
-    // This local copy contains a copy of the openUDID, myRedundancySlotPBid (and unused in this block, the local bundleid, and the timestamp)
-    //
-    id localDict = [defaults objectForKey:kOpenUDIDKey];
-    if ([localDict isKindOfClass:[NSDictionary class]]) {
-        localDict = [NSMutableDictionary dictionaryWithDictionary:localDict]; // we might need to set/overwrite the redundancy slot
-        openUDID = [localDict objectForKey:kOpenUDIDKey];
-        myRedundancySlotPBid = [localDict objectForKey:kOpenUDIDSlotKey];
-        optedOutDate = [localDict objectForKey:kOpenUDIDOOTSKey];
-        optedOut = optedOutDate!=nil;
-        OpenUDIDLog(@"localDict = %@",localDict);
-    }
-    
+
     // Here we go through a sequence of slots, each of which being a UIPasteboard created by each participating app
     // The idea behind this is to both multiple and redundant representations of OpenUDIDs, as well as serve as placeholder for potential opt-out
     //
@@ -314,11 +290,6 @@ static int const kOpenUDIDRedundancySlots = 100;
             [OpenUDID _setDict:localDict forPasteboard:slotPB];
     }
 
-    // Save the dictionary locally if applicable
-    //
-    if (localDict && saveLocalDictToDefaults)
-        [defaults setObject:localDict forKey:kOpenUDIDKey];
-
     // If the UIPasteboard external representation marks this app as opted-out, then to respect privacy, we return the ZERO OpenUDID, a sequence of 40 zeros...
     // This is a *new* case that developers have to deal with. Unlikely, statistically low, but still.
     // To circumvent this and maintain good tracking (conversion ratios, etc.), developers are invited to calculate how many of their users have opted-out from the full set of users.
@@ -351,33 +322,7 @@ static int const kOpenUDIDRedundancySlots = 100;
 
 + (void) setOptOut:(BOOL)optOutValue {
 
-    // init call
-    [OpenUDID value];
-    
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
-    // load the dictionary from local cache or create one
-    id dict = [defaults objectForKey:kOpenUDIDKey];
-    if ([dict isKindOfClass:[NSDictionary class]]) {
-        dict = [NSMutableDictionary dictionaryWithDictionary:dict];
-    } else {
-        dict = [NSMutableDictionary dictionaryWithCapacity:2];
-    }
-
-    // set the opt-out date or remove key, according to parameter
-    if (optOutValue)
-        [dict setObject:[NSDate date] forKey:kOpenUDIDOOTSKey];
-    else
-        [dict removeObjectForKey:kOpenUDIDOOTSKey];
-
-  	// store the dictionary locally
-    [defaults setObject:dict forKey:kOpenUDIDKey];
-    
-    OpenUDIDLog(@"Local dict after opt-out = %@",dict);
-    
-    // reset memory cache 
-    kOpenUDIDSessionCache = nil;
-    
 }
 
 @end

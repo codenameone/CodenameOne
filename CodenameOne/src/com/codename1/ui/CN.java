@@ -1398,7 +1398,9 @@ public class CN extends  CN1Constants {
      * last modified.
      * @return A long value representing the time the file was last modified, 
      * measured in milliseconds
-     */ 
+     * @deprecated this API requires additional privacy permissions on iOS
+     *     and might cause problems with iOS submissions
+     */
     public static long getFileLastModifiedFile(String file) {
         return FileSystemStorage.getInstance().getLastModified(file);
     }

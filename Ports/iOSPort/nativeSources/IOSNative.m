@@ -77,6 +77,7 @@
 #include "java_util_ArrayList.h"
 #include "com_codename1_ui_Font.h"
 #include "java_util_Vector.h"
+#include "permission_apis.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 #ifdef ENABLE_WKWEBVIEW
@@ -1469,6 +1470,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THR
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+#ifdef checkModificationDatePermission
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
@@ -1489,6 +1491,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
 #endif
     POOL_END();
     return result;
+#else
+    return 0;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_OBJECT n1) {
