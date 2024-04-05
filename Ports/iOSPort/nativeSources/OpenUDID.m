@@ -170,10 +170,6 @@ static int const kOpenUDIDRedundancySlots = 100;
 + (NSString*) valueWithError:(NSError **)error {
 
     if (kOpenUDIDSessionCache!=nil) {
-        if (error!=nil)
-            *error = [NSError errorWithDomain:kOpenUDIDDomain
-                                         code:kOpenUDIDErrorNone
-                                     userInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"OpenUDID in cache from first call",@"description", nil]];
         return kOpenUDIDSessionCache;
     }
 
@@ -214,17 +210,6 @@ static int const kOpenUDIDRedundancySlots = 100;
                 int count = [[frequencyDict valueForKey:oudid] intValue];
                 [frequencyDict setObject:[NSNumber numberWithInt:++count] forKey:oudid];
             }
-            // if we have a match with the app unique id,
-            // then let's look if the external UIPasteboard representation marks this app as OptedOut
-            NSString* gid = [dict objectForKey:kOpenUDIDAppUIDKey];
-            if (gid!=nil && [gid isEqualToString:appUID]) {
-                myRedundancySlotPBid = slotPBid;
-                // the local dictionary is prime on the opt-out subject, so ignore if already opted-out locally
-                if (optedOut) {
-                    optedOutDate = [dict objectForKey:kOpenUDIDOOTSKey];
-                    optedOut = optedOutDate!=nil;   
-                }
-            }
         }
     }
     
@@ -247,16 +232,6 @@ static int const kOpenUDIDRedundancySlots = 100;
             // or we leverage the OpenUDID shared by other apps that have already gone through the process
             // 
             openUDID = mostReliableOpenUDID;
-        }
-        // then we create a local representation
-        //
-        if (localDict==nil) { 
-            localDict = [NSMutableDictionary dictionaryWithCapacity:4];
-            [localDict setObject:openUDID forKey:kOpenUDIDKey];
-            [localDict setObject:appUID forKey:kOpenUDIDAppUIDKey];
-            [localDict setObject:[NSDate date] forKey:kOpenUDIDTSKey];
-            if (optedOut) [localDict setObject:optedOutDate forKey:kOpenUDIDTSKey];
-            saveLocalDictToDefaults = YES;
         }
     }
     else {
@@ -283,11 +258,6 @@ static int const kOpenUDIDRedundancySlots = 100;
             [localDict setObject:availableSlotPBid forKey:kOpenUDIDSlotKey];
             saveLocalDictToDefaults = YES;
         }
-        
-        // Save the local dictionary to the corresponding UIPasteboard slot
-        //
-        if (openUDID && localDict)
-            [OpenUDID _setDict:localDict forPasteboard:slotPB];
     }
 
     // If the UIPasteboard external representation marks this app as opted-out, then to respect privacy, we return the ZERO OpenUDID, a sequence of 40 zeros...
@@ -296,26 +266,12 @@ static int const kOpenUDIDRedundancySlots = 100;
     // This ratio will let them extrapolate convertion ratios more accurately.
     //
     if (optedOut) {
-        if (error!=nil) *error = [NSError errorWithDomain:kOpenUDIDDomain
-                                                     code:kOpenUDIDErrorOptedOut
-                                                 userInfo:[NSDictionary dictionaryWithObjectsAndKeys:[NSString stringWithFormat:@"Application with unique id %@ is opted-out from OpenUDID as of %@",appUID,optedOutDate],@"description", nil]];
-            
         kOpenUDIDSessionCache = [[NSString stringWithFormat:@"%040x",0] retain];
         return kOpenUDIDSessionCache;
     }
 
     // return the well earned openUDID!
     //
-    if (error!=nil) {
-        if (isCompromised)
-            *error = [NSError errorWithDomain:kOpenUDIDDomain
-                                         code:kOpenUDIDErrorCompromised
-                                     userInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"Found a discrepancy between stored OpenUDID (reliable) and redundant copies; one of the apps on the device is most likely corrupting the OpenUDID protocol",@"description", nil]];
-        else
-            *error = [NSError errorWithDomain:kOpenUDIDDomain
-                                         code:kOpenUDIDErrorNone
-                                     userInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"OpenUDID succesfully retrieved",@"description", nil]];
-    }
     kOpenUDIDSessionCache = [openUDID retain];
     return kOpenUDIDSessionCache;
 }
