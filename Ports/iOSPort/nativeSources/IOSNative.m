@@ -55,7 +55,6 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
-#include "OpenUDID.h"
 #ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
 #endif
@@ -4356,7 +4355,7 @@ int popoverSupported()
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return fromNSString(CN1_THREAD_STATE_PASS_ARG [OpenUDID value]);
+    return JAVA_NULL;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
