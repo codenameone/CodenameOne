@@ -3384,6 +3384,104 @@ void cn1_addSelectedImagePath(NSString* path) {
     galleryPopover = NO;
 }
 
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_UNAVAILABLE(watchos)
+{
+    if (cn1_waitingForImages == NULL) {
+        cn1_waitingForImages = [[NSMutableString alloc] init];
+    } else {
+        [cn1_waitingForImages setString:@""];
+    }
+
+    NSMutableArray<PHAsset *> *assets = [NSMutableArray new];
+    for (PHPickerResult *result in results) {
+           NSString *assetIdentifier = result.assetIdentifier;
+           if (assetIdentifier) {
+               PHFetchResult<PHAsset *> *fetchResult = [PHAsset fetchAssetsWithLocalIdentifiers:@[assetIdentifier] options:nil];
+               [assets addObject:fetchResult.firstObject];
+           }
+       }
+
+    cn1_waitingForImagesCount = [assets count];
+    __block int idx=0;
+    PHImageRequestOptions *options = [PHImageRequestOptions new];
+    options.synchronous = YES;
+    options.networkAccessAllowed = YES;
+    for (PHAsset *asset in assets) {
+        @autoreleasepool {
+            if (asset.mediaType == PHAssetMediaTypeImage) {
+                [[PHImageManager defaultManager] requestImageForAsset:asset
+                                  targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                 contentMode:PHImageContentModeDefault
+                                     options:options
+                               resultHandler:^(UIImage *originalImage, NSDictionary *info) {
+                    UIImage* image = originalImage;
+                    if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
+                        return;
+                    }
+
+//$$ DISABLE_IMAGE_ROTATION_FIX_START
+#ifndef LOW_MEM_CAMERA
+                    if (image.imageOrientation != UIImageOrientationUp) {
+                        UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                        [image drawInRect:(CGRect){0, 0, image.size}];
+                        image = UIGraphicsGetImageFromCurrentImageContext();
+                        UIGraphicsEndImageContext();
+                    }
+#endif
+//$$ DISABLE_IMAGE_ROTATION_FIX_END
+
+                    NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_image_%d.jpg", idx++]];
+                    [data writeToFile:path atomically:YES];
+                    cn1_addSelectedImagePath(path);
+                }];
+            } else {
+                PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+                options.version = PHVideoRequestOptionsVersionOriginal;
+                options.networkAccessAllowed = YES;
+
+                [[PHImageManager defaultManager] requestAVAssetForVideo:asset
+                                                                options:options
+                                                          resultHandler:
+                 ^(AVAsset * _Nullable avasset,
+                   AVAudioMix * _Nullable audioMix,
+                   NSDictionary * _Nullable info)
+                {
+                    NSError *error;
+                    AVURLAsset *avurlasset = (AVURLAsset*) avasset;
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_video_%d.%@", idx++, avurlasset.URL.pathExtension]];
+                    // Write to documents folder
+                    NSURL *fileURL = [NSURL fileURLWithPath:path];
+                    [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+                    if ([[NSFileManager defaultManager] copyItemAtURL:avurlasset.URL
+                                                                 toURL:fileURL
+                                                                 error:&error]) {
+                        cn1_addSelectedImagePath(path);
+                    } else {
+                        cn1_addSelectedImagePath([NSString stringWithFormat:@"!{Error: %@}", [error localizedDescription]]);
+                    }
+                 }];
+            }
+        }
+    }
+
+#ifdef LOW_MEM_CAMERA
+    [picker dismissModalViewControllerAnimated:NO];
+#else
+    [picker dismissModalViewControllerAnimated:YES];
+#endif
+    popoverController = nil;
+    popoverControllerInstance = nil;
+    galleryPopover = NO;
+}
+#endif
+
 #endif
 #endif
 
