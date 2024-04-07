@@ -61,6 +61,7 @@
 //#define GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
 //#define CN1_USE_JAVASCRIPTCORE
 //#define ENABLE_GALLERY_MULTISELECT
+//#define USE_PHOTOKIT_FOR_MULTIGALLERY
 //#define INCLUDE_CONTACTS_USAGE
 //#define INCLUDE_CALENDARS_USAGE
 //#define INCLUDE_CAMERA_USAGE
@@ -92,6 +93,11 @@
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 #import "QBImagePickerController.h"
+
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+#import "PhotosUI/PhotosUI.h"
+#endif
+
 #endif
 #endif
 
@@ -178,6 +184,9 @@ MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecord
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
         ,QBImagePickerControllerDelegate
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+        ,PHPickerViewControllerDelegate
+#endif
 #endif
 #endif
 > {

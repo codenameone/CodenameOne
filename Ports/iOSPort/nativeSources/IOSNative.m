@@ -106,6 +106,13 @@ extern int popoverSupported();
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
 #endif
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+#import <PhotosUI/PhotosUI.h>
+#endif
+#endif
+#endif
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
@@ -4234,6 +4241,75 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
 
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
+
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+void openGalleryMultipleWithPhotoKit(JAVA_INT type) {
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+    if (@available(iOS 14, *)) {
+        openGalleryMultipleWithPhotoKit(type);
+        return;
+    }
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+
+        if (@available(iOS 14, *)) {
+            PHPickerFilter *filter;
+            if (type==0 || type == 3){
+                filter = [PHPickerFilter imagesFilter];
+            } else if (type==1 || type == 4){
+                filter = [PHPickerFilter videosFilter];
+            } else {
+                filter = [PHPickerFilter anyFilterMatchingSubfilters:[NSArray arrayWithObjects:[PHPickerFilter imagesFilter], [PHPickerFilter videosFilter], nil]];
+            }
+
+            PHPickerConfiguration *config = [[PHPickerConfiguration alloc] initWithPhotoLibrary:[PHPhotoLibrary sharedPhotoLibrary]];
+            config.filter = filter;
+            config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
+            if (@available(iOS 15, *)) {
+                config.selection = PHPickerConfigurationSelectionOrdered;
+            } else {
+                // Fallback on earlier versions
+            }
+            config.selectionLimit = 0;
+
+
+            PHPickerViewController *pickerController =[[PHPickerViewController alloc] initWithConfiguration:config];
+
+            pickerController.delegate = [CodenameOne_GLViewController instance];
+
+            if(popoverSupported()) {
+                if (popoverController != nil) {
+    #ifndef CN1_USE_ARC
+                    [popoverController release];
+    #endif
+                    popoverController = nil;
+                }
+                galleryPopover = YES;
+                popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
+                                     initWithContentViewController:pickerController];
+
+                popoverController.delegate = [CodenameOne_GLViewController instance];
+                [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                 permittedArrowDirections:UIPopoverArrowDirectionAny
+                                                 animated:YES];
+            } else {
+                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            }
+
+
+        } else {
+            // Fallback on earlier versions
+        }
+
+
+
+        POOL_END();
+    });
+}
+#endif
+
 void openGalleryMultiple(JAVA_INT type) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();

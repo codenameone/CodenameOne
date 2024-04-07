@@ -49,6 +49,7 @@ import java.util.logging.Logger;
 public class IPhoneBuilder extends Executor {
     private boolean useMetal;
     private boolean enableGalleryMultiselect;
+    private boolean usePhotoKitForMultigallery;
     private boolean enableWKWebView, disableUIWebView;
     private String pod = "/usr/local/bin/pod";
     private int podTimeout = 300000; // 5 minutes
@@ -269,6 +270,8 @@ public class IPhoneBuilder extends Executor {
                 addMinDeploymentTarget("8.0");
             }
         }
+        usePhotoKitForMultigallery = "true".equals(request.getArg("ios.usePhotoKitForMultigallery", "false"));
+
         enableWKWebView = "true".equals(request.getArg("ios.useWKWebView", "true"));
         if (enableWKWebView) {
             addMinDeploymentTarget("8.0");
@@ -806,6 +809,13 @@ public class IPhoneBuilder extends Executor {
         if (enableGalleryMultiselect) {
             try {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define ENABLE_GALLERY_MULTISELECT", "#define ENABLE_GALLERY_MULTISELECT");
+            } catch (IOException ex) {
+                throw new BuildException("Failed to enabled gallery multiselect support", ex);
+            }
+        }
+        if (usePhotoKitForMultigallery) {
+            try {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define USE_PHOTOKIT_FOR_MULTIGALLERY", "#define USE_PHOTOKIT_FOR_MULTIGALLERY");
             } catch (IOException ex) {
                 throw new BuildException("Failed to enabled gallery multiselect support", ex);
             }
@@ -1420,6 +1430,14 @@ public class IPhoneBuilder extends Executor {
                         addLibs = "AdSupport.framework;SystemConfiguration.framework;StoreKit.framework;CoreTelephony.framework";
                     } else {
                         addLibs = addLibs + ";AdSupport.framework;SystemConfiguration.framework;StoreKit.framework;CoreTelephony.framework";
+                    }
+                }
+
+                if (enableGalleryMultiselect && photoLibraryUsage && usePhotoKitForMultigallery) {
+                    if (addLibs == null || addLibs.length() == 0) {
+                        addLibs = "PhotosUI.framework";
+                    } else {
+                        addLibs += ";PhotosUI.framework";
                     }
                 }
 
