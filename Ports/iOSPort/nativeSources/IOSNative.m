@@ -4244,6 +4244,12 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
 
 #ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
 void openGalleryMultipleWithPhotoKit(JAVA_INT type) {
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+    if (@available(iOS 14, *)) {
+        openGalleryMultipleWithPhotoKit(type);
+        return;
+    }
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
 
