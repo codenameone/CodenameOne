@@ -9680,9 +9680,7 @@ JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_INT textDecoration,
             return drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
     }
 }
-                  
-                  
-                  
+
 JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lang_Object_int_int_int_int_com_codename1_ui_plaf_Style_java_lang_String_java_lang_Object_java_lang_Object_int_int_boolean_boolean_int_int_boolean_int_boolean_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT cmpX, JAVA_INT cmpY, JAVA_INT cmpHeight, JAVA_INT cmpWidth, JAVA_OBJECT style, JAVA_OBJECT text, JAVA_OBJECT icon, JAVA_OBJECT stateIcon, JAVA_INT preserveSpaceForState, JAVA_INT gap, JAVA_BOOLEAN rtl, JAVA_BOOLEAN isOppositeSide, JAVA_INT textPosition, JAVA_INT stringWidth, JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_BOOLEAN endsWith3Points, JAVA_INT valign) {
     JAVA_OBJECT font = com_codename1_ui_plaf_Style_getFont___R_com_codename1_ui_Font(threadStateData, style);
     JAVA_OBJECT nativeFont = com_codename1_ui_Font_getNativeFont___R_java_lang_Object(threadStateData, font);
@@ -9929,4 +9927,51 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THRE
 JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
 {
     [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT javaString)
+{
+    POOL_BEGIN();
+    NSString *string = toNSString(CN1_THREAD_STATE_PASS_ARG javaString);
+    // Define Unicode ranges for Hebrew and Arabic
+    NSRange hebrewRange = NSMakeRange(0x0590, 0x05FF - 0x0590 + 1);
+    NSRange arabicRange = NSMakeRange(0x0600, 0x06FF - 0x0600 + 1);
+    // Range for common neutral characters (basic Latin, common punctuation, and digits)
+    NSRange neutralRange = NSMakeRange(0x0020, 0x007E - 0x0020 + 1);
+    // Emoji ranges (covering most common emoji blocks)
+    NSArray<NSValue *> *emojiRanges = @[
+        [NSValue valueWithRange:NSMakeRange(0x1F600, 0x1F64F - 0x1F600 + 1)], // Emoticons
+        [NSValue valueWithRange:NSMakeRange(0x1F300, 0x1F5FF - 0x1F300 + 1)], // Miscellaneous Symbols and Pictographs
+        [NSValue valueWithRange:NSMakeRange(0x1F900, 0x1F9FF - 0x1F900 + 1)], // Supplemental Symbols and Pictographs
+        [NSValue valueWithRange:NSMakeRange(0x2600, 0x26FF - 0x2600 + 1)]   // Miscellaneous Symbols
+    ];
+
+    NSUInteger length = [string length];
+    for (NSUInteger i = 0; i < length; i++) {
+        unichar c = [string characterAtIndex:i];
+        // Continue if the character is within the neutral or emoji ranges
+        BOOL isNeutralOrEmoji = (c >= neutralRange.location && c <= NSMaxRange(neutralRange));
+        for (NSValue *value in emojiRanges) {
+            NSRange range = [value rangeValue];
+            if (c >= range.location && c <= NSMaxRange(range)) {
+                isNeutralOrEmoji = YES;
+                break;
+            }
+        }
+        if (isNeutralOrEmoji) {
+            continue;
+        }
+        // Return true if the character is within the Hebrew or Arabic Unicode ranges
+        if ((c >= hebrewRange.location && c <= NSMaxRange(hebrewRange)) ||
+            (c >= arabicRange.location && c <= NSMaxRange(arabicRange))) {
+            POOL_END();
+            return YES;
+        }
+        // If the first significant character is not Hebrew or Arabic, return false
+        POOL_END();
+        return NO;
+    }
+
+    POOL_END();
+    return NO;
 }

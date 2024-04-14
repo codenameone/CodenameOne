@@ -109,6 +109,7 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
@@ -150,6 +151,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     private boolean isActive=false;
     private final ArrayList<Runnable> onActiveListeners = new ArrayList<Runnable>();
     private static BackgroundFetch backgroundFetchCallback;
+
+    private boolean useContentBasedRTLStringDetection = false;
     
     
     /**
@@ -342,7 +345,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             return v;
         } 
         return super.getCookiesForURL(url);
-    }    
+    }
+
+    public void setPlatformHint(String key, String value) {
+        if ("platformHint.ios.useContentBasedRTLStringDetection".equals(key)) {
+            useContentBasedRTLStringDetection = Boolean.parseBoolean(value);
+        }
+    }
     
     private boolean textEditorHidden;
     
@@ -1854,17 +1863,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         int l = str.length();
         int max = fnt.getMaxStringLength();
         if(l > max) {
+            boolean rtl = useContentBasedRTLStringDetection
+                ? nativeInstance.isRTLString(str)
+                : UIManager.getInstance().getLookAndFeel().isRTL();
             // really long string split it and draw multiple strings to avoid texture overload
             int one = 1;
             if(l % max == 0) {
                 one = 0;
             }
+            if (rtl) {
+                x += stringWidth(fnt, str);
+            }
             int stringCount = l / max + one;
             for(int iter = 0 ; iter < stringCount ; iter++) {
                 int pos = iter * max;
                 String s = str.substring(pos, Math.min(pos + max, str.length()));
-                ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, s, x, y);
-                x += stringWidth(fnt, s);
+                int substrWidth = stringWidth(fnt, s);
+                int rtlOffset = rtl ? -substrWidth : 0;
+                ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, s, x + rtlOffset, y);
+                x += (rtl ? -substrWidth : substrWidth);
             }
         } else {
             ng.nativeDrawString(ng.color, ng.alpha, fnt.peer, str, x, y);
