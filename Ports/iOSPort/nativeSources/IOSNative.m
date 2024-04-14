@@ -9931,6 +9931,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_S
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT javaString)
 {
+    POOL_BEGIN();
     NSString *string = toNSString(CN1_THREAD_STATE_PASS_ARG javaString);
     // Define Unicode ranges for Hebrew and Arabic
     NSRange hebrewRange = NSMakeRange(0x0590, 0x05FF - 0x0590 + 1);
@@ -9963,10 +9964,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_b
         // Return true if the character is within the Hebrew or Arabic Unicode ranges
         if ((c >= hebrewRange.location && c <= NSMaxRange(hebrewRange)) ||
             (c >= arabicRange.location && c <= NSMaxRange(arabicRange))) {
+            POOL_END();
             return YES;
         }
         // If the first significant character is not Hebrew or Arabic, return false
+        POOL_END();
         return NO;
     }
+
+    POOL_END();
     return NO;
 }
