@@ -2535,6 +2535,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT ua) {
+#ifdef ENABLE_SET_BROWSER_USER_AGENT
     NSString *_ua = toNSString(CN1_THREAD_GET_STATE_PASS_ARG ua);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2543,6 +2544,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
         [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];
         POOL_END();
     });
+#endif
 }
 
 
