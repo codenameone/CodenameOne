@@ -274,7 +274,7 @@ public class Capture {
                 if(scale != null) {
                     try {
                         
-                        String path = url.substring(0, url.indexOf(".")) + "s" + url.substring(url.indexOf("."));
+                        String path = url.substring(0, url.lastIndexOf(".")) + "s" + url.substring(url.lastIndexOf("."));
                         OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
                         scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
                         Util.cleanup(os);
