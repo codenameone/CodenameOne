@@ -83,6 +83,12 @@ public class BackgroundLocationBroadcastReceiver extends BroadcastReceiver {
             }
             if (ACTION_PROCESS_GEOFENCE_TRANSITIONS.equals(action)) {
                 GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
+                if(geofencingEvent == null) {
+                    // Attempt to workaround this issue: https://stackoverflow.com/questions/78497339/geofence-bug-in-codename-one-on-android
+                    Log.e(TAG, "Null geofencingEvent!");
+                    return;
+                }
+                
                 if (geofencingEvent.hasError()) {
                     String errorMessage = GeofenceStatusCodes
                             .getStatusCodeString(geofencingEvent.getErrorCode());
