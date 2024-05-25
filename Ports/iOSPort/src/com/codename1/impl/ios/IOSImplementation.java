@@ -929,6 +929,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         showToolbar = false;
                     }
                     if ( currentEditing != null ){
+                        int align = currentEditing.getStyle().getAlignment();
                         nativeInstance.editStringAt(x,
                                 y,
                                 w,
@@ -944,7 +945,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 hintColor,
                                 showToolbar, 
                                 Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
-                                currentEditing.getStyle().getAlignment(),
+                                DefaultLookAndFeel.reverseAlignForBidi(cmp, align),
                                 currentEditing.getVerticalAlignment());
                     }
                 }
