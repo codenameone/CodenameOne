@@ -1309,7 +1309,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * Reverses alignment in the case of bidi
      */
-    private int reverseAlignForBidi(Component c, int align) {
+    public static int reverseAlignForBidi(Component c, int align) {
         if(c.isRTL()) {
             switch(align) {
                 case Component.RIGHT:
