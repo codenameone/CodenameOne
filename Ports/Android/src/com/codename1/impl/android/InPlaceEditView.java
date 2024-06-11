@@ -34,6 +34,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
+import android.text.Selection;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -1018,6 +1019,12 @@ public class InPlaceEditView extends FrameLayout{
             // on a particular text field.
             mEditText.setCursorVisible(false);
         }
+
+	// Set to true if TextField should be selected automatically on focus
+        if (Boolean.TRUE.equals(textArea.getClientProperty("autoSelectOnFocus"))) {
+            Editable spannable = mEditText.getText();
+            Selection.setSelection(spannable, 0, spannable.length());
+        }
         
         /*
         // Leaving this hack here for posterity.  It seems that this manually
@@ -1104,10 +1111,13 @@ public class InPlaceEditView extends FrameLayout{
 
     private Component getNextComponent(Component curr) {
         Form f = curr.getComponentForm();
+        Component cmp = null;
         if (f != null) {
-            return f.getNextComponent(curr);
+            cmp = f.getNextComponent(curr);
+            if(cmp == null) // If TextField is last get next focus down Component
+                cmp = f.findNextFocusDown();
         }
-        return null;
+        return cmp;
     }
 
     /**
@@ -1216,7 +1226,7 @@ public class InPlaceEditView extends FrameLayout{
         Component next = null;
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
-            next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);
+            next = getNextComponent(mEditText.mTextArea);
             if (next != null) {
                 hasNext = true;
             }
@@ -2145,11 +2155,15 @@ public class InPlaceEditView extends FrameLayout{
             // If the user presses the back button, or the menu button
             // we must terminate editing, to allow EDT to handle events
             // again
-            if (keyCode == KeyEvent.KEYCODE_BACK
-                    || keyCode == KeyEvent.KEYCODE_MENU) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+            switch(keyCode) {
+                case KeyEvent.KEYCODE_BACK:
+                case KeyEvent.KEYCODE_MENU:
+                    endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+                    break;
+                case KeyEvent.KEYCODE_TAB:
+                    onEditorAction(EditorInfo.IME_ACTION_NEXT);
+                    break;
             }
-
             return super.onKeyDown(keyCode, event);
         }
 
