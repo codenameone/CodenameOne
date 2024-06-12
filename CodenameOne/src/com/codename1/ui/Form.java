@@ -4313,7 +4313,7 @@ public class Form extends Container {
      * on the currently focused component.  Failing that it will scan the form based on Y-coord.
      * @return 
      */
-    public Component findNextFocusDown() {
+    Component findNextFocusDown() {
         if (focused != null) {
             if (focused.getNextFocusDown() != null) {
                 return focused.getNextFocusDown();
