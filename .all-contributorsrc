@@ -364,6 +364,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "ImmediandoSrl",
+      "name": "ImmediandoSrl",
+      "avatar_url": "https://avatars.githubusercontent.com/u/172423330?v=4",
+      "profile": "https://github.com/ImmediandoSrl",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
@@ -372,5 +381,6 @@
   "repoType": "github",
   "repoHost": "https://github.com",
   "skipCi": true,
-  "commitConvention": "angular"
+  "commitConvention": "angular",
+  "commitType": "docs"
 }
