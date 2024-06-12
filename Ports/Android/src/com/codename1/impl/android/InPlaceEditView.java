@@ -1020,7 +1020,7 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setCursorVisible(false);
         }
 
-	// Set to true if TextField should be selected automatically on focus
+        // Set to true if TextField should be selected automatically on focus
         if (Boolean.TRUE.equals(textArea.getClientProperty("autoSelectOnFocus"))) {
             Editable spannable = mEditText.getText();
             Selection.setSelection(spannable, 0, spannable.length());
@@ -1111,13 +1111,10 @@ public class InPlaceEditView extends FrameLayout{
 
     private Component getNextComponent(Component curr) {
         Form f = curr.getComponentForm();
-        Component cmp = null;
         if (f != null) {
-            cmp = f.getNextComponent(curr);
-            if(cmp == null) // If TextField is last get next focus down Component
-                cmp = f.findNextFocusDown();
+            return f.getNextComponent(curr);
         }
-        return cmp;
+        return null;
     }
 
     /**
@@ -1226,7 +1223,7 @@ public class InPlaceEditView extends FrameLayout{
         Component next = null;
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
-            next = getNextComponent(mEditText.mTextArea);
+            next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);
             if (next != null) {
                 hasNext = true;
             }
@@ -2164,6 +2161,7 @@ public class InPlaceEditView extends FrameLayout{
                     onEditorAction(EditorInfo.IME_ACTION_NEXT);
                     break;
             }
+
             return super.onKeyDown(keyCode, event);
         }
 
