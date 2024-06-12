@@ -320,6 +320,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Wninayyds"><img src="https://avatars.githubusercontent.com/u/90488923?v=4?s=100" width="100px;" alt="Nina"/><br /><sub><b>Nina</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=Wninayyds" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/FercueNat"><img src="https://avatars.githubusercontent.com/u/113535859?v=4?s=100" width="100px;" alt="FercueNat"/><br /><sub><b>FercueNat</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=FercueNat" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ImmediandoSrl"><img src="https://avatars.githubusercontent.com/u/172423330?v=4?s=100" width="100px;" alt="ImmediandoSrl"/><br /><sub><b>ImmediandoSrl</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=ImmediandoSrl" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/davideprimasc"><img src="https://avatars.githubusercontent.com/u/159039808?v=4?s=100" width="100px;" alt="davideprimasc"/><br /><sub><b>davideprimasc</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=davideprimasc" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
