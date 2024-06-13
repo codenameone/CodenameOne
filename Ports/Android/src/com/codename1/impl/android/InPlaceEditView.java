@@ -1168,9 +1168,13 @@ public class InPlaceEditView extends FrameLayout{
                 && ((TextArea) mEditText.mTextArea).getDoneListener() != null
                 && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
             ((TextArea) mEditText.mTextArea).fireDoneEvent();
-
         }
-        
+
+	if (reason == REASON_IME_ACTION
+                && ((TextArea) mEditText.mTextArea).getUnknownListener() != null
+                && (actionCode == EditorInfo.IME_ACTION_UNSPECIFIED)) {
+            ((TextArea) mEditText.mTextArea).fireUnknownEvent(keyEvent);
+        }
 
         // Call this in onComplete instead
         //mIsEditing = false;
@@ -2156,6 +2160,9 @@ public class InPlaceEditView extends FrameLayout{
                 case KeyEvent.KEYCODE_BACK:
                 case KeyEvent.KEYCODE_MENU:
                     endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+                    break;  
+                case KeyEvent.KEYCODE_ESCAPE:
+                    endEditing(InPlaceEditView.REASON_IME_ACTION, false, true, 0, keyCode);
                     break;
                 case KeyEvent.KEYCODE_TAB:
                     onEditorAction(EditorInfo.IME_ACTION_NEXT);
@@ -2164,9 +2171,6 @@ public class InPlaceEditView extends FrameLayout{
 
             return super.onKeyDown(keyCode, event);
         }
-
-
-
     }
 
     public class MyPasswordTransformationMethod extends PasswordTransformationMethod {
