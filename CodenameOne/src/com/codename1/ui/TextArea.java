@@ -64,6 +64,7 @@ import java.util.ArrayList;
 public class TextArea extends Component implements ActionSource, TextHolder {
     private EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
+    private ActionListener unknownListener;
     
     private static int defaultValign = TOP;
 
@@ -2173,6 +2174,41 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
     
+    /**
+     * Sets a Unknown listener on the TextField
+     * 
+     * @param l the listener
+     */
+    public void setUnknownListener(ActionListener l) {
+        unknownListener = l;
+    }
+
+    /**
+     * Gets the unknown listener of this TextField.
+     * 
+     * @return the unknown listener or null if not exists
+     */ 
+    public ActionListener getUnknownListener() {
+        return unknownListener;
+    }
+    
+    /**
+     * Fire the done event to done listener
+     */ 
+    public void fireUnknwonEvent(int keyEvent) {
+        if (unknownListener != null) {
+            if (!Display.getInstance().isEdt()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    
+                    public void run() {
+                        fireUknwownEvent(keyEvent);
+                    }
+                });
+                return;
+            }
+            unknownListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Other, keyEvent));
+        }
+    }
 
     /**
      * Sets a Done listener on the TextField - notice this listener will be called
