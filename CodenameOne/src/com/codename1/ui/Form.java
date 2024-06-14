@@ -60,7 +60,7 @@ import java.util.Set;
  *
  * <p>Form contains a title bar area which in newer application is replaced by the {@link Toolbar}.
  * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form} 
- * delegates to the contenPane so calling {@code form.add(cmp)} is equivalent to 
+ * delegates to the contentPane so calling {@code form.add(cmp)} is equivalent to
  * {@code form.getContentPane().add(cmp)}. Normally this shouldn't matter, however in some cases such as
  * animation we need to use the content pane directly e.g. {@code form.getContentPane().animateLayout(200)}
  * will work whereas {@code form.animateLayout(200)} will fail. </p>
@@ -122,7 +122,7 @@ public class Form extends Container {
      */
     private Transition transitionInAnimator;
     /**
-     * This member allows us to define a an animation that will draw the transition for
+     * This member allows us to define an animation that will draw the transition for
      * exiting this form. A transition is an animation that would occur when 
      * switching from one form to another.
      */
