@@ -122,12 +122,7 @@ public class ActionEvent {
             /**
              * Fired on a {@link com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener)} action event
              */
-            Done,	
-
-            /**
-             * Fired on a {@link com.codename1.ui.TextField#setEscapeListener(com.codename1.ui.events.ActionListener)} action event
-             */
-            Escape,		
+            Done,		
             
             /**
              * Fired by the {@link com.codename1.javascript.JavascriptContext} 
