@@ -34,6 +34,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
+import android.text.Selection;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -1017,6 +1018,12 @@ public class InPlaceEditView extends FrameLayout{
             // just providing a client property to disable the blinking cursor
             // on a particular text field.
             mEditText.setCursorVisible(false);
+        }
+
+        // Set to true if TextField should be selected automatically on focus
+        if (Boolean.TRUE.equals(textArea.getClientProperty("autoSelectOnFocus"))) {
+            Editable spannable = mEditText.getText();
+            Selection.setSelection(spannable, 0, spannable.length());
         }
         
         /*
@@ -2145,9 +2152,14 @@ public class InPlaceEditView extends FrameLayout{
             // If the user presses the back button, or the menu button
             // we must terminate editing, to allow EDT to handle events
             // again
-            if (keyCode == KeyEvent.KEYCODE_BACK
-                    || keyCode == KeyEvent.KEYCODE_MENU) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+            switch(keyCode) {
+                case KeyEvent.KEYCODE_BACK:
+                case KeyEvent.KEYCODE_MENU:
+                    endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+                    break;
+                case KeyEvent.KEYCODE_TAB:
+                    onEditorAction(EditorInfo.IME_ACTION_NEXT);
+                    break;
             }
 
             return super.onKeyDown(keyCode, event);
