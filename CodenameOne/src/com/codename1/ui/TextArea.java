@@ -2196,21 +2196,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * Fire the done event to done listener
      */ 
-    public void fireDoneEvent() {
-        if (doneListener != null) {
-            if (!Display.getInstance().isEdt()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    
-                    public void run() {
-                        fireDoneEvent();
-                    }
-                });
-                return;
-            }
-            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
-        }
-    }
-    
     public void fireDoneEvent(int keyEvent) {
         if (doneListener != null) {
             if (!Display.getInstance().isEdt()) {
