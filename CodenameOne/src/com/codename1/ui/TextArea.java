@@ -64,6 +64,7 @@ import java.util.ArrayList;
 public class TextArea extends Component implements ActionSource, TextHolder {
     private EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
+    private ActionListener escapeListener;
     
     private static int defaultValign = TOP;
 
@@ -2208,6 +2209,44 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 return;
             }
             doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
+        }
+    }
+    
+    /**
+     * Sets an Escape listener on the TextField - notice this listener will be called
+     * only on supported platforms that supports escape action on the keyboard
+     *
+     * @param l the listener
+     */
+    public void setEscapeListener(ActionListener l) {
+        escapeListener = l;
+    }
+
+    /**
+     * Gets the escape listener of this TextField.
+     *
+     * @return the escape listener or null if not exists
+     */
+    public ActionListener getEscapeListener() {
+        return escapeListener;
+    }
+
+    /**
+     * Fire the escape event to escape listener
+     */
+    public void fireEscapeEvent() {
+        if (escapeListener != null) {
+            if (!Display.getInstance().isEdt()) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    public void run() {
+                        fireEscapeEvent();
+                    }
+                });
+                return;
+            }
+
+            escapeListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Escape));
         }
     }
 
