@@ -1025,7 +1025,12 @@ public class InPlaceEditView extends FrameLayout{
             Editable spannable = mEditText.getText();
             Selection.setSelection(spannable, 0, spannable.length());
         }
-        
+
+	// Set a color (int) to set background color to TextField on focus
+        if (textArea.getClientProperty("backgroundColorOnFocus") != null && textArea.getClientProperty("backgroundColorOnFocus") instanceof Integer)  {
+            mEditText.setBackgroundColor((Integer) textArea.getClientProperty("backgroundColorOnFocus"));
+        }
+	    
         /*
         // Leaving this hack here for posterity.  It seems that this manually
         // blinking cursor causes the paste menu to disappear
