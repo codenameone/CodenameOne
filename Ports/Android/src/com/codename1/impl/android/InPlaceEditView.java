@@ -1270,7 +1270,8 @@ public class InPlaceEditView extends FrameLayout{
                                         fNext.startEditingAsync();
                                     }
                                 });
-				fNext.requestFocus();
+				if(EditorInfo.IME_ACTION_NEXT == fActionCode)
+                                    fNext.requestFocus();
                             }
                         });
                     }
