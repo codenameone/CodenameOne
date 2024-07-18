@@ -1025,7 +1025,7 @@ public class InPlaceEditView extends FrameLayout{
             Editable spannable = mEditText.getText();
             Selection.setSelection(spannable, 0, spannable.length());
         }
-        
+	    
         /*
         // Leaving this hack here for posterity.  It seems that this manually
         // blinking cursor causes the paste menu to disappear
@@ -1258,7 +1258,7 @@ public class InPlaceEditView extends FrameLayout{
                     if (fHasNext && fNext != null) {
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
-                                final Form f = fNext.getComponentForm();
+				final Form f = fNext.getComponentForm();
                                 if (f == null) {
                                     return;
                                 }
@@ -1270,7 +1270,8 @@ public class InPlaceEditView extends FrameLayout{
                                         fNext.startEditingAsync();
                                     }
                                 });
-
+				if(EditorInfo.IME_ACTION_NEXT == fActionCode)
+                                    fNext.requestFocus();
                             }
                         });
                     }
