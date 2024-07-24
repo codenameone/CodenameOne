@@ -1025,7 +1025,7 @@ public class InPlaceEditView extends FrameLayout{
             Editable spannable = mEditText.getText();
             Selection.setSelection(spannable, 0, spannable.length());
         }
-        
+	    
         /*
         // Leaving this hack here for posterity.  It seems that this manually
         // blinking cursor causes the paste menu to disappear
@@ -1105,10 +1105,6 @@ public class InPlaceEditView extends FrameLayout{
         return mIsEditing && mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.contains(x, y);
     }
 
-    private synchronized void endEditing(int reason, boolean forceVKBOpen, int actionCode) {
-        endEditing(reason, forceVKBOpen, false, actionCode);
-    }
-
     private Component getNextComponent(Component curr) {
         Form f = curr.getComponentForm();
         if (f != null) {
@@ -1117,11 +1113,19 @@ public class InPlaceEditView extends FrameLayout{
         return null;
     }
 
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, int actionCode) {
+        endEditing(reason, forceVKBOpen, false, actionCode);
+    }
+
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
+	endEditing(reason, forceVKBOpen, false, actionCode, -1);
+    }
+
     /**
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
      */
-    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode, int keyEvent) {
         //if (cursorTimer != null) {
         //    cursorTimer.cancel();
         //}
@@ -1167,11 +1171,9 @@ public class InPlaceEditView extends FrameLayout{
         if (reason == REASON_IME_ACTION
                 && ((TextArea) mEditText.mTextArea).getDoneListener() != null
                 && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
-            ((TextArea) mEditText.mTextArea).fireDoneEvent();
-
+            ((TextArea) mEditText.mTextArea).fireDoneEvent(keyEvent);
         }
         
-
         // Call this in onComplete instead
         //mIsEditing = false;
         mLastEditText = mEditText;
@@ -1256,7 +1258,7 @@ public class InPlaceEditView extends FrameLayout{
                     if (fHasNext && fNext != null) {
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
-                                final Form f = fNext.getComponentForm();
+				final Form f = fNext.getComponentForm();
                                 if (f == null) {
                                     return;
                                 }
@@ -1268,7 +1270,8 @@ public class InPlaceEditView extends FrameLayout{
                                         fNext.startEditingAsync();
                                     }
                                 });
-
+				if(EditorInfo.IME_ACTION_NEXT == fActionCode)
+                                    fNext.requestFocus();
                             }
                         });
                     }
@@ -2156,6 +2159,12 @@ public class InPlaceEditView extends FrameLayout{
                 case KeyEvent.KEYCODE_BACK:
                 case KeyEvent.KEYCODE_MENU:
                     endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
+                    break;
+                case KeyEvent.KEYCODE_ENTER:
+                    onEditorAction(EditorInfo.IME_ACTION_DONE);
+                    break;
+                case KeyEvent.KEYCODE_ESCAPE:
+                    endEditing(InPlaceEditView.REASON_IME_ACTION, false, true, EditorInfo.IME_ACTION_DONE, keyCode);
                     break;
                 case KeyEvent.KEYCODE_TAB:
                     onEditorAction(EditorInfo.IME_ACTION_NEXT);
