@@ -761,11 +761,11 @@ public class InteractionDialog extends Container {
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
-            if(availableHeight < (availableWidth - rect.getWidth()) / 2) {
+            if(availableHeight < prefHeight && availableHeight < (availableWidth - rect.getWidth()) / 2) {
                 showPortrait = false;
             }
         } else {
-            if(availableHeight / 2 > availableWidth - rect.getWidth()) {
+            if(availableWidth < prefWidth && availableHeight / 2 > availableWidth - rect.getWidth()) {
                 showPortrait = true;
             }
         }
