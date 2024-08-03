@@ -436,8 +436,19 @@ public class AndroidGradleBuilder extends Executor {
     private String getGradleJavaHome() throws BuildException {
         if (useGradle8) {
             String home =  System.getenv("JAVA17_HOME");
+            if (home == null && (home = getLocalBuilderProperties().getProperty("java17.home", null)) != null) {
+                if (!(new File(home)).isDirectory()) {
+                    throw new BuildException("The java17.home property is not set to a valid directory.  " +
+                            "You have defined it in your ~/.codenameone/local.properties file, " +
+                            "but it is not a valid directory."
+                    );
+                }
+            }
             if (home == null) {
-                throw new BuildException("When using gradle 8, you must set the JAVA17_HOME environment variable to the location of a Java 17 JDK");
+                throw new BuildException(
+                        "When using gradle 8, " +
+                                "you must set the JAVA17_HOME environment variable to the location of a Java 17 JDK"
+                );
             }
 
             if (!(new File(home).isDirectory())) {
@@ -448,7 +459,6 @@ public class AndroidGradleBuilder extends Executor {
         }
         return System.getProperty("java.home");
     }
-
     private int parseVersionStringAsInt(String versionString) {
         if (versionString.indexOf(".") > 0) {
             try {
@@ -3526,6 +3536,10 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (buildToolsVersion.startsWith("33")) {
             compileSdkVersion = "33";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("34")) {
+            compileSdkVersion = "34";
             supportLibVersion = "28";
         }
         jcenter =

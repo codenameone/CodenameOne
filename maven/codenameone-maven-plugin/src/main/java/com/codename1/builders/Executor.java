@@ -99,7 +99,7 @@ public abstract class Executor {
     static boolean IS_MAC;
     protected final Map<String,String> defaultEnvironment = new HashMap<String,String>();
 
-
+    private Properties localBuilderProperties;
 
 
     protected File codenameOneJar;
@@ -2077,9 +2077,6 @@ public abstract class Executor {
         }
     }
 
-
-
-
     private ClassLoader getCodenameOneJarClassLoader() throws IOException {
         if (codenameOneJar == null) {
             throw new IllegalStateException("Must set codenameOneJar in Executor");
@@ -2087,5 +2084,35 @@ public abstract class Executor {
         return new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()});
     }
 
+    /**
+     * Loads global local builder properties from user's home directory.
+     * @return
+     * @throws IOException
+     */
+    protected Properties getLocalBuilderProperties() {
+        if (localBuilderProperties == null) {
+            String sep = File.separator;
+            File propertiesFile = new File(
+                    System.getProperty("user.home") + sep + ".codenameone" + sep + "local.properties"
+            );
+            localBuilderProperties = new Properties();
+            if (!propertiesFile.exists()) {
+                return localBuilderProperties;
 
+            }
+            try {
+                FileInputStream fis = new FileInputStream(propertiesFile);
+                try {
+                    localBuilderProperties.load(fis);
+                } finally {
+                    fis.close();
+                }
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to load local properties", ex);
+            }
+        }
+
+        return localBuilderProperties;
+
+    }
 }
